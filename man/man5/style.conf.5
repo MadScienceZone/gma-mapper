@@ -1,0 +1,356 @@
+'\" vim:set syntax=nroff:
+'\" <<ital-is-var>>
+'\" <<bold-is-fixed>>
+.TH STYLE.CONF 5 "GMA Toolkit 4.3.7" 17-Jul-2021 "File Formats" \" @@mp@@
+.SH NAME
+style.conf \- GMA GUI Style Configuration File
+.SH DESCRIPTION
+.LP
+The
+.BR mapper (6)
+battle grid program, along with other GUI tools such as
+.BR initiative-clock (6),
+use colors and fonts to indicate a number of things on their displays.
+The
+.B style.conf
+file described here allows the user to customize any or all of these
+settings. This file may be specified to the application using command-line
+options. Otherwise, if the file
+.B ~/.gma/mapper/style.conf
+exists, it will be read by default. See the manpage entries for the
+individual programs for details.
+.LP
+The overall format of this file is that of a classic Windows INI file;
+that is, the file is divided into named stanzas. Within each stanza is
+a set of named values, one per line.
+.LP
+Each stanza begins with a line containing only the stanza name in square
+brackets.
+Each value is defined by a line that begins with the value name, followed
+by an equals sign, followed by the value itself.
+.SS "Tool Stanzas"
+.LP
+A stanza with the name of a GMA tool defines the style settings for that
+tool. Currently-supported tool names (i.e., the names of these stanzas)
+include just
+.RB \*(lq mapper \*(rq.
+The tool-name stanza may include the following definitions:
+'\" <<desc>>
+.TP 16
+.BI fonts= stanza
+Specifies the stanza which defines the custom fonts to be used by this program.
+.TP
+.BI dierolls= stanza
+Specifies the stanza which defines the custom styling to be used for die roll displays.
+'\" <</>>
+.SS "Font Definitions"
+.LP
+A font definition stanza defines named fonts with lines of the form
+.RS
+.IB fontname = definition
+.RE
+.LP
+The definition of the font is provided by giving option-value pairs. You need only
+provide the options which differ from the default for a given font for your system.
+If the value in any of these pairs contains spaces, it must be enclosed in curly
+braces. Options and values are separated from each other with whitespace.
+.LP
+The available options are:
+'\" <<desc>>
+.TP 12
+.B \-family
+The name of the font. The underlying Tk system provides the family names
+.BR Courier ,
+.BR Helvetica ,
+and
+.BR Times ,
+which are representative names for a fixed-width, sans serif, and serifed font, respectively;
+these may not necessarily be fonts with those exact names. You may also use the name of any
+font known on your system. This name is case-insensitive.
+.TP 
+.B \-size
+The size in points of the font, if a positive value. If negative, its absolute value
+specifies the font size in pixels.
+.TP
+.B \-weight
+One of
+.B normal 
+or
+.BR bold .
+.TP
+.B \-slant
+One of
+.B roman
+or 
+.BR italic .
+.TP
+.B \-underline
+A boolean value; if true, characters drawn in this font will be underlined.
+.TP
+.B \-overstrike
+A boolean value; if true, characters drawn in this font will have a line struck through
+their centers. Note that there is a style setting (q.v.) which will specify overstriking
+for a specific display type. This is generally preferred to setting it font-wide so the same
+font may be used for values which are overstruck and for others which are not.
+'\" <</>>
+.LP
+Example:
+'\" <<TeX>>
+'\" \begin{SourceCode}
+'\" [mapper]
+'\" fonts=myfonts
+'\" [myfonts]
+'\" hack=-family Hack -size 12
+'\" fancy=-family {Fancy Script Regular} -size 24 -slant italic
+'\" \end{SourceCode}
+.RS
+.na
+.nf
+.B [mapper]
+.B fonts=myfonts
+.B [myfonts]
+.B "hack=\-family Hack \-size 12"
+.B "fancy=\-family {Fancy Script Regular} \-size 24 \-slant italic"
+.fi
+.ad
+.RE
+'\" <</TeX>>
+.SS "Die Roll Style Stanzas"
+.LP
+There are a number of die roll reporting styles in effect to display the various
+elements that make up a report of a die roll result. The color and font of each
+may be controlled by entries in this stanza. Any not provided in this stanza will assume
+their built-in default values.
+'\" <<desc>>
+.TP 24
+.BI bg_ element = color
+Sets the color drawn behind text for the die-roll element named.
+.TP
+.BI bg_list_even= color
+Sets the background color for even-numbered entries in the recent and preset die roll lists.
+.TP
+.BI bg_list_odd= color
+Sets the background color for odd-numbered entries in the recent and preset die roll lists.
+.TP
+.BI default_font= name
+Use the user-defined font
+.I name
+for all element fonts where no explicit
+.BI font_ element
+assignment exists in this file.
+.TP
+.BI fg_ element = color
+Sets the color of the text for the die-roll element named.
+.TP
+.BI fmt_ element = string
+Specifies the formatting to be used for the reported
+.IR element .
+By default, some descriptive punctuation, spacing, and text are presented
+around the variable values being reported. If these are not how you would
+like those elements to be shown, specify your own string in this configuration
+value. The
+.I string
+is a 
+.BR printf (3)-style
+format string, with a 
+.RB \*(lq %s \*(rq
+at the location you would like the data item(s) to appear.
+.RS
+'\" <</>>
+.LP
+Since whitespace is allowed around the keys and values in an INI file, which is
+automatically ignored, a mechanism is provided to allow your format string to explicitly
+contain leading and/or trailing spaces. If your format string (excluding any leading or trailing
+spaces) begins or ends with a vertical bar (\*(lq|\*(rq), the bar(s) mark the explicit end(s)
+of the string value. Thus, given the configuration file lines:
+'\" <<TeX>>
+'\" \begin{SourceCode}
+'\" fmt_a=  (%s)
+'\" fmt_b=| (%s) |
+'\" fmt_c=| (%s)
+'\" fmt_d=  (%s) |
+'\" \end{SourceCode}
+.RS
+.nf
+.na
+.B "fmt_a=  (%s)  "
+.B "fmt_b=| (%s) |"
+.B "fmt_c=| %s"
+.B "fmt_d= %s |"
+.ad
+.fi
+.RE
+'\" <</TeX>>
+the resulting format string for element
+.B a
+will be 
+.RB \*(lq (%s) \*(rq 
+(with all spaces stripped); the format for
+.B b
+will have a space before and after the 
+.B (%s) 
+part;
+.B c
+will have a space before its content; and
+.B d
+will have a space after its content.
+.RE
+'\" <<desc>>
+.TP 26
+.BI font_ element = name
+Sets the font used for the die-roll element named. This font name must be defined in
+the selected font definition stanza in this file.
+.TP
+.BI offset_ element = delta
+Display the text of this element
+.I delta
+pixels higher than the baseline of the surrounding text. The
+.I delta
+value may be negative to lower the text.
+.TP
+.BI overstrike_ element = bool
+A boolean value; if true, text for this element will have a line struck through it.
+.TP
+.BI underline_ element = bool
+A boolean value; if true, text for this element will be underlined.
+'\" <</>>
+.LP
+The
+.I element
+names may be
+.BR best ,
+.BR bonus ,
+.BR constant ,
+.BR critlabel ,
+.BR critspec ,
+.BR dc ,
+.BR diebonus ,
+.BR diespec ,
+.BR discarded ,
+.BR exceeded ,
+.BR fail ,
+.BR fullmax ,
+.BR iteration ,
+.BR label ,
+'\" .BR limit ,
+.BR max ,
+.BR maximized ,
+.BR maxroll ,
+.BR met ,
+.BR min ,
+.BR moddelim ,
+.BR operator ,
+.BR repeat ,
+.BR result ,
+.BR roll ,
+.BR separator ,
+.BR short ,
+.BR success ,
+.BR until ,
+or
+.BR worst ,
+the meanings of which are described in
+.BR dice (3).
+In addition, the elements
+.B fullresult 
+and
+.B title 
+control the display of the overall total and user-assigned title for the die roll,
+.B comment
+describes comments about the die roll from the server,
+.B system
+is for system-generated messages,
+and the elements
+.BR from ,
+.BR normal ,
+and
+.B to 
+control the appearance of chat messages generally.
+.LP
+A
+.I color
+value may be the name of a color as known to the system (e.g., listed in
+the X11 
+.I rgb.txt
+file), such as
+.RB \*(lq "alice blue" \*(rq 
+or
+.RB \*(lq PaleGreen4 \*(rq,
+or a hexadecimal color value in the format
+.BI # rgb \fR,\fP
+.BI # rrggbb \fR,\fP
+.BI # rrrgggbbb \fR,\fP
+or
+.BI # rrrrggggbbbb \fR.\fP
+System-defined names such as
+.RB \*(lq systemActiveAreaFill \*(rq 
+(macOS) and
+.RB \*(lq system3dLight \*(rq 
+(Windows) are also recognized where available. The X11 names are typically
+implemented by the underlying frameworks even on non-Unix-like systems so they
+are generally usable everywhere.
+.LP
+Example:
+'\" <<TeX>>
+'\"\begin{SourceCode}
+'\"; This is an example style.conf file which
+'\"; shows how to customize the mapper tool.
+'\"[mapper]
+'\"dierolls=mydice
+'\"fonts=myfonts
+'\"
+'\"[mydice]
+'\"fg_fullresult=red
+'\"font_fullresult=hack
+'\"fmt_roll=(rolled {%s})
+'\"
+'\"[myfonts]
+'\"hack=\-family Hack -size 12 -weight bold
+'\"\end{SourceCode}
+.RS
+.nf
+.na
+.B "; This is an example style.conf file which"
+.B "; shows how to customize the mapper tool."
+.B [mapper]
+.B dierolls=mydice
+.B fonts=myfonts
+.B ""
+.B [mydice]
+.B fg_fullresult=red
+.B font_fullresult=hack
+.B "fmt_roll=(rolled {%s})"
+.B ""
+.B [myfonts]
+.B "hack=\-family Hack \-size 12 \-weight bold"
+.ad
+.fi
+.RE
+'\" <</TeX>>
+.SH HISTORY
+.LP
+This feature appeared in version 3.33 of the mapper tool.
+.SH AUTHOR
+.LP
+Steve Willoughby / steve@madscience.zone.
+.SH "SEE ALSO"
+.LP
+.BR dice (3).
+.SH BUGS
+.LP
+The Tcl library support for reading INI files isn't as enhanced as the one in the Python
+library, so since the mapper uses this configuration file it needs to conform to the simpler
+rules supported by the Tcl library: no multi-line values, keys and values separated only
+by an equals sign, and only supports 
+.RB \*(lq ; \*(rq 
+as the comment character.
+.LP
+Since this is (eventually) intended to apply to more tools than the mapper,
+this really should have been located in
+.B ~/.gma
+instead of
+.BR ~/.gma/mapper .
+A future version will either move the default location or search both directories.
+
+.SH COPYRGHT
+Part of the GMA software suite, copyright \(co 1992\-2021 by Steven L. Willoughby (Software Alchemy), Aloha, Oregon, USA. All Rights Reserved. Distributed under BSD-3-Clause License. \"@m(c)@

@@ -1,0 +1,155 @@
+.\" vim:set syntax=nroff:
+'\" <<bold-is-fixed>>
+'\" <<ital-is-var>>
+.TH GMAUTIL 3 "GMA Toolkit 4.3.7" 17-Jul-2021 "API Functions" \" @@mp@@
+.SH NAME
+gmautil \- General Tcl Utility Routines
+.SH SYNOPSIS
+'\" <<usage>>
+.na
+(If package installed globally)
+.br
+.B package
+.B require
+.B gmautil
+.LP
+(Otherwise)
+.br
+.B source
+.B gmautil.tcl
+.LP
+.B ::gmautil::is_git
+.I path
+.LP
+.B ::gmautil::verify
+.I data
+.I signature
+.LP
+.B ::gmautil::version_compare
+.I v1
+.I v2
+.LP
+.B ::gmautil::upgrade
+.I destination
+.I tmp
+.I url
+.I file
+.I old
+.I new
+.I strip
+.I launch
+.I msg
+.I proxy
+.I curl
+.ad
+'\" <</usage>>
+.SH DESCRIPTION
+.LP
+This module provides a set of miscellaneous utility functions that could be
+useful to more than one part of the overall product suite.
+'\" <<list>>
+.TP 10
+.BI "::gmautil::is_git " path
+Returns true if the directory
+.I path
+resides inside a Git working directory tree.
+.TP
+.BI "::gmautil::verify " data " " signature
+Given a binary data string
+.IR data ,
+return true if the binary cryptographic signature
+in
+.I signature
+is valid for that data. This uses our built-in
+product public key.
+.TP
+.BI "::gmautil::version_compare " v1 " " v2
+Compares two version number strings to see which order they should go in, chronologically.
+Each string must consist of one or more integers (as ASCII digit sequences) separated by dots.
+The first such number is the most significant (major) version, the next is the next-most significant
+sub-version within the major one, and so forth. Thus, 1.2 comes before 1.10, 2.2.4 comes before 2.3, etc.
+Returns 0 if 
+.I v1
+and
+.I v2
+are equal or equivalent, a number <0 if
+.IR v1 < v2
+(i.e.,
+.I v1
+comes before
+.IR v2 ), 
+or a number >0 if
+.IR v1 > v2 .
+.TP
+.BI "::gmautil::upgrade " destination " " tmp " " url " " file " " old " " new " " strip " " launch " " msg " " proxy " " curl
+This function facilitates automatic upgrades within an application. The application is downloaded using the CURL
+program whose pathname is given in
+.I curl
+(using a proxy server as specified by 
+.I proxy
+if that value is non-empty).
+The file itself is obtained from the server directory indicated by the
+.I url
+value, with the base filename
+.I file
+and suffix
+.B .tar.gz
+and 
+.B .tar.gz.sig
+(the latter being a cryptographic signature verifying the authenticity of the compressed
+tar file).
+These files are downloaded to the temporary directory
+.IR tmp .
+.RS
+.LP
+Once the files are downloaded, the signature is checked, and then the files are extracted
+into the destination diretory
+.IR destination ,
+although a leading
+.I strip
+(possibly prefixed with
+.BR ./ )
+is removed from the names as they exist in the tar file.
+.LP
+The tar file is expected to contain a manifest file in its top-level directory, called
+.BR __checksums__ .
+Each line of this file consists of a SHA256 checksum in hex, whitespace, a type character
+(space for text files, 
+.B *
+for binary files,
+.B ?
+for portable-newline files, or
+.B ^
+for BITS files), then the path of the file.
+Only binary files are supported at this time. Every file extracted from the archive
+must have an entry in this manifest file, and the installed file's checksum must match
+the manifest entry.
+.LP
+Once that is all accomplished, the downloaded files are removed and, if
+.I launch
+is non-empty, the program will attempt to start the program 
+.I launch
+relative to
+.I destination
+and then the calling program is terminated.
+.LP
+.I old
+and 
+.I new
+are the current and to-be-installed version numbers. Warnings will be issued before
+downgrading. The routine will refuse to continue if the versions are equal to each other.
+.RE
+'\" <</>>
+.SH DIAGNOSTICS
+.LP
+An exception is thrown if a serious error is encountered.
+.SH "SEE ALSO"
+.BR openssl (1).
+.SH AUTHOR
+.LP
+Steve Willoughby / steve@madscience.zone.
+.SH HISTORY
+.LP
+Initial version created 17 July 2020.
+.SH COPYRGHT
+Part of the GMA software suite, copyright \(co 1992\-2021 by Steven L. Willoughby (Software Alchemy), Aloha, Oregon, USA. All Rights Reserved. Distributed under BSD-3-Clause License. \"@m(c)@

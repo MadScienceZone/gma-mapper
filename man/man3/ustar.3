@@ -1,0 +1,207 @@
+.\" vim:set syntax=nroff:
+'\" <<bold-is-fixed>>
+'\" <<ital-is-var>>
+.TH USTAR 3 "GMA Toolkit 4.3.7" 17-Jul-2021 "API Functions" \" @@mp@@
+.SH NAME
+ustar \- Pure Tcl USTAR Archive Reader
+.SH SYNOPSIS
+'\" <<usage>>
+.na
+(If package installed globally)
+.br
+.B package
+.B require
+.B ustar
+.LP
+(Otherwise)
+.br
+.B source
+.B ustar.tcl
+.LP
+.B ::ustar::contents
+.I stream
+.LP
+.B ::ustar::file_contents
+.I path
+.LP
+.B ::ustar::gzip_contents
+.I path
+.LP
+.B ::ustar::extract
+.I stream
+.I callback
+.LP
+.B ::ustar::file_extract
+.I path
+.I callback
+.LP
+.B ::ustar::gzip_extract
+.I path
+.I callback
+.LP
+.B ::ustar::format_contents
+.I contents
+.ad
+'\" <</usage>>
+.SH DESCRIPTION
+.LP
+This module provides a simple interface for reading USTAR archive files, to either
+enumerate their contents or extract them completely.
+The following procedures are provided.
+'\" <<list>>
+.TP 10
+.BI "::ustar::contents " stream
+Scan the archive by reading data from
+.I stream
+(which must be a stream channel open in binary mode).
+The stream is not closed at the end of the operation.
+This returns a list of metadata values, one per file, in the order
+in which they appear in the archive. Each is a list of 13 values:
+.RS
+'\" <<desc>>
+.TP 12
+.I size
+The length, in bytes, of the file. Things without lengths (such as directories) will
+have a zero in this field.
+.TP
+.I type
+The file type. This is a single character exactly as found in the USTAR header field.
+A null byte or ASCII
+.B 0
+digit indicates a regular file. Other than null, the type characters will be ASCII alphanumeric
+characters. A 
+.B 1
+indicates the file is a hard link to another file already recorded in the archive. A
+.B 2
+indicates that this entry describes a symbolic link. Types
+.BR 3 ,
+.BR 4 ,
+.BR 5 ,
+and
+.B 6 
+indicate character devices, block devices, directories, and FIFOs respectively.
+Other type values may be used to designate vendor-specific custom types of files.
+.TP
+.I name
+The full pathname of the file. This might contain arbitrary Unicode characters.
+.TP
+.I mode
+The binary file mode as described in
+.BR lstat (2).
+.TP
+.I uid
+The numeric user ID of the file's owner.
+.TP
+.I uname
+If provided in the archive, the user name of the file's owner.
+.TP
+.I gid
+The numeric group ID of the file's owner.
+.TP
+.I gname
+If provided in the archive, the group name of the file's owner.
+.TP
+.I mtime
+The file's modification time as a UNIX 
+.B time_t
+value. If the archive supports it, this may be a floating-point value
+giving fractional seconds.
+.TP
+.I link
+For links, this is the pathname of the file being linked to.
+.TP
+.I major
+For devices, this is the numeric major device number. Otherwise zero.
+.TP
+.I minor
+For devices, this is the numeric minor device number. Otherwise zero.
+.TP
+.I attrs
+If any extended attributes were given for the file, they are listed here. This is
+a list with an even number of elements, which are taken in pairs as the name of the
+attribute followed by its value. These are completely arbitrary. Any which map directly
+to the above metadata fields are automatically updated in the other fields, but regardless
+of that, the entire extended attribute set appears here.
+'\" <</>>
+.RE
+.TP
+.BI "::ustar::file_contents " path
+As an convenience function, this opens
+.I path
+as a binary file and then calls
+.B contents
+on it, returning the result.
+This does close the file when finished reading from it.
+.TP
+.BI "::ustar::gzip_contents " path
+As with
+.B file_contents 
+but decompresses the data as described for
+.B gzip_extract
+below.
+.TP
+.BI "::ustar::extract " stream " " callback
+This reads the archive data from the open binary file stream channel
+.I stream
+like the
+.B contents
+procedure does, but it also extracts the actual file data in addition to
+the metadata for each file. As each file is read, the supplied
+.I callback
+procedure is invoked to handle the disposition of the file's data, so the
+caller can decide whether to process the data in-memory or save it somewhere,
+perhaps after other processing takes place.
+The callback is invoked with two arguments: the metadata as already described
+above for the
+.B contents
+procedure, and the binary data of the file itself.
+.TP
+.BI "::ustar::file_extract " path " " callback
+As an convenience function, this opens
+.I path
+as a binary file and then calls
+.B extract
+on it, saving the caller from the trouble of opening and closing
+the archive.
+.TP
+.BI "::ustar::gzip_extract " path " " callback
+As with
+.B file_extract
+but also decompresses the contents of
+.I path
+while reading from it. This uses a 
+.BR gzip (1)-compatible
+decompresion suitable for tar archives created with
+.BR tar "'s"
+.B \-z
+option.
+.TP
+.BI "::ustar::format_contents " contents
+Given a list of metadata values exactly as returned by the
+.B contents
+procedure, this returns a multi-line string with that information
+formatted in a human-readable presentation. Not all extended attributes
+are included.
+'\" <</>>
+.SH DIAGNOSTICS
+.LP
+An exception is thrown if the archive is unable to be processed for reasons such as unexpected end of file, 
+unparseable header fields, checksum verification failures, etc.
+.SH "SEE ALSO"
+.BR gzip (1),
+.BR lstat (2),
+.BR pax (1),
+.BR tar (1).
+.SH AUTHOR
+.LP
+Steve Willoughby / steve@madscience.zone.
+.SH HISTORY
+.LP
+Initial version created 16 July 2020.
+.SH BUGS
+.LP
+Does not support base-256-encoded numeric values in headers, nor global extended header blocks.
+Neither of those is commonly found enough to prioritize implementation but that may change in the
+future.
+.SH COPYRGHT
+Part of the GMA software suite, copyright \(co 1992\-2021 by Steven L. Willoughby (Software Alchemy), Aloha, Oregon, USA. All Rights Reserved. Distributed under BSD-3-Clause License. \"@m(c)@

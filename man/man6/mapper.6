@@ -1,0 +1,3286 @@
+.\" vim:set syntax=nroff:
+.\" *** 332 ***
+'\" <<ital-is-var>>
+'\" <<bold-is-fixed>>
+.TH MAPPER 6 "GMA Toolkit 4.3.7" 17-Jul-2021 "Games" \" @@mp@@
+.SH NAME
+mapper \- GMA battle grid map
+.SH SYNOPSIS
+'\" <<usage>>
+.na
+.B gma
+.B mapper
+.B \-\-
+.B \-\-help
+.LP
+.B gma
+.B mapper
+.RB [ \-display
+.IR name ]
+.RB [ \-geometry
+.IR value ]
+.RI [ "other wish options" ]
+.B \-\-
+.RB [ \-A ]
+.RB [ \-a ]
+.RB [ \-B ]
+.RB [ \-b
+.IR pct ]
+.RB [ \-C
+.IR file ]
+.RB [ \-c
+.RI [ image\fB=\fP ] name [\fB:\fP color ]]
+.RB [ \-D ]
+.RB [ \-d ]
+.RB [ \-G
+.IR n [\fB+\fP x [\fB:\fP y ]]]
+.RB [ \-g
+.IR n [\fB+\fP x [\fB:\fP y ]]]
+.RB [ \-h
+.IR hostname ]
+.RB [ \-k ]
+.RB [ \-l ]
+.RB [ \-M
+.IR module ]
+'\".RB [ \-m ]
+.RB [ \-n ]
+.RB [ \-P
+.IR pass ]
+.RB [ \-p
+.IR port ]
+.RB [ \-s
+.IR file ]
+.RB [ \-t
+.IR transcript ]
+.RB [ \-u
+.IR name ]
+.RB [ \-X
+.IR proxyhost ]
+.RB [ \-x
+.IR proxyurl ]
+.RB [ \-\-button\-size
+.BR small | medium | large ]
+.RB [ \-\-curl\-path
+.IR path ]
+.RB [ \-\-curl\-url\-base
+.IR url ]
+.RB [ \-\-dark ]
+.RB [ \-\-mkdir\-path
+.IR path ]
+.RB [ \-\-nc\-path
+.IR path ]
+.RB [ \-\-no\-blur\-all ]
+.RB [ \-\-scp\-dest
+.IR path ]
+.RB [ \-\-scp\-path
+.IR path ]
+.RB [ \-\-scp\-server
+.IR hostname ]
+.RB [ \-\-ssh\-path
+.IR path ]
+.RB [ \-\-update\-url
+.IR url ]
+.RI [ mapfiles... ]
+.LP
+.B gma
+.B mapper
+.RB [ \-display
+.IR name ]
+.RB [ \-geometry
+.IR value ]
+.RI [ "other wish options" ]
+.B \-\-
+.RB [ \-\-animate ]
+.RB [ \-\-no\-animate ]
+.RB [ \-\-blur\-all ]
+.RB [ \-\-no\-blur\-all ]
+.RB [ \-\-blur\-hp
+.IR pct ]
+.RB [ \-\-button\-size
+.BR small | medium | large ]
+.RB [ \-\-config
+.IR file ]
+.RB [ \-\-character
+.RI [ image\fB=\fP ] name [\fB:\fP color ]]
+.RB [ \-\-chat\-history
+.IR n ]
+.RB [ \-\-curl\-path
+.IR path ]
+.RB [ \-\-curl\-url\-base
+.IR url ]
+.RB [ \-\-dark ]
+.RB [ \-\-debug ]
+.RB [ \-\-generate\-config
+.IR path ]
+.RB [ \-\-generate\-style\-config
+.IR path ]
+.RB [ \-\-guide
+.IR n [\fB+\fP x [\fB:\fP y ]]]
+.RB [ \-\-host
+.IR hostname ]
+.RB [ \-\-keep\-tools ]
+.RB [ \-\-major
+.IR n [\fB+\fP x [\fB:\fP y ]]]
+'\".RB [ \-\-master ]
+.RB [ \-\-mkdir\-path
+.IR path ]
+.RB [ \-\-module
+.IR module ]
+.RB [ \-\-nc\-path
+.IR path ]
+.RB [ \-\-no\-chat ]
+.RB [ \-\-password
+.IR pass ]
+.RB [ \-\-port
+.IR port ]
+.RB [ \-\-preload ]
+.RB [ \-\-proxy\-host
+.IR proxyhost ]
+.RB [ \-\-proxy\-url
+.IR proxyurl ]
+.RB [ \-\-scp\-dest
+.IR path ]
+.RB [ \-\-scp\-path
+.IR path ]
+.RB [ \-\-scp\-server
+.IR hostname ]
+.RB [ \-\-ssh\-path
+.IR path ]
+.RB [ \-\-style
+.IR file ]
+.RB [ \-\-transcript
+.IR filename ]
+.RB [ \-\-update\-url
+.IR url ]
+.RB [ \-\-username
+.IR name ]
+.RI [ mapfiles... ]
+.ad
+'\" <</usage>>
+.LP
+Options cannot be combined into a single CLI argument.
+They are evaluated in the order they are received.
+While not recommended (nor guaranteed to always be the case), it happens that
+options specified after 
+.IR mapfile s 
+will affect only 
+.IR mapfile s 
+named following those
+later options. Thus, if a
+.I mapfile
+has a name beginning with a hyphen, it is necessary to specify it in some
+sneaky way, such as prefixing it with a 
+.RB \*(lq ./ \*(rq.
+.LP
+(Depending on your system, you may need to run as
+.B wish
+.B mapper.tcl
+\&...)
+.SH DESCRIPTION
+.LP
+The
+.B mapper
+program displays a battle grid map for the players to see their tactical positions
+with respect to their opponents and features of their environment (e.g., dungeon
+rooms).
+.LP
+If one or more map file names are listed on the command line, those files are loaded
+into the grid display.  Otherwise, a blank map grid is shown.  Map files may subsequently
+be loaded via interactive commands or upon request from a control service (see the
+.B \-h
+option and \*(lqControl Protocol\*(rq section, below).
+.LP
+See notes at the bottom of this manpage for installation requirements.
+.SH "HELPER PROGRAMS"
+.LP
+The
+.B mapper
+client makes use of a few other programs to facilitate the efficient handling
+of data transfers. These are only used if the client is working in networked mode rather
+than as a stand-alone map drawing program.
+'\" <<desc>>
+.TP
+.B curl
+Assuming the GM (or whomever is administrating the map assets) has arranged for a web server
+to host content for the map, the
+.B mapper
+client will invoke the
+.BR curl (1)
+program to actually retrieve the files from that server. If needed, you will need to provide
+options and/or configuration file parameters as documented below to let
+.B mapper
+know where to find the 
+.B curl
+binary and what options it needs to find the web server, navigate through proxy servers, etc.
+.TP
+.B scp
+For users with privileges to
+'\" <</ital-is-var>>
+.I store
+'\" <<ital-is-var>>
+data on the web server (generally, this would be the GM or other designated administrative users,
+not the general player group), 
+.B mapper
+will invoke
+.BR scp (1)
+to copy new data files up to the server. For example, in store-and-forward mode, when opening
+a local data file or pushing map contents out to other clients, 
+.B mapper
+checks to see if the server has the data file(s) available for everyone to download. If not,
+it will use
+.B scp
+to upload them to the server before sending out a command to peer clients to retrieve them.
+.RS
+.LP
+This requires that the user is authorized to perform this action on the remote server.
+Usually this is done by having an SSH certificate loaded via
+.BR ssh-agent (1)
+and the server set up to recognize that for the needed operations without requiring a
+password to be manually entered.
+.RE
+.TP
+.B ssh
+Along with the use of
+.B scp
+to transfer new data to the web server, 
+.B mapper
+will use
+.BR ssh (1)
+to create directories and set file permissions as needed on the server for the content being
+uploaded. 
+'\" <</>>
+.SH OPTIONS
+.LP
+The following options control the behavior of
+.BR mapper .
+'\" <<list>>
+.TP 16
+.BR \-A , \-\-no\-animate
+Suppress the animation effects enabled by the 
+.B \-a
+.RB ( \-\-animate )
+option. This is the default, so it only needs to be given to cancel an
+.B \-a
+option which appeared previously or which was read from a configuration file.
+.TP
+.BR \-a , \-\-animate
+This option causes
+the mapper to make a lame attempt to \*(lqanimate\*(rq the appearance
+of objects being drawn onto the screen by updating the display after each one.
+(The author was feeling oddly nostalgic about working with the Tektronix storage-screen
+computer displays of his childhood at the time. If you don't know what that means, go
+watch an episode of the 1970s-era Battlestar Galactica and look at most of their
+computer screens.)
+.TP
+.BR \-B , \-\-blur\-all
+Normally, the imprecision introduced to health bar displays by the 
+.B \-b
+.RB ( \-\-blur\-hp )
+option applies only to \*(lqmonsters\*(rq (opponents). With this option, it
+applies to all participants.
+.TP
+.B \-\-no\-blur\-all
+Cancels the effect of the
+.B \-B
+.RB ( \-\-blur\-all )
+option.
+.TP
+.BI "\-b\fR,\fP\-\-blur\-hp " pct
+This option \*(lqblurs\*(rq the health bar displays by rounding off the displayed
+hit point total to only be accurate in
+.IR pct -percent
+intervals. For example, a setting of
+.B 10
+means the health bar will blur the value by 10%; in other words, rather than
+every hit point showing proportionally on the health bar, the health bar will only
+show 10 possible intermediate values, corresponding to the hit points being 1\-9%,
+10\-19%, 20\-29%, ..., 90\-99% of the total, as well as 0% and 100%.
+Thus, higher 
+.I pct
+values indicate less accurate displays. 
+.RS
+.LP
+Setting 
+.I pct
+to 0 (or less) indicates that no blurring is desired; in this case the display is
+precisely accurate. This is the default, but note that the hit points reported may
+be blurred on the server (GM)'s side independently.
+.LP
+Once a creature reaches 0 hit points, no further blurring is
+done, so the bleed-out sequence is accurate (but this is fairly quick for almost all
+creatures and is of less consequence than the hit point totals while they are still
+alive and fighting, so this was considered a better course of action).
+.RE
+.TP
+.BI "\-\-button\-size " size
+Change the size of the toolbar buttons. The
+.I size
+value may be any string starting with
+.BR s ,
+.BR m ,
+or
+.BR l ,
+representing small, medium, or large-size icons. Small buttons are the default.
+.TP
+.BI "\-C\fR,\fP\-\-config " file
+Read a set of command-line options from the named
+.I file
+as if they appeared at this point in the list of command-line
+options. Only the long-form option names are allowed and are
+given without the leading hyphens.
+The file must contain a single option per line. Options which
+take a parameter are separated from their parameter with an equals
+sign (although this is currently not supported in the command line
+itself). For example, a configuration file might contain the
+following:
+'\" <<TeX>>
+'\" \begin{SourceCode}
+'\"# My configuration settings
+'\"scp-dest=/usr/local/game-support
+'\"scp-server=www.example.org
+'\"curl-url-base=https://www.example.org/game
+'\"no-animate
+'\"keep-tools
+'\" \end{SourceCode}
+.RS
+.RS
+.nf
+.na
+.B "# My configuration settings"
+.B "scp-dest=/usr/local/game-support"
+.B "scp-server=www.example.org"
+.B "curl-url-base=https://www.example.org/game"
+.B "no-animate"
+.B "keep-tools"
+.ad
+.fi
+.RE
+'\" <</TeX>>
+.LP
+Note that any line whose very first character is a pound sign
+.RB (\*(lq # \*(rq))
+is ignored as a comment.
+.LP
+If the file
+.B ~/.gma/mapper/mapper.conf
+exists, it is read first before command-line options or
+(other) configuration files are loaded.
+.LP
+Note that more than one
+.B \-\-config
+(and/or
+.BR \-C )
+option may be given, in which case the files are read in the order they appear in the 
+command line. This may be used to split up options into different files, such as general
+settings common to all sessions, and specific settings based on networks or different games.
+.RE
+.TP
+.BI "\-c\fR,\fP\-\-character \fR[\fP" image =\fR]\fP name \fR[\fP: color \fR]\fP
+Add player
+.I name
+to the list of standard players tracked by the mapper.
+This is the list that appears in the pop-up menu for placing
+people onto the map.  If 
+.I color
+is also specified, that color is used for the threat zone
+highlighting.  This may be a standard X11 color name, or
+an RGB value in the form 
+.BI # rgb,
+.BI # rrggbb,
+or
+.BI # rrrgggbbb.
+The default is \*(lqblue\*(rq.
+.RS
+.LP
+If an image file will be used with the character that's not the same
+name as the character, specify it as
+.IB image = name
+in this option.
+.LP
+Multiple
+.B \-c
+options may be given.  Each adds another name to the list.
+.LP
+Note that when the mapper is networked with the GM's console, the
+default list of names actually comes from the GM's console so it
+should not be necessary to specify these names to the client from
+the command line or configuration file.
+.RE
+.TP
+.BI "\-\-chat\-history " n
+Limits the retained chat history to 
+.I n
+messages. When
+.B mapper
+starts, it reloads the chat history it had cached from the previous
+session on the current
+.I host
+and 
+.I port
+but if that results in more than
+.I n
+messages being in the history, the list of messages is truncated to
+the most recent
+.I n
+(both in-memory and in the cache file). Any additional messages
+received will be kept, so the actual history will be a little
+larger than
+.I n
+until the next time 
+.B mapper
+is started. If
+.I n
+is less than or equal to 0,
+then no limit is placed on the history size.
+The default limit is 512.
+.TP
+.BI "\-\-curl\-path " path
+Specify the path to the
+.BR curl (1)
+program on your system, if the built-in default doesn't work for you.
+This is used when fetching image and map files from the server.
+.TP
+.BI "\-\-curl\-url\-base " url
+Specify the base URL on the data server. The files downloaded by mapper
+clients will be in a directory hierarchy appended to this string.
+.TP
+.BR \-D , \-\-debug
+Increase debugging output level. Multiple 
+.B \-D 
+options further increase verbosity of debugging messages. These are displayed
+in a separate window.
+.TP
+.BR \-d , \-\-dark
+This option changes the default color palette to use a darker background which
+may be easier to look at for longer periods of time. On macOS systems running
+up-to-date versions of Tcl/Tk (not the default legacy version supplied by
+Apple), dark mode is automatically selected if the macOS session is also
+configured for dark mode.
+.TP
+.BI "\-G\fR,\fP\-\-major " n
+Make every
+.IR n th
+gridline green (very thick lines).
+This is for major guide lines on the map. 
+.TP
+.BI "\-G\fR,\fP\-\-major " n + o
+As above, but offset the major guide lines to the right and down by
+.I o
+lines.
+The
+.B +
+character is required, but the value of
+.I o
+may be negative, so the option 
+.RB \*(lq \-G
+.IB n +\-3\fR\*(rq\fP
+would move the lines to the left and up by 3 lines.
+.TP
+.BI "\-G\fR,\fP\-\-major " n + x : y
+If expressed this way, rather than use the same offset in both directions, move the guide
+lines 
+.I x
+lines to the right and
+.I y
+lines down.
+.TP
+.BI "\-g\fR,\fP\-\-guide " n
+Make every
+.IR n th
+gridline red (thick lines).
+This is for minor guide lines. The value of
+.I n
+may be specified in all the same ways as for the
+.BR \-G / \-\-major
+option (see above).
+.TP
+.BI "\-\-generate\-config " path
+Append a set of example settings to the file named in
+.IR path .
+This will include the set of options you might want to configure
+in the mapper, most of which will be commented out. This is intended
+to make it easier for you to create a configuration file for the 
+mapper without having to remember what all of the options are.
+In reality you won't likely need most of them.
+.RS
+.LP
+After writing to this file, the mapper client will exit.
+.RE
+.TP
+.BI "\-\-generate\-style\-config " path
+Append a set of example style settings to the file named
+in
+.IR path .
+This will include all possible style definitions. Their built-in
+default values are also provided, so that if this file were loaded
+as the
+.I style.conf
+file of the mapper, it should result in the same appearance it
+normally would have. The intent is to help you get started configuring
+the styles of the mapper and to see what the mapper's settings would
+be if you didn't override them. You should delete or comment out any
+entries you wish to leave at the built-in default values.
+.RS
+.LP
+After writing to this file, the mapper client will exit.
+.RE
+.TP
+.B \-\-help
+Print a summary of the command invocation options and exit.
+.TP
+.BI "\-h\fR,\fP\-\-host " hostname
+Connect to a map control service running on the designated host.  This will 
+send updates to item positions, display of rooms, etc.
+If this option is not specified, no control connection is made, and the mapper
+runs in stand-alone mode.
+.TP
+.BR \-k , \-\-keep\-tools
+Normally, map clients have their toolbars turned off to maximize
+the available screen space for the battle map. The GM can turn on and off their toolbars from
+his console as needed.  If this option is given, this causes the client to unconditionally
+display its toolbar anyway. This is used for the main map run by the GM or whomever else is
+managing the group map and needs the toolbar active, or if people just want to keep the toolbar all
+the time.
+.TP
+.BR \-l , \-\-preload
+Pre-load all the cached images into memory at start-up, instead of loading them
+as needed during the map's operation. Note that this only loads cached images
+which are new enough that the mapper wouldn't check the server for newer versions
+anyway, thus allowing a mapper client to be restarted mid-game with a minimum of
+impact to game performance.
+.TP
+.BI "\-\-mkdir\-path " path
+Specify the 
+.I "server-side"
+path to the
+.BR mkdir (1)
+program which will be used when uploading files
+'\" <</ital-is-var>>
+.I to
+'\" <<ital-is-var>>
+the data server (authorized users only).
+.TP
+.BI "\-M\fR,\fP\-\-module " module
+Use the module ID code
+.I module
+for this session. This is used to differentiate server-side resources
+between campaigns which have conflicting names. This is only needed 
+for the mapper clients used as the forwarder in store-and-forward mode
+(typically the GM's own client).
+.TP
+.BI "\-\-nc\-path " path
+Specify the path to the
+.BR nc (1)
+program which will be used when sending files
+'\" <</ital-is-var>>
+.I to
+'\" <<ital-is-var>>
+the data server (authorized users only) through a SOCKS proxy server.
+.TP
+.BR \-n , \-\-no\-chat
+Suppress the display of incoming chat messages including die rolls.
+.TP
+.BI "\-P\fR,\fP\-\-password " pass
+For servers which require authentication, this specifies the password to gain entry to that server.
+This is a fairly simple authentication mechanism intended to block nuisance connections, spam,
+and accidental connections of legitimate clients to the wrong game server. If 
+.I pass
+is given as a single question mark
+.RB (\*(lq ? \*(rq),
+then the user will be prompted to enter their password manually when connecting to the server.
+This avoids placing the plaintext password on the command line or in a configuration file.
+.TP
+.BI "\-p\fR,\fP\-\-port " port
+If the
+.B \-h
+.RB ( \-\-host )
+option is given, connect to the specified TCP
+.I port
+number on that host.  The default is port 2323.
+'\" .TP
+'\" .BI \-S " hostname"
+'\" Connect to the map server via SOCKS5 proxy host with the
+'\" given
+'\" .IR hostname .
+'\" .TP
+'\" .BI \-s " port"
+'\" Specify the TCP port for the SOCKS5 proxy named with the
+'\" .B \-S
+'\" option.
+'\" .TP
+'\" .BI \-U " user"
+'\" Specify the user name for the SOCKS5 proxy server, if needed.
+.TP
+.BI "\-\-scp\-dest " path
+Specify the 
+.I server-side
+directory into which files will be uploaded (authorized users only).
+This will be the top-level data directory for the mapper; subdirectory
+names will be appended to this string.
+.TP
+.BI "\-\-scp\-path " path
+Specify the path to the
+.BR scp (1)
+program which will be used to send files
+'\" <</ital-is-var>>
+.I to
+'\" <<ital-is-var>>
+the data server. (Authorized users only.)
+.TP
+.BI "\-\-scp\-server " hostname
+The host name of the storage server. Only used when sending files
+'\" <</ital-is-var>>
+.I to
+'\" <<ital-is-var>>
+the server (authorized users only).
+.TP
+.BI "\-\-ssh\-path " path
+Specify the path to the 
+.BR ssh (1)
+program used to send files
+'\" <</ital-is-var>>
+.I to
+'\" <<ital-is-var>>
+the storage server (authorized users only).
+.TP
+.BI "\-\-style " file
+Loads custom style definitions for fonts, colors, and so forth from the named
+.IR file .
+If this option is not specified but the file
+.B ~/.gma/mapper/style.conf
+exists, that file will be read by default. See
+.BR style.conf (5)
+for details about what can go in this file.
+.TP
+.BI "\-t\fR,\fP\-\-transcript " path
+Records all chat window activity (including results of die rolls) to the
+specified file
+.IR path .
+If this file exists, it will be appended to with the new information.
+.RS
+.LP
+The following special tokens may appear in the
+.I path
+string, which will be replaced with values based on the time of day
+the file is opened:
+.TP 4
+.B %a
+Mon, Tue, etc.
+.TP
+.B %A
+Monday, Tuesday, etc.
+.TP
+.B %b
+Jan, Feb, etc.
+.TP
+.B %B
+January, February, etc.
+.TP
+.B %d
+Day of month (1\-31).
+.TP
+.B %j
+Julian day of the year.
+.TP
+.B %m
+Month (01\-12).
+.TP
+.B %y
+Year (00\-99).
+.TP
+.B %Y
+Year (all digits).
+.TP
+.B %H
+Hour (00\-23).
+.TP
+.B %I
+Hour (01\-12).
+.TP
+.B %M
+Minutes (00\-59).
+.TP
+.B %S
+Seconds (00\-59).
+.TP
+.B %p
+AM or PM.
+.TP
+.B %D
+Date (%m/%y/%d).
+.TP
+.B %r
+Time (%I:%M:%S %p).
+.TP
+.B %R
+Time (%H:%M).
+.TP
+.B %T
+Time (%H:%M:%S).
+.TP
+.B %Z
+Time zone name.
+.RE
+.TP
+.BI "\-\-update\-url " url
+Specifies the URL where updated versions of the 
+.B mapper
+program may be obtained. This enables automatic upgrades. The
+.B mapper
+will, with the user's approval, download updated versions of itself
+from this URL and install them.
+.TP
+.BI "\-u\fR,\fP\-\-username " name
+Sets the name used to identify you amongst the other players on your server.
+If this option is not provided, your current system username will be used
+instead.
+.TP
+.BI "\-X\fR,\fP\-\-proxy\-host " host \fR[\fP: port \fR]\fP
+For sending files
+'\" <</ital-is-var>>
+.I to
+'\" <<ital-is-var>>
+the server (for authorized users only), use the specified SOCKS5 proxy
+server. (E.g.,
+.BR "\-X proxy.example.org:1080" .)
+.TP
+.BI "\-x\fR,\fP\-\-proxy\-url " proxyurl
+Use the given URL to connect through a proxy server to fetch image data.
+This does not affect the connection to the map server used by GMA (yet).
+(E.g., 
+.BR "\-x http://proxy.example.org:1080" .)
+'\" <</>>
+.SH "INVOCATION"
+.LP
+As of this writing, the mapper still has not been ported to the new GMA
+code in Python, and is still implemented as a Tcl/Tk script.  This means
+you need to have a Tcl/Tk interpreter installed on your system. (See 
+.B "http://tcl.tk"
+if you need more information about that.) Since it's a GUI application,
+it is run using the 
+.B wish
+command (the Tcl Windowing Shell).
+.LP
+We have noted that at least on the Mac platform, the
+.B wish
+program will refuse to let you expand the map window larger than
+the largest dimensions of the screen(s) when it was launched,
+so you want to plug in any projector or external displays before
+starting the map.
+.SH "INTERACTIVE USAGE"
+.LP
+The mapper shows the dungeon area around the players and includes features which
+are helpful for managing game mechanics, particularly those relating to combat.
+It is intended to be fairly self-explanatory (and I don't have time to thoroughly
+document everything at the moment), so the following brief notes will hopefully suffice
+to help a new user navigate its quirks.
+.LP
+The system menu bar is not used for this application, and is left to whatever the
+.B wish
+program sets it to for generic scripts. Instead, all of the interaction with the mapper
+is done through its toolbar and context menu.
+.SS "Tool Bar"
+.LP
+Across the top of the map is a graphical toolbar. Click on each button to activate its features. Note that some of these turn on/off different modes of operation for the map. When this happens, the mouse cursor will change to show the mode the map is currently in.
+.LP
+Each button is described briefly below.
+The first block of buttons control the mapper's mode of operation.
+They function as radio buttons (only one is active at a time,
+and selecting one de-selects the previously selected one).
+'\" <<list>>
+.TP 10
+Line Tool (cross-hair cursor)
+Selects the line drawing tool. When this tool is active, click
+the left button to start drawing a line, then click it again at
+the other end of the line. You may continue clicking to get multiple
+connected line segments (which all count as a single object on the
+map). When finished, press the Escape key or click the middle button.  Cancel by pressing Escape or the middle button without having 
+defined any points on the line at all.
+Note that the current FILL color (not OUTLINE color) is used to
+draw the line on the map.
+.TP
+Rectangle Tool (square cursor)
+Selects the rectangle drawing tool. When this tool is active, click
+the left button where you want one corner of the rectangle
+to go, then click again where the diagonally opposite corner
+should go.
+The rectangle will be outlined in the OUTLINE color and filled
+in with the FILL color.
+Cancel by pressing Escape or the middle button.
+.TP
+Polygon Tool (polygon cursor)
+This works like the Line Tool except that the region inside the
+shape defined by the line segments is filled in with the FILL color,
+while the outline is colored in the OUTLINE color.
+.RS
+.LP
+Note that when this tool is selected, the two option buttons 
+become active, offering some different options for how the lines
+of the polygon are to be joined:
+'\" <<list>>
+.TP 8
+Corner
+Each time you click on this button, it cycles through the different
+corner-join options: beveled, mitered, and round.
+.TP
+Spline
+Each time you click on this button, it cycles through the spline 
+levels from 0 (no splines, just straight lines), to 9 (use 9
+lines between points to make a smooth curve).
+.RE
+'\" <</>>
+.TP
+Ellipse Tool (circle cursor)
+This works like the Rectangle Tool except that it draws an elliptical shape inscribed within (tangent to) the rectangular area defined
+by the two mouse clicks.
+.TP
+Arc Tool (diamond crosshair cursor)
+This tool is for making various semicircular shapes. Its operation
+is a little more complex than the others. When this tool is
+active, the option is also active, allowing you to choose the
+type of arc to create:
+.RS
+'\" <<desc>>
+.TP 10
+Arc type
+Each time you click on this option button, it cycles through the
+choices of arc types: pie slice, chord, and arc.
+.LP
+First, draw the elliptical shape for the arc (as if it were a
+complete ellipse) as described for the Arc Tool. Then, move the
+mouse horizontally to rotate the arc and vertically to adjust the
+length of the arc. When satisfied, click the left button to complete
+the arc.
+Cancel by pressing Escape.
+.RE
+'\" <</>>
+.TP
+Text Tool (i-beam cursor)
+This is used for placing text on the map. Its operation works much
+like the stamp tool (q.v.), in that left-clicking on the canvas will
+place a new copy of the current string at that location. If there is
+no current string, you will be prompted to enter one.  Right-clicking
+will prompt you for a new string rather than using the current one.
+The current string is displayed below the tool bar.
+.RS
+.LP
+With this tool active, a font selection button is available. Clicking
+this toggles the font selection dialog. Changing the font in that dialog
+will alter the font of the most recently placed text object (as long as
+the text tool remains active) and sets the font for future text objects.
+.LP
+There is also an anchor selection button while this tool is active. This
+shows as a centered cross (+) to indicate that the text will be centered
+around the point where the mouse is clicked. Clicking on the anchor selection
+button will cycle through all of the anchor directions available: north, south,
+northeast, etc. These mean that the text will be aligned so that the point
+where the mouse is clicked will be that direction from the text. Thus, for example,
+selecting an anchor of \*(lqwest\*(rq (incidated by a left-pointing arrow) will
+center the text vertically but align it horizontally so that the point
+is to the left of the text.
+.RE
+.TP
+Move Tool (iron cross cursor)
+This is the default mode, and the one you should keep the mapper
+in when not changing the map features. With this mode, you can
+drag creatures around the map as described below.
+.RS
+.LP
+If the mouse is not over a creature token when starting to
+drag the mouse, the map grid itself is dragged, providing an easy way to scroll
+the map.
+.LP
+If you hold down the shift key while clicking the left button on the canvas in
+this mode, it will briefly show a marker to draw attention to the grid square
+the mouse is in.
+.RE
+.TP
+Cut Tool (skull cursor)
+With this tool active, any object you click on with the left button
+will be deleted from the map immediately (no saving throw).
+if you click where there are multiple overlapping objects,
+you will be prompted to select which to delete. Press Escape if
+you don't want to delete any of them.
+.TP
+Object Move Tool (multi-arrow cursor)
+This tool allows the map objects (as opposed to creature tokens)
+to be dragged to new locations. Note that you are dragging the object's
+.I "reference point"
+with the cursor. Once an object has been moved any distance with the
+mouse, the arrow keys (or the standard 
+.BR vi (1)
+movement keys) may be used to \*(lqnudge\*(rq the object by one pixel
+at a time up, down, left, or right; additionally the keys
+.BR u ,
+.BR d ,
+.BR f ,
+and
+.BR b
+may be used to move the object up, down, to the front, and to the back in the stacking order
+'\" <</ital-is-var>>
+.RI ( z
+coordinate), respectively.
+'\" <<ital-is-var>>
+.TP
+Stamp Tool (star cursor)
+This allows graphical tiles to be \*(lqstamped\*(rq onto the map.
+If there is a current tile already chosen, a new copy of it is placed
+on the map with the upper-left corner at the point the mouse was clicked.
+If no such tile was chosen, you will be prompted for its name. Right-clicking
+will force the selection of a new tile image rather than re-stamping the
+current one. See
+.BR rendersizes (6)
+for more information about the format of these tile files. They should be
+rendered and (if using a map server) uploaded ahead of time so they are
+visible in the map.
+.LP
+The next block of buttons control the appearance of
+any new objects added to the map.
+.TP
+Fill Mode
+Clicking on this button toggles whether the shape will be filled
+or not. (Somewhat counter-intuitively, lines are filled with the
+FILL color, not the OUTLINE color, so turning off fill will just
+give you invisible lines.)
+.TP
+Fill Color
+Clicking on this button selects the FILL color to be used to
+fill in new object areas. This is disabled if fill mode is turned
+off.
+.TP
+Outline Color
+Clicking on this button selects the OUTLINE color to be used to
+draw around new object areas.
+.TP
+Grid Snap
+Clicking on this button cycles through the grid snap options:
+.RS
+'\" <<desc>>
+.TP 
+Off
+Points may be added anywhere on the canvas (free form drawing).
+.TP
+1
+Points may only be added at the intersections of grid lines.
+.TP
+1/2
+Points may be added at grid intersections, and 1/2 way between them
+horizontally or vertically.
+.TP
+1/3
+Points may be added at grid intersections, and every 1/3 of the way
+between them
+horizontally or vertically.
+.TP
+1/4
+Points may be added at grid intersections, and every 1/4 of the way
+between them 
+horizontally or vertically.
+.RE
+'\" <</>>
+.TP
+Line Width
+Clicking on this button cycles through the line widths from thinnest to 
+thickest.
+'\" <</>>
+.LP
+The next block of buttons clear the map:
+'\" <<desc>>
+.TP
+Clear Features
+Clicking this button wipes the map clean except for creatures.
+.TP
+Clear Creatures
+Clicking this button removes all creatures from the map.
+.LP
+The next block gives access to tactical displays.
+.TP
+Toggle Combat Mode
+Normally, the GM console will automatically turn on combat mode,
+but if you want to manually enable or disable it, click this button.
+When active, the threat zones around each creature are highlighted
+using colored cross-hatch patterns.
+.RS
+.LP
+If health tracking is in effect (i.e., for creature objects which
+have a non-empty 
+.B HEALTH
+attribute), a health bar is displayed across the bottom of each creature's token.
+The appearance of this bar depends on the current health of the creature.  For
+the description that follows, the significant health statistics are:
+'\" <<desc>>
+.TP
+.I t
+The total number of hit points the creature has when at maximum health.
+.TP
+.I x
+The extra points (below zero) which define the amount of lethal damage
+a dying creature can sustain before being dead. In Pathfinder and compatible
+d20 games (and perhaps others), this is the Constitution score for the creature.
+.TP
+.I l
+The number of hit points worth of 
+.I lethal
+damage sustained by the creature.
+.TP
+.I n
+The number of hit points worth of
+.I non-lethal
+(i.e., subdual)
+damage sustained by the creature.
+'\" <</>>
+.LP
+The health bar indicates graphically the creature's health condition and relative
+amount of damage they have taken, as follows:
+'\" <<desc>>
+.TP 13
+Full health
+A creature in full health will have a solid green bar across the entire width of their token's space
+on the map.
+.TP
+Injured
+The full width of the token space represents the creature's total (maximum) hit points 
+.RI ( t ).
+A red bar will start encroaching over the green in proportion to the number of lethal hit points
+.RI ( l )
+they have taken. A yellow bar will likewise represent the number of non-lethal hit points
+.RI ( n )
+taken. Thus, the health bar will be shifting more from green to red/yellow as the creature gets more
+and more injured, until as it nears the point of meeting its maker, the entire bar will be red.
+.TP
+Flat-footed
+A flat-footed creature (which does not also have any of the conditions listed below) will have a blue
+frame around the health bar.
+.TP
+Staggered
+When staggered due to non-lethal damage (i.e.,
+.IR n >0
+and
+.IR l + n = t ),
+the health bar has a yellow frame around it. The creature will move to unconscious if it suffers more
+damage.
+.TP
+Unconscious
+When unconscious due to non-lethal damage (i.e.,
+.IR n >0
+and
+.IR l + n > t),
+the health bar has a violet frame around it.
+.TP
+Disabled
+When disabled, a red frame will appear around the health bar. 
+The mapper will automatically assume disabled condition if a creature has exactly 0 hit points left (i.e.,
+.IR l = t .)
+.TP
+Dying
+When at negative hit points but still above the death level
+.RI (\- x < t \- l < 0 ),
+a red frame will appear but the red bar will retreat to the left as more lethal damage is taken,
+until it's fully black at the point of death.
+.TP
+Stable
+If dying but stabilized, the health bar will have a brown frame around it.
+.TP
+Dead
+When completely mortally wounded
+.RI ( t \- l <=\- x ),
+the health bar is solid black.
+.RE
+'\" <</>>
+.TP
+Show HP Values
+This toggles the display of health statistics for players (not monsters) over the
+health bars. If only lethal damage has been inflicted, it displays
+.RI \*(lq hp / max \*(rq
+where
+.I hp
+is the current number of hit points remaining, out of a maximum of
+.I max
+hit points. If non-lethal damage has been suffered, then the display is
+.RI \*(lq hp ( nl )\*(rq
+where
+.I nl
+is the amount of non-lethal damage.
+If a creature is fully dead, it simply says 
+.RB \*(lq DEAD \*(rq.
+.TP
+Spell Area of Effect
+This adds a spell area of effect to the battle grid. Once created,
+this becomes a permanent map feature which may be removed using the
+Cut Tool (q.v.).
+When this tool is activated, two option buttons are enabled which allow
+you to control the shape of the spell area:
+.RS
+'\" <<desc>>
+.TP
+Shape
+This button cycles through the supported spell shapes: radius, cone, and ray.
+.TP
+Spread
+This button toggles whether the spell effect \*(lqspreads\*(rq around corners.
+This is not yet implemented.
+.LP
+Select the point of origin for the spell by clicking the left button over a
+grid intersection (the tool will snap to intersections automatically). Then
+move the mouse to the target point of the spell and click again to complete
+the area. As you move the mouse, the spell's area and affected grids will be
+shown.  The area of effect is filled in with cross-hatch patterns in the FILL
+color.
+Cancel by pressing Escape.
+This is an active tool like the other drawing tools. When finished, select
+another mode such as the Move Tool.
+.RE
+'\" <</>>
+.TP
+Ruler Tool
+Selecting this tool allows you to measure the distance
+along a path. Click the left button on a point, then
+move the mouse to another point. If desired, multiple
+points may be clicked to build a path. Middle-click or
+press Escape to end the measurement.
+.TP
+Grid Display Toggle
+Clicking this button turns on and off the display of the
+gridlines on the map. This is a local display setting only,
+and is not broadcast to other clients.
+.TP
+Die Roller
+If connected to a server, this button brings up the chat window. In this window,
+you may send and receive messages and die rolls to other connected users. 
+This window is split into three adjustable panes, described individually below.
+The division between each pane may be moved by dragging the mouse over the
+separation point or pane handle.
+.RS
+'\" <</ital-is-var>>
+'\" <<desc>>
+.TP
+.I "Chat Messages Pane"
+In the main portion of this pane displays incoming chat messages.
+Each is prefixed with the name of the sender. If the message was
+addressed only to you, the tag
+.RI \*(lq (private) \*(rq
+is added after the sender's name. If it was sent to a specific subset
+of users, their names will be listed as
+.RI \*(lq "(private to alice, bob, charlie)" \*(rq.
+.RS
+.LP
+There are two entry lines below the chat window. The top one is for sending
+chat messages. Anything typed in the entry box will be transmitted when the Return
+key is hit. To the left of this entry box is a menu button which controls who
+the message is sent to. If \*(lq(all)\*(rq is selected, the message is sent to all
+listening clients (which need not be listed in the menu; the message will be sent to
+everyone at the server level). If a recipient's name is selected, it will only be
+sent to them. If another recipient's name is selected, they are
+.I "added to"
+the list of recipients. These selections are actually toggles\(emselecting a recipient's
+name again will remove them from the list. This allows for messages to be sent to
+any arbitrary subset of users. Selecting \*(lq(all)\*(rq will clear all selections again.
+The \*(lqrefresh\*(rq button to the right of the entry box will update the recipient selection
+menu with the current set of logged-in users.
+.LP
+The bottom entry line is for making die rolls. Into the entry box you may type any die roll
+string such as would be accepted to the
+.B DieRoller.do_roll()
+method as documented in
+.BR dice (3).
+When the Return key is pressed, this die roll is sent to the server, which will roll the
+dice and transmit the results just like a chat message (which includes the currently-selected
+chat recipient list). The \*(lq(i)\*(rq button to the right of the entry box will bring up
+a help window explaining what may be entered for die rolls.
+'\" <<ital-is-var>>
+.RE
+.TP
+.I "Recent Rolls Pane"
+The most recent 10 rolls entered into the above-mentioned entry box are kept in a list in this
+pane, with the most recent on top. Clicking on the die button next to any of these will re-roll
+it again. If additional modifiers are in play, they can be typed into the entry box next to the 
+die button. Whatever is entered is simply appended to the original die expression after a plus sign.
+Thus, entering \*(lq5\*(rq will add \*(lq+5\*(rq to the roll, and entering \*(lq1d6 fire+3\*(rq
+will add \*(lq+1d6 fire+3\*(rq to the roll.
+.TP
+.I "Preset Rolls Pane"
+A set of commonly-needed die rolls may be pre-set into the tool and then invoked using the
+third pane. Clicking the \*(lq(+)\*(rq button will add a new preset by prompting for its name,
+description, and die roll. The name uniquely identifies the preset within the list. The description
+will appear as a tooltip for your reference when looking at your presets. The new preset is
+saved on the server and will be loaded into your client every time it's started. Presets are
+invoked in the same manner as described above for recent rolls. Clicking the \*(lq(\-)\*(rq
+button removes the preset from the list.
+.RS
+.LP
+If a preset name includes a vertical bar (e.g.,
+.RB \*(lq 12|WillSave \*(rq),
+then only the part after the bar will be displayed on-screen, but the entire name is used to
+sort the presets in the window. This allows arbitrary sort ordering without cluttering the display.
+.LP
+The file load and save buttons at the bottom of the pane are used to load and save the preset
+list to local disk files which have the format documented in
+.BR dice (5).
+.RE
+.RE
+'\" <</>>
+'\" <</>>
+.LP
+The final block of tool buttons control global operations of the mapper:
+'\" <<desc>>
+.TP
+Zoom In
+Double the visual size of grid blocks.
+.TP
+Zoom Out
+Halve the visual size of grid blocks.
+.TP
+Un-Zoom
+Restore the zoom level to normal.
+.TP
+Load
+Add all the map objects from a disk file onto the map tool, replacing all the map features
+previously on the map (but not the creatures).
+.TP
+Merge
+Like Load, but add to the existing objects rather than replacing them.
+.TP
+Unload
+All the objects saved to a selected disk file are 
+.I erased
+from the map.
+.TP
+Push
+Push the entire contents of this map client to all other clients, replacing their
+current contents. (Only available in store-and-forward mode, generally only for GM use.
+Since the server now tracks game state and clients and re-sync with it directly,
+there is no longer a need for clients to push their contents to each other, and that
+was a problematic operation anyway.)
+.TP
+Store and Forward
+Toggles store-and-forward mode. When enabled, this changes the behavior of the following
+other buttons, providing a client update path that is much more efficient and less
+error-prone than streaming the object updates through the server. Stand-alone
+(non-networked) map clients should use the normal mode of operation instead.
+.RS
+.TP 7
+Load
+Prompts for the selection of a map file from disk as usual. However, rather than
+loading that file directly, it checks to see that the file is available from the
+server by checking the local cache and (if necessary) downloading from the server.
+If the file is not found by those operations, it will be uploaded to the server
+(assuming the user has the proper SSH access active at the time). Other clients
+are then instructed to load the map file from the server. 
+.TP
+Merge
+As with the Load button, but merges the map file with the existing map contents
+rather than replacing them.
+.TP
+Unload
+Ensures that a server copy of the map file exists as the Load button does, but then instructs
+the remote clients to delete the contents of that file rather than sending individual
+object deletion commands over the network to them.
+.TP
+Push
+Saves the current map contents to a temporary file, uploads it to the server,
+and then instructs the other clients to load that file.
+.RE
+.TP
+Sync
+.I "(Note that this button's function has changed as of version 3.25.)"
+This clears the contents of the mapper client and requests a fresh set of data
+from the server, thus synchronizing this client to be in line with the server's
+idea of the current game state. Depending on how the server is configured, it
+may automatically perform this operation for you when you connect to it.
+.TP
+Save
+Save everything on the map to a disk file. You will be prompted to decide whether
+this includes creatures as well.
+.TP
+Exit
+Exit the mapper program.
+'\" <</>>
+.SS "Context Menu"
+.LP
+Clicking the right button over an object calls up a context-sensitive menu with the
+following options. Not all options will be enabled in all cases.
+Most of these involve performing actions on creatures. 
+'\"This only works when the creature's
+'\".I "reference grid"
+'\"(the upper-left most grid in the space the creature occupies for creatures larger than
+'\"medium-size) is right-clicked.
+'\" <<list>>
+.TP 20
+.BI "Remove " name
+Remove the creature from the map. 
+If there are multiple creatures in the same grid, a submenu will allow you to select which one to remove, or allow you to remove them all.
+.TP
+.B "Add Player..."
+Add one or more new player tokens into the grid clicked. This pops up a dialog box to enter the relevant
+information about the new player:
+.RS
+'\" <<desc>>
+.TP
+.I name
+The name by which the creature is to be known on the map. This
+'\" <</ital-is-var>>
+.I must
+'\" <<ital-is-var>>
+match the name the GM console is using to track initiative, or it'll never be highlighted
+when its turn comes up (otherwise the name doesn't matter).  If the name coincides with 
+graphical tile images already loaded, that image will be used instead of a plain circle with
+the creature's name inside.  If a range in the form
+.BI # n \- m
+is appended to the name (usually with a space between the name and this notation),
+then 
+.IR m \- n +1
+copies of the creature are added in a series of grid spaces starting with the one right-clicked
+and continuing to the right.  For example, entering the name
+\*(lqOrc #1\-3\*(rq will create three creatures, named
+\*(lqOrc #1\*(rq,
+\*(lqOrc #2\*(rq,
+and
+\*(lqOrc #3\*(rq.
+Names must be unique. If another token was already on the map with the same name,
+it is replaced with this one.
+.RS
+.LP
+If a different image file is needed than the default (named the same as the person's name), 
+specify it as 
+.IB imagename = creaturename
+(optionally followed by the 
+.B #
+notation described above).
+.RE
+.TP
+.I size
+The size, in units of grid squares (diameter), of the creature's token. 
+You can also use standard size
+designations
+.B f
+(fine),
+.B d
+(diminutive),
+.B t
+(tiny),
+.B s
+(small),
+.B m
+(medium),
+.B l
+(large),
+.B h
+(huge),
+.B g
+(gargantuan),
+.B c
+(colossal).
+Where it makes a difference, indicate \*(lqtall\*(rq creatures by using
+a capital letter and \*(lqwide\*(rq creatures with a lower-case one.
+Since the recommended practice is to use the size codes, which means
+you would use the same code for both
+.I size
+and 
+.I area
+fields, any time you type into the 
+.I size
+field, that will update 
+.I area
+at the same time. If a different
+.I area
+is needed, that can be edited afterward separately.
+.TP
+.I area
+The threat area in the same units as the
+.I size
+field. This may also be
+one of the standard size designator codes as with
+.I size
+(and this is generally preferred). In that case,
+for size categories larger than medium, use upper-case
+(tall) letters for size categories of tall creatures,
+and lower-case for long creatures.
+.TP
+.I color
+The color of the threat zone to draw around the creature
+in combat mode.
+.TP
+.I reach?
+Check this box if the creature has a reach weapon in hand.
+'\" <</>>
+.LP
+Clicking
+.B Ok
+places the creature(s) on the grid and dismisses the dialog
+box, while clicking
+.B Apply
+places the creature(s) but leaves the dialog up in case you want
+to add more creatures to that grid square.
+.RE
+.TP
+.B "Add Monster..."
+Just like 
+.B "Add Player" 
+but adds a monster token.
+.TP
+.BI "Toggle Death for " name
+Flips the creature token between living and dead states.
+The mapper will automatically draw an \*(lqX\*(rq across the creature
+token in addition to switching to the \*(lqdead\*(rq image (if images
+are used).
+.TP
+.BI "Toggle Reach for " name
+Flips on/off the extra threat zone for reach weapons.
+.TP
+.BI "Toggle Spell Area for " name
+Defines a spell effect which is described as a radius \*(lqcentered on you\*(rq (or some
+creature). After choosing this item, click the left button to define where the radius extends
+from the creature's perimeter.  If there was already a spell in effect, this cancels it.
+This differs from the spell area tool from the toolbar in that it moves with the creature
+and radiates from the creature's entire space rather than coming from a fixed point on the map.
+The area is filled in with the current FILL color.
+.TP
+.BI "Polymorph " name
+If alternative images are available for a creature, this selects which is to be displayed.
+If the creature has a 
+.B SKINSIZE
+attribute which indicates the size of each of its polymorphed forms, then this menu will
+allow you to choose between the number of forms defined for that creature, and will automatically
+adjust the creature size at the same time. Otherwise, the mapper program doesn't know what
+alternate forms are available so it will offer you a choice of three different forms, and will
+make a best-effort attempt to locate and display the corresponding images. In this case,
+you will need to manually adjust the size if needed.
+.TP
+.BI "Change Size of " name
+Alter the size of a creature token.
+.TP
+.BI "Toggle Condition for " name
+Selects a condition from the list of conditions built in to
+.B mapper
+or defined by the map service for custom game-specific conditions.
+If the selected condition is already set for the target creature(s),
+then it is removed. Otherwise it is added to the target(s).
+.TP
+.BI "Tag " name
+Add a tag to a creature token to indicate their conditions. The recent tags which were set
+are remembered and available in a sub-menu for convenience.
+.TP
+.BI "Set Elevation of " name
+Specify how high above (or below) the obvious reference level a particular creature is.
+This puts a tag in the upper right corner of their token in which is shown their elevation 
+(as a simple number). The sub-menu triggered by this item allows easy selection of relative
+distances, so you can quickly note that a creature moved up by 10 feet, for example.
+Any arbitrary elevation may be directly input by selecting
+.RB \*(lq (set) \*(rq
+and typing the desired elevation into the dialog box that appears. If an absolute number is
+input, that will be the new elevation. If the number begins with a 
+.B +
+or 
+.B \-
+sign, its value will be added or subtracted to the current elevation instead.
+.TP
+.B "Set Movement Mode"
+Various modes of locomotion are denoted in the elevation tag (q.v.) by using
+a different color for each. Use this menu item to select the mode currently
+employed by the creature:
+.RS
+'\" <<desc>>
+.TP
+.B land
+(white text on a black background)
+.TP
+.B fly
+(black text on a deep sky blue background)
+.TP
+.B climb
+(white text on a forest green background)
+.TP
+.B swim
+(white text on a teal background)
+.TP
+.B burrow
+(white text on a sienna background)
+.RE
+'\" <</>>
+.TP
+.B "Deselect All"
+Cancels the multiple-creature selection.
+.TP
+.B "Show Visible Objects"
+Moves the scrollbars to bring map features into view.
+.TP
+.B "Sync Others Views"
+Moves all the other map clients scrollbars to see what this client is showing.
+.TP
+.B "Refresh Display"
+Redraws the contents of the local mapper client. This does not reload any data (see the
+.B Sync
+button in the toolbar for that), but just locally re-draws everything again. This is useful,
+for example, if the client didn't know about image data for tiles or creature tokens when it
+first rendered the display. Often, it will work in the background to discover the missing
+image data, so refreshing the display will then render everything properly.
+.TP
+.I name
+Add a player token for the named player to the map, or move it to this location
+if it was already on the map.
+'\" <</>>
+.SS "Creatures"
+.LP
+With the Move Tool (q.v.) selected, click and drag creatures to move them
+around the map. 
+'\"As with context menus, creatures larger than medium-size must
+'\"be dragged from the upper-left corner of the rectangular space they fill on the board.
+.LP
+If you hold the control key down while left-clicking on creature tokens, it toggles whether
+that creature is included in the group selection. When a group is selected, dragging any member
+of the group moves the entire group at once. Context selections will also apply to the entire
+group (e.g., to toggle death for all the selected tokens).
+.LP
+In combat mode, the area threatened by each creature is shown as a dashed outline,
+and is cross-hatched when that player's turn is up for action. Arrows are drawn between
+creatures in range to be melee targets.
+'\" <<TeX>>
+'\" \label{manpage:mapper:6:protocol:start}
+'\" <</TeX>>
+.SH "CONTROL PROTOCOL"
+.LP
+When connected to a control service (see the
+.B \-h
+option above), the mapper and remote service exchange
+commands to indicate changes to the map display.  Each
+command is a newline-terminated line of plain ASCII text
+in the following formats.  If the mapper sends one of these
+commands to the service, it is indicating that the local
+user made those changes and requests that other connected
+map clients update themselves accordingly.  If the mapper receives
+the command from the service, it should comply to make the
+corresponding change to itself.
+.LP
+The software SHOULD allow Unicode text encoded as UTF-8
+everywhere (of which 7-bit ASCII is a subset), but this 
+has not been extensively tested, thus the above note that
+the file is plain text ASCII.
+.LP
+Each command must be a properly-formed TCL list value (in simplest
+terms, a space-separated list of elements with curly braces surrounding
+elements with embedded spaces; braces must be balanced).  The first
+element of the list determines the request being made, and therefore
+the meaning of the other elements of the list.
+.LP
+Unless otherwise noted, there is no response expected from
+these commands.
+.LP
+This describes protocol verion 332. These notes are intended to be 
+detailed enough to implement a client from and should be considered
+the definitive reference to the protocol.
+.LP
+See also the documentation of the map file format in
+.BR mapper (5)
+which defines some of the data items referenced here.
+.LP
+Where boolean values are indicated, clients SHOULD use 0 for false and 1 for true,
+but MAY accept any non-zero value as true.
+.LP
+In the protocol command descriptions,
+.B BOLD
+text indicates literal text to be sent as-is,
+.I Italics
+indicate a parameter whose value should appear in place of the name shown, and
+[square brackets]
+surround optional items which may be omitted.
+'\" <<list>>
+.TP 20
+.BR "// " [\fIargs\fP...]
+This is a server comment.  The entire command should be ignored by all clients. This is used
+to inject informative context and messages into the client/server conversation which may be
+of interest for debugging or interactive use.
+.RS
+.LP
+It is permitted for clients to use certain comment strings to carry useful information
+the systems administrator wishes to communicate to them. These are strictly speaking not
+part of the server protocol, but this allows for some local configuration management to
+take place, and these are easy to add to the server's initial greeting to the clients. 
+The following special comments are currently recognized:
+'\" <<list>>
+.TP 5
+.BI "// MAPPER UPDATE // " version " " file
+The latest available
+.B mapper
+client is 
+.I version
+and is available for download from
+.IR file .
+Mapper clients which support automatic upgrades will offer to download this
+version and install it for the user. For this to work, the mapper client must
+see this comment before any non-comment commands from the server.
+The designated file is fetched from the server location indicated by the
+value of the
+.B \-\-update\-url
+option.
+.TP
+.BI "// CORE UPDATE // " version " \fR[\fP" file \fR]\fP
+The core GMA code's current release version is indicated as
+.IR version .
+If
+.I file
+is present, a new GMA release may be downloaded from that file in the same manner as
+for the mapper updates. Otherwise it is expected that the user obtains the code independently
+such as pulling from the git repository. Note that the git repository may contain more recent
+commits than this advertised release version. (This is intended to announce release points
+rather than individual commits.)
+.TP
+.BI "// BEGIN " id " " max " " title
+Start tracking progress for some event identified by
+.I id
+which will have a maximum value of 
+.IR max .
+(If
+.I max
+is the special value
+.RB \*(lq * \*(rq
+then there is no known maximum value yet.)
+The user-facing title for the event is given by
+.IR title .
+.TP
+.BI "// UPDATE " id " " value " \fR[\fP" newmax \fR]\fP
+Update the progress indicator for event
+.I id
+to have the new
+.I value
+toward the previously-declared maximum value.
+If
+.I newmax
+is specified and is not the empty string or
+.RB \*(lq * \*(rq,
+then the expected maximum value is updated as well.
+.TP
+.BI "// END " id
+Stop tracking progress for the specified event
+.IR id .
+.RE
+'\" <</>>
+.TP
+.BI "AC " name " " id " " color " " area " " size
+Add a character to the pop-up menu for map clients. This makes it easy to place important character tokens
+on the map and ensures that such tokens are given consistent
+.I id
+values rather than generating a random one.
+Clients should NOT send this command to each other; it is intended for the server to send to the clients.
+'\" <<desc>>
+.RS
+.TP 8
+.I name
+The name of the creature as displayed on the map. As with the 
+.B \-c
+option, this has the format
+.RI [ image\fB=\fP ] name
+which allows for creatures whose image names are different than their character name.
+.TP
+.I id
+The fixed ID for this creature. This will be used for internal references to this object on the map.
+.TP
+.I color
+The color to use when shading in the creature's threatened space when it has initiative to act.
+The
+.I color
+value may be in the form 
+.BI # rgb \fR,\fP
+.BI # rrggbb \fR,\fP
+.BI # rrrgggbbb \fR,\fP
+.BI # rrrrggggbbbb \fR,\fP
+or a color name as defined by the local system. (For example, on a Unix-like system which uses the standard
+.I rgb.txt
+file, a certain shade of blue with 8-bit values for red=0x46, green=0x82, and blue=0xb4, 
+could be specified as 
+.RB \*(lq #4682b4 \*(rq
+or 
+.RB \*(lq "steel blue" \*(rq).
+.TP
+.I area
+The size of the area threatened by the creature on the map. This can be the number of squares in diameter,
+but more commonly it should be a standard size code such as 
+.RB \*(lq M \*(rq
+for medium-size creatures.
+.TP
+.I size
+The size occupied by the creature on the map. This can be the number of squares in diameter,
+but more commonly it should be a standard size code such as 
+.RB \*(lq M \*(rq
+for medium-size creatures.
+.RE
+'\" <</>>
+.TP
+.BI "ACCEPT " msg_set
+A client sends this message to the server to indicate that from this point
+forward (until another
+.B ACCEPT
+command), only the commands listed in
+.I msg_set
+should be sent to it by the server. This is a list of command names as they
+appear in this specification (e.g.,
+.BR "{AI CO TO}" ),
+or it may be the special value
+.RB \*(lq * \*(rq
+which means to accept all messages (the default).
+.TP
+.BI "AI " name " " size
+Add an image to the map. This begins a sequence of commands which together
+transmit image data to the client, followed by a number of
+.RB \*(lq AI: \*(rq
+commands and finally an 
+.RB \*(lq AI. \*(rq
+command at the end. Other commands MAY appear between any of these commands
+while the image is being transferred, but another
+.RB \*(lq AI \*(rq
+command is NOT allowed until the previous one is completed.
+This does not
+'\" <</ital-is-var>>
+.I draw
+'\" <<ital-is-var>>
+the image on the map; it merely defines it so the client knows what to draw when an image of
+the given
+.I name
+at the specified
+.I size
+is called for.
+.RS
+'\" <<desc>>
+.TP 8
+.I name
+The name of the image as it is referred to by other protocol commands and
+inside map files.
+.TP
+.I size
+The zoom factor desired. This is a real number where 1 (or 1.0) is the default zoom level for the map.
+If the map is zoomed out one step, images of 
+.I size
+0.5 will be needed; if zoomed in one step, 
+.I size
+will be 2 or 2.0. The map client does not internally have the ability to scale images, so it uses
+a separate image data file for each graphic element at each desired zoom level.
+'\" <</>>
+.LP
+Use of a web server hosting images and the protocol command
+.RB \*(lq AI@ \*(rq
+are preferred to sending raw image data through the mapper data socket.
+.RE
+.TP
+.BI "AI: " data
+Add a line of image data to the image started by a previous
+.RB \*(lq AI \*(rq
+command. The 
+.I data 
+are base 64 encoded as a single unit. In other words, the binary image data (which must be in
+GIF format) is encoded as a single block of bytes into a single base-64 string. This string is broken into a
+number of pieces, which are sent in individual
+.RB \*(lq AI: \*(rq
+commands. After the last
+.RB \*(lq AI: \*(rq
+command is sent, finish by giving a
+.RB \*(lq AI. \*(rq
+command.
+.TP
+.BI "AI. " lines " " checksum
+Complete the image transfer begun by the most recent
+.RB \*(lq AI \*(rq
+command.
+.RS
+'\" <<desc>>
+.TP 10
+.I lines
+The number of 
+.RB \*(lq AI: \*(rq
+commands which should have been received during the transfer.
+.TP
+.I checksum
+The SHA-256 checksum, encoded in base-64, of the original binary GIF image data
+before it was encoded and transmitted. This field MAY be omitted if a client is not
+able to calculate the checksum or chooses not to do so.
+.LP
+Clients SHOULD reject image transfers which fail to match the expectations
+given in this command as to number of data lines received and checksum.
+'\" <</>>
+.RE
+.TP
+.BI "AI? " name " " size
+Request for the named image.
+Clients may send this if they need an image of the given
+.I name
+and 
+.I size
+(as described above for the
+.B AI
+command) but no such image is defined yet in the client. This
+queries the server or connected peers to see if any of them know
+of the needed image. The client should continue to process tasks without
+waiting for a response (which is never guaranteed). If another peer knows
+of the requested image, it should respond with an
+.RB \*(lq AI \*(rq
+command containing the full image data or (preferably) an
+.RB \*(lq AI@ \*(rq
+command indicating how to obtain the image from the game server.
+.TP
+.BI "AI@ " name " " size " " id
+Like
+.RB \*(lq AI \*(rq,
+but rather than receiving image data directly, this merely informs the client
+that the image with the indicated
+.I name
+and
+.I size
+(as described above) may be obtained from the game server under the file
+ID
+.IR id .
+.RS
+.LP
+As currently implemented, the 
+.B mapper
+client checks to see if it has a cached version of the file. If so, and that
+file is newer than 2 days, it is used without further checks. If the cached file
+is older, the server is queried to see if it has a newer version of the file; if so,
+that is retrieved and cached; otherwise, the existing cache is updated to note that
+it was the known latest version as of that moment. If no usable cache file is available,
+the file with the given
+.I id
+is obtained from the server. For example, if the image
+.I id
+were
+.RB \*(lq abcdefg \*(rq,
+the URL of the file to be retrieved would be
+.IB base /a/ab/abcdefg.gif
+where
+.I base
+is the base URL as specified to the 
+.BI \-\-curl\-url\-base= base
+option (or 
+.BI curl\-url\-base= base
+configuration file line).
+.LP
+Servers SHOULD be set up to provide alternative file formats so that, for example,
+with ID
+.B abcdefg
+files such as 
+.B a/ab/abcdefg.jpg
+or
+.B a/ab/abcdefg.png
+may be retrieved for clients which use those other formats. 
+Due to implementation limitations of the framework used, 
+.B mapper.tcl
+always uses GIF format files.
+.RE
+.TP
+.BI "AUTH " response " \fR[\fP" user " " client \fR]\fP
+If the server included a challenge string (see the
+.B OK
+command below), then it requires a password before the client is allowed to
+join the server. This is intended to prevent accidental connections by clients
+to the wrong servers, and to filter out nuisance connections from spammers or
+other random connections, so it is a fairly simple authentication mechanism
+using a password shared by all clients in a play group.
+.RS
+.LP
+If provided, the
+.I user
+parameter gives the local username, and
+.I client
+describes the client program connected to the server. These are intended to help
+diagnose issues with communications between clients while they are occurring.
+The
+.I user
+name may be any arbitrary name except 
+.RB \*(lq GM \*(rq 
+(unless the client is really
+the GM), but for best results it should be a short, single word such as the player's
+name or the name of the character they're playing. If the client is authenticating
+using the GM's credentials, the
+.I user
+parameter will be ignored, and the name 
+.RB \*(lq GM \*(rq 
+will be used instead.
+Given:
+'\" <<TeX>>
+'\" \begin{align*}
+'\"  C & \text{ is the server's challenge as a binary string of bytes }\\
+'\"    & \text{ (after decoding from the base-64 string sent by the server),} \\
+'\"  H(x) & \text{ is the binary SHA-256 hash digest of \(x\),} \\
+'\"  P & \text{ is the password needed to connect to the server, and the notation} \\
+'\"  x || y& \text{ means to concatenate the strings \(x\) and \(y\),}
+'\" \end{align*}
+'\" then the procedure to calculate the \Var*{response} string is:
+'\" \begin{enumerate}
+'\"  \item Obtain $i$ by extracting the first two bytes from \Var*{C} as an unsigned, big-endian,
+'\" 16-bit integer value.
+'\"  \item Calculate $D=H(C||P)$.
+'\"  \item Repeat $i$ times:
+'\"  \begin{enumerate}
+'\"   \item Calculate $D'=H(P||D)$.
+'\"   \item Let $D=D'$.
+'\"  \end{enumerate}
+'\" \end{enumerate}
+.TP 5
+.I C
+is the server's challenge as a binary string of bytes (after decoding from the base-64 string actually sent by the server),
+.TP
+.RI H( x )
+is the binary SHA-256 hash digest of 
+.IR x ,
+.TP
+.I P
+is the password needed to connect to the server, and the notation
+.TP
+.IR x || y
+means to concatenate strings
+.I x
+and 
+.IR y ,
+.LP
+To calculate the
+.I response
+string, the client must do the following:
+.TP
+(1)
+Obtain
+.I i
+by extracting the first two bytes from
+.I C
+as an unsigned, big-endian, 16-bit integer value.
+.TP
+(2)
+Calculate 
+.IR D =H( C || P ).
+.TP
+(3)
+Repeat 
+.I i
+times: Calculate 
+.IR D '=H( P || D "); then let " D = D '
+'\" <</TeX>>
+.LP
+The binary value of 
+'\" <</ital-is-var>>
+.I D
+'\" <<ital-is-var>>
+is then encoded using base-64 and sent as the
+.I response
+value.
+.LP
+Starting with protocol version 332, the server is guaranteed to
+respond to the
+.B AUTH
+command with either a 
+.B DENIED
+or
+.B GRANTED
+message (q.v.). The client may wait for this response before proceeding
+with its other operations, so that it knows for sure how the authentication
+went.
+.RE
+.TP
+.BI "AV " x " " y
+Adjust view by setting the horizontal scrollbar to 
+.I x
+as a fraction of its full distance, where 0.0 is all the way to the left and
+1.0 is all the way to the right. The vertical scrollbar is similarly set based on
+.I y
+where 0.0 is all the way to the top and 1.0 is all the way to the bottom.
+.TP
+.BI "CC *\fR|\fP" user " " target " " message-ID
+Clear the chat history. If the parameter is
+.RB \*(lq * \*(rq,
+do so without further comment. Otherwise, the client may inform the
+user that the chat was cleared, and further if the parameter is not the
+empty string, it indicates the user name of the person who cleared it.
+.RS
+.LP
+If
+.I target
+is given and not the empty string, it may be a message ID in which case all messages
+with
+.I message-ID
+less than 
+.I target
+are removed from the history; it may also be a negative integer 
+'\" <</ital-is-var>>
+.IR \-n ,
+in which case all but the most recent
+.I n
+items are deleted.
+'\" <<ital-is-var>>
+.LP
+The
+.I message-ID
+paramter is a sequence ID for this command in a manner identical to the
+.B TO
+command.
+.RE
+.TP
+.BI "CLR " id
+Remove object with internal ID
+.I id
+from the map.
+The
+.I id
+may also be one of the following special values:
+'\" <<desc>>
+.RS
+.TP 20
+.B *
+Remove all objects from the map.
+.TP
+.B E*
+Remove all map elements (non-creatures).
+.TP
+.B M*
+Remove all monster tokens.
+.TP
+.B P*
+Remove all player tokens.
+.TP
+.RI [ imagename \fB=\fP] name
+Remove the creature with the given
+.IR name .
+.RE
+'\" <</>>
+.TP
+.BI "CLR@ " id
+Retrieve the map file with the given
+.I id
+from the server (as the
+.RB \*(lq M@ \*(rq
+command does) but rather than merging its contents with the map,
+the client is to delete the objects described in the file from the local map
+as if 
+.RB \*(lq CLR \*(rq
+were called for each of them.
+.TP
+.BI "CO " state
+Set combat mode on or off based on the boolean value
+.IR state .
+This value SHOULD be 0 for off and 1 for on, but clients MAY interpret any non-zero value to turn
+the combat mode on.
+.TP
+.BI "CS " abs " " rel
+Update the client's clock.
+.RS
+'\" <<desc>>
+.TP 8
+.I abs
+The absolute time as a real number of seconds from the GMA clock's epoch.
+.TP
+.I rel
+The real number of seconds which have elapsed from some GM-designated point of
+reference
+(usually from the start of
+going into initiative).
+'\" <</>>
+.RE
+.TP
+.BI "D " recipient-list " " dice
+Roll the dice described by the
+.I dice
+parameter, sending the results to all of the authenticated users
+in
+.IR recipient-list .
+This list may include the usernames of other logged-in users.
+The list may also include any of the special symbols:
+'\" <<desc>>
+.RS
+.TP 4
+.B @
+Send back to the user issuing this command.
+.TP
+.B *
+Send to all clients.
+The presence of this in the
+.I recipient-list
+overrides everything else in the list.
+.TP
+.B %
+Send privately to the GM, and
+.I only
+to the GM (i.e., do not send a copy back to the
+user making the die roll, as would normally be done).
+The presence of this in the
+.I recipient-list
+overrides everything else in the list.
+.RE
+'\" <</>>
+.TP
+.BI "DD " definition-list
+Define a personal set of die roll presets. Each entry in
+.I definition-list
+describes a preset and contains three elements:
+.RS
+'\" <<desc>>
+.TP 12
+.I name
+The name of the preset.
+.TP
+.I description
+A long description of what the preset is for.
+.TP
+.I dice
+A list of die roll specifications as appropriate for the
+.B D
+command.
+'\" <</>>
+.LP
+All existing presets for the authenticated user are replaced with
+the set given to this command.
+This will trigger a
+.B DD=
+message to be sent to all peers other than the requesting connection
+which are logged in with the same username.
+.RE
+.TP
+.BI "DD+ " definition-list
+Just as
+.BR DD ,
+but rather than replacing the existing list, the elements of
+.I definition-list
+are added to the existing list. 
+This will trigger a
+.B DD=
+message to be sent to all peers other than the requesting connection
+which are logged in with the same username.
+.TP
+.BI "DD/ " regex
+Deletes all elements from the die-roll preset for the requesting
+user whose names match the regular expression
+.IR regex .
+This will trigger a
+.B DD=
+message to be sent to all peers other than the requesting connection
+which are logged in with the same username.
+.TP
+.B DD=
+Begins a dump of defined dice rolls in response to a
+.B DR
+command. It is followed by a number of 
+.B DD:
+commands, and ultimately by a
+.B DD.
+command at the end of the list.
+The
+.BR DD= ,
+.BR DD: ,
+and
+.B DD.
+commands are not sent by clients, only by the server.
+.TP
+.BI "DD: " i " " name " " desc " " dice
+Gives a preset dice roll definition. The fields are:
+.RS
+'\" <<desc>>
+.TP 10
+.I i
+The position in the list, starting with 0.
+.TP
+.I name
+The name for this preset.
+.TP
+.I desc
+The description for this preset.
+.TP
+.I dice
+The list of dice rolls to make.
+.RE
+'\" <</>>
+.TP
+.BI "DD. " count " " checksum
+Ends the list started with
+.B DD=
+in the same manner as the
+.B LS.
+command (see below).
+.TP
+.BI "DENIED " message
+Access to the server is denied. The server will send this to a client; no client
+should send it.
+.TP
+.BI "DR"
+Retrieve the authenticated user's die roll presets. This should
+result in the server sending the
+.B DD=
+command back to the requesting client. 
+.TP
+.BI "DSM " condition " " shape " " color
+Define a new status marker for creatures with the named
+.IR condition .
+If there was already a marker defined for that condition, it is replaced with the new
+definition. If either 
+.I shape
+or
+.I color
+is the empty string (noted as 
+.RB \*(lq {} \*(rq
+in this data format), then the condition is effectively removed from the list of conditions
+known to the mapper. Creature conditions are in effect if their name appears in the list value
+for that creature's 
+.B STATUSLIST
+attribute as documented in
+.BR mapper (5).
+'\" <<desc>>
+.RS
+.TP 10
+.I condition
+This is an aribtrarily-named string that describes the creature's condition that will be noted
+with a special mark on their token. The mapper comes with the following conditions pre-defined:
+.BR "ability drained" ,
+.BR bleed ,
+.BR blinded ,
+.BR confused ,
+.BR cowering ,
+.BR dazed ,
+.BR dazzled ,
+.BR deafened ,
+.BR disabled ,
+.BR dying ,
+.BR "energy drained" ,
+.BR entangled ,
+.BR exhausted ,
+.BR fascinated ,
+.BR fatigued ,
+.BR flat-footed ,
+.BR frightened ,
+.BR grappled ,
+.BR helpless ,
+.BR incorporeal ,
+.BR invisible ,
+.BR nauseated ,
+.BR panicked ,
+.BR paralyzed ,
+.BR petrified ,
+.BR pinned ,
+.BR poisoned ,
+.BR prone ,
+.BR shaken ,
+.BR sickened ,
+.BR stable ,
+.BR staggered ,
+.BR stunned ,
+and
+.BR unconscious .
+Remember that values with embedded spaces need to be surrounded by braces
+(e.g., 
+.RB \*(lq {ability
+.BR drained} \*(rq).
+.TP
+.I shape
+The shape of the marker to be placed if the creature has this condition.
+The mapper will attempt to arrange multiple markers with the same shape such
+that they are all visible at the same time. This value may be one of the 
+'\" <<TeX>>
+'\"symbols shown in Table~\ref{tbl:manpages:mapper:6:conditions}.
+'\"\begin{table}
+'\" \begin{center}
+'\"  \begin{tabular}{lp{4in}}\toprule
+'\"   \bfseries Symbol & \bfseries Description of Indicator \\\midrule
+'\"    \z{|v} & A small downward-pointing triangle against the middle of the left edge of the token.
+'\"             (This is a lower-case ``\z{v}''.)\\
+'\"    \z{v|} & A small downward-pointing triangle against the middle of the right edge of the token.
+'\" (This is a lower-case ``\z{v}''.)\\
+'\"    \z{|o} & A small circle against the middle of the left edge of the token.
+'\" (This is a lower-case ``\z{o}''.)\\
+'\" \z{o|} & A small circle against the middle of the right edge of the token.
+'\" (This is a lower-case ``\z{o}''.)\\
+'\" \z{|<>} & A small diamond against the middle of the left edge of the token.\\
+'\" \z{<>|} & A small diamond against the middle of the right edge of the token.\\
+'\" \z{/} & A slash (upper right to lower left) through the entire token.\\
+'\" \z{\textbackslash} & A back-slash (upper left to lower right) through the entire token.\\
+'\" \z{//} & A double slash (upper right to lower left) through the entire token.\\
+'\" \z{\textbackslash\textbackslash} & A double back-slash (upper left to lower right) through the entire token.\\
+'\" \z{-} & A single horizontal line drawn through the center of the entire token.\\
+'\" \z{=} & A double horizontal line drawn through the center of the entire token.\\
+'\" \z{|} & A single vertical line drawn through the center of the entire token.\\
+'\" \z{||} & A double vertical line drawn through the center of the entire token.\\
+'\" \z{+} & A cross drawn through the entire token.\\
+'\" \z{\#} & A hash-mark drawn through the entire token.\\
+'\" \z{V} & A large downward triangle drawn around the entire token.  (This is an upper-case letter ``\z{V}''.)\\
+'\" \z{\textasciicircum} & A large upward triangle drawn around the entire token.\\
+'\" \z{<>} & A large diamond drawn around the entire token.\\
+'\" \z{O} & A large circle drawn around the entire token. (This is an upper-case letter ``\z{O}''.)\\
+'\" \bottomrule
+'\" \end{tabular}
+'\" \caption{Condition Marker Symbols\label{tbl:manpages:mapper:6:conditions}}
+'\" \end{center}
+'\"\end{table}
+following:
+.RS
+.TP
+.B |v
+A small downward-pointing triangle against the middle of the left edge of the token.
+(This is a lower-case \*(lqv\*(rq.)
+.TP
+.B v|
+A small downward-pointing triangle against the middle of the right edge of the token.
+(This is a lower-case \*(lqv\*(rq.)
+.TP
+.B |o
+A small circle against the middle of the left edge of the token.
+(This is a lower-case \*(lqo\*(rq.)
+.TP
+.B o|
+A small circle against the middle of the right edge of the token.
+(This is a lower-case \*(lqo\*(rq.)
+.TP
+.B |<>
+A small diamond against the middle of the left edge of the token.
+.TP
+.B <>|
+A small diamond against the middle of the right edge of the token.
+.TP
+.B /
+A slash (upper right to lower left) through the entire token.
+.TP
+.B \e
+A back-slash (upper left to lower right) through the entire token.
+.TP
+.B //
+A double slash (upper right to lower left) through the entire token.
+.TP
+.B "\e\e"
+A double back-slash (upper left to lower right) through the entire token.
+.TP
+.B \-
+A single horizontal line drawn through the center of the entire token.
+.TP
+.B =
+A double horizontal line drawn through the center of the entire token.
+.TP
+.B |
+A single vertical line drawn through the center of the entire token.
+.TP
+.B ||
+A double vertical line drawn through the center of the entire token.
+.TP
+.B +
+A cross drawn through the entire token.
+.TP
+.B #
+A hash-mark drawn through the entire token.
+.TP
+.B V
+A large downward triangle drawn around the entire token.
+(This is an upper-case letter \*(lqV\*(rq.)
+.TP
+.B ^
+A large upward triangle drawn around the entire token.
+.TP
+.B <>
+A large diamond drawn around the entire token.
+.TP
+.B O
+A large circle drawn around the entire token.
+(This is an upper-case letter \*(lqO\*(rq.)
+.RE
+'\" <</TeX>>
+.TP
+.I color
+The color to draw the marker in any of the forms documented
+above, or the special value
+.RB \*(lq * \*(rq,
+which means to draw the marker in the same color as the creature's
+threatened area.
+.RS
+.LP
+If 
+.I color
+begins with 
+.RB \*(lq \-\- \*(rq
+then the marker is drawn with dashed lines instead of solid ones.
+If it begins with
+.RB \*(lq .. \*(rq
+then the effect is the same, but the dashes are shorter.
+.RE
+'\" <</>>
+.RE
+.TP
+.BI "GRANTED " name
+Access to the server is granted. The server will send this to a client; no client should send it.
+.TP
+.BI "I " time " " id
+Update the time clock for initiative-based actions.  If the mapper
+is in combat mode, the clock display is updated accordingly.
+The
+.I time
+parameter is a list of five values, in this order:
+.RS
+'\" <<desc>>
+.TP 4
+.I r
+Number of rounds elapsed since start of combat.
+.TP
+.I c
+The initiative count within the round. This is a number from 0\-59, which
+indicates which of 60 possible
+initiative slots is currently active. Since this means we are effectively
+dividing the round into 60 equal parts, each \*(lqcount\*(rq represents 0.1 seconds
+of game time.
+.TP
+.I s
+Number of seconds elapsed.
+.TP
+.I m
+Number of minutes elapsed.
+.TP
+.I h
+Number of hours elapsed.
+'\" <</>>
+.LP
+The 
+.I id
+parameter gives
+the name of the creature whose turn it is.  This may be
+the name of a player or monster (exactly matching one of the values
+given by the
+.B \-c
+option(s), or creatures added via 
+.RB \*(lq AC \*(rq
+commands),
+the unique ID for a creature,
+the special string
+.RB \*(lq *Monsters* \*(rq
+(to indicate that all tokens of type \*(lqmonster\*(rq get to act now),
+or the empty string (written as
+.RB \*(lq {} \*(rq
+due to the rules for Tcl list string representation) which means no one has initiative at this point in time.
+.LP
+Alternatively, if
+.I id
+begins with a slash
+.RB (\*(lq / \*(rq),
+then all creatures whose names match the regular expression
+.I id
+(not including the leading slash)
+are selected.
+.LP
+If the mapper client is not in combat mode, this command 
+'\"will remove the clock
+'\"(if still displayed) and reset all combatants to their neutral appearance.
+has no effect.
+.RE
+.TP
+.BI "IL " slot-list
+Update the initiative list. The 
+.I slot-list
+parameter given is a list of an arbitrary number of sub-lists. Each
+sub-list consists of the following six values which describe a combatant:
+.RS
+'\" <<desc>>
+.TP 8
+.I name
+The creature's name as it appears on the map. This must be unique with respect to the other
+creatures listed. It may have the forms acceptable to the
+.RB \*(lq AC \*(rq
+command.
+.TP
+.I hold
+Boolean value; if true, this person is holding their action.
+.TP
+.I ready
+Boolean value; if true, this person is not only holding their action (and thus the
+.I hold
+field should also be true) but have a readied action waiting to trigger.
+.TP
+.I hp
+Their current hit point total.
+.TP
+.I flat
+Boolean value; if true, this person is flat-footed. 
+.TP
+.I slot
+The slot number in the initiative list for this combatant. (An integer from 
+0\-59 as described above.)
+.RE
+'\" <</>>
+.TP
+.BI "L " filename-list
+Load one or more map files into the mapper. The current contents of the client's
+map canvas are to be deleted, then the named
+.I file
+loaded from disk. Its contents are as documented in 
+.BR mapper (5).
+The objects described in the file are added to the local map. For completeness
+(and consistency with the
+.RB \*(lq M \*(rq
+command), multiple files may be named, but since the map contents are cleared
+before each one, only a single file should be specified with this command.
+The files must be accessible from the local mapper process (and relative pathnames
+are relative to its current working directory).
+The braces are merely illustrative in this case. The argument to this command is a
+TCL list of filenames.
+.TP
+.B LS
+Begin loading an object from the data stream rather than from
+a map file. This is analogous to the
+.RB \*(lq AI \*(rq
+\&...
+.RB \*(lq AI: \*(rq
+\&...
+.RB \*(lq AI. \*(rq
+sequence of commands described above.
+.TP
+.BI "LS: " data
+The map data
+are loaded from the sequence of 
+.RB \*(lq LS: \*(rq
+commands as if read from a local map file, one line of data
+(i.e., one object attribute record) per command.
+.TP
+.BI "LS. " count " " checksum
+Following the last data packet, this line terminates the stream
+transfer.  See 
+.RB \*(lq AI. \*(rq
+for a description of how this command ends the data sequence.
+The 
+.I checksum
+value is calculated as the SHA-256 hash of the
+.I data
+values of each command.
+.TP
+.BI "M " file-name-list
+Merge one or more map files into the mapper.  This is just like the load
+.RB (\*(lq L \*(rq)
+command, except the contents of the file are 
+'\" <</ital-is-var>>
+.I "added to"
+'\" <<ital-is-var>>
+the existing mapper contents rather than replacing them.
+Since the argument to this command is a Tcl list, braces enclose it if there
+is more than one filename. Examples:
+'\" <<TeX>>
+'\" \begin{verbatim}
+'\" M room12.map
+'\" M {room1.map room2.map room3.map}
+'\" M {room4.map {south corridor.map}}
+'\" \end{verbatim}
+.RS
+.RS
+.na
+.nf
+.B "M room12.map"
+.B "M {room1.map room2.map room3.map}"
+.B "M {room4.map {south corridor.map}}"
+.fi
+.ad
+'\" <</TeX>>
+.RE
+.RE
+.TP
+.BI "M? " id
+Ensure that we have a locally-cached copy of a map file with the given
+.IR id .
+This performs an operation similar to that of
+.RB \*(lq AI@ \*(rq
+(looking for a file with a
+.RB \*(lq .map \*(rq
+suffix on the server)
+in that it checks to see that a cached copy exists. If it does but isn't
+recent enough, it will check the server to see if a newer version exists
+there. If no cached version is found or the server has a newer one, the file
+is downloaded to the cache. It does not actually load the map file, however.
+See
+.RB \*(lq M@ \*(rq.
+The 
+.I id
+has the same form as that allowed for
+.RB \*(lq AI@ \*(rq.
+.TP
+.BI "M@ " id
+Identical to
+.RB \*(lq M? \*(rq
+but will then merge the contents of the map file with the current map data in the
+same fashion as the
+.RB \*(lq M \*(rq
+command does.
+.TP
+.BI "MARK " x " " y
+Make a brief animated marker at the specified coordinates to draw attention
+to that space.
+.TP
+.B MARCO
+Status check. If received, reply with a 
+.B POLO
+command.
+.B N.B.
+It is important that your client not ignore these occasional ping messages.
+For example, if your client is too slow receiving messages such that the
+server needs to expend extra work to queue them up for you, it will be
+willing to do so if you have been at least responding to
+.B MARCO
+messages. If you haven't, the server will suspect your client has locked up
+or is not going to be able to catch up with the data being sent to it, and
+may decide to terminate the client's connection.
+.TP
+.B NO
+Request that the server send no more data to the client.
+.TP
+.B NO+
+Same as 
+.BR NO ,
+but the client is also asserting primary control role to the other clients.
+(This is generally done by the GM console. The effect is that the server sends
+a 
+.RB \*(lq TB
+.BR 0 \*(rq
+command to tell all mapper clients to turn off their toolbars (unless, of course,
+they were invoked with the
+.B \-\-keep\-tools
+option) and the server will automatically tell all clients which connect after this
+point to start with their toolbars disabled as well.)
+Once all \*(lqprimary\*(rq clients (those who issued this command) have disconnected,
+the server will stop telling new clients to turn off their toolbars.
+'\" <</ital-is-var>>
+.I "This is deprecated. In the future, the concept of a primary client will not be"
+.I "supported by servers, and management of toolbars will be at the clients' discretion."
+'\" <<ital-is-var>>
+.TP
+'\".BI "OA " id " {{" key1 " " val1 "} {" key2 " " val2 "} \fR...\fP {" keyN " " valN }}
+'\".BI "OA " id " {" "key1 val1 key2 val2 \fR...\fP keyN valN" }
+.BI "OA " id " " kvlist
+Update a set of arbitrary attributes for the object with the given
+.IR id .
+The
+.I id
+is either the unique identifier for the given object, or has the form
+.BI @ name
+where
+.I name
+is the name of a creature in any of the forms accepted by the
+.RB \*(lq AC \*(rq
+command.
+.RS
+.LP
+The
+.I kvlist
+parameter is a list with an even number of elements. The first gives the
+name of an attribute. The next gives a new value for that attribute, and so on
+by pairs to specify a set of attributes to change.
+.LP
+For example, the command
+'\" <<center>>
+.RS
+.B "OA 12345 {X 13 Y 47}"
+.RE
+alters the
+.B X
+and 
+.B Y
+attributes of the object with ID
+.B 12345
+to the values 13 and 47, respectively. For a typical map element,
+this will move the object so its reference point is at coordinates (13, 47).
+.LP
+Note that there was an implicit assumption in the past that the
+.B NAME
+attribute would not change and it could be used as an immutable identifier
+within a map client for a creature token. However, this is not the case and
+in fact GMA now includes explicit features to change this very attribute.
+Clients must be prepared to deal with the consequences of a change to any
+attribute, including
+.BR NAME .
+The 
+.B mapper
+client itself does this correctly starting with version 3.39.
+.RE
+.TP
+.BI "OA+ " id " " key " " vlist
+Assuming that the object with the given
+.I id
+(which may be specified as described for the 
+.B OA
+command) has an attribute 
+.I key
+whose value is actually a list of values
+(e.g., the
+.B STATUSLIST
+attribute of creature objects), this command adds the values from
+.I vlist
+to that attribute's list. If any value was already in the
+attribute's list, it is not added again.
+.TP
+.BI "OA\- " id " " key " " vlist
+Just like 
+.B OA+
+but removes the specified values from the attribute's list rather than
+adding them. It is not an error if any of them did not already exist. 
+.TP
+.BI "OK " v " \fR[\fP" challenge \fR]\fP
+The server sends this to the client after the initial set of messages that are sent upon connection.
+It signals that those messages are over and the server is now ready to listen to the client.
+The
+.I v
+value is an integer which indicates the protocol version supported by the service.
+Map clients which do not support that protocol should warn their users to upgrade.
+.RS
+.LP
+If present, the
+.I challenge
+value is a base-64-encoded authentication challenge. A client must successfully
+respond with a valid
+.B AUTH
+command before any of its commands to the server will be accepted. The server will also
+refuse to send the client any map updates until it has successfully authenticated.
+.RE
+.TP
+.BI "PRIV " message
+Notice from the server that a command sent by the client is denied due to
+insufficient privilege. Clients should not send this command.
+.TP
+.B POLO
+No-op. Ignore if received.
+.TP
+.BI "PS " id " " color " " name " " area " " size " player|monster " x " " y " " reach
+Place a creature token on the map. This may be used to define a new creature object
+if no object with the given
+.I id
+already exists, or replaces an existing token with the (possibly different) paramters
+given.
+.RS
+'\" <<desc>>
+.TP 8
+.I id
+The internal ID by which this creature is to be known. This must be unique. The client
+which creates the character token locally should create a unique ID, which is then broadcast
+via this command to the other clients, which use the same ID.
+.TP
+.I color
+The color used to shade the creature's threat zone when they have initiative to act.
+It has the same forms as accepted by the
+.RB \*(lq AC \*(rq
+command.
+.TP
+.I name
+The name of the creature as will be displayed on the token. 
+It has the same forms as accepted by the
+.RB \*(lq AC \*(rq
+command.
+.TP
+.I area
+The size of the threat zone around the creature.
+It has the same forms as accepted by the
+.RB \*(lq AC \*(rq
+command.
+.TP
+.I size
+The size of the creature itself.
+It has the same forms as accepted by the
+.RB \*(lq AC \*(rq
+command.
+.TP
+.I type
+This is either the constant string
+.RB \*(lq player \*(rq
+or
+.RB \*(lq monster \*(rq,
+to indicate whether the creature is generally considered an ally or adversary (respectively)
+to the players. The only effect this has is that creatures of
+.RB \*(lq monster \*(rq
+type may be selected by the special token
+.RB \*(lq *Monsters* \*(rq
+when specifying whose turn it is in initiative, and are deleted by the
+.RB \*(lq "CLR M*" \*(rq
+command, while player type creatures are deleted by the
+.RB \*(lq "CLR P*" \*(rq
+command.
+.TP
+.I x
+The location on the
+.I x
+axis for the creature's reference point (upper-left corner). 
+.B Note 
+that this
+is in 
+'\" <</ital-is-var>>
+.IR "grid units" .
+'\" <<ital-is-var>>
+The leftmost square of the map is 0, the next square to the right is 1, and so forth.
+Creatures smaller than \*(lqsmall\*(rq size category may be placed with fractional
+values such as 0.5 for the right half of the left-most square on the map.
+.TP
+.I y
+Like
+.IR x ,
+but along the 
+.I y
+axis.
+.TP
+.I reach
+Boolean value; if true, the creature is wielding a reach weapon and thus has an extended
+threat zone.
+.RE
+'\" <</>>
+.TP
+.BI "ROLL " from " " recipient-list " " title " " result " " structured-result-list " " message-ID
+Reports the results of a die roll initiated by the
+.B D
+command. The values given are:
+.RS
+'\" <<desc>>
+.TP 23
+.I from
+The user who initiated the roll.
+.TP
+.I recipient-list
+The list of users to receive this notice, in a form identical to the
+.B TO
+command.
+.TP
+.I title
+A descriptive title for the die roll. This may be the empty string.
+.TP
+.I result
+The numeric result of the die roll.
+.TP
+.I structured-result-list
+A list of tuples describing the actual die rolls that resulted in the reported 
+.I result
+value. See
+.BR dice (3)
+for a description of what this list may look like.
+.TP
+.I message-ID
+A server sequence for the message as described for the
+.B TO
+command.
+.RE
+'\" <</>>
+.TP
+.BI "SYNC \fR[\fPCHAT \fR[\fP" target \fR]]\fP
+This command is
+'\" <</ital-is-var>>
+.I not
+'\" <<ital-is-var>>
+recognized by any client (if a client receives one, it should simply ignore it) and is not
+relayed by the server to any other clients. Instead, this is a request by a client to the 
+server itself. The client should completely clear its internal state before making this
+request. In response, the server will send to the client its understanding of the current
+state of the game. This should catch up the client to match what the other map clients are seeing.
+.RS
+.LP
+If a parameter with the word
+.B CHAT
+is added, then the chat message history is synced to the client instead of the map contents.
+In this case the optional paramter
+.I target
+may be used to get only a subset of the chat history. If 
+.I target
+is a negative integer
+'\" <</ital-is-var>>
+.I \-n
+then only the most recent
+.I n
+'\" <<ital-is-var>>
+messages are sent; otherwise it is assumed to be the 
+.I message-ID
+the client last saw, so only messages with IDs higher than
+.I target
+are sent.
+.LP
+A server may be configured to perform a sync operation upon client connection (after, if 
+required, authentication) without the client explicitly sending a
+.RB \*(lq SYNC \*(rq
+command to it.
+.RE
+.TP
+.BI "TB " state
+If
+.I state
+is a boolean true value, display the toolbar in the mapper client, otherwise hide it.
+A client may choose to disregard this command.
+.TP
+.BI "TO " from " " recipient-list " " message " " message-ID
+Send chat message to a set of recipients. The values in the recipient
+list are as described above for the
+.B D
+command. The
+.I from
+parameter is ignored when received from a client and may be the empty string. It is replaced
+by the username of the sender when the server resends the command out to all clients.
+The
+.I message-ID
+value is ignored when sent by clients, but when the server relays this out to the
+peer clients, it will add a unique (and sequentially increasing) value to identify
+the message. Clients can use this to request updates via the
+.B "SYNC CHAT"
+command or to sort messages chronologically.
+.TP
+.B /CONN
+For diagnostic purposes, this command causes the server to send a summary of the
+connections it is currently serving. These are sent back to the client
+using the
+.B CONN
+\&...
+.B CONN:
+\&...
+.B CONN.
+command series.
+It is not passed on to peer clients.
+.TP
+.B CONN
+Begin a sequence of data records describing current connected clients. This is
+followed by a number of
+.B CONN:
+commands.
+.TP
+.BI "CONN: " i " you|peer " addr " " user " " client " " auth? " " primary? " " w/o? " " polo
+Gives one data record describing a connection to the server. The fields included are:
+.RS
+'\" <<desc>>
+.TP 10
+.I i
+Position in the data list, starting with 0.
+.TP
+.BR you | peer
+Indicates if this describes the requesting client or a peer connection.
+.TP
+.I addr
+The IP address of the connection.
+.TP
+.I user
+The username given by the client when logging in.
+.TP
+.I client
+The client tool using that connection.
+.TP
+.I auth?
+A boolean value, true if the connection authenticated successfully.
+.TP
+.I primary?
+A boolean value, true if the connection asserted primary mode.
+.TP
+.I w/o?
+A boolean value, true if the connection is in write-only mode (will send commands to the server
+but it not listening for any replies).
+.TP
+.I polo
+The number of seconds (which may be an integer or real number) since the last
+.B POLO
+command was received from this client. This may help debug stuck clients or
+dropped connections.
+.RE
+'\" <</>>
+.TP
+.BI "CONN. " count " " checksum
+Marks the end of the sequence of data records, just as the
+.B LS.
+command does (q.v.). The
+.I checksum
+value may be 0, in which case there is no calculated checksum provided.
+'\" <</>>
+'\" <<TeX>>
+'\" \label{manpage:mapper:6:protocol:end}
+'\" <</TeX>>
+.SH "WEIRD SIZES"
+.LP
+While the mapper implements the standard d20/Pathfinder creature size categories,
+including tall (uppercase) and wide (lowercase) variants, sometimes there are special
+cases which fall outside that list. The following special codes are also usable:
+'\" <<desc>>
+.TP 10
+.B M20/m20
+Medium creature (5-foot space, 5-foot threat zone) with a 20-foot reach zone.
+.TP
+.B L0/l0
+10-foot swarm (10-foot space, no threat or reach zone).
+'\" <</>>
+.SH INSTALLATION
+.LP
+To run the mapper, you'll need an up-to-date Tcl/Tk interpreter (8.6 or later), 
+and the following packages
+in your Tcl runtime library:
+'\" <<itemize>>
+.TP 3
+\(bu
+uuid
+.TP
+\(bu
+base64
+.TP
+\(bu
+struct::queue
+.TP
+\(bu
+tklib
+'\" <</>>
+.LP
+Additionally you will need a copy of
+.BR curl (1)
+installed on your system. 
+.LP
+If you will be uploading content to the web server (and are authorized to do so),
+you will also need to have
+.BR ssh (1)
+and 
+.BR scp (1)
+on your system.
+.LP
+You will need to ensure that the paths to these commands, server name(s), data paths, etc,
+are configured correctly for your needs as well.
+.SH "SEE ALSO"
+.LP
+.BR curl (1),
+.BR scp (1),
+.BR ssh (1),
+.BR dice (3),
+.BR dice (5),
+.BR mapper (5),
+.BR gma (6).
+.LP
+The wiki page 
+.B "https://www.madscience.zone/gamers/wiki/GmaSoftwareDevelopment/Protocols/MapperProtocol"
+contains more detail on the map protocol, but this manpage is the definitive reference
+to the protocol.
+.SH AUTHOR
+.LP
+Steve Willoughby / steve@madscience.zone;
+John Mechalas (elevation and movement modes).
+.SH HISTORY
+.LP
+This document describes version 3.39 of 
+.BR mapper .
+(A previous version of this manpage erroneously listed the mapper version as 4.)
+A version of 
+.B mapper
+was also in version 3 of GMA, but was different in operation.
+.LP
+As of version 3.25, the operation of the "Push to other clients" button was changed
+so that it only works in store-and-forward mode (and is thus reserved essentially
+for privileged users only). This was done because the old function of that button
+is no longer needed and tended to cause more trouble than it was worth anyway.
+.LP
+Also changed in 3.25 is the function of the "Sync" button. It used to simply attempt to
+reconnect a client to the server (which should automatically happen anyway). Now, since
+the server tracks game state, simply exiting and restarting the map client accomplishes
+the same effect (possibly better). Now this button requests a "sync" operation with the
+server. 
+.LP
+This document also describes map protocol version 332,
+which added the
+.B GRANTED
+server response, guaranteeing that
+.B AUTH
+will be followed by a response in any case.
+.LP
+Version 331
+changed the way persistent
+chat messages are managed, altering the
+.BR ROLL ,
+.BR TO ,
+.BR SYNC ,
+and
+.BR CC
+commands.
+.LP
+Version 329 added
+the
+.B CC
+command and the extended form of
+.BR SYNC .
+.LP
+Previously, version 328 introduced
+the 
+.B ACCEPT
+command.
+.LP
+Version 327 added 
+the 
+.B DENIED
+and
+.B PRIV
+response commands.
+.LP
+Version 326 added support
+for chat channels and die rolling, and changed the response from the
+.B /CONN
+command to be a structured sequence of data records rather than sending
+the reply in comments.
+.LP
+Protocol 325 added
+connection debugging support by changing the
+.B AUTH
+command and adding
+.BR /CONN .
+.LP
+The version 324 protocol added the
+.BR DSM ,
+.BR OA+ ,
+and
+.BR OA\-
+protocol commands. This version of the protocol also assumes mapper file format
+15 is being used.
+.LP
+Previously, protocol version 323 added support for server-side persistent 
+state and the introduction of the
+.B SYNC
+protocol command.
+.LP
+Protocol version 322 added comments to version 321.
+.LP
+Protocol version 321 added authentication support to the 
+capabilities of protocol 320.
+.LP
+Map protocol version 320 has the same commands as 319, but the
+.B HEALTH
+attribute of creatures changed from map version 12 to 13, so we are advancing the protocol
+version at the same time since maps released for protocol 319 were expecting the older map
+format.
+.LP
+Map protocol version 319 differs from version 318 (the first explicitly
+numbered version) by the addition of the
+.BR CLR@ ,
+.BR M? ,
+and
+.B M@ 
+commands.
+.SH COMPATIBILITY
+.LP
+This program requires a reasonably modern version of Tcl/Tk, tcllib and tklib to function properly.
+We strongly recommend running it with the latest versions of all of those.
+.LP
+It is known to run on the macOS Mojave platform (tested on 10.14.6), 
+macOS Catalina (tested on 10.15.3, but note that Apple's support for python3, tcl, and tk is such that
+you may want to install your own versions of those tools); and should run fine on any
+modern *NIX-like platform (tested on FreeBSD 12.0, Ubuntu 18.04 LTS, and Ubuntu 16.04 LTS).
+.LP
+It was also tested (briefly) on Windows 10. Specific notes about
+using it on that platform are in the following section.
+'\"Whether it will run correctly on Microsoft Windows is anyone's guess. It should at least have some
+'\"code added to properly handle what pathnames look like on that platform, but fully porting it to
+'\"Windows should be a fairly easy job to perform.
+.SH "WINDOWS USAGE"
+.LP
+To install on Windows, you will need to install the following
+products in addition to GMA:
+'\" <<itemize>>
+.TP 4
+\(bu
+A Tcl/Tk interpreter. We tested with Active Tcl 8.6 from
+.IR activestate.com .
+.TP
+\(bu
+The Curl utility. We tested with Curl 7.67.0 from
+.IR curl.haxx.se .
+.TP
+\(bu
+The SSH shell program, including the SCP command for copying 
+files (if you want to use the store and forward mode to send
+data to the server; note that this requires authorization to 
+perform that action by the server administrator and that you
+have configured the SSH/SCP program(s) with the valid credential
+certificates). We tested with PuTTY 0.73 from
+.IR www.chiark.greenend.org.uk .
+'\" <</>>
+.LP
+By default, the 
+.B mapper
+program will try to load its configuration file from 
+.IB homedir "\e.gma\emapper\emapper.conf"
+if that file exists, where 
+.I homedir
+is the user's home directory. This allows the mapper to be
+launched by double-clicking its file icon without needing to
+provide command-line options.
+.LP
+We recommend that you set up this configuration file before
+starting, since we don't currently have a fancy Windows installer
+wizard thingy to configure it for you.
+.LP
+In this file, you will need at a minimum to tell the mapper
+where to find the 
+.B curl
+program and the network locations in use for your game. 
+For example:
+'\" <<TeX>>
+'\" \begin{SourceCode}
+'\" curl-path=C:\ecurl-7.67.0-win64-mingw\ebin\ecurl.exe
+'\" curl-url-base=https://www.example.org/game/map
+'\" host=www.example.org
+'\" port=2323
+'\" proxy-url=http://proxy.example.org:1080
+'\" \end{SourceCode}
+.LP
+.RS
+.nf
+.na
+.B "curl-path=C:\ecurl-7.67.0-win64-mingw\ebin\ecurl.exe"
+.B "curl-url-base=https://www.example.org/game/map"
+.B "host=www.example.org"
+.B "port=2323"
+.B "proxy-url=http://proxy.example.org:1080"
+.ad
+.fi
+.RE
+'\" <</TeX>>
+.LP
+If your game does not use a network server at all, it's possible
+you won't need a configuration file.
+.LP
+Handling of standard output and standard error devices for
+printing messages is not as well-supported in Windows as in
+Unix-like operating systems, so the mapper will attempt to place
+output in files called
+.BI mapper. pid .stdout
+and
+.BI mapper. pid .stderr
+in the
+.IB homedir "\e.gma\emapper\elogs"
+directory. If the mapper just silently fails to start, look
+in those to see if there were fatal error messages recorded there.
+.LP
+The mapper does not currently support being the forwarder in a 
+store and forward configuration for Windows clients.
+.SH FILES
+'\" <<desc>>
+.TP
+.B ~/.gma/mapper/mapper.conf
+Default configuration file read if no explicit
+.B \-C
+or
+.B \-\-config
+option is given.
+.TP
+.B ~/.gma/mapper/style.conf
+Default custom style configuration file read if no explicit
+.B \-s
+or
+.B \-\-style
+option is given.
+.TP
+.B ~/.gma/mapper/debug.log
+Location where debugging messages are written in addition to being displayed in the debugging window.
+.TP
+.B ~/.gma/mapper/logs
+Runtime logfiles are stored here for each execution of the mapper.
+.TP
+.B ~/.gma/mapper/cache
+Cached copies of images and other content are stored here to improve speed of the mapper.
+'\" <</>>
+.SH BUGS
+.LP
+There are numerous hacks in the program which really should not be there.
+In fact, at this point the thing just needs to be rewritten using the newer
+GMA code base.
+.LP
+Calculation of threatened spaces needs to take elevation into account.
+.LP
+Arrowheads need to be drawn bigger.
+.LP
+The
+.B \-h
+option really should have been for
+.B \-\-help
+to conform to usual command-line conventions, and the 
+.B \-\-host
+option should instead have been
+.BR \-H .
+This may change in the future.
+.LP
+In previous versions,
+.B \-\-keep\-tools
+.RB ( \-k )
+was called 
+.B \-\-master
+.RB ( \-m ),
+but this never really made sense, as it didn't really mean the mapper
+was in any sort of controlling or leadership role. It only meant it would
+refuse to turn off its own toolbar if asked to do so. The new name is
+more descriptive of the actual function.
+.SH COPYRGHT
+Part of the GMA software suite, copyright \(co 1992\-2021 by Steven L. Willoughby (Software Alchemy), Aloha, Oregon, USA. All Rights Reserved. Distributed under BSD-3-Clause License. \"@m(c)@
