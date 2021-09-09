@@ -46,6 +46,14 @@ full tutorials describing how to use the mapper (in addition to the rest of GMA)
 Players should refer to Appendix G, while the GM would want to read Chapters 4, 5, and
 possibly 8–10.
 
+### Standalone Note
+In the documentation, the invocation of the `mapper` client is shown as
+`gma mapper ...` which only makes sense if using the full GMA toolset. The
+`gma` script merely sets up some convenient environment variables and allows
+you to avoid having to have all the bits of GMA in your `$PATH`. When using
+`mapper` on its own, merely execute `bin/mapper.tcl` as a command by having
+it in your `$PATH` or using the Tcl/Tk `wish` command (e.g. `wish mapper.tcl`).
+
 ## Versioning
 Until the mapper is rewritten in Python and/or Go, it has its own 3._x_ version
 number. Once it is ported, that will bump its version to 4._x_. We have not yet
