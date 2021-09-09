@@ -62,3 +62,5 @@ separate.
 
 ## Other Software
 Includes Paul Walton's scrollable frame code `sframe.tcl`, available at [http://wiki.tcl.tk/9223]().
+
+Also uses a modified version of [Silk Icons](http://www.famfamfam.com/lab/icons/silk/).
