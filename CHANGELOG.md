@@ -3,10 +3,9 @@ Release Notes
 Version 3.40.10 * Thursday, 24th June, 2021
 
 Represents:
-  GMAVersionNumber="4.3.7"			@@##@@
-  GMAMapperVersion="3.40.10"			@@##@@
-  GMAMapperFileFormat="17"			@@##@@
-  GMAMapperProtocol="332"			@@##@@
+ * Supported GMA Mapper Version: 3.40.10      <!-- @@##@@ -->
+ * Supported GMA Mapper File Format: 17	      <!-- @@##@@ -->
+ * Supported GMA Mapper Protocol: 332         <!-- @@##@@ -->
 
 # 3.40.10
 Moved out of the main GMA repository into its own.
