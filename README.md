@@ -54,6 +54,13 @@ you to avoid having to have all the bits of GMA in your `$PATH`. When using
 `mapper` on its own, merely execute `bin/mapper.tcl` as a command by having
 it in your `$PATH` or using the Tcl/Tk `wish` command (e.g. `wish mapper.tcl`).
 
+### Integrated Usage
+If using with the full GMA toolset, the `gma mapper` command will use the environment
+variable `GMA_MAPPER` to find the top-level directory of where you cloned this
+repository (thus `$GMA_MAPPER/bin/mapper.tcl` is the executable mapper script).
+You may need to set `GMA_TCLSH` to point to your `tclsh` interpreter if the `gma`
+script can't find it on its own.
+
 ## Versioning
 Until the mapper is rewritten in Python and/or Go, it has its own 3._x_ version
 number. Once it is ported, that will bump its version to 4._x_. We have not yet
