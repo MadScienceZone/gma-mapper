@@ -1,27 +1,28 @@
 # vi:set ai sm nu ts=4 sw=4 fileencoding=utf-8 expandtab:
 #
 ########################################################################################
-#  _______  _______  _______                ___       ______      ______               #
-# (  ____ \(       )(  ___  )              /   )     / ___  \    / ___  \              #
-# | (    \/| () () || (   ) |             / /) |     \/   \  \   \/   )  )             #
-# | |      | || || || (___) |            / (_) (_       ___) /       /  /              #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ (       /  /               #
-# | | \_  )| |   | || (   ) | Game           ) (           ) \     /  /                #
-# | (___) || )   ( || )   ( | Master's       | |   _ /\___/  / _  /  /                 #
-# (_______)|/     \||/     \| Assistant      (_)  (_)\______/ (_) \_/                  #
+#  _______  _______  _______                ___       ______       __     __           #
+# (  ____ \(       )(  ___  )              /   )     / ___  \     /  \   /  \          #
+# | (    \/| () () || (   ) |             / /) |     \/   \  \    \/) )  \/) )         #
+# | |      | || || || (___) |            / (_) (_       ___) /      | |    | |         #
+# | | ____ | |(_)| ||  ___  |           (____   _)     (___ (       | |    | |         #
+# | | \_  )| |   | || (   ) | Game           ) (           ) \      | |    | |         #
+# | (___) || )   ( || )   ( | Master's       | |   _ /\___/  / _  __) (_ __) (_        #
+# (_______)|/     \||/     \| Assistant      (_)  (_)\______/ (_) \____/ \____/        #
 #                                                                                      #
 ########################################################################################
 # version 1.0, 17 July 2020.
 # Steve Willoughby <steve@madscience.zone>
 #
-# @[00]@| GMA 4.3.7
+# @[00]@| GMA 4.3.11
 # @[01]@|
 # @[10]@| Copyright © 1992–2021 by Steven L. Willoughby
-# @[11]@| (AKA Software Alchemy), Aloha, Oregon, USA. All Rights Reserved.
-# @[12]@| Distributed under the terms and conditions of the BSD-3-Clause
-# @[13]@| License as described in the accompanying LICENSE file distributed
-# @[14]@| with GMA.
-# @[15]@|
+# @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
+# @[12]@| Aloha, Oregon, USA. All Rights Reserved.
+# @[13]@| Distributed under the terms and conditions of the BSD-3-Clause
+# @[14]@| License as described in the accompanying LICENSE file distributed
+# @[15]@| with GMA.
+# @[16]@|
 # @[20]@| Redistribution and use in source and binary forms, with or without
 # @[21]@| modification, are permitted provided that the following conditions
 # @[22]@| are met:
