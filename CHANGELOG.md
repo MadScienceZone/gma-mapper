@@ -1,11 +1,21 @@
 Game Master's Assistant / Mapper Client
 Release Notes
-Version 3.40.10 * Thursday, 24th June, 2021
+Version 3.41.0 * Sunday, 26th September, 2021
 
 Represents:
- * Supported GMA Mapper Version: 3.40.10      <!-- @@##@@ -->
+ * Supported GMA Mapper Version: 3.41.0      <!-- @@##@@ -->
  * Supported GMA Mapper File Format: 17	      <!-- @@##@@ -->
  * Supported GMA Mapper Protocol: 332         <!-- @@##@@ -->
+
+# 3.41.0
+## Enhancements
+When reporting die rolls which are critical confirmation attempts, the die icon
+is reversed in color so that roll is easily distinguished from regular attack
+and other rolls.
+
+## Changes
+Changed icon directory path from `lib/SoftwareAlchemy...` to `lib/MadScienceZone/...`
+to reflect our change in domain name.
 
 # 3.40.10
 Moved out of the main GMA repository into its own.

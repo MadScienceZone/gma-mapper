@@ -1,27 +1,26 @@
 #!/usr/bin/env wish
-# vi:set ai sm nu ts=4 sw=4 fileencoding=utf-8 expandtab:
-#
 ########################################################################################
-#  _______  _______  _______             ______         ___    _______      __    ____ #
-# (  ____ \(       )(  ___  ) Game      / ___  \       /   )  (  __   )    /  \  (  __ #
-# | (    \/| () () || (   ) | Master's  \/   \  \     / /) |  | (  )  |    \/) ) | (   #
-# | |      | || || || (___) | Assistant    ___) /    / (_) (_ | | /   |      | | | | / #
-# | | ____ | |(_)| ||  ___  |             (___ (    (____   _)| (/ /) |      | | | (/  #
-# | | \_  )| |   | || (   ) |                 ) \        ) (  |   / | |      | | |   / #
-# | (___) || )   ( || )   ( | Mapper    /\___/  / _      | |  |  (__) | _  __) (_|  (_ #
-# (_______)|/     \||/     \| Client    \______/ (_)     (_)  (_______)(_) \____/(____ #
+#  _______  _______  _______             ______         ___     __       _______       #
+# (  ____ \(       )(  ___  ) Game      / ___  \       /   )   /  \     (  __   )      #
+# | (    \/| () () || (   ) | Master's  \/   \  \     / /) |   \/) )    | (  )  |      #
+# | |      | || || || (___) | Assistant    ___) /    / (_) (_    | |    | | /   |      #
+# | | ____ | |(_)| ||  ___  |             (___ (    (____   _)   | |    | (/ /) |      #
+# | | \_  )| |   | || (   ) |                 ) \        ) (     | |    |   / | |      #
+# | (___) || )   ( || )   ( | Mapper    /\___/  / _      | |   __) (_ _ |  (__) |      #
+# (_______)|/     \||/     \| Client    \______/ (_)     (_)   \____/(_)(_______)      #
 #                                                                                      #
 ########################################################################################
 #
 # GMA Mapper Client with background I/O processing.
-# @[00]@| GMA 4.3.7
+# @[00]@| GMA 4.3.11
 # @[01]@|
 # @[10]@| Copyright © 1992–2021 by Steven L. Willoughby
-# @[11]@| (AKA Software Alchemy), Aloha, Oregon, USA. All Rights Reserved.
-# @[12]@| Distributed under the terms and conditions of the BSD-3-Clause
-# @[13]@| License as described in the accompanying LICENSE file distributed
-# @[14]@| with GMA.
-# @[15]@|
+# @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
+# @[12]@| Aloha, Oregon, USA. All Rights Reserved.
+# @[13]@| Distributed under the terms and conditions of the BSD-3-Clause
+# @[14]@| License as described in the accompanying LICENSE file distributed
+# @[15]@| with GMA.
+# @[16]@|
 # @[20]@| Redistribution and use in source and binary forms, with or without
 # @[21]@| modification, are permitted provided that the following conditions
 # @[22]@| are met:
@@ -53,12 +52,11 @@
 # @[51]@| the safety of lives or property would be at risk due to failure or
 # @[52]@| defect of the software.
 #
-# TODO: image tags to use an existing image with a new name
 # Auto-configure values
-set GMAMapperVersion {3.40.10}       ;# @@##@@
+set GMAMapperVersion {3.41.0}       ;# @@##@@
 set GMAMapperFileFormat {17}        ;# @@##@@
 set GMAMapperProtocol {332}         ;# @@##@@
-set GMAVersionNumber {4.3.7}            ;# @@##@@
+set GMAVersionNumber {4.3.11}            ;# @@##@@
 # legacy variables (TODO: change to new ones)
 set MapperVersion $GMAMapperVersion
 set FileVersion $GMAMapperFileFormat
@@ -351,37 +349,6 @@ proc CheckProtocolCompatibility {v} {
 #
 # For now, however, here it is.
 # 
-#
-# TODO: fix exceptions when updating from other map clients (nonexistent/conflicting ids?)
-# done: don't auto-cancel multiple selections
-# TODO: move to center of visible stuff; include images
-# done: move to view object under cursor when zooming (nearly: now scales the viewing region the same)
-# done: highlight anyone within attack space too (done: uses arrows to show threatened mobs)
-# done: move multiple objects at once
-# done: zoom in/out
-# TODO: layers
-# done: save people?
-# done: show area of effect of spells cast
-# TODO: show range increments
-# done: drop multiple mobs in one click
-# TODO: (gma) allow adjustment to same-rank ordering
-# done: scaling errors when zooming
-# done: pop-up to deselect all
-# done: dragging unselected object when some are selected doesn't affect the selection
-# done: pop-up operations for all selected (if any)
-# done: sync scroll to clients
-# done: adding multiple mobs at once
-# done: moving multiple objects works locally; only transmits change for one
-# done: show distance moved as you drag MOBs around the grid
-# done: delete objects by clicking on them
-# done: put back in the support for highlighting turns in combat
-# done: fix stippling bug
-# 
-#set canw 1000
-#set canh 700
-#set canw 1500
-#set canh 1100
-#set ICON_DIR /opt/gma/lib/icons
 package require Tcl 8.6
 package require uuid 1.0.1
 package require base64
@@ -785,15 +752,12 @@ if {$tcl_platform(os) eq "Darwin"} {
 	set BUTTON_MIDDLE <2>
 }
 
-set ICON_DIR [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end-1 end lib SoftwareAlchemy GMA Mapper icons]]]
+set ICON_DIR [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end-1 end lib MadScienceZone GMA Mapper icons]]]
 set BIN_DIR [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end end]]]
 foreach module {scrolledframe ustar gmautil} {
 	source [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end end $module.tcl]]]
 }
 
-#set ICON_DIR /Users/steve/Personal/proj/gma/lib/SoftwareAlchemy/GMA/Mapper/icons
-#set ICON_DIR /users/steve/Desktop/projects/gma/icons
-#set ICON_DIR /Users/steve/proj/gma/trunk/lib/SoftwareAlchemy/GMA/Mapper/icons
 set canw 1000
 set canh 1400
 set cansw 40000
@@ -1259,7 +1223,7 @@ foreach icon_name {
 	stamp zoom_in zoom_out zoom unload wand wandbound radius cone ray spread no_spread ruler
 	shape_square_go dash0 dash24 dash44 dash64 dash6424 dash642424 
 	arrow_both arrow_first arrow_none arrow_last arrow_refresh heart
-	saf saf_open saf_merge saf_unload saf_group_go die16 information info20 die20
+	saf saf_open saf_merge saf_unload saf_group_go die16 die16c information info20 die20 die20c
 	delete add menu
 } {
 	if {$dark_mode && [file exists "${ICON_DIR}/d_${icon_name}${icon_size}.gif"]} {
@@ -8352,7 +8316,7 @@ proc format_with_style {value format} {
 }
 
 proc DisplayDieRoll {from recipientlist title result details} {
-	global icon_die16 SuppressChat
+	global icon_die16 icon_die16c SuppressChat
 
 	if {$SuppressChat} {
 		return
@@ -8363,9 +8327,17 @@ proc DisplayDieRoll {from recipientlist title result details} {
 	if {![winfo exists $w]} {
 		DisplayChatMessage {} {} {}
 	}
+	set icon $icon_die16
+	foreach tuple $details {
+		if {[lindex $tuple 0] eq "critlabel"} {
+			set icon $icon_die16c
+			break
+		}
+	}
+
 	TranscribeDieRoll $from $recipientlist $title $result $details
 	$w.1.text configure -state normal
-	$w.1.text image create end -align baseline -image $icon_die16 -padx 2
+	$w.1.text image create end -align baseline -image $icon -padx 2
 	$w.1.text insert end [format_with_style $result fullresult] fullresult
 	ChatAttribution $w.1.text $from $recipientlist
 	if {$title != {}} {
@@ -9358,7 +9330,7 @@ proc aboutMapper {} {
 	global GMAMapperVersion GMAMapperFileFormat GMAMapperProtocol GMAVersionNumber
 
 	tk_messageBox -type ok -icon info -title "About Mapper" \
-		-message "GMA Mapper Client, Version $GMAMapperVersion, for GMA $GMAVersionNumber.\n\nCopyright (c) Steve Willoughby / Software Alchemy, Aloha, Oregon, USA. All Rights Reserved. Distributed under the terms and conditions of the 3-Clause BSD License.\n\nThis client supports file format $GMAMapperFileFormat and server protocol $GMAMapperProtocol."
+		-message "GMA Mapper Client, Version $GMAMapperVersion, for GMA $GMAVersionNumber.\n\nCopyright (c) Steve Willoughby, Aloha, Oregon, USA. All Rights Reserved. Distributed under the terms and conditions of the 3-Clause BSD License.\n\nThis client supports file format $GMAMapperFileFormat and server protocol $GMAMapperProtocol."
 }
 
 proc SyncAllClientsToMe {} {
