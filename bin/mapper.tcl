@@ -10405,10 +10405,10 @@ set ChatHistoryLastMessageID 0
 
 proc InitializeChatHistory {} {
 	global ChatHistoryFile ChatHistory ChatHistoryFileHandle ChatHistoryLastMessageID
-	global path_cache IThost ITport ChatHistoryLimit
+	global path_cache IThost ITport ChatHistoryLimit local_user
 
 	if {$IThost ne {}} {
-		set ChatHistoryFile [file join $path_cache "${IThost}-${ITport}-chat.history"]
+		set ChatHistoryFile [file join $path_cache "${IThost}-${ITport}-${local_user}-chat.history"]
 		DEBUG 1 "Loading chat history from $ChatHistoryFile"
 		if {! [file exists $ChatHistoryFile]} {
 			DEBUG 1 "-Creating new file; did not find an existing one"
