@@ -36,6 +36,21 @@ The manual describing the full GMA product may be downloaded
 In the mean time, we're moving individual parts of GMA (specifically the map
 server and clients) into their own repositories. This is the client repository.
 
+## Installation
+The easiest way to use the GMA mapper tool is to use one of the pre-compiled
+binaries in the `signed-releases` directory. (Alternatively, you can build
+the code from the sources here. You'll just need to have a Go compiler (1.18 or
+later) and the Tcl/Tk developer libraries installed.)
+
+### Windows
+You will need the Tcl/Tk runtime DLL installed on your system. You can obtain
+one from ActiveState for free.
+
+### Linux/BSD
+### MacOS
+The Apple-supplied Tcl/Tk libraries are known to have numerous issues. You
+should locally install a more up-to-date version directly.
+
 ## Documentation
 In the repository you will find manpages which document the usage of the
 client itself, the file format used for storage of map data, and the network
