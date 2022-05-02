@@ -17,7 +17,11 @@
 //
 package main
 
-import "github.com/visualfc/atk/tk"
+import (
+	"fmt"
+
+	"github.com/visualfc/atk/tk"
+)
 
 //
 // Auto-configure values
@@ -45,12 +49,94 @@ func NewWindow() *Window {
 	return mw
 }
 
+func aboutMapper() {
+	_, err := tk.MessageBox(nil, "About Mapper", fmt.Sprintf("GMA Mapper Client, Version %v, for GMA %v.", GMAMapperVersion, GMAVersionNumber),
+		fmt.Sprintf("Copyright © Steve Willoughby, Aloha, Oregon, USA. All Rights Reserved. Distributed under the terms and conditions of the 3-Clause BSD License.\n\nThis client supports file format %v and server protocol %v.", GMAMapperFileFormat, GMAMapperProtocol), "ok",
+		tk.MessageBoxIconInfo, tk.MessageBoxTypeOk)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func exitCheck() {
+	// TODO look for unsaved changes
+	tk.Quit()
+}
+
 func main() {
 	tk.MainLoop(func() {
-		mw := NewWindow()
-		mw.SetTitle("ATK Sample")
-		//		mw.Center(nil)
-		mw.ShowNormal()
+		root := tk.RootWindow()
+		root.SetTitle("ATK Sample")
+
+		menuBar := tk.NewMenu(root)
+		fileMenu := tk.NewMenu(menuBar)
+		editMenu := tk.NewMenu(menuBar)
+		viewMenu := tk.NewMenu(menuBar)
+		playMenu := tk.NewMenu(menuBar)
+		helpMenu := tk.NewMenu(menuBar)
+
+		fileMenu.AddAction(tk.NewActionEx("Load Map File...", func() {}))
+		fileMenu.AddAction(tk.NewActionEx("Merge Map File...", func() {}))
+		fileMenu.AddAction(tk.NewActionEx("Save Map File...", func() {}))
+		fileMenu.AddSeparator()
+		fileMenu.AddAction(tk.NewActionEx("Exit", exitCheck))
+
+		editMenu.AddAction(tk.NewActionEx("Normal Play Mode", func() {}))
+		editMenu.AddSeparator()
+		editMenu.AddAction(tk.NewActionEx("Clear All Map Elements", func() {}))
+		editMenu.AddAction(tk.NewActionEx("Clear All Monsters", func() {}))
+		editMenu.AddAction(tk.NewActionEx("Clear All Players", func() {}))
+		editMenu.AddAction(tk.NewActionEx("Clear All Creatures", func() {}))
+		editMenu.AddAction(tk.NewActionEx("Clear All Objects", func() {}))
+		editMenu.AddSeparator()
+		editMenu.AddAction(tk.NewActionEx("Draw Lines", func() {}))
+		editMenu.AddAction(tk.NewActionEx("Draw Rectangles", func() {}))
+		editMenu.AddAction(tk.NewActionEx("Draw Polygons", func() {}))
+		editMenu.AddAction(tk.NewActionEx("Draw Circles/Ellipses", func() {}))
+		editMenu.AddAction(tk.NewActionEx("Draw Arcs", func() {}))
+		editMenu.AddAction(tk.NewActionEx("Add Text...", func() {}))
+		editMenu.AddAction(tk.NewActionEx("Remove Objects", func() {}))
+		editMenu.AddAction(tk.NewActionEx("Move Objects", func() {}))
+		editMenu.AddAction(tk.NewActionEx("Stamp Objects", func() {}))
+		editMenu.AddSeparator()
+		editMenu.AddAction(tk.NewActionEx("Toggle Fill/No-Fill", func() {}))
+		editMenu.AddAction(tk.NewActionEx("Choose Fill Color...", func() {}))
+		editMenu.AddAction(tk.NewActionEx("Choose Outline Color...", func() {}))
+		editMenu.AddSeparator()
+		editMenu.AddAction(tk.NewActionEx("Cycle Grid Snap", func() {}))
+		editMenu.AddAction(tk.NewActionEx("Cycle Line Thickness", func() {}))
+		editMenu.AddSeparator()
+		editMenu.AddAction(tk.NewActionEx("Remove Elements from File...", func() {}))
+
+		viewMenu.AddAction(tk.NewActionEx("Hide Toolbar", func() {}))
+		viewMenu.AddAction(tk.NewActionEx("Toggle Grid", func() {}))
+		viewMenu.AddAction(tk.NewActionEx("Toggle Health Stats", func() {}))
+		viewMenu.AddSeparator()
+		viewMenu.AddAction(tk.NewActionEx("Zoom In", func() {}))
+		viewMenu.AddAction(tk.NewActionEx("Zoom Out", func() {}))
+		viewMenu.AddAction(tk.NewActionEx("Restore Zoom", func() {}))
+		viewMenu.AddSeparator()
+		viewMenu.AddAction(tk.NewActionEx("Scroll to Visible Objects", func() {}))
+		viewMenu.AddAction(tk.NewActionEx("Scroll Others' Views to Match Mine", func() {}))
+		viewMenu.AddAction(tk.NewActionEx("Refresh Display", func() {}))
+
+		playMenu.AddAction(tk.NewActionEx("Toggle Combat Mode", func() {}))
+		playMenu.AddAction(tk.NewActionEx("Indicate Area of Effect", func() {}))
+		playMenu.AddAction(tk.NewActionEx("Measure Distance Along Line(s)", func() {}))
+		playMenu.AddAction(tk.NewActionEx("Show Chat/Die-roll Window", func() {}))
+		playMenu.AddSeparator()
+		playMenu.AddAction(tk.NewActionEx("Deselect All", func() {}))
+
+		helpMenu.AddAction(tk.NewActionEx("About Mapper...", aboutMapper))
+
+		menuBar.AddSubMenu("File", fileMenu)
+		menuBar.AddSubMenu("Edit", editMenu)
+		menuBar.AddSubMenu("View", viewMenu)
+		menuBar.AddSubMenu("Play", playMenu)
+		menuBar.AddSubMenu("Help", helpMenu)
+		root.SetMenu(menuBar)
+
+		root.ShowNormal()
 	})
 }
 
