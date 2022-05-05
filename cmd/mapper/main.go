@@ -157,14 +157,26 @@ func helpDice() {
 		*/
 
 		for _, part := range line {
-			text.AppendText(part.text)
+			text.AppendText(fmt.Sprintf("<%s>%s", part.style, part.text))
 		}
+		text.AppendText("\n")
 	}
+}
+
+func okToExit() bool {
+	answer, err := tk.MessageBox(nil, "Ok to quit?", "Is it ok to stop now?", "(more details...)", "cancel", tk.MessageBoxIconWarning, tk.MessageBoxTypeOkCancel)
+	if err != nil {
+		fmt.Printf("ERROR posting okToExit dialog: %v\n", err)
+		return true
+	}
+	return answer == "ok"
 }
 
 func exitCheck() {
 	// TODO look for unsaved changes
-	tk.Quit()
+	if okToExit() {
+		tk.Quit()
+	}
 }
 
 func main() {
@@ -192,7 +204,9 @@ func main() {
 
 			_, err = interp.CreateCommand("::tk::mac::Quit", func(args []string) (string, error) {
 				fmt.Println("Exiting via mac menu")
-				tk.Quit()
+				if okToExit() {
+					tk.Quit()
+				}
 				return "", nil
 			})
 			if err != nil {
@@ -204,6 +218,10 @@ func main() {
 
 		root := tk.RootWindow()
 		root.SetTitle("ATK Sample")
+		root.OnClose(func() bool {
+			fmt.Printf("In OnClose\n")
+			return okToExit()
+		})
 
 		menuBar := tk.NewMenu(root)
 		fileMenu := tk.NewMenu(menuBar)
