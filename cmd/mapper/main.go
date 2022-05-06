@@ -54,7 +54,7 @@ func helpDice() {
 	if err := text.DefineTagHACK("p", map[string]string{"wrap": "word", "font": Nf12.Id()}); err != nil {
 		panic(err)
 	}
-	if err := text.DefineTagHACK("b", map[string]string{"wrap": "word", "font": Tf12.Id()}); err != nil {
+	if err := text.DefineTagHACK("b", map[string]string{"wrap": "word", "font": Cf12.Id()}); err != nil {
 		panic(err)
 	}
 	if err := text.DefineTagHACK("i", map[string]string{"wrap": "word", "font": If12.Id()}); err != nil {
@@ -101,7 +101,7 @@ func helpDice() {
 			{"b", "best|worst of "},
 			{"i", "n"},
 			{"p", "]  [...] ["},
-			{"b", " | "},
+			{"b", "| "},
 			{"i", "modifiers"},
 			{"p", "]"},
 		},
@@ -135,7 +135,7 @@ func helpDice() {
 			{"i", "B"}, {"p", " added to the confirmation roll."}},
 		{{"b", "| min "}, {"i", "N"}, {"p", "\t\tThe result will be "}, {"i", "N"}, {"p", " or the result of the actual dice, whichever is greater."}},
 		{{"b", "| max "}, {"i", "N"}, {"p", "\t\tThe result will be "}, {"i", "N"}, {"p", " or the result of the actual dice, whichever is less."}},
-		{{"b", "| maximized"}, {"p", "\tAll dice will produce their maximum possible values rather than being random. (May also be given as "},
+		{{"b", "| maximized"}, {"p", "\t\tAll dice will produce their maximum possible values rather than being random. (May also be given as "},
 			{"b", "!"}, {"p", ".)"}},
 		{{"b", "| repeat "}, {"i", "N"}, {"p", "\t\tRoll the expression "}, {"i", "N"}, {"p", " times, reporting that many separate results."}},
 		{{"b", "| until "}, {"i", "N"}, {"p", "\t\tRoll the expression repeatedly (reporting each result) until the result is at least "}, {"i", "N"}, {"p", "."}},
@@ -146,18 +146,18 @@ func helpDice() {
 		{{"p", "Examples:"}},
 		{{"b", "d20"}, {"p", "\t\tRoll a 20-sided die."}},
 		{{"b", "3d6"}, {"p", "\t\tRoll three 6-sided dice and add them together."}},
-		{{"b", "15d6+15"}, {"p", "\t\tRoll 16 6-sided dice and add them together, addiing 15 to the result."}},
+		{{"b", "15d6+15"}, {"p", "\tRoll 16 6-sided dice and add them together, addiing 15 to the result."}},
 		{{"b", "1d10+5*10"}, {"p", "\tRoll a 10-sided die, add 5, then multiply the result by 10."}},
 		{{"b", "1/2d6"}, {"p", "\t\tRoll a 6-sided die, then divide the result by 2 (i.e., roll 1/2 of a d6)."}},
 		{{"b", "2d10+3d6+12"}, {"p", "\tRoll 2d10, 3d6, add them plus 12 and report the result."}},
-		{{"b", "d20+15|c"}, {"p", "\t\tRoll 1d20, add 15 and report the result. Additionally, if the d20 rolled a natural 20, roll 1d20+15 again and report that result."}},
+		{{"b", "d20+15|c"}, {"p", "\tRoll 1d20, add 15 and report the result. Additionally, if the d20 rolled a natural 20, roll 1d20+15 again and report that result."}},
 		{{"b", "d20+15|c19+2"}, {"p", "\tRoll 1d20, add 15 and report the result. Additionally, if the d20 rolled a natural 19 or 20, roll 1d20+15+2 and report that result."}},
 		{{"b", "d%"}, {"p", "\t\tRoll a percentile die, generating a number from 1-100."}},
 		{{"b", "40%"}, {"p", "\t\tThis is an additional way to roll percentile dice, by specifying the probability of a successful outcome. In this example, the roll should be successful 40% of the time. The report will include the die roll and whether it was successful or not."}},
-		{{"b", "40%"}, {"i", "label"}, {"p", "\t\tAs above, but indicate the event outcome as a 40% chance of being \""}, {"i", "label"}, {"p", "\" and 60% chance of \"did not "}, {"i", "label"}, {"p", "\". Note that if "}, {"i", "label"}, {"p", " is \"hit\" then \"miss\" will be displayed rather than \"did not hit\" and vice versa."}},
+		{{"b", "40%"}, {"i", "label"}, {"p", "\tAs above, but indicate the event outcome as a 40% chance of being \""}, {"i", "label"}, {"p", "\" and 60% chance of \"did not "}, {"i", "label"}, {"p", "\". Note that if "}, {"i", "label"}, {"p", " is \"hit\" then \"miss\" will be displayed rather than \"did not hit\" and vice versa."}},
 		{{"b", "40%"}, {"i", "a"}, {"b", "/"}, {"i", "b"}, {"p", "\t\tAs above, but indicate the event outcome as a 40% chance of being \""}, {"i", "a"}, {"p", "\" and 60% chance of \""}, {"i", "b"}, {"p", "\"."}},
-		{{"b", "d20 + 12 | max 20"}, {"p", "\tRolls a d20, adds 12, and reports the result or 20, whichever is smaller."}},
-		{{"b", "1d20 + 2d12 + 2 | max 20"}, {"p", "\tRolls a d20, 2 12-sided dice, adds them together, adds 2 to the sum, then reports the result or 20, whichever is smaller."}},
+		{{"b", "d20+12|max20"}, {"p", "\tRolls a d20, adds 12, and reports the result or 20, whichever is smaller."}},
+		{{"b", "1d20+2d12+2|max20"}, {"p", "\tRolls a d20, 2 12-sided dice, adds them together, adds 2 to the sum, then reports the result or 20, whichever is smaller."}},
 		{{"p", ""}},
 		{{"p", "You can't use the "}, {"b", "c"}, {"p", "... modifier to ask for confirmation rolls if there was more than one die involved in your roll."}},
 		{{"p", ""}},
@@ -180,7 +180,7 @@ func helpDice() {
 		{{"h1", "Presets"}},
 		{{"p", ""}},
 		{{"p", "Saving preset rolls to the server allows them to be available any time your client connects to it. Each preset is given a unique name. If another preset is added with the same name, it will replace the previous one."}},
-		{{"p", "If a vertical bar (|) appears in the preset name, everything up to and including the bar is not displayed in the tool, but the sort order of the preset display is based on the entire name. This allows you to sort the entries in any arbitrary order without cluttering the display if you wish. This is most convenient if you save your presets to a file, edit them, and load them back again."}},
+		{{"p", "If a vertical bar ("}, {"b", "|"}, {"p", ") appears in the preset name, everything up to and including the bar is not displayed in the tool, but the sort order of the preset display is based on the entire name. This allows you to sort the entries in any arbitrary order without cluttering the display if you wish. This is most convenient if you save your presets to a file, edit them, and load them back again."}},
 	} {
 		for _, part := range line {
 			//text.AppendText(fmt.Sprintf("<%s>%s", part.style, part.text))
@@ -329,12 +329,13 @@ func main() {
 		Nf12 = tk.NewUserFont("Times", 12)
 		If12 = tk.NewUserFont("Times", 12, tk.FontAttrItalic())
 		Tf12 = tk.NewUserFont("Helvetica", 12, tk.FontAttrBold())
+		Cf12 = tk.NewUserFont("Courier", 12, tk.FontAttrBold())
 
 		root.ShowNormal()
 	})
 }
 
-var Tf14, Nf12, If12, Tf12 tk.Font
+var Tf14, Nf12, If12, Tf12, Cf12 tk.Font
 
 // @[00]@| GMA 4.3.11
 // @[01]@|
