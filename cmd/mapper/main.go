@@ -60,8 +60,22 @@ func helpDice() {
 	if err := text.DefineTagHACK("i", map[string]string{"wrap": "word", "font": If12.Id()}); err != nil {
 		panic(err)
 	}
+	sb := tk.NewScrollBar(w, tk.Vertical)
+	if err := sb.OnCommandEx(text.SetYViewArgs); err != nil {
+		panic(err)
+	}
+	if err := text.OnYScrollEx(sb.SetScrollArgs); err != nil {
+		panic(err)
+	}
 	grid := tk.NewGridLayout(w)
-	grid.AddWidget(text, tk.GridAttrSticky(tk.StickyAll))
+	if err := grid.AddWidgetEx(text, 0, 0, 1, 1, tk.StickyAll); err != nil {
+		panic(err)
+	}
+	if err := grid.AddWidgetEx(sb, 0, 1, 1, 1, tk.StickyAll); err != nil {
+		panic(err)
+	}
+	tk.GridRowIndex(grid, 0, tk.GridIndexAttrWeight(1))
+	tk.GridColumnIndex(grid, 0, tk.GridIndexAttrWeight(1))
 	w.ShowNormal()
 	// grid [text] [sb]	-sticky news
 	//
