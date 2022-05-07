@@ -19,6 +19,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"runtime"
 
 	"github.com/visualfc/atk/tk"
@@ -34,57 +35,86 @@ const (
 	GMAVersionNumber    = "4.3.11" // @@##@@
 )
 
-func aboutMapper() {
-	_, err := tk.MessageBox(nil, "About Mapper", fmt.Sprintf("GMA Mapper Client, Version %v, for GMA %v.", GMAMapperVersion, GMAVersionNumber),
-		fmt.Sprintf("Copyright © Steve Willoughby, Aloha, Oregon, USA. All Rights Reserved. Distributed under the terms and conditions of the 3-Clause BSD License.\n\nThis client supports file format %v and server protocol %v.", GMAMapperFileFormat, GMAMapperProtocol), "ok",
-		tk.MessageBoxIconInfo, tk.MessageBoxTypeOk)
-	if err != nil {
-		panic(err)
+//
+// Application holds the global settings and other context
+// for the application generally.
+//
+type Application struct {
+	// FontList holds all of the fonts we will be using (other than the default).
+	// The user is allowed to customize this list, and all the rest of the code
+	// will use those settings by looking up font info here.
+	FontList map[string]tk.Font
+
+	// Logger is whatever device or file we're writing logs to.
+	Logger *log.Logger
+
+	// Root is the Tk root window for the application.
+	Root *tk.Window
+}
+
+//
+// addFont defines a font to be used by the application and assigns it a name
+// as the key of the FontList map.
+//
+func (a *Application) addFont(name, family string, size int, bold bool, ital bool) {
+	var attrs []*tk.FontAttr
+
+	if bold {
+		attrs = append(attrs, tk.FontAttrBold())
+	}
+	if ital {
+		attrs = append(attrs, tk.FontAttrItalic())
+	}
+
+	f := tk.NewUserFont(family, size, attrs...)
+	if f == nil {
+		a.Logger.Printf("unable to create %v %v font as \"%s\"", family, size, name)
+	} else {
+		a.FontList[name] = f
 	}
 }
 
-func helpDice() {
+func aboutMapper() {
+	tk.MessageBox(nil, "About Mapper", fmt.Sprintf("GMA Mapper Client, Version %v, for GMA %v.", GMAMapperVersion, GMAVersionNumber),
+		fmt.Sprintf("Copyright © Steve Willoughby, Aloha, Oregon, USA. All Rights Reserved. Distributed under the terms and conditions of the 3-Clause BSD License.\n\nThis client supports file format %v and server protocol %v.", GMAMapperFileFormat, GMAMapperProtocol), "ok",
+		tk.MessageBoxIconInfo, tk.MessageBoxTypeOk)
+}
+
+func helpDice(a Application) {
 	w := tk.NewWindow()
 	w.SetTitle("Chat/Dice Roller Information")
 	text := tk.NewText(w)
 	text.SetTabWordProcessorStyle(true)
-	if err := text.DefineTagHACK("h1", map[string]string{"justify": "center", "font": Tf14.Id()}); err != nil {
-		panic(err)
+	/*** TODO: THIS IS A HACK. Replace with real code ***/
+	if err := text.DefineTagHACK("h1", map[string]string{"justify": "center", "font": a.FontList["Tf14"].Id()}); err != nil {
+		a.Logger.Printf("error defining text tag \"%s\": %v", "h1", err)
 	}
-	if err := text.DefineTagHACK("p", map[string]string{"wrap": "word", "font": Nf12.Id()}); err != nil {
-		panic(err)
+	if err := text.DefineTagHACK("p", map[string]string{"wrap": "word", "font": a.FontList["Nf12"].Id()}); err != nil {
+		a.Logger.Printf("error defining text tag \"%s\": %v", "p", err)
 	}
-	if err := text.DefineTagHACK("b", map[string]string{"wrap": "word", "font": Cf12.Id()}); err != nil {
-		panic(err)
+	if err := text.DefineTagHACK("b", map[string]string{"wrap": "word", "font": a.FontList["Cf12"].Id()}); err != nil {
+		a.Logger.Printf("error defining text tag \"%s\": %v", "b", err)
 	}
-	if err := text.DefineTagHACK("i", map[string]string{"wrap": "word", "font": If12.Id()}); err != nil {
-		panic(err)
+	if err := text.DefineTagHACK("i", map[string]string{"wrap": "word", "font": a.FontList["If12"].Id()}); err != nil {
+		a.Logger.Printf("error defining text tag \"%s\": %v", "i", err)
 	}
 	sb := tk.NewScrollBar(w, tk.Vertical)
 	if err := sb.OnCommandEx(text.SetYViewArgs); err != nil {
-		panic(err)
+		a.Logger.Printf("error setting scrollbar for syntax help window: %v", err)
 	}
 	if err := text.OnYScrollEx(sb.SetScrollArgs); err != nil {
-		panic(err)
+		a.Logger.Printf("error setting scrollbar for syntax help window: %v", err)
 	}
 	grid := tk.NewGridLayout(w)
 	if err := grid.AddWidgetEx(text, 0, 0, 1, 1, tk.StickyAll); err != nil {
-		panic(err)
+		a.Logger.Printf("error setting layout for syntax help window: %v", err)
 	}
 	if err := grid.AddWidgetEx(sb, 0, 1, 1, 1, tk.StickyAll); err != nil {
-		panic(err)
+		a.Logger.Printf("error setting layout for syntax help window: %v", err)
 	}
 	tk.GridRowIndex(grid, 0, tk.GridIndexAttrWeight(1))
 	tk.GridColumnIndex(grid, 0, tk.GridIndexAttrWeight(1))
 	w.ShowNormal()
-	// grid [text] [sb]	-sticky news
-	//
-	// column 0 weight 1
-	// row 0 weight 1
-	// tag h1 -justify center -font Tf14
-	// tag p -font Nf12 -wrap word
-	// tag i -font If12 -wrap word
-	// tag b -font Tf12 -wrap word
 
 	for _, line := range [][]struct {
 		style, text string
@@ -197,7 +227,6 @@ func helpDice() {
 		{{"p", "If a vertical bar ("}, {"b", "|"}, {"p", ") appears in the preset name, everything up to and including the bar is not displayed in the tool, but the sort order of the preset display is based on the entire name. This allows you to sort the entries in any arbitrary order without cluttering the display if you wish. This is most convenient if you save your presets to a file, edit them, and load them back again."}},
 	} {
 		for _, part := range line {
-			//text.AppendText(fmt.Sprintf("<%s>%s", part.style, part.text))
 			text.AppendTextWithTag(part.text, part.style)
 		}
 		text.AppendText("\n")
@@ -214,6 +243,11 @@ func okToExit() bool {
 }
 
 func main() {
+	mapApp := Application{
+		FontList: make(map[string]tk.Font),
+		Logger:   log.Default(),
+	}
+
 	tk.MainLoop(func() {
 		//
 		// Set up menus
@@ -224,14 +258,14 @@ func main() {
 			//
 			interp := tk.MainInterp()
 			if interp == nil {
-				panic("no interpreter")
+				mapApp.Logger.Fatal("no Tcl interpreter found")
 			}
 			_, err := interp.CreateCommand("::tk::mac::ShowPreferences", func(args []string) (string, error) {
 				_, err := tk.MessageBox(nil, "Edit Preferences", "In this version of the mapper tool, editing preferences is done by modifying the GMA Mapper configuration file.", "", "ok", tk.MessageBoxIconInfo, tk.MessageBoxTypeOk)
 				return "", err
 			})
 			if err != nil {
-				panic(err)
+				mapApp.Logger.Fatalf("error creating MacOS ShowPreferences event hook: %v", err)
 			}
 
 			/*
@@ -250,20 +284,23 @@ func main() {
 				return "", nil
 			})
 			if err != nil {
-				panic(err)
+				mapApp.Logger.Fatalf("error creating MacOS Quit event hook: %v", err)
 			}
 		}
 
-		tk.MainInterp().Eval("foo")
+		/*
+			tk.MainInterp().Eval("foo")
+		*/
 
-		root := tk.RootWindow()
-		root.SetTitle("ATK Sample")
-		root.OnClose(func() bool {
+		mapApp.Root = tk.RootWindow()
+
+		mapApp.Root.SetTitle("ATK Sample")
+		mapApp.Root.OnClose(func() bool {
 			fmt.Printf("In OnClose\n")
 			return okToExit()
 		})
 
-		menuBar := tk.NewMenu(root)
+		menuBar := tk.NewMenu(mapApp.Root)
 		fileMenu := tk.NewMenu(menuBar)
 		editMenu := tk.NewMenu(menuBar)
 		viewMenu := tk.NewMenu(menuBar)
@@ -329,28 +366,27 @@ func main() {
 		playMenu.AddAction(tk.NewActionEx("Deselect All", func() {}))
 
 		helpMenu.AddAction(tk.NewActionEx("About Mapper...", aboutMapper))
-		helpMenu.AddAction(tk.NewActionEx("Die Roll Syntax...", helpDice))
+		helpMenu.AddAction(tk.NewActionEx("Die Roll Syntax...", func() { helpDice(mapApp) }))
 
 		menuBar.AddSubMenu("File", fileMenu)
 		menuBar.AddSubMenu("Edit", editMenu)
 		menuBar.AddSubMenu("View", viewMenu)
 		menuBar.AddSubMenu("Play", playMenu)
 		menuBar.AddSubMenu("Help", helpMenu)
-		root.SetMenu(menuBar)
+		mapApp.Root.SetMenu(menuBar)
 
 		// Define our fonts
-		Tf14 = tk.NewUserFont("Helvetica", 14, tk.FontAttrBold())
-		Nf12 = tk.NewUserFont("Times", 12)
-		If12 = tk.NewUserFont("Times", 12, tk.FontAttrItalic())
-		Tf12 = tk.NewUserFont("Helvetica", 12, tk.FontAttrBold())
-		Cf12 = tk.NewUserFont("Courier", 12, tk.FontAttrBold())
+		mapApp.addFont("Tf14", "Helvetica", 14, true, false)
+		mapApp.addFont("Nf12", "Times", 12, false, false)
+		mapApp.addFont("If12", "Times", 12, false, true)
+		mapApp.addFont("Tf12", "Helvetica", 12, true, false)
+		mapApp.addFont("Cf12", "Courier", 12, true, false)
 
-		root.ShowNormal()
+		mapApp.Root.ShowNormal()
 	})
 }
 
-var Tf14, Nf12, If12, Tf12, Cf12 tk.Font
-
+//
 // @[00]@| GMA 4.3.11
 // @[01]@|
 // @[10]@| Copyright © 1992–2021 by Steven L. Willoughby
