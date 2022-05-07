@@ -1,20 +1,20 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______             ______         ___     __       _______       #
-# (  ____ \(       )(  ___  ) Game      / ___  \       /   )   /  \     (  __   )      #
-# | (    \/| () () || (   ) | Master's  \/   \  \     / /) |   \/) )    | (  )  |      #
-# | |      | || || || (___) | Assistant    ___) /    / (_) (_    | |    | | /   |      #
-# | | ____ | |(_)| ||  ___  |             (___ (    (____   _)   | |    | (/ /) |      #
-# | | \_  )| |   | || (   ) |                 ) \        ) (     | |    |   / | |      #
-# | (___) || )   ( || )   ( | Mapper    /\___/  / _      | |   __) (_ _ |  (__) |      #
-# (_______)|/     \||/     \| Client    \______/ (_)     (_)   \____/(_)(_______)      #
+#  _______  _______  _______                ___       _______     _______              #
+# (  ____ \(       )(  ___  ) Game         /   )     (  __   )   (  __   )             #
+# | (    \/| () () || (   ) | Master's    / /) |     | (  )  |   | (  )  |             #
+# | |      | || || || (___) | Assistant  / (_) (_    | | /   |   | | /   |             #
+# | | ____ | |(_)| ||  ___  |           (____   _)   | (/ /) |   | (/ /) |             #
+# | | \_  )| |   | || (   ) |                ) (     |   / | |   |   / | |             #
+# | (___) || )   ( || )   ( | Mapper         | |   _ |  (__) | _ |  (__) |             #
+# (_______)|/     \||/     \| Client         (_)  (_)(_______)(_)(_______)             #
 #                                                                                      #
 ########################################################################################
 #
 # GMA Mapper Client with background I/O processing.
 # @[00]@| GMA 4.3.11
 # @[01]@|
-# @[10]@| Copyright © 1992–2021 by Steven L. Willoughby
+# @[10]@| Copyright © 1992–2022 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
 # @[12]@| Aloha, Oregon, USA. All Rights Reserved.
 # @[13]@| Distributed under the terms and conditions of the BSD-3-Clause
@@ -53,9 +53,9 @@
 # @[52]@| defect of the software.
 #
 # Auto-configure values
-set GMAMapperVersion {3.41.0}       ;# @@##@@
-set GMAMapperFileFormat {17}        ;# @@##@@
-set GMAMapperProtocol {332}         ;# @@##@@
+set GMAMapperVersion {4.0.0}       ;# @@##@@
+set GMAMapperFileFormat {20}        ;# @@##@@
+set GMAMapperProtocol {400}         ;# @@##@@
 set GMAVersionNumber {4.3.11}            ;# @@##@@
 # legacy variables (TODO: change to new ones)
 set MapperVersion $GMAMapperVersion

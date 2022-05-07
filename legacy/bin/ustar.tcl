@@ -12,7 +12,7 @@
 #
 # @[00]@| GMA 4.3.11
 # @[01]@|
-# @[10]@| Copyright © 1992–2021 by Steven L. Willoughby
+# @[10]@| Copyright © 1992–2022 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
 # @[12]@| Aloha, Oregon, USA. All Rights Reserved.
 # @[13]@| Distributed under the terms and conditions of the BSD-3-Clause
