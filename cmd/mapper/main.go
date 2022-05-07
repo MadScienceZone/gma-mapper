@@ -29,7 +29,7 @@ import (
 // Auto-configure values
 //
 const (
-	GMAMapperVersion    = "3.41.0" // @@##@@
+	GMAMapperVersion    = "4.0.0"  // @@##@@
 	GMAMapperFileFormat = 20       // @@##@@
 	GMAMapperProtocol   = 400      // @@##@@
 	GMAVersionNumber    = "4.3.11" // @@##@@
@@ -122,7 +122,7 @@ func helpDice(a Application) {
 		{{"h1", "Chat Window"}},
 		{{"p", ""}},
 		{{"p", "Select the recipient(s) to whom you wish to send a message, or select \"To all\" to send a global message to everyone. If you select one person, the message will be private to them. If you select another person, they will be "},
-			{"i", "added to"},
+			{"i", "added to "},
 			{"p", "the conversation, so the message goes to all of them. Selecting \"all\" will clear the recipient selection. The message is sent when you press Return in the entry field."},
 		},
 		{{"p", ""}},
@@ -294,7 +294,7 @@ func main() {
 
 		mapApp.Root = tk.RootWindow()
 
-		mapApp.Root.SetTitle("ATK Sample")
+		mapApp.Root.SetTitle("GMA Mapper")
 		mapApp.Root.OnClose(func() bool {
 			fmt.Printf("In OnClose\n")
 			return okToExit()
