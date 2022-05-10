@@ -85,19 +85,19 @@ func helpDice(a Application) {
 	w.SetTitle("Chat/Dice Roller Information")
 	text := tk.NewText(w)
 	text.SetTabWordProcessorStyle(true)
-	/*** TODO: THIS IS A HACK. Replace with real code ***/
-	if err := text.DefineTagHACK("h1", map[string]string{"justify": "center", "font": a.FontList["Tf14"].Id()}); err != nil {
+	if err := text.TagConfigure("h1", tk.TextTagAttrJustify(tk.JustifyCenter), tk.TextTagAttrFont(a.FontList["Tf14"])); err != nil {
 		a.Logger.Printf("error defining text tag \"%s\": %v", "h1", err)
 	}
-	if err := text.DefineTagHACK("p", map[string]string{"wrap": "word", "font": a.FontList["Nf12"].Id()}); err != nil {
+	if err := text.TagConfigure("p", tk.TextTagAttrWrapMode(tk.LineWrapWord), tk.TextTagAttrFont(a.FontList["Nf12"])); err != nil {
 		a.Logger.Printf("error defining text tag \"%s\": %v", "p", err)
 	}
-	if err := text.DefineTagHACK("b", map[string]string{"wrap": "word", "font": a.FontList["Cf12"].Id()}); err != nil {
+	if err := text.TagConfigure("b", tk.TextTagAttrWrapMode(tk.LineWrapWord), tk.TextTagAttrFont(a.FontList["Cf12"])); err != nil {
 		a.Logger.Printf("error defining text tag \"%s\": %v", "b", err)
 	}
-	if err := text.DefineTagHACK("i", map[string]string{"wrap": "word", "font": a.FontList["If12"].Id()}); err != nil {
+	if err := text.TagConfigure("i", tk.TextTagAttrWrapMode(tk.LineWrapWord), tk.TextTagAttrFont(a.FontList["If12"])); err != nil {
 		a.Logger.Printf("error defining text tag \"%s\": %v", "i", err)
 	}
+
 	sb := tk.NewScrollBar(w, tk.Vertical)
 	if err := sb.OnCommandEx(text.SetYViewArgs); err != nil {
 		a.Logger.Printf("error setting scrollbar for syntax help window: %v", err)
