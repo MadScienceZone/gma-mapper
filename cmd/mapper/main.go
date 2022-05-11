@@ -18,10 +18,19 @@
 package main
 
 import (
+	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
+	"os"
+	"os/user"
 	"runtime"
+	"strconv"
+	"strings"
 
+	"github.com/MadScienceZone/go-gma/v4/mapper"
+	"github.com/MadScienceZone/go-gma/v4/util"
+	"github.com/google/uuid"
 	"github.com/visualfc/atk/tk"
 )
 
@@ -50,6 +59,99 @@ type Application struct {
 
 	// Root is the Tk root window for the application.
 	Root *tk.Window
+
+	// Local controls over whether the map reports HP accurately
+	// (server may override)
+	BlurAll bool
+	BlurPct int
+
+	// Should we make the toolbar buttons larger?
+	LargeButtons bool
+
+	// List of PCs who are important enough to get on the main menu
+	PCList []mapper.PlayerToken
+
+	// If DebugLevel is 0, no extra debugging output will be made.
+	// otherwise, increasing levels of output are generated for
+	// increasing values of DebugLevel.
+
+	DebugLevel int
+
+	// Server contact information
+	ServerHost      string
+	ServerPort      int
+	SCPServerHost   string
+	SCPServerDest   string
+	ServerUsername  string
+	ServerPassword  string
+	ServerMkdirPath string
+	ProxyHost       string
+	ProxyURL        string
+	UpdateURL       string
+
+	// Should we keep our toolbar visible regardless of instructions from the server?
+	KeepTools bool
+
+	// Optional guidelines to draw on the map
+	MajorGuides, MinorGuides gridGuide
+
+	// The module ID code in play
+	ModuleID string
+
+	// Local tool paths
+	NcPath  string
+	SCPPath string
+	SSHPath string
+
+	// Should we ignore chat messages?
+	SuppressChat bool
+
+	// Should we preload cached objects?
+	CachePreload bool
+
+	// Paths to files we use
+	StyleFilename      string
+	TranscriptFilename string
+
+	// True if we're restarting after an upgrade
+	upgradeNotice bool
+}
+
+type gridGuide struct {
+	interval int
+	offset   struct {
+		x, y int
+	}
+}
+
+func (g *gridGuide) Parse(s string) error {
+	var err error
+
+	f := strings.SplitN(s, "+", 2)
+	g.interval, err = strconv.Atoi(f[0])
+	g.offset.x = 0
+	g.offset.y = 0
+
+	if err != nil {
+		return err
+	}
+
+	if len(f) > 1 {
+		ff := strings.SplitN(f[1], ":", 2)
+		g.offset.x, err = strconv.Atoi(ff[0])
+		if err != nil {
+			return err
+		}
+		if len(ff) > 1 {
+			g.offset.y, err = strconv.Atoi(ff[1])
+			if err != nil {
+				return err
+			}
+		} else {
+			g.offset.y = g.offset.x
+		}
+	}
+	return nil
 }
 
 //
@@ -85,19 +187,29 @@ func helpDice(a Application) {
 	w.SetTitle("Chat/Dice Roller Information")
 	text := tk.NewText(w)
 	text.SetTabWordProcessorStyle(true)
-	if err := text.TagConfigure("h1", tk.TextTagAttrJustify(tk.JustifyCenter), tk.TextTagAttrFont(a.FontList["Tf14"])); err != nil {
-		a.Logger.Printf("error defining text tag \"%s\": %v", "h1", err)
-	}
-	if err := text.TagConfigure("p", tk.TextTagAttrWrapMode(tk.LineWrapWord), tk.TextTagAttrFont(a.FontList["Nf12"])); err != nil {
-		a.Logger.Printf("error defining text tag \"%s\": %v", "p", err)
-	}
-	if err := text.TagConfigure("b", tk.TextTagAttrWrapMode(tk.LineWrapWord), tk.TextTagAttrFont(a.FontList["Cf12"])); err != nil {
-		a.Logger.Printf("error defining text tag \"%s\": %v", "b", err)
-	}
-	if err := text.TagConfigure("i", tk.TextTagAttrWrapMode(tk.LineWrapWord), tk.TextTagAttrFont(a.FontList["If12"])); err != nil {
-		a.Logger.Printf("error defining text tag \"%s\": %v", "i", err)
+
+	//
+	// define type styles
+	//
+	for _, tagInfo := range []struct {
+		tag   string
+		font  string
+		attrs []tk.TextTagAttr
+	}{
+		{"h1", "Tf14", []tk.TextTagAttr{tk.TextTagAttrJustify(tk.JustifyCenter)}},
+		{"p", "Nf12", []tk.TextTagAttr{tk.TextTagAttrWrapMode(tk.LineWrapWord)}},
+		{"i", "If12", []tk.TextTagAttr{tk.TextTagAttrWrapMode(tk.LineWrapWord)}},
+		{"b", "Cf12", []tk.TextTagAttr{tk.TextTagAttrWrapMode(tk.LineWrapWord)}},
+	} {
+		at := append(tagInfo.attrs, tk.TextTagAttrFont(a.FontList[tagInfo.font]))
+		if err := text.TagConfigure(tagInfo.tag, at...); err != nil {
+			a.Logger.Printf("error defining text tag \"%s\": %v", tagInfo.tag, err)
+		}
 	}
 
+	//
+	// scrollbars
+	//
 	sb := tk.NewScrollBar(w, tk.Vertical)
 	if err := sb.OnCommandEx(text.SetYViewArgs); err != nil {
 		a.Logger.Printf("error setting scrollbar for syntax help window: %v", err)
@@ -116,6 +228,11 @@ func helpDice(a Application) {
 	tk.GridColumnIndex(grid, 0, tk.GridIndexAttrWeight(1))
 	w.ShowNormal()
 
+	//
+	// The text contents of the window. This is a sequence of lines.
+	// Each line is a tuple of (tag, text) where tag is one of the defined type styles
+	// (see above).
+	//
 	for _, line := range [][]struct {
 		style, text string
 	}{
@@ -242,11 +359,399 @@ func okToExit() bool {
 	return answer == "ok"
 }
 
+//
+// Command-line arguments (from the command line and/or config file)
+// If we see a --config option then we'll populate our set of defaults
+// from that first, then override with command-line options.
+//
+
+func setConfigDefaults() util.SimpleConfigurationData {
+	cdata := util.NewSimpleConfigurationData()
+	for _, v := range []struct {
+		option, value string
+	}{
+		{"blur-all", "0"},
+		{"blur-hp", "0"},
+		{"button-size", "small"},
+		{"character", ""},
+		{"chat-history", "512"},
+		{"curl-path", "/usr/bin/curl"},
+		{"curl-url-base", "https://www.rag.com/gma/map"},
+		{"dark", "0"},
+		{"debug", "0"},
+		{"guide", ""},
+		{"host", ""},
+		{"keep-tools", "0"},
+		{"log", ""},
+		{"major", ""},
+		{"master", "0"},
+		{"mkdir-path", "/bin/mkdir"},
+		{"module", ""},
+		{"nc-path", "/usr/bin/nc"},
+		{"no-blur-all", "0"},
+		{"no-chat", "0"},
+		{"password", ""},
+		{"port", "2323"},
+		{"preload", "0"},
+		{"proxy-host", ""},
+		{"proxy-url", ""},
+		{"scp-dest", ""},
+		{"scp-path", "/usr/bin/scp"},
+		{"scp-server", ""},
+		{"ssh-path", "/usr/bin/ssh"},
+		{"style", "~/.gma/mapper/style.conf"},
+		{"transcript", ""},
+		{"update-url", ""},
+		{"upgrade-notice", "0"},
+		{"username", "__unknown__"},
+	} {
+		cdata.Set(v.option, v.value)
+	}
+	if u, err := user.Current(); err == nil {
+		cdata.Set("username", u.Username)
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		cdata.Set("log", strings.Join([]string{home, ".gma", "mapper", "logs", fmt.Sprintf("mapper.%d.log", os.Getpid())}, string(os.PathSeparator)))
+	}
+	return cdata
+}
+
+type multiOptionString []string
+
+func (o *multiOptionString) String() string {
+	if o == nil {
+		return ""
+	}
+	return strings.Join(*o, ",")
+}
+
+func (o *multiOptionString) Set(s string) error {
+	*o = append(*o, s)
+	return nil
+}
+
+type optionCount int
+
+func (o *optionCount) String() string {
+	if o == nil {
+		return "0"
+	}
+	return strconv.Itoa(int(*o))
+}
+
+func (o *optionCount) Set(s string) error {
+	*o++
+	return nil
+}
+
+func (a *Application) getAppOptions() error {
+	var defaultConfigPath string
+	var charList multiOptionString
+	var debugLevel optionCount
+	var err error
+
+	cdata := setConfigDefaults()
+
+	// no-blur-all should be moved to blur-all with a false value so we just have one
+	// variable to indicate the desired status. we have both keywords due to legacy
+	// semantics for boolean options.
+	//
+	// Thus, in the config file setting
+	//    blur-all=0
+	// and
+	//    no-blur-all
+	// are equivalent now and we'll only look at blur-all's value.
+	if cdata.GetBoolDefault("no-blur-all", false) {
+		cdata.Set("blur-all", "0")
+	}
+
+	if home, err := os.UserHomeDir(); err == nil {
+		defaultConfigPath = strings.Join([]string{home, ".gma", "mapper", "mapper.conf"}, string(os.PathSeparator))
+	}
+
+	var noAnimate = flag.Bool("no-animate", false, "Don't animate element drawing on the map")
+	flag.BoolVar(noAnimate, "a", false, "same as -no-animate")
+	var animate = flag.Bool("animate", false, "Animate element drawing on the map")
+	flag.BoolVar(animate, "A", false, "same as -animate")
+	var blurAll = flag.Bool("blur-all", false, "Show approximate hit points for all creatures")
+	flag.BoolVar(animate, "B", false, "same as -blur-all")
+	var noBlurAll = flag.Bool("no-blur-all", false, "Show approximate hit points ONLY for non-players")
+	var blurHP = flag.Int("blur-hp", 0, "Percentage of hit point blurring")
+	flag.IntVar(blurHP, "b", 0, "same as -blur-hp")
+	var logFile = flag.String("log", "", "Write log info to named file [default=stderr]")
+	var configFile = flag.String("config", defaultConfigPath, "Read configuration options from file")
+	flag.StringVar(configFile, "C", defaultConfigPath, "same as -config")
+	flag.Var(&charList, "character", "Add PC to menu (value is name[:color], specify multiple times)")
+	flag.Var(&charList, "c", "same as -character")
+	flag.Var(&debugLevel, "debug", "Increment debugging level")
+	flag.Var(&debugLevel, "D", "same as -debug")
+	var darkMode = flag.Bool("dark", false, "Use dark mode")
+	flag.BoolVar(darkMode, "d", false, "same as -dark")
+	var host = flag.String("host", "", "Map server hostname")
+	flag.StringVar(host, "h", "", "same as -host")
+	var password = flag.String("password", "", "Server login password")
+	flag.StringVar(password, "P", "", "same as -password")
+	var port = flag.Int("port", 2323, "Server TCP port")
+	flag.IntVar(port, "p", 2323, "same as -port")
+	var guide = flag.String("guide", "", "minor guideline (as interval[+x:y])")
+	flag.StringVar(guide, "g", "", "same as -guide")
+	var major = flag.String("major", "", "major guideline (as interval[+x:y])")
+	flag.StringVar(major, "G", "", "same as -major")
+	var module = flag.String("module", "", "Module ID")
+	flag.StringVar(module, "M", "", "same as -module")
+	var DEPRECATEDmaster = flag.Bool("master", false, "same as -keep-tools (deprecated name)")
+	flag.BoolVar(DEPRECATEDmaster, "m", false, "same as -master")
+	var keepTools = flag.Bool("keep-tools", false, "Keep toolbar on unconditionally")
+	flag.BoolVar(keepTools, "k", false, "same as -keep-tools")
+	var noChat = flag.Bool("no-chat", false, "Suppress receipt of chat messages")
+	flag.BoolVar(noChat, "n", false, "same as -no-chat")
+	var style = flag.String("style", "", "Style settings filename")
+	flag.StringVar(style, "s", "", "same as -style")
+	var transcript = flag.String("transcript", "", "Chat transcript save filename")
+	flag.StringVar(transcript, "t", "", "same as -transcript")
+	var username = flag.String("username", "", "Name to use on the game server (default is local username)")
+	flag.StringVar(username, "u", "", "same as -username")
+	var proxyURL = flag.String("proxy-url", "", "Proxy URL for curl access to server")
+	flag.StringVar(proxyURL, "x", "", "same as -proxy-url")
+	var proxyHost = flag.String("proxy-host", "", "Proxy hostname for ssh access to server")
+	flag.StringVar(proxyHost, "X", "", "same as -proxy-host")
+	var preload = flag.Bool("preload", false, "Preload map elements from cache")
+	flag.BoolVar(preload, "l", false, "same as -preload")
+	var buttonSize = flag.String("button-size", "small", "Size for toolbar buttons")
+	var chatHistory = flag.Int("chat-history", 512, "Number of historical chat messages to keep")
+	var curlPath = flag.String("curl-path", "", "Path to curl program locally")
+	var curlURLBase = flag.String("curl-url-path", "", "Base URL to fetch artifacts via curl")
+	var mkdirPath = flag.String("mkdir-path", "", "Path to mkdir on server")
+	var ncPath = flag.String("nc-path", "", "Path to nc program locally")
+	var scpPath = flag.String("scp-path", "", "Path to scp program locally")
+	var scpDest = flag.String("scp-dest", "", "Path to server data area")
+	var scpServer = flag.String("scp-server", "", "Hostname of server for scp transfers")
+	var sshPath = flag.String("ssh-path", "", "Path to ssh program locally")
+	var generateStyleConfig = flag.String("generate-style-config", "", "Generate a new style config file, writing to the named file")
+	var generateConfig = flag.String("generate-config", "", "Generate a new mapper config file, writing to the named file")
+	var updateURL = flag.String("update-url", "", "URL for program updates")
+	var upgradeNotice = flag.Bool("upgrade-notice", false, "(for internal use only)")
+
+	flag.Parse()
+
+	if *configFile != "" {
+		cfile, err := os.Open(*configFile)
+		if err != nil {
+			a.Logger.Printf("warning: unable to open configuration file \"%s\": %v", *configFile, err)
+		} else {
+			if err := util.UpdateSimpleConfig(cfile, cdata); err != nil {
+				a.Logger.Printf("warning: unable to parse configuration file \"%s\": %v", *configFile, err)
+			}
+		}
+	}
+
+	if err := cdata.Override(
+		util.OverrideString("log", *logFile),
+	); err != nil {
+		a.Logger.Fatalf("error handling command-line arguments: %v", err)
+	}
+
+	if *logFile != "" {
+		f, err := os.OpenFile(*logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			a.Logger.Printf("unable to open log file \"%s\": %v", *logFile, err)
+		} else {
+			a.Logger.SetOutput(f)
+		}
+	}
+
+	if *animate || *noAnimate {
+		a.Logger.Printf("--animate/--no-animate options deprecated (ignored)")
+	}
+
+	if err := cdata.Override(
+		util.OverrideBool("animate", *animate),
+		util.OverrideBool("no-animate", *noAnimate),
+		util.OverrideBoolWithNegation("blur-all", *blurAll, *noBlurAll),
+		util.OverrideInt("blur-hp", *blurHP),
+		util.OverrideString("button-size", *buttonSize),
+		util.OverrideString("character", charList.String()),
+		util.OverrideInt("chat-history", *chatHistory),
+		util.OverrideString("curl-path", *curlPath),
+		util.OverrideString("curl-url-base", *curlURLBase),
+		util.OverrideBool("dark", *darkMode),
+		util.OverrideInt("debug", int(debugLevel)),
+		util.OverrideString("guide", *guide),
+		util.OverrideString("host", *host),
+		util.OverrideBool("keep-tools", *keepTools),
+		util.OverrideString("major", *major),
+		util.OverrideBool("master", *DEPRECATEDmaster),
+		util.OverrideString("mkdir-path", *mkdirPath),
+		util.OverrideString("module", *module),
+		util.OverrideString("nc-path", *ncPath),
+		util.OverrideBool("no-chat", *noChat),
+		util.OverrideString("password", *password),
+		util.OverrideInt("port", *port),
+		util.OverrideBool("preload", *preload),
+		util.OverrideString("proxy-host", *proxyHost),
+		util.OverrideString("proxy-url", *proxyURL),
+		util.OverrideString("scp-dest", *scpDest),
+		util.OverrideString("scp-path", *scpPath),
+		util.OverrideString("scp-server", *scpServer),
+		util.OverrideString("ssh-path", *sshPath),
+		util.OverrideString("style", *style),
+		util.OverrideString("transcript", *transcript),
+		util.OverrideString("update-url", *updateURL),
+		util.OverrideBool("upgrade-notice", *upgradeNotice),
+		util.OverrideString("username", *username),
+	); err != nil {
+		a.Logger.Fatalf("error handling command-line arguments: %v", err)
+	}
+
+	if *generateStyleConfig != "" {
+		GenerateStyleConfig(*a, *generateStyleConfig)
+	}
+
+	if *generateConfig != "" {
+		panic("not yet")
+	}
+
+	if cdata.GetBoolDefault("no-animate", false) || cdata.GetBoolDefault("animate", false) {
+		a.Logger.Printf("warning: --animate and --no-animate are deprecated (ignored)")
+	}
+
+	if cdata.GetBoolDefault("master", false) {
+		if cdata.GetBoolDefault("keep-tools", false) {
+			a.Logger.Printf("warning: --master deprecated (you also specified --keep-tools; just remove --master)")
+		} else {
+			a.Logger.Printf("warning: --master deprecated (use --keep-tools instead)")
+			cdata.Set("keep-tools", "1")
+		}
+	}
+
+	// now cdata has our defaults + config file data + command-line options
+	// so we can just validate that list and act on it.
+
+	for _, v := range []struct {
+		dst *string
+		key string
+	}{
+		{&a.ServerHost, "host"},
+		{&a.ServerMkdirPath, "mkdir-path"},
+		{&a.ModuleID, "module"},
+		{&a.NcPath, "nc-path"},
+		{&a.ServerPassword, "password"},
+		{&a.ProxyHost, "proxy-host"},
+		{&a.ProxyURL, "proxy-url"},
+		{&a.SCPServerDest, "scp-dest"},
+		{&a.SCPPath, "scp-path"},
+		{&a.SCPServerHost, "scp-server"},
+		{&a.SSHPath, "ssh-path"},
+		{&a.StyleFilename, "style"},
+		{&a.TranscriptFilename, "transcript"},
+		{&a.UpdateURL, "update-url"},
+		{&a.ServerUsername, "username"},
+	} {
+		*v.dst, _ = cdata.GetDefault(v.key, "")
+	}
+
+	for _, v := range []struct {
+		dst *bool
+		key string
+	}{
+		{&a.BlurAll, "blur-all"},
+		{&a.KeepTools, "keep-tools"},
+		{&a.SuppressChat, "no-chat"},
+		{&a.CachePreload, "preload"},
+		{&a.upgradeNotice, "upgrade-notice"},
+	} {
+		*v.dst, err = cdata.GetBool(v.key)
+		if err != nil {
+			a.Logger.Fatalf("unable to set boolean option \"%s\": %v", v.key, err)
+		}
+	}
+
+	for _, v := range []struct {
+		dst *int
+		key string
+	}{
+		{&a.BlurPct, "blur-hp"},
+		{&a.DebugLevel, "debug"},
+		{&a.ServerPort, "port"},
+	} {
+		*v.dst, err = cdata.GetInt(v.key)
+		if err != nil {
+			a.Logger.Fatalf("unable to set integer option \"%s\": %v", v.key, err)
+		}
+	}
+
+	if a.BlurPct < 0 {
+		a.BlurPct = 0
+	}
+
+	if a.BlurPct > 100 {
+		a.BlurPct = 100
+	}
+
+	bs, _ := cdata.GetDefault("button-size", "small")
+	switch bs {
+	case "small":
+		a.LargeButtons = false
+	case "large":
+		a.LargeButtons = true
+	default:
+		a.Logger.Printf("warning: -button-size=\"%s\" invalid (must be \"small\" or \"large\")", bs)
+	}
+
+	chars, _ := cdata.GetDefault("character", "")
+	for _, ch := range strings.Split(chars, ",") {
+		cparts := strings.Split(ch, ":")
+		if len(cparts) == 1 {
+			cparts = append(cparts, "blue")
+		}
+		if len(cparts) != 2 {
+			a.Logger.Printf("warning: illegal character option value \"%s\"", ch)
+			continue
+		}
+		newId, err := uuid.NewRandom()
+		if err != nil {
+			a.Logger.Printf("warning: unable to generate an ID for \"%s\": %v", ch, err)
+			continue
+		}
+
+		a.PCList = append(a.PCList, mapper.PlayerToken{
+			CreatureToken: mapper.CreatureToken{
+				BaseMapObject: mapper.BaseMapObject{
+					ID: newId.String(),
+				},
+				CreatureType: mapper.CreatureTypePlayer,
+				Name:         cparts[0],
+				Color:        cparts[1],
+				Size:         "M",
+				Area:         "M",
+			},
+		})
+	}
+
+	g, ok := cdata.Get("guide")
+	if ok && g != "" {
+		if err := a.MinorGuides.Parse(g); err != nil {
+			a.Logger.Printf("warning: can't understand minor guide spec \"%s\": %v", g, err)
+		}
+	}
+
+	g, ok = cdata.Get("major")
+	if ok && g != "" {
+		if err := a.MajorGuides.Parse(g); err != nil {
+			a.Logger.Printf("warning: can't understand major guide spec \"%s\": %v", g, err)
+		}
+	}
+
+	return nil
+}
+
 func main() {
 	mapApp := Application{
 		FontList: make(map[string]tk.Font),
 		Logger:   log.Default(),
 	}
+	mapApp.Logger.SetPrefix("mapper: ")
+	mapApp.getAppOptions()
 
 	tk.MainLoop(func() {
 		//
@@ -386,6 +891,291 @@ func main() {
 	})
 }
 
+//
+// DisplayStyle describes the user's preferences for how we
+// display various things.
+//
+type DisplayStyleDetails map[string]DisplayStyleDetail
+
+type DisplayStyleDetail struct {
+	Font       string `json:",omitempty"`
+	Color      string `json:",omitempty"`
+	Background string `json:",omitempty"`
+	Overstrike bool   `json:",omitempty"`
+	Format     string `json:",omitempty"`
+}
+
+type DisplayStyleOptions struct {
+	DarkStyle            DisplayStyleDetails
+	LightStyle           DisplayStyleDetails
+	CollapseDescriptions bool
+}
+
+type DisplayStyle struct {
+	DieRollResults DisplayStyleOptions
+}
+
+//
+// DefaultDisplayStyle generates the built-in default style
+// settings.
+//
+func DefaultDisplayStyle() DisplayStyle {
+	return DisplayStyle{
+		DieRollResults: DisplayStyleOptions{
+			DarkStyle: DisplayStyleDetails{
+				"best":       {Font: "If12", Format: " best of %s", Color: "#aaaaaa"},
+				"bonus":      {Font: "Hf12", Color: "#fffb00"},
+				"comment":    {Font: "If12", Color: "#fffb00"},
+				"constant":   {Font: "Hf12"},
+				"critlabel":  {Font: "If12", Format: "Confirm: ", Color: "#fffb00"},
+				"critspec":   {Font: "If12", Color: "#fffb00"},
+				"dc":         {Font: "If12", Format: "DC %s: ", Color: "#aaaaaa"},
+				"diebonus":   {Font: "If12", Color: "red"},
+				"diespec":    {Font: "Hf12"},
+				"discarded":  {Font: "Hf12", Format: "{%s}", Overstrike: true, Color: "#aaaaaa"},
+				"exceeded":   {Font: "If12", Format: "exceeded DC by %s", Color: "#00fa92"},
+				"fail":       {Font: "Tf12", Format: "(%s)", Color: "red"},
+				"from":       {Font: "Hf12", Color: "cyan"},
+				"fullmax":    {Font: "Tf12", Format: "maximized", Color: "red"},
+				"fullresult": {Font: "Tf16", Format: "%s ", Background: "blue"},
+				"iteration":  {Font: "If12", Format: " (roll #%s)", Color: "#aaaaaa"},
+				"label":      {Font: "If12", Format: " %s", Color: "cyan"},
+				"max":        {Font: "If12", Format: "max %s", Color: "#aaaaaa"},
+				"maximized":  {Font: "Tf12", Format: ">", Color: "red"},
+				"maxroll":    {Font: "Tf12", Format: "{%s}", Color: "red"},
+				"met":        {Font: "If12", Format: "successful", Color: "#00fa92"},
+				"min":        {Font: "If12", Format: "min %s", Color: "#aaaaaa"},
+				"moddelim":   {Font: "Hf12", Format: " | ", Color: "#fffb00"},
+				"normal":     {Font: "Hf12"},
+				"operator":   {Font: "Hf12"},
+				"repeat":     {Font: "If12", Format: "repeat %s", Color: "#aaaaaa"},
+				"result":     {Font: "Hf14"},
+				"roll":       {Font: "Hf12", Format: "{%s}", Color: "#00fa92"},
+				"separator":  {Font: "Hf12", Format: "="},
+				"sf":         {Font: "If12", Color: "#aaaaaa"},
+				"short":      {Font: "If12", Format: "missed DC by %s", Color: "red"},
+				"success":    {Font: "Tf12", Color: "#00fa92"},
+				"system":     {Font: "If10", Color: "cyan"},
+				"title":      {Font: "Tf12", Format: "%s: "},
+				"to":         {Font: "If12", Color: "red"},
+				"until":      {Font: "If12", Color: "#aaaaaa"},
+				"worst":      {Font: "If12", Color: "#aaaaaa"},
+			},
+			LightStyle: DisplayStyleDetails{
+				"best":       {Font: "If12", Format: " best of %s", Color: "#888888"},
+				"bonus":      {Font: "Hf12", Color: "#f05b00"},
+				"comment":    {Font: "If12", Color: "#f05b00"},
+				"constant":   {Font: "Hf12"},
+				"critlabel":  {Font: "If12", Format: "Confirm: ", Color: "#f05b00"},
+				"critspec":   {Font: "If12", Color: "#f05b00"},
+				"dc":         {Font: "If12", Format: "DC %s: ", Color: "#888888"},
+				"diebonus":   {Font: "If12", Color: "red"},
+				"diespec":    {Font: "Hf12"},
+				"discarded":  {Font: "Hf12", Format: "{%s}", Overstrike: true, Color: "#888888"},
+				"exceeded":   {Font: "If12", Format: "exceeded DC by %s", Color: "green"},
+				"fail":       {Font: "Tf12", Format: "(%s)", Color: "red"},
+				"from":       {Font: "Hf12", Color: "blue"},
+				"fullmax":    {Font: "Tf12", Format: "maximized", Color: "red"},
+				"fullresult": {Font: "Tf16", Format: "%s ", Color: "#ffffff", Background: "blue"},
+				"iteration":  {Font: "If12", Format: " (roll #%s)", Color: "#888888"},
+				"label":      {Font: "If12", Format: " %s", Color: "blue"},
+				"max":        {Font: "If12", Format: "max %s", Color: "#888888"},
+				"maximized":  {Font: "Tf12", Format: ">", Color: "red"},
+				"maxroll":    {Font: "Tf12", Format: "{%s}", Color: "red"},
+				"met":        {Font: "If12", Format: "successful", Color: "green"},
+				"min":        {Font: "If12", Format: "min %s", Color: "#888888"},
+				"moddelim":   {Font: "Hf12", Format: " | ", Color: "#f05b00"},
+				"normal":     {Font: "Hf12"},
+				"operator":   {Font: "Hf12"},
+				"repeat":     {Font: "If12", Format: "repeat %s", Color: "#888888"},
+				"result":     {Font: "Hf14"},
+				"roll":       {Font: "Hf12", Format: "{%s}", Color: "green"},
+				"separator":  {Font: "Hf12", Format: "="},
+				"sf":         {Font: "If12"},
+				"short":      {Font: "If12", Format: "missed DC by %s", Color: "red"},
+				"success":    {Font: "Tf12"},
+				"system":     {Font: "If10", Color: "blue"},
+				"title":      {Font: "Tf12", Format: "%s: "},
+				"to":         {Font: "If12", Color: "red"},
+				"until":      {Font: "If12", Color: "#888888"},
+				"worst":      {Font: "If12", Color: "#888888"},
+			},
+			CollapseDescriptions: false,
+		},
+	}
+}
+
+//
+// GenerateStyleConfig creates a default style configuration
+// which may be used as a starting point for the user to
+// customize the settings.
+//
+func GenerateStyleConfig(a Application, path string) error {
+	file, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("unable to create new style config file: %v", err)
+	}
+	defer func() {
+		err := file.Close()
+		if err != nil {
+			a.Logger.Printf("error closing style config file \"%s\": %v", path, err)
+		}
+	}()
+
+	dd := DefaultDisplayStyle()
+	b, err := json.MarshalIndent(dd, "", "    ")
+	if err != nil {
+		return fmt.Errorf("unable to write new style config file: %v", err)
+	}
+	_, err = file.Write(b)
+	if err != nil {
+		return fmt.Errorf("unable to write new style config file: %v", err)
+	}
+	return nil
+}
+
+/*
+
+if {$__generate_style_config ne {}} {
+	set f [open $__generate_style_config a]
+	array set def_settings [default_style_data]
+	puts $f {
+;------------------------------------------------------------------------------
+; The following settings were automatically generated by the mapper client.
+; This shows the full set of possible style configurations currently supported
+; for this client, with the values that are built-in to the mapper client.
+; You can delete any of these you don't want to change, so you get the built-
+; in values by default. (That way if the built-in values change, you'll get
+; the current ones instead of these.)
+;------------------------------------------------------------------------------
+[mapper]
+dierolls=mapper_default_die_rolls
+fonts=mapper_default_fonts
+
+[mapper_default_fonts]
+Tf16=-family Helvetica -size 16 -weight bold
+Tf14=-family Helvetica -size 14 -weight bold
+Tf12=-family Helvetica -size 12 -weight bold
+Tf10=-family Helvetica -size 10 -weight bold
+Tf8 =-family Helvetica -size  8 -weight bold
+Hf14=-family Helvetica -size 14
+Hf12=-family Helvetica -size 12
+Hf10=-family Helvetica -size 10
+If12=-family Times     -size 12 -slant italic
+If10=-family Times     -size 10 -slant italic
+Nf10=-family Times     -size 10
+Nf12=-family Times     -size 12
+
+[mapper_default_die_rolls]
+collapse_descriptions = 0
+;default_font= XXX set this to a font if you want it to be the default for all styles XXX
+;bg_list_even= XXX set this to a color for even-numbered list rows
+;bg_list_odd= XXX set this to a color for odd-numbered list rows}
+	array unset elements
+	array set def {
+		font {}
+		fg   {}
+		bg   {}
+		overstrike 0
+		underline 0
+		fmt  %s
+	}
+
+	foreach name [array names def_settings] {
+		if {[set index [string first _ $name]] >= 0} {
+			set elements([string range $name $index+1 end]) 1
+		}
+	}
+	foreach name [lsort [array names elements]] {
+		foreach style [lsort [array names def]] {
+			if {[info exists "def_settings(${style}_${name})"]} {
+				set v $def_settings(${style}_${name})
+				if {$style eq {fmt}} {
+					if {[string range $v 0 0] eq { }} {
+						set v "|$v"
+					}
+					if {[string range $v end end] eq { }} {
+						set v "$v|"
+					}
+				}
+				puts $f "${style}_${name}=$v"
+			} elseif {$def($style) eq {}} {
+				puts $f ";${style}_${name}= XXX SYSTEM DEFAULT VALUE XXX"
+			} else {
+				puts $f "${style}_${name}=$def($style)"
+			}
+		}
+	}
+	puts $f {;------------------------------------------------------------------------------
+; End of default generated values
+;------------------------------------------------------------------------------}
+	close $f
+	exit 0
+}
+#
+# --generate-config:       output to the specified file a full
+#                          list of configuration options and their
+#                          current values
+#
+if {$__generate_config ne {}} {
+	set f [open $__generate_config a]
+	puts $f {
+#------------------------------------------------------------------------------
+# The following settings were automatically generated by the mapper client.
+# This shows the full set of possible mapper configurations currently supported
+# for this client, with the values that are built-in to the mapper client.
+# You can delete any of these you don't want to change, so you get the built-
+# in values by default. (That way if the built-in values change, you'll get
+# the current ones instead of these.)
+#
+# Commented-out options are off by default. Un-comment them to enable them.
+#------------------------------------------------------------------------------
+no-animate
+#animate
+#blur-all
+no-blur-all
+#blur-hp=PERCENT
+#character=NAME[:COLOR]  (you should never enable this)
+#set this to the maximum number of chat/die roll messages you want to retain
+chat-history=500
+#enable more of these to increase debugging output
+#debug
+#debug
+#debug
+#debug
+#debug
+#debug
+#dark
+#host=YOUR_GAME_SERVER_HOSTNAME
+#port=2323
+#guide=INTERVAL[+OFFSET[:YOFFSET]]
+#major=INTERVAL[+OFFSET[:YOFFSET]]
+#module=CODE
+#keep-tools
+#no-chat
+#style=~/.gma/mapper/style.conf
+#transcript=PATHNAME
+#username=MYNAME
+#proxy-url=CURL-PROXY-URL
+#proxy-host=SSH-PROXY-HOST
+#preload
+#curl-path=PATH
+#curl-url-base=YOUR_GAME_SERVER_URL
+#mkdir-path=PATH
+#nc-path=PATH
+#scp-path=PATH
+#scp-dest=YOUR_GAME_SERVER_DIR
+#scp-server=YOUR_GAME_SERVER
+#ssh-path=PATH
+#update-url=YOUR_GAME_SERVER_UPGRADE_URL
+#------------------------------------------------------------------------------
+# End of default generated values
+#------------------------------------------------------------------------------
+}
+	close $f
+	exit 0
+}
+*/
 //
 // @[00]@| GMA 4.3.11
 // @[01]@|
