@@ -22,7 +22,7 @@ import (
 	"log"
 	"runtime"
 
-	"github.com/visualfc/atk/tk"
+	"github.com/MadScienceZone/atk/tk"
 )
 
 //
@@ -36,7 +36,6 @@ const (
 )
 
 func main() {
-	// TODO read style config (setting fonts etc)
 	mapApp := Application{
 		FontList: make(map[string]tk.Font),
 		Logger:   log.Default(),
@@ -46,7 +45,6 @@ func main() {
 	mapApp.LoadDisplayStyle()
 
 	tk.MainLoop(func() {
-		mapApp.DefineDeclaredFonts()
 		//
 		// Set up menus
 		//
@@ -91,6 +89,7 @@ func main() {
 		*/
 
 		mapApp.Root = tk.RootWindow()
+		mapApp.DefineDeclaredFonts()
 
 		mapApp.Root.SetTitle("GMA Mapper")
 		mapApp.Root.OnClose(func() bool {
@@ -173,13 +172,7 @@ func main() {
 		menuBar.AddSubMenu("Help", helpMenu)
 		mapApp.Root.SetMenu(menuBar)
 
-		// Define our fonts
-		mapApp.addFont("Tf14", "Helvetica", 14, true, false)
-		mapApp.addFont("Nf12", "Times", 12, false, false)
-		mapApp.addFont("If12", "Times", 12, false, true)
-		mapApp.addFont("Tf12", "Helvetica", 12, true, false)
-		mapApp.addFont("Cf12", "Courier", 12, true, false)
-
+		mapApp.MapWidget = NewMapWidget(&mapApp, mapApp.Root)
 		mapApp.Root.ShowNormal()
 	})
 }

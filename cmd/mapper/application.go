@@ -27,10 +27,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/MadScienceZone/atk/tk"
 	"github.com/MadScienceZone/go-gma/v4/mapper"
 	"github.com/MadScienceZone/go-gma/v4/util"
-	"github.com/google/uuid"
-	"github.com/visualfc/atk/tk"
 )
 
 //
@@ -50,7 +49,8 @@ type Application struct {
 	Logger *log.Logger
 
 	// Root is the Tk root window for the application.
-	Root *tk.Window
+	Root      *tk.Window
+	MapWidget *tk.Canvas
 
 	// Local controls over whether the map reports HP accurately
 	// (server may override)
@@ -107,6 +107,9 @@ type Application struct {
 
 	// True if we're restarting after an upgrade
 	upgradeNotice bool
+
+	// Directories we need for things
+	cacheDir string
 }
 
 type gridGuide struct {
@@ -258,7 +261,7 @@ func (a *Application) LoadDisplayStyle() error {
 	if a.StyleFilename != "" {
 		sfile, err := os.Open(a.StyleFilename)
 		if err != nil {
-			a.Logger.Printf("warning: unable to open style configuration file \"%s\": %v", a.StyleFilename, err)
+			a.Logger.Printf("warning: unable to open style configuration file: %v", err)
 		} else {
 			defer func() {
 				if err := sfile.Close(); err != nil {
@@ -562,16 +565,11 @@ func (a *Application) GetAppOptions() error {
 			a.Logger.Printf("warning: illegal character option value \"%s\"", ch)
 			continue
 		}
-		newId, err := uuid.NewRandom()
-		if err != nil {
-			a.Logger.Printf("warning: unable to generate an ID for \"%s\": %v", ch, err)
-			continue
-		}
 
 		a.PCList = append(a.PCList, mapper.PlayerToken{
 			CreatureToken: mapper.CreatureToken{
 				BaseMapObject: mapper.BaseMapObject{
-					ID: newId.String(),
+					ID: NewID(),
 				},
 				CreatureType: mapper.CreatureTypePlayer,
 				Name:         cparts[0],

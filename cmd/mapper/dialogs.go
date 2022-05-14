@@ -20,7 +20,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/visualfc/atk/tk"
+	"github.com/MadScienceZone/atk/tk"
 )
 
 func aboutMapper() {

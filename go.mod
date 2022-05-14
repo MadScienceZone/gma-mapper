@@ -3,14 +3,18 @@ module github.com/MadScienceZone/gma-mapper/v4
 go 1.18
 
 replace (
+	github.com/MadScienceZone/atk => ../atk
+	github.com/MadScienceZone/atk/tk => ../atk/tk
+	github.com/MadScienceZone/atk/tk/interp => ../atk/tk/interp
 	github.com/MadScienceZone/go-gma/v4 => ../go-gma
 	github.com/MadScienceZone/go-gma/v4/util => ../go-gma/util
-	github.com/visualfc/atk => ../atk
+	github.com/visualfc/atk/tk => ../atk/tk
+	github.com/visualfc/atk/tk/interp => ../atk/tk/interp
 )
 
 require (
+	github.com/MadScienceZone/atk v1.2.2
 	github.com/MadScienceZone/go-gma/v4 v4.3.12
-	github.com/visualfc/atk v1.2.2
 )
 
 require (
