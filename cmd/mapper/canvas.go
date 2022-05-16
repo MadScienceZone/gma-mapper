@@ -35,13 +35,19 @@ import (
 	"github.com/google/uuid"
 )
 
-func NewMapWidget(a *Application, p *tk.Window) *tk.Canvas {
-	c := tk.NewCanvas(p)
-	c.SetWidth(1000)
-	c.SetHeight(1400)
+type MapWidget struct {
+	Canvas *tk.Canvas
+}
+
+func NewMapWidget(a *Application, p *tk.Window) *MapWidget {
+	w := MapWidget{
+		Canvas: tk.NewCanvas(p),
+	}
+	w.Canvas.SetWidth(1000)
+	w.Canvas.SetHeight(1400)
 
 	grid := tk.NewGridLayout(p)
-	if err := grid.AddWidgetEx(c, 0, 0, 1, 1, tk.StickyAll); err != nil {
+	if err := grid.AddWidgetEx(w.Canvas, 0, 0, 1, 1, tk.StickyAll); err != nil {
 		a.Logger.Fatalf("error setting map canvas: %v", err)
 	}
 	tk.GridRowIndex(grid, 0, tk.GridIndexAttrWeight(1))
@@ -55,10 +61,10 @@ func NewMapWidget(a *Application, p *tk.Window) *tk.Canvas {
 	//grid [scrollbar .xs -orient horizontal -command {battleGridScroller .c xview}]  -sticky  ew
 	//label .c.distanceLabel -textvariable DistanceLabelText
 	//bind $canvas <Shift-1> "PingMarker $canvas %x %y"
-	return c
+	return &w
 }
 
-func (c *tk.Canvas) BattleGridLabels(gridColor string, iScale int) {
+func (w *MapWidget) BattleGridLabels(gridColor string, iScale int) {
 	// save scrollbar position to {x,y}{start,end}frac
 	//c.Delete "x#label"
 	//startPx := int(xStartFrac * cansw)
@@ -66,10 +72,10 @@ func (c *tk.Canvas) BattleGridLabels(gridColor string, iScale int) {
 	//startGrid := CanvasToGrid(startPx)
 	//endGrid := CanvasToGric(endPx)
 	//yPx := int(yStartFrac * cansh)
-	for xBox := startGrid; xBox <= endGrid; xBox++ {
-		// c.Create text GridToCanvas(xBox)+(iscale/2.0) yPx
-		//	-tags x#label -anchor n -justify center -text LetterLabel(xBox) -fill gridColor
-	}
+	//for xBox := startGrid; xBox <= endGrid; xBox++ {
+	// c.Create text GridToCanvas(xBox)+(iscale/2.0) yPx
+	//	-tags x#label -anchor n -justify center -text LetterLabel(xBox) -fill gridColor
+	//}
 	// same but for y axis
 }
 
@@ -120,8 +126,9 @@ func CacheInfo(path string) (CacheInfoDetails, error) {
 	imagePattern := regexp.MustCompile(`^(.+)@([0-9.]+)\.gif$`)
 	mapPattern := regexp.MustCompile(`^(.+)\.map$`)
 	var info CacheInfoDetails
+	var err error
 
-	fileComponents := strings.Split(path, os.PathSeparator)
+	fileComponents := strings.Split(path, string(os.PathSeparator))
 	if len(fileComponents) == 0 {
 		return CacheInfoDetails{}, fmt.Errorf("empty pathname in cache search")
 	}
@@ -168,11 +175,11 @@ type CacheInfoDetails struct {
 func (a *Application) ImageCacheFilename(name string, zoom float64) string {
 	// TODO on Windows, make sure the directory exists
 	// TODO nativename?
-	return strings.Join([]string{a.CacheDirName(), "_" + name[4:5], fmt.Sprintf("%s@%g.gif", name, zoom)}, os.PathSeparator)
+	return strings.Join([]string{a.CacheDirName(), "_" + name[4:5], fmt.Sprintf("%s@%g.gif", name, zoom)}, string(os.PathSeparator))
 }
 
 func (a *Application) MapCacheFilename(name string) string {
-	return strings.Join([]string{a.CacheDirName(), "_" + name[0:1], name + ".map"}, os.PathSeparator)
+	return strings.Join([]string{a.CacheDirName(), "_" + name[0:1], name + ".map"}, string(os.PathSeparator))
 }
 
 func (a *Application) CacheDirName() string {
@@ -183,9 +190,9 @@ func (a *Application) CacheDirName() string {
 			if err2 != nil {
 				a.Logger.Fatalf("unable to figure out where to write cache data (%v, %v)", err, err2)
 			}
-			a.cacheDir = strings.Join([]string{home, ".gma", "mapper", "cache"}, os.PathSeparator)
+			a.cacheDir = strings.Join([]string{home, ".gma", "mapper", "cache"}, string(os.PathSeparator))
 		} else {
-			a.cacheDir = cache + os.PathSeparator + "gma-mapper"
+			a.cacheDir = cache + string(os.PathSeparator) + "gma-mapper"
 		}
 	}
 	return a.cacheDir
@@ -460,14 +467,14 @@ func SnapCoord(x, objSnap, rScale float64) float64 {
 // CanvasToGrid scales down canvas coordinates to grid units.
 //
 func CanvasToGrid(x float64, iScale int) float64 {
-	return math.Floor(x / iScale)
+	return math.Floor(x / float64(iScale))
 }
 
 //
 // GridToCanvas scales up grid units to canvas coordinates.
 //
 func GridToCanvas(x float64, iScale int) float64 {
-	return x * iScale
+	return x * float64(iScale)
 }
 
 //
@@ -516,16 +523,16 @@ func DistanceAlongRoute(coordList []mapper.Coordinates) float64 {
 // easily.
 //
 func CacheMapID(path, module, secret string) string {
-	if slash := strings.LastIndex(path, os.PathSeparator); slash >= 0 {
+	if slash := strings.LastIndex(path, string(os.PathSeparator)); slash >= 0 {
 		path = path[slash+1:]
 	}
 	if dot := strings.LastIndex(path, "."); dot > 0 {
 		path = path[:dot]
 	}
+	sumData := md5.Sum([]byte(module + secret + path))
 	return strings.ReplaceAll(
 		strings.ReplaceAll(
-			base64.StdEncoding.WithPadding(base64.NoPadding).EncodeToString(
-				md5.Sum([]byte(module+secret+path))),
+			base64.StdEncoding.WithPadding(base64.NoPadding).EncodeToString(sumData[:]),
 			"+", "_"),
 		"/", "-")
 }

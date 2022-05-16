@@ -172,7 +172,7 @@ func main() {
 		menuBar.AddSubMenu("Help", helpMenu)
 		mapApp.Root.SetMenu(menuBar)
 
-		mapApp.MapWidget = NewMapWidget(&mapApp, mapApp.Root)
+		mapApp.MapCanvas = NewMapWidget(&mapApp, mapApp.Root)
 		mapApp.Root.ShowNormal()
 	})
 }

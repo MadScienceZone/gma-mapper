@@ -50,7 +50,7 @@ type Application struct {
 
 	// Root is the Tk root window for the application.
 	Root      *tk.Window
-	MapWidget *tk.Canvas
+	MapCanvas *MapWidget
 
 	// Local controls over whether the map reports HP accurately
 	// (server may override)
@@ -211,7 +211,6 @@ func setConfigDefaults() util.SimpleConfigurationData {
 		{"scp-path", "/usr/bin/scp"},
 		{"scp-server", ""},
 		{"ssh-path", "/usr/bin/ssh"},
-		{"style", "~/.gma/mapper/style.conf"},
 		{"transcript", ""},
 		{"update-url", ""},
 		{"upgrade-notice", "0"},
@@ -222,9 +221,17 @@ func setConfigDefaults() util.SimpleConfigurationData {
 	if u, err := user.Current(); err == nil {
 		cdata.Set("username", u.Username)
 	}
+	var home string
 	if home, err := os.UserHomeDir(); err == nil {
-		cdata.Set("log", strings.Join([]string{home, ".gma", "mapper", "logs", fmt.Sprintf("mapper.%d.log", os.Getpid())}, string(os.PathSeparator)))
+		// TODO: is there a better os-specific place for these?
+		cdata.Set("log", strings.Join([]string{home, ".gma", "mapper", "logs", "gma-mapper.log"}, string(os.PathSeparator)))
 	}
+	if cfgDir, err := os.UserConfigDir(); err == nil {
+		cdata.Set("style", strings.Join([]string{cfgDir, "gma-mapper", "style.conf"}, string(os.PathSeparator)))
+	} else if home != "" {
+		cdata.Set("style", strings.Join([]string{home, ".gma", "mapper", "style.conf"}, string(os.PathSeparator)))
+	}
+
 	return cdata
 }
 
@@ -314,7 +321,9 @@ func (a *Application) GetAppOptions() error {
 		cdata.Set("blur-all", "0")
 	}
 
-	if home, err := os.UserHomeDir(); err == nil {
+	if cfgDir, err := os.UserConfigDir(); err == nil {
+		defaultConfigPath = strings.Join([]string{cfgDir, "gma-mapper", "mapper.conf"}, string(os.PathSeparator))
+	} else if home, err := os.UserHomeDir(); err == nil {
 		defaultConfigPath = strings.Join([]string{home, ".gma", "mapper", "mapper.conf"}, string(os.PathSeparator))
 	}
 
@@ -386,7 +395,7 @@ func (a *Application) GetAppOptions() error {
 	if *configFile != "" {
 		cfile, err := os.Open(*configFile)
 		if err != nil {
-			a.Logger.Printf("warning: unable to open configuration file \"%s\": %v", *configFile, err)
+			a.Logger.Printf("warning: unable to open configuration file: %v", err)
 		} else {
 			if err := util.UpdateSimpleConfig(cfile, cdata); err != nil {
 				a.Logger.Printf("warning: unable to parse configuration file \"%s\": %v", *configFile, err)
@@ -403,7 +412,7 @@ func (a *Application) GetAppOptions() error {
 	if *logFile != "" {
 		f, err := os.OpenFile(*logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
-			a.Logger.Printf("unable to open log file \"%s\": %v", *logFile, err)
+			a.Logger.Printf("unable to open log file: %v", err)
 		} else {
 			a.Logger.SetOutput(f)
 		}
