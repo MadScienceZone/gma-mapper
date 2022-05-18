@@ -342,6 +342,9 @@ func (a *Application) DefineDeclaredFonts() {
 		}
 
 		a.FontList[fName] = tk.NewUserFont(fData.Family, int(fData.Size), attrs...)
+		if a.FontList[fName] == nil {
+			a.Logger.Printf("warning: error defining font \"%s\"", fName)
+		}
 	}
 }
 

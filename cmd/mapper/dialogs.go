@@ -151,7 +151,9 @@ func helpDice(a Application) {
 		{{"p", "If a vertical bar ("}, {"b", "|"}, {"p", ") appears in the preset name, everything up to and including the bar is not displayed in the tool, but the sort order of the preset display is based on the entire name. This allows you to sort the entries in any arbitrary order without cluttering the display if you wish. This is most convenient if you save your presets to a file, edit them, and load them back again."}},
 	} {
 		for _, part := range line {
-			text.AppendTextWithTag(part.text, part.style)
+			if err := text.AppendTextWithTag(part.text, part.style); err != nil {
+				a.Logger.Printf("warning: trying to add text with tag \"%s\": %v", part.style, err)
+			}
 		}
 		text.AppendText("\n")
 	}
