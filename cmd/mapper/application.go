@@ -26,10 +26,12 @@ import (
 	"os/user"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/MadScienceZone/atk/tk"
 	"github.com/MadScienceZone/go-gma/v4/mapper"
 	"github.com/MadScienceZone/go-gma/v4/util"
+	"github.com/lestrrat-go/strftime"
 )
 
 //
@@ -48,9 +50,9 @@ type Application struct {
 	// Logger is whatever device or file we're writing logs to.
 	Logger *log.Logger
 
-	// Root is the Tk root window for the application.
-	Root      *tk.Window
-	MapCanvas *MapWidget
+	// On-screen objects that need to be widely visible.
+	Root      *tk.Window // the root Tk window
+	MapCanvas *MapWidget // the main scrolling canvas where the map is drawn
 
 	// Local controls over whether the map reports HP accurately
 	// (server may override)
@@ -85,7 +87,7 @@ type Application struct {
 	KeepTools bool
 
 	// Optional guidelines to draw on the map
-	MajorGuides, MinorGuides gridGuide
+	MajorGuides, MinorGuides GridGuide
 
 	// The module ID code in play
 	ModuleID string
@@ -112,20 +114,58 @@ type Application struct {
 	cacheDir string
 }
 
-type gridGuide struct {
-	interval int
-	offset   struct {
-		x, y int
+//
+// GridGuide describes guidelines added to the map grid
+// as requested by the user. These are heavier lines in
+// a different color which occur at some multiple of
+// grid lines, possibly with an offset of a number of
+// lines from the grid origin.
+//
+type GridGuide struct {
+	Interval int
+	Offset   struct {
+		X, Y int
 	}
 }
 
-func (g *gridGuide) Parse(s string) error {
+//
+// Debug logs messages conditionally based on the currently set
+// debug level. It acts just like fmt.Println as far as formatting
+// its arguments.
+//
+func (a *Application) Debug(level int, message ...any) {
+	if a.DebugLevel >= level {
+		a.Logger.Println(message...)
+	}
+}
+
+//
+// Debugf works like Debug, but takes a format string and argument list
+// just like fmt.Printf does.
+//
+func (a *Application) Debugf(level int, format string, args ...any) {
+	if a.DebugLevel >= level {
+		a.Logger.Printf(format, args...)
+	}
+}
+
+//
+// Parse reads in a string representation of a guide-line to be drawn
+// on the map, in the forms accepted by command line options and configuration
+// files, populating the receiver.
+//
+// The accepted forms include (here n, x, and y are integers):
+//    n       (guide lines every n squares)
+//    n+x     (... shifted x squares right and down)
+//    n+x:y   (... shifted x squares right and y squares down)
+//
+func (g *GridGuide) Parse(s string) error {
 	var err error
 
 	f := strings.SplitN(s, "+", 2)
-	g.interval, err = strconv.Atoi(f[0])
-	g.offset.x = 0
-	g.offset.y = 0
+	g.Interval, err = strconv.Atoi(f[0])
+	g.Offset.X = 0
+	g.Offset.Y = 0
 
 	if err != nil {
 		return err
@@ -133,17 +173,17 @@ func (g *gridGuide) Parse(s string) error {
 
 	if len(f) > 1 {
 		ff := strings.SplitN(f[1], ":", 2)
-		g.offset.x, err = strconv.Atoi(ff[0])
+		g.Offset.X, err = strconv.Atoi(ff[0])
 		if err != nil {
 			return err
 		}
 		if len(ff) > 1 {
-			g.offset.y, err = strconv.Atoi(ff[1])
+			g.Offset.Y, err = strconv.Atoi(ff[1])
 			if err != nil {
 				return err
 			}
 		} else {
-			g.offset.y = g.offset.x
+			g.Offset.Y = g.Offset.X
 		}
 	}
 	return nil
@@ -172,7 +212,8 @@ func (a *Application) addFont(name, family string, size int, bold bool, ital boo
 }
 
 //
-// Command-line arguments (from the command line and/or config file)
+// setConfigDefaults starts us off with default values for
+// configuration options (overridden from the command line and/or config file)
 // If we see a --config option then we'll populate our set of defaults
 // from that first, then override with command-line options.
 //
@@ -221,14 +262,14 @@ func setConfigDefaults() util.SimpleConfigurationData {
 	if u, err := user.Current(); err == nil {
 		cdata.Set("username", u.Username)
 	}
-	var home string
-	if home, err := os.UserHomeDir(); err == nil {
-		// TODO: is there a better os-specific place for these?
-		cdata.Set("log", strings.Join([]string{home, ".gma", "mapper", "logs", "gma-mapper.log"}, string(os.PathSeparator)))
-	}
+
+	// We'll default to stderr for the log output, and let the user
+	// use the -log option to move it someplace if they prefer that,
+	// rather than trying to guess where it belongs on each platform.
+
 	if cfgDir, err := os.UserConfigDir(); err == nil {
 		cdata.Set("style", strings.Join([]string{cfgDir, "gma-mapper", "style.conf"}, string(os.PathSeparator)))
-	} else if home != "" {
+	} else if home, err := os.UserHomeDir(); err == nil {
 		cdata.Set("style", strings.Join([]string{home, ".gma", "mapper", "style.conf"}, string(os.PathSeparator)))
 	}
 
@@ -266,13 +307,17 @@ func (o *optionCount) Set(s string) error {
 func (a *Application) LoadDisplayStyle() error {
 	a.Styles = DefaultDisplayStyle()
 	if a.StyleFilename != "" {
-		sfile, err := os.Open(a.StyleFilename)
+		spath, err := a.FancyFileName(a.StyleFilename)
+		if err != nil {
+			a.Logger.Fatalf("unable to parse style configuration file name \"%s\": %v", a.StyleFilename, err)
+		}
+		sfile, err := os.Open(spath)
 		if err != nil {
 			a.Logger.Printf("warning: unable to open style configuration file: %v", err)
 		} else {
 			defer func() {
 				if err := sfile.Close(); err != nil {
-					a.Logger.Printf("warning: unable to close \"%s\": %v", a.StyleFilename, err)
+					a.Logger.Printf("warning: unable to close \"%s\": %v", spath, err)
 				}
 			}()
 
@@ -393,28 +438,17 @@ func (a *Application) GetAppOptions() error {
 	flag.Parse()
 
 	if *configFile != "" {
-		cfile, err := os.Open(*configFile)
+		cpath, err := a.FancyFileName(*configFile)
+		if err != nil {
+			a.Logger.Fatalf("unable to understand config file path \"%s\": %v", *configFile, err)
+		}
+		cfile, err := os.Open(cpath)
 		if err != nil {
 			a.Logger.Printf("warning: unable to open configuration file: %v", err)
 		} else {
 			if err := util.UpdateSimpleConfig(cfile, cdata); err != nil {
 				a.Logger.Printf("warning: unable to parse configuration file \"%s\": %v", *configFile, err)
 			}
-		}
-	}
-
-	if err := cdata.Override(
-		util.OverrideString("log", *logFile),
-	); err != nil {
-		a.Logger.Fatalf("error handling command-line arguments: %v", err)
-	}
-
-	if *logFile != "" {
-		f, err := os.OpenFile(*logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			a.Logger.Printf("unable to open log file: %v", err)
-		} else {
-			a.Logger.SetOutput(f)
 		}
 	}
 
@@ -437,6 +471,7 @@ func (a *Application) GetAppOptions() error {
 		util.OverrideString("guide", *guide),
 		util.OverrideString("host", *host),
 		util.OverrideBool("keep-tools", *keepTools),
+		util.OverrideString("log", *logFile),
 		util.OverrideString("major", *major),
 		util.OverrideBool("master", *DEPRECATEDmaster),
 		util.OverrideString("mkdir-path", *mkdirPath),
@@ -459,6 +494,19 @@ func (a *Application) GetAppOptions() error {
 		util.OverrideString("username", *username),
 	); err != nil {
 		a.Logger.Fatalf("error handling command-line arguments: %v", err)
+	}
+
+	if *logFile != "" {
+		path, err := a.FancyFileName(*logFile)
+		if err != nil {
+			a.Logger.Fatalf("unable to understand log file path \"%s\": %v", *logFile, err)
+		}
+		f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			a.Logger.Printf("unable to open log file: %v", err)
+		} else {
+			a.Logger.SetOutput(f)
+		}
 	}
 
 	if *generateStyleConfig != "" {
@@ -546,13 +594,7 @@ func (a *Application) GetAppOptions() error {
 		}
 	}
 
-	if a.BlurPct < 0 {
-		a.BlurPct = 0
-	}
-
-	if a.BlurPct > 100 {
-		a.BlurPct = 100
-	}
+	a.BlurPct = LimitToRange(a.BlurPct, 0, 100)
 
 	bs, _ := cdata.GetDefault("button-size", "small")
 	switch bs {
@@ -611,14 +653,18 @@ func (a *Application) GetAppOptions() error {
 // as a starting point for the user to customize the application.
 //
 func GenerateConfig(a Application, path string) error {
-	file, err := os.Create(path)
+	cpath, err := a.FancyFileName(path)
+	if err != nil {
+		return fmt.Errorf("unable to understand path \"%s\": %v", path, err)
+	}
+	file, err := os.Create(cpath)
 	if err != nil {
 		return fmt.Errorf("unable to create new config file: %v", err)
 	}
 	defer func() {
 		err := file.Close()
 		if err != nil {
-			a.Logger.Printf("error closing config file \"%s\": %v", path, err)
+			a.Logger.Printf("error closing config file \"%s\": %v", cpath, err)
 		}
 	}()
 
@@ -704,6 +750,12 @@ func GenerateConfig(a Application, path string) error {
 # "host" names the server hostname
 #host=example.com
 #
+# "log" names the logfile to use to record various status and debugging
+# messages. If not specified, these messages go to stderr. The filename
+# given here may have the special %-tokens as with the transcript option,
+# as documented in mapper(6).
+#log=PATH
+#
 # "major" is like "guide" but adds major guidelines.
 #major=
 #
@@ -753,7 +805,7 @@ func GenerateConfig(a Application, path string) error {
 # chat messages received. This path may include formatting tokens
 # as documented in mapper(6), e.g., %m-%d-%y for the month-date-year
 # value.
-#transcript=
+#transcript=PATH
 #
 # "update-url" gives the base URL to use when downloading available
 # software updates. This value should be given to you by your GM or
@@ -772,6 +824,97 @@ func GenerateConfig(a Application, path string) error {
 		}
 	}
 	return nil
+}
+
+func LimitToRange(v, min, max int) int {
+	if v < min {
+		return min
+	}
+	if v > max {
+		return max
+	}
+	return v
+}
+
+//
+// FancyFileName expands tokens found in the path string to allow the user
+// to specify dynamically-named files at runtime. If there's a problem with
+// the formatting, an error is returned along with the original path.
+//
+// The tokens which may appear in the path include the following
+// (note that all of these are modified as appropriate to the locale's
+// national conventions and language):
+//    %A   full weekday name
+//    %a   abbreviated weekday name
+//    %B   full month name
+//    %b   abbreviated month name
+//    %C   zero-padded two-digit year 00-99
+//    %c   time and date
+//    %d   day of month as number 01-31 (zero padded)
+//    %e   day of month as number  1-31 (space padded)
+//    %F   == %Y-%m-%d
+//    %H   hour as number 00-23 (zero padded)
+//    %h   abbreviated month name (same as %b)
+//    %I   hour as number 01-12 (zero padded)
+//    %j   day of year as number 001-366
+//    %k   hour as number  0-23 (space padded)
+//    %L   milliseconds as number 000-999
+//    %l   hour as number  1-12 (space padded)
+//    %M   minute as number 00-59
+//    %m   month as number 01-12
+//    %N   username
+//    %n   module name
+//    %P   process ID
+//    %p   AM or PM
+//    %R   == %H:%M
+//    %r   == %I:%M:%S %p
+//    %S   second as number 00-60
+//    %s   Unix timestamp as a number
+//    %T   == %H:%M:%S
+//    %U   week of the year as number 00-53 (Sunday as first day of week)
+//    %u   weekday as number (1=Monday .. 7=Sunday)
+//    %V   week of the year as number 00-53 (Monday as first day of week)
+//    %v   == %e-%b-%Y
+//    %W   week of the year as number 00-53 (Monday as first day of week)
+//    %w   weekday as number (0=Sunday .. 6=Saturday)
+//    %X   time
+//    %x   date
+//    %Y   full year
+//    %y   two-digit year (00-99)
+//    %Z   time zone name
+//    %z   time zone offset from UTC
+//    %µ   microseconds as number 000-999
+//    %%   literal % character
+//
+func (a *Application) FancyFileName(path string) (string, error) {
+	ss := strftime.NewSpecificationSet()
+
+	if err := ss.Delete('n'); err != nil {
+		return path, err
+	}
+	if err := ss.Delete('t'); err != nil {
+		return path, err
+	}
+	if err := ss.Delete('D'); err != nil {
+		return path, err
+	}
+	if err := ss.Set('P', strftime.Verbatim(strconv.Itoa(os.Getpid()))); err != nil {
+		return path, err
+	}
+	if err := ss.Set('N', strftime.Verbatim(a.ServerUsername)); err != nil {
+		return path, err
+	}
+	if err := ss.Set('n', strftime.Verbatim(a.ModuleID)); err != nil {
+		return path, err
+	}
+
+	return strftime.Format(path, time.Now(),
+		strftime.WithSpecificationSet(ss),
+		strftime.WithUnixSeconds('s'),
+		strftime.WithMilliseconds('L'),
+		strftime.WithMicroseconds('µ'),
+	)
+
 }
 
 //
