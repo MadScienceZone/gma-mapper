@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/MadScienceZone/atk/tk"
+	"github.com/MadScienceZone/go-gma/v4/auth"
 	"github.com/MadScienceZone/go-gma/v4/mapper"
 	"github.com/MadScienceZone/go-gma/v4/util"
 	"github.com/lestrrat-go/strftime"
@@ -76,12 +77,11 @@ type Application struct {
 	ServerPort      int
 	SCPServerHost   string
 	SCPServerDest   string
-	ServerUsername  string
-	ServerPassword  string
 	ServerMkdirPath string
 	ProxyHost       string
 	ProxyURL        string
 	UpdateURL       string
+	ServerAuth      *auth.Authenticator
 
 	// Should we keep our toolbar visible regardless of instructions from the server?
 	KeepTools bool
@@ -350,6 +350,8 @@ func (a *Application) GetAppOptions() error {
 	var charList multiOptionString
 	var debugLevel optionCount
 	var err error
+	var serverUsername string
+	var serverPassword string
 
 	cdata := setConfigDefaults()
 
@@ -549,7 +551,7 @@ func (a *Application) GetAppOptions() error {
 		{&a.ServerMkdirPath, "mkdir-path"},
 		{&a.ModuleID, "module"},
 		{&a.NcPath, "nc-path"},
-		{&a.ServerPassword, "password"},
+		{&serverPassword, "password"},
 		{&a.ProxyHost, "proxy-host"},
 		{&a.ProxyURL, "proxy-url"},
 		{&a.SCPServerDest, "scp-dest"},
@@ -559,7 +561,7 @@ func (a *Application) GetAppOptions() error {
 		{&a.StyleFilename, "style"},
 		{&a.TranscriptFilename, "transcript"},
 		{&a.UpdateURL, "update-url"},
-		{&a.ServerUsername, "username"},
+		{&serverUsername, "username"},
 	} {
 		*v.dst, _ = cdata.GetDefault(v.key, "")
 	}
@@ -644,6 +646,9 @@ func (a *Application) GetAppOptions() error {
 			a.Logger.Printf("warning: can't understand major guide spec \"%s\": %v", g, err)
 		}
 	}
+
+	a.ServerAuth = auth.NewClientAuthenticator(serverUsername, []byte(serverPassword),
+		fmt.Sprintf("gma-mapper %s", GMAMapperVersion))
 
 	return nil
 }
@@ -853,6 +858,7 @@ func LimitToRange(v, min, max int) int {
 //    %d   day of month as number 01-31 (zero padded)
 //    %e   day of month as number  1-31 (space padded)
 //    %F   == %Y-%m-%d
+//    %G   "GM" if logged in as the GM, otherwise ""
 //    %H   hour as number 00-23 (zero padded)
 //    %h   abbreviated month name (same as %b)
 //    %I   hour as number 01-12 (zero padded)
@@ -901,11 +907,26 @@ func (a *Application) FancyFileName(path string) (string, error) {
 	if err := ss.Set('P', strftime.Verbatim(strconv.Itoa(os.Getpid()))); err != nil {
 		return path, err
 	}
-	if err := ss.Set('N', strftime.Verbatim(a.ServerUsername)); err != nil {
-		return path, err
+	if a.ServerAuth == nil {
+		if err := ss.Set('N', strftime.Verbatim("__unknown__")); err != nil {
+			return path, err
+		}
+	} else {
+		if err := ss.Set('N', strftime.Verbatim(a.ServerAuth.Username)); err != nil {
+			return path, err
+		}
 	}
 	if err := ss.Set('n', strftime.Verbatim(a.ModuleID)); err != nil {
 		return path, err
+	}
+	if a.ServerAuth != nil && a.ServerAuth.GmMode {
+		if err := ss.Set('G', strftime.Verbatim("GM")); err != nil {
+			return path, err
+		}
+	} else {
+		if err := ss.Set('G', strftime.Verbatim("")); err != nil {
+			return path, err
+		}
 	}
 
 	return strftime.Format(path, time.Now(),
