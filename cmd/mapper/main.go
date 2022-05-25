@@ -40,7 +40,7 @@ func main() {
 		FontList: make(map[string]tk.Font),
 		Logger:   log.Default(),
 	}
-	mapApp.Logger.SetPrefix("mapper: ")
+	mapApp.Logger.SetPrefix("gma-mapper: ")
 	mapApp.GetAppOptions()
 	mapApp.LoadDisplayStyle()
 

@@ -18,8 +18,8 @@ require (
 )
 
 require (
-	github.com/MadScienceZone/atk v1.2.2 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/schwarmco/go-cartesian-product v0.0.0-20180515110546-d5ee747a6dc9 // indirect
+	golang.org/x/exp v0.0.0-20220518171630-0b5c67f07fdf // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
 )
