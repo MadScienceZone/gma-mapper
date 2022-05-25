@@ -28,6 +28,8 @@ import (
 	"strings"
 	"time"
 
+	"x/exp/constraints"
+
 	"github.com/MadScienceZone/atk/tk"
 	"github.com/MadScienceZone/go-gma/v4/auth"
 	"github.com/MadScienceZone/go-gma/v4/mapper"
@@ -599,7 +601,7 @@ func (a *Application) GetAppOptions() error {
 		}
 	}
 
-	a.BlurPct = LimitToRange(a.BlurPct, 0, 100)
+	a.BlurPct = LimitToRange[int](a.BlurPct, 0, 100)
 
 	bs, _ := cdata.GetDefault("button-size", "small")
 	switch bs {
@@ -834,7 +836,7 @@ func GenerateConfig(a Application, path string) error {
 	return nil
 }
 
-func LimitToRange(v, min, max int) int {
+func LimitToRange[T constraints.Ordered](v, min, max T) T {
 	if v < min {
 		return min
 	}
