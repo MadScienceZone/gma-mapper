@@ -23,12 +23,18 @@ import (
 	"github.com/MadScienceZone/atk/tk"
 )
 
+//
+// aboutMapper displays a description of the application, including supported file and protocol versions.
+//
 func aboutMapper() {
 	tk.MessageBox(nil, "About Mapper", fmt.Sprintf("GMA Mapper Client, Version %v, for GMA %v.", GMAMapperVersion, GMAVersionNumber),
 		fmt.Sprintf("Copyright © Steve Willoughby, Aloha, Oregon, USA. All Rights Reserved. Distributed under the terms and conditions of the 3-Clause BSD License.\n\nThis client supports file format %v and server protocol %v.", GMAMapperFileFormat, GMAMapperProtocol), "ok",
 		tk.MessageBoxIconInfo, tk.MessageBoxTypeOk)
 }
 
+//
+// helpDice displays basic how-to documentation for using the built-in die roller function.
+//
 func helpDice(a Application) {
 	w := tk.NewWindow()
 	w.SetTitle("Chat/Dice Roller Information")
@@ -159,11 +165,16 @@ func helpDice(a Application) {
 	}
 }
 
+//
+// okToExit determines if we should be allowed to stop the program.
+// If any unsaved edits exist, we ask the user for permission; otherwise we don't object to the exit.
+//
 func okToExit() bool {
-	answer, err := tk.MessageBox(nil, "Ok to quit?", "Is it ok to stop now?", "(more details...)", "cancel", tk.MessageBoxIconWarning, tk.MessageBoxTypeOkCancel)
-	if err != nil {
-		fmt.Printf("ERROR posting okToExit dialog: %v\n", err)
-		return true
-	}
-	return answer == "ok"
+	//answer, err := tk.MessageBox(nil, "Ok to quit?", "Is it ok to stop now?", "(more details...)", "cancel", tk.MessageBoxIconWarning, tk.MessageBoxTypeOkCancel)
+	//if err != nil {
+	//		fmt.Printf("ERROR posting okToExit dialog: %v\n", err)
+	//		return true
+	//	}
+	//return answer == "ok"
+	return true
 }
