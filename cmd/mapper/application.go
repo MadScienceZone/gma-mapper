@@ -136,7 +136,7 @@ type GridGuide struct {
 // its arguments.
 //
 func (a *Application) Debug(level int, message ...any) {
-	if a.DebugLevel >= level {
+	if a != nil && a.Logger != nil && a.DebugLevel >= level {
 		a.Logger.Println(message...)
 	}
 }
@@ -146,7 +146,7 @@ func (a *Application) Debug(level int, message ...any) {
 // just like fmt.Printf does.
 //
 func (a *Application) Debugf(level int, format string, args ...any) {
-	if a.DebugLevel >= level {
+	if a != nil && a.Logger != nil && a.DebugLevel >= level {
 		a.Logger.Printf(format, args...)
 	}
 }
