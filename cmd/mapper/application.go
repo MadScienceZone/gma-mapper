@@ -844,8 +844,17 @@ func LimitToRange[T constraints.Ordered](v, min, max T) T {
 	return v
 }
 
+//
+// FancyFileName substitutes special tokens in a file pathname
+// to allow run-time dynamic naming for things like dates, ala
+// the util.FancyFileName function, with the addition of these
+// extra tokens:
+//   %n Module ID
+//   %N Username or "__unknown__"
+//   %G "GM" if logged in as the GM or "" otherwise
+//
 func (a *Application) FancyFileName(path string) (string, error) {
-	extras := map[rune]string{
+	extras := map[byte]string{
 		'n': a.ModuleID,
 		'N': "__unknown__",
 		'G': "",
