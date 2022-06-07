@@ -1,20 +1,20 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______             ______         ___     __       _______       #
-# (  ____ \(       )(  ___  ) Game      / ___  \       /   )   /  \     (  __   )      #
-# | (    \/| () () || (   ) | Master's  \/   \  \     / /) |   \/) )    | (  )  |      #
-# | |      | || || || (___) | Assistant    ___) /    / (_) (_    | |    | | /   |      #
-# | | ____ | |(_)| ||  ___  |             (___ (    (____   _)   | |    | (/ /) |      #
-# | | \_  )| |   | || (   ) |                 ) \        ) (     | |    |   / | |      #
-# | (___) || )   ( || )   ( | Mapper    /\___/  / _      | |   __) (_ _ |  (__) |      #
-# (_______)|/     \||/     \| Client    \______/ (_)     (_)   \____/(_)(_______)      #
+#  _______  _______  _______             ______         ___    _______     _______     #
+# (  ____ \(       )(  ___  ) Game      / ___  \       /   )  / ___   )   (  __   )    #
+# | (    \/| () () || (   ) | Master's  \/   \  \     / /) |  \/   )  |   | (  )  |    #
+# | |      | || || || (___) | Assistant    ___) /    / (_) (_     /   )   | | /   |    #
+# | | ____ | |(_)| ||  ___  |             (___ (    (____   _)  _/   /    | (/ /) |    #
+# | | \_  )| |   | || (   ) |                 ) \        ) (   /   _/     |   / | |    #
+# | (___) || )   ( || )   ( | Mapper    /\___/  / _      | |  (   (__/\ _ |  (__) |    #
+# (_______)|/     \||/     \| Client    \______/ (_)     (_)  \_______/(_)(_______)    #
 #                                                                                      #
 ########################################################################################
 #
 # GMA Mapper Client with background I/O processing.
-# @[00]@| GMA 4.3.11
+# @[00]@| GMA 4.3.13
 # @[01]@|
-# @[10]@| Copyright © 1992–2021 by Steven L. Willoughby
+# @[10]@| Copyright © 1992–2022 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
 # @[12]@| Aloha, Oregon, USA. All Rights Reserved.
 # @[13]@| Distributed under the terms and conditions of the BSD-3-Clause
@@ -53,10 +53,10 @@
 # @[52]@| defect of the software.
 #
 # Auto-configure values
-set GMAMapperVersion {3.41.0}       ;# @@##@@
+set GMAMapperVersion {3.42.0}       ;# @@##@@
 set GMAMapperFileFormat {17}        ;# @@##@@
 set GMAMapperProtocol {332}         ;# @@##@@
-set GMAVersionNumber {4.3.11}            ;# @@##@@
+set GMAVersionNumber {4.3.13}            ;# @@##@@
 # legacy variables (TODO: change to new ones)
 set MapperVersion $GMAMapperVersion
 set FileVersion $GMAMapperFileFormat
@@ -518,6 +518,7 @@ proc default_style_data {} {
 		font_repeat     If12
 		font_result     Hf14
 		font_roll       Hf12
+		font_subtotal   Hf12
 		font_separator  Hf12
 		font_short   	If12
 		font_sf         If12
@@ -554,6 +555,7 @@ proc default_style_data {} {
 		fmt_moddelim	{ | }
 		fmt_repeat		{repeat %s}
 		fmt_roll		{{%s}}
+		fmt_subtotal    {(%s)}
 		fmt_separator	=
 		fmt_success     {(%s) }
 		fmt_short		{missed DC by %s}
@@ -579,6 +581,7 @@ proc default_style_data {} {
 			fg_moddelim   #fffb00
 			fg_repeat     #aaaaaa
 			fg_roll       #00fa92
+			fg_subtotal   #00fa92
 			fg_sf         #aaaaaa
 			fg_success    #00fa92
 			fg_system     cyan
@@ -607,6 +610,7 @@ proc default_style_data {} {
 			fg_moddelim   #f05b00
 			fg_repeat     #888888
 			fg_roll       green
+			fg_subtotal   green
 			fg_sf         #888888
 			fg_success    green
 			fg_system     blue
@@ -8717,7 +8721,7 @@ proc DisplayChatMessage {from recipientlist message args} {
 			best bonus comment constant critlabel critspec dc diebonus diespec discarded
 			exceeded fail from fullmax fullresult iteration label max maximized maxroll 
 			met min moddelim normal operator repeat result roll separator short sf success 
-			title to until worst system
+			title to until worst system subtotal
 		} {
 			set options {}
 			foreach {stylekey optkey} "fg_$tag -foreground bg_$tag -background overstrike_$tag -overstrike font_$tag -font underline_$tag -underline offset_$tag -offset" {
@@ -8941,11 +8945,14 @@ proc TranscribeDieRoll {from recipientlist title result details} {
 				# moddelim  " | "
 				# critspec	"c..."
 				# critlabel	"Confirm:"
+				# subtotal      "(n)"
 				switch -exact [lindex $tuple 0] {
 					discarded	{append message "(DISCARDED: [lindex $tuple 1])"}
 					maxroll		{append message "(MAXIMIZED: [lindex $tuple 1])"}
 					diebonus	{append message "(per-die bonus [lindex $tuple 1])"}
 					fullmax     {append message "MAXIMIZED ROLL: [lindex $tuple 1]"}
+					subtotal    {append message "([lindex $tuple 1])"}
+					roll        {append message "{[lindex $tuple 1]}"}
 					default 	{append message [lindex $tuple 1]}
 				}
 			}
