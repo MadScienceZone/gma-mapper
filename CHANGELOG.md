@@ -1,11 +1,15 @@
 Game Master's Assistant / Mapper Client
 Release Notes
-Version 3.42.0 * Tuesday, 7th June, 2022
+Version 3.42.1 * Tuesday, 7th June, 2022
 
 Represents:
- * Supported GMA Mapper Version: 3.42.0      <!-- @@##@@ -->
+ * Supported GMA Mapper Version: 3.42.1      <!-- @@##@@ -->
  * Supported GMA Mapper File Format: 17	      <!-- @@##@@ -->
  * Supported GMA Mapper Protocol: 332         <!-- @@##@@ -->
+
+# 3.42.1
+## Enhancements
+Improved styling of die-roll results.
 
 # 3.42.0
 ## Enhancements
