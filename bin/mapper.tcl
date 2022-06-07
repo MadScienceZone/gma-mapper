@@ -524,7 +524,7 @@ proc default_style_data {} {
 		font_sf         If12
 		font_system     If10
 		font_success    Tf12
-		font_title      Tf12
+		font_title      Hf12
 		font_to         If12
 		font_until		If12
 		font_worst      If12
@@ -538,6 +538,7 @@ proc default_style_data {} {
 		fg_to           red
 		overstrike_discarded 1
 		fmt_best		{ best of %s}
+		fmt_worst	{ worst of %s}
 		fmt_critlabel	{Confirm: }
 		fmt_dc			{DC %s: }
 		fmt_discarded	{{%s}}
@@ -559,7 +560,7 @@ proc default_style_data {} {
 		fmt_separator	=
 		fmt_success     {(%s) }
 		fmt_short		{missed DC by %s}
-		fmt_title		{%s: }
+		fmt_title		{%s}
 		collapse_descriptions 0
 	}
 	if $dark_mode {
@@ -588,6 +589,8 @@ proc default_style_data {} {
 			fg_until      #aaaaaa
 			fg_worst      #aaaaaa
 			bg_fullresult blue
+			fg_title      #aaaaaa
+			bg_title      #000044
 		}
 	} else {
 		append default_styles {
@@ -616,6 +619,8 @@ proc default_style_data {} {
 			fg_system     blue
 			fg_until      #888888
 			fg_worst      #888888
+			fg_title      #000000
+			bg_title      #c7c0ae
 		}
 	}
 	return $default_styles
@@ -8319,8 +8324,9 @@ proc format_with_style {value format} {
 	return $value
 }
 
+set drd_id 0
 proc DisplayDieRoll {from recipientlist title result details} {
-	global icon_die16 icon_die16c SuppressChat
+	global icon_die16 icon_die16c SuppressChat drd_id
 
 	if {$SuppressChat} {
 		return
@@ -8345,7 +8351,15 @@ proc DisplayDieRoll {from recipientlist title result details} {
 	$w.1.text insert end [format_with_style $result fullresult] fullresult
 	ChatAttribution $w.1.text $from $recipientlist
 	if {$title != {}} {
-		$w.1.text insert end [format_with_style $title title] title 
+		global display_styles
+		if [catch {
+			set wt $w.1.text.[incr drd_id]
+			label $wt -padx 2 -pady 2 -relief raised -foreground $display_styles(fg_title) -background $display_styles(bg_title) -font $display_styles(font_title) -borderwidth 2 -text [format_with_style $title title]
+			$w.1.text window create end -align bottom -window $wt -padx 2
+		} err] {
+			DEBUG 0 $err
+			$w.1.text insert end [format_with_style $title title] title 
+		}
 	}
 #				critspec  {$w.1.text insert end "  [lindex $tuple 1]" [lindex $tuple 0]}
 	if [catch {
