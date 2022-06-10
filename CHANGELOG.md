@@ -3,9 +3,21 @@ Release Notes
 Version 3.42.1 * Tuesday, 7th June, 2022
 
 Represents:
- * Supported GMA Mapper Version: 3.42.1      <!-- @@##@@ -->
+ * Supported GMA Mapper Version: 3.42.2      <!-- @@##@@ -->
  * Supported GMA Mapper File Format: 17	      <!-- @@##@@ -->
  * Supported GMA Mapper Protocol: 332         <!-- @@##@@ -->
+
+# 3.42.2
+## Enhancements
+Improved styling of die-roll results by allowing user control over coloring and number of titles attached to the start of a die roll.
+
+A die roll specification may have an optional title, followed by an equals sign (=), before the start of the die-roll spec proper. This is returned as-is by the server and clients may display it along with the detailed results. Previously, clients treated this as plain text without further consideration.
+
+Starting with version 3.42.2, the gma-mapper client allows for some additional formatting controls to be embedded in the title string.
+
+First, multiple titles may be given, separated from one another by '`‖`' characters (codepoint U+2016). Each of these titles are displayed in its own colored box. The color may be set by the user as part of their client's style configuration settings (`fg_title` sets the foreground color.)
+
+Second, within each of the (possibly multiple) titles, the title text may be followed by the character '`≡`' (codepoint U+2261) and a color specification (e.g., "goblin≡blue" or "goblin≡#8888ff"). This sets an arbitrary foreground color. By default, the background will be the same color as the foreground, but darkened to 40% of the foreground's color intensity. However, adding a second color specification will set an arbitrary background color (e.g., "goblin≡red≡yellow").
 
 # 3.42.1
 ## Enhancements

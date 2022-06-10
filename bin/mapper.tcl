@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______             ______         ___    _______      __         #
-# (  ____ \(       )(  ___  ) Game      / ___  \       /   )  / ___   )    /  \        #
-# | (    \/| () () || (   ) | Master's  \/   \  \     / /) |  \/   )  |    \/) )       #
-# | |      | || || || (___) | Assistant    ___) /    / (_) (_     /   )      | |       #
-# | | ____ | |(_)| ||  ___  |             (___ (    (____   _)  _/   /       | |       #
-# | | \_  )| |   | || (   ) |                 ) \        ) (   /   _/        | |       #
-# | (___) || )   ( || )   ( | Mapper    /\___/  / _      | |  (   (__/\ _  __) (_      #
-# (_______)|/     \||/     \| Client    \______/ (_)     (_)  \_______/(_) \____/      #
+#  _______  _______  _______             ______         ___    _______     _______     #
+# (  ____ \(       )(  ___  ) Game      / ___  \       /   )  / ___   )   / ___   )    #
+# | (    \/| () () || (   ) | Master's  \/   \  \     / /) |  \/   )  |   \/   )  |    #
+# | |      | || || || (___) | Assistant    ___) /    / (_) (_     /   )       /   )    #
+# | | ____ | |(_)| ||  ___  |             (___ (    (____   _)  _/   /      _/   /     #
+# | | \_  )| |   | || (   ) |                 ) \        ) (   /   _/      /   _/      #
+# | (___) || )   ( || )   ( | Mapper    /\___/  / _      | |  (   (__/\ _ (   (__/\    #
+# (_______)|/     \||/     \| Client    \______/ (_)     (_)  \_______/(_)\_______/    #
 #                                                                                      #
 ########################################################################################
 #
@@ -53,7 +53,7 @@
 # @[52]@| defect of the software.
 #
 # Auto-configure values
-set GMAMapperVersion {3.42.1}       ;# @@##@@
+set GMAMapperVersion {3.42.2}       ;# @@##@@
 set GMAMapperFileFormat {17}        ;# @@##@@
 set GMAMapperProtocol {332}         ;# @@##@@
 set GMAVersionNumber {4.3.13}            ;# @@##@@
@@ -619,7 +619,7 @@ proc default_style_data {} {
 			fg_system     blue
 			fg_until      #888888
 			fg_worst      #888888
-			fg_title      #000000
+			fg_title      #ffffff
 			bg_title      #c7c0ae
 		}
 	}
@@ -8353,11 +8353,33 @@ proc DisplayDieRoll {from recipientlist title result details} {
 	if {$title != {}} {
 		global display_styles
 		if [catch {
-			set wt $w.1.text.[incr drd_id]
-			label $wt -padx 2 -pady 2 -relief raised -foreground $display_styles(fg_title) -background $display_styles(bg_title) -font $display_styles(font_title) -borderwidth 2 -text [format_with_style $title title]
-			$w.1.text window create end -align bottom -window $wt -padx 2
+			foreach title_block [split $title "\u2016"] {
+				set title_parts [split $title_block "\u2261"]
+				switch [llength $title_parts] {
+					0 {
+						# title was empty?
+						error "bug - uncaught empty title string"
+					}
+					1 {
+						set title_fg $display_styles(fg_title)
+						set title_bg [::tk::Darken $title_fg 40]
+					}
+					2 {
+						set title_fg [lindex $title_parts 1]
+						set title_bg [::tk::Darken $title_fg 40]
+					}
+					default {
+						set title_fg [lindex $title_parts 1]
+						set title_bg [lindex $title_parts 2]
+					}
+				}
+
+				set wt $w.1.text.[incr drd_id]
+				label $wt -padx 2 -pady 2 -relief groove -foreground $title_fg -background $title_bg -font $display_styles(font_title) -borderwidth 2 -text [lindex $title_parts 0]
+				$w.1.text window create end -align bottom -window $wt -padx 2
+			}
 		} err] {
-			DEBUG 0 $err
+			DEBUG 0 "unable to set title block: $err"
 			$w.1.text insert end [format_with_style $title title] title 
 		}
 	}
