@@ -1,62 +1,9 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       _______     _______              #
-# (  ____ \(       )(  ___  ) Game         /   )     (  __   )   (  __   )             #
-# | (    \/| () () || (   ) | Master's    / /) |     | (  )  |   | (  )  |             #
-# | |      | || || || (___) | Assistant  / (_) (_    | | /   |   | | /   |             #
-# | | ____ | |(_)| ||  ___  |           (____   _)   | (/ /) |   | (/ /) |             #
-# | | \_  )| |   | || (   ) |                ) (     |   / | |   |   / | |             #
-# | (___) || )   ( || )   ( | Mapper         | |   _ |  (__) | _ |  (__) |             #
-# (_______)|/     \||/     \| Client         (_)  (_)(_______)(_)(_______)             #
-#                                                                                      #
-########################################################################################
-#
-# GMA Mapper Client with background I/O processing.
-# @[00]@| GMA 4.3.11
-# @[01]@|
-# @[10]@| Copyright © 1992–2022 by Steven L. Willoughby (AKA MadScienceZone)
-# @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
-# @[12]@| Aloha, Oregon, USA. All Rights Reserved.
-# @[13]@| Distributed under the terms and conditions of the BSD-3-Clause
-# @[14]@| License as described in the accompanying LICENSE file distributed
-# @[15]@| with GMA.
-# @[16]@|
-# @[20]@| Redistribution and use in source and binary forms, with or without
-# @[21]@| modification, are permitted provided that the following conditions
-# @[22]@| are met:
-# @[23]@| 1. Redistributions of source code must retain the above copyright
-# @[24]@|    notice, this list of conditions and the following disclaimer.
-# @[25]@| 2. Redistributions in binary form must reproduce the above copy-
-# @[26]@|    right notice, this list of conditions and the following dis-
-# @[27]@|    claimer in the documentation and/or other materials provided
-# @[28]@|    with the distribution.
-# @[29]@| 3. Neither the name of the copyright holder nor the names of its
-# @[30]@|    contributors may be used to endorse or promote products derived
-# @[31]@|    from this software without specific prior written permission.
-# @[32]@|
-# @[33]@| THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
-# @[34]@| CONTRIBUTORS “AS IS” AND ANY EXPRESS OR IMPLIED WARRANTIES,
-# @[35]@| INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
-# @[36]@| MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-# @[37]@| DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS
-# @[38]@| BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY,
-# @[39]@| OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-# @[40]@| PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-# @[41]@| PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-# @[42]@| THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR
-# @[43]@| TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
-# @[44]@| THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
-# @[45]@| SUCH DAMAGE.
-# @[46]@|
-# @[50]@| This software is not intended for any use or application in which
-# @[51]@| the safety of lives or property would be at risk due to failure or
-# @[52]@| defect of the software.
-#
-# Auto-configure values
-set GMAMapperVersion {4.0.0}       ;# @@##@@
-set GMAMapperFileFormat {20}        ;# @@##@@
-set GMAMapperProtocol {400}         ;# @@##@@
-set GMAVersionNumber {4.3.11}            ;# @@##@@
+set GMAMapperVersion {3.42.2}       ;# @@##@@
+set GMAMapperFileFormat {17}        ;# @@##@@
+set GMAMapperProtocol {332}         ;# @@##@@
+set GMAVersionNumber {4.3.13}            ;# @@##@@
 # legacy variables (TODO: change to new ones)
 set MapperVersion $GMAMapperVersion
 set FileVersion $GMAMapperFileFormat
@@ -518,12 +465,13 @@ proc default_style_data {} {
 		font_repeat     If12
 		font_result     Hf14
 		font_roll       Hf12
+		font_subtotal   Hf12
 		font_separator  Hf12
 		font_short   	If12
 		font_sf         If12
 		font_system     If10
 		font_success    Tf12
-		font_title      Tf12
+		font_title      Hf12
 		font_to         If12
 		font_until		If12
 		font_worst      If12
@@ -537,6 +485,7 @@ proc default_style_data {} {
 		fg_to           red
 		overstrike_discarded 1
 		fmt_best		{ best of %s}
+		fmt_worst	{ worst of %s}
 		fmt_critlabel	{Confirm: }
 		fmt_dc			{DC %s: }
 		fmt_discarded	{{%s}}
@@ -554,10 +503,11 @@ proc default_style_data {} {
 		fmt_moddelim	{ | }
 		fmt_repeat		{repeat %s}
 		fmt_roll		{{%s}}
+		fmt_subtotal    {(%s)}
 		fmt_separator	=
 		fmt_success     {(%s) }
 		fmt_short		{missed DC by %s}
-		fmt_title		{%s: }
+		fmt_title		{%s}
 		collapse_descriptions 0
 	}
 	if $dark_mode {
@@ -579,12 +529,15 @@ proc default_style_data {} {
 			fg_moddelim   #fffb00
 			fg_repeat     #aaaaaa
 			fg_roll       #00fa92
+			fg_subtotal   #00fa92
 			fg_sf         #aaaaaa
 			fg_success    #00fa92
 			fg_system     cyan
 			fg_until      #aaaaaa
 			fg_worst      #aaaaaa
 			bg_fullresult blue
+			fg_title      #aaaaaa
+			bg_title      #000044
 		}
 	} else {
 		append default_styles {
@@ -607,11 +560,14 @@ proc default_style_data {} {
 			fg_moddelim   #f05b00
 			fg_repeat     #888888
 			fg_roll       green
+			fg_subtotal   green
 			fg_sf         #888888
 			fg_success    green
 			fg_system     blue
 			fg_until      #888888
 			fg_worst      #888888
+			fg_title      #ffffff
+			bg_title      #c7c0ae
 		}
 	}
 	return $default_styles
@@ -8315,8 +8271,9 @@ proc format_with_style {value format} {
 	return $value
 }
 
+set drd_id 0
 proc DisplayDieRoll {from recipientlist title result details} {
-	global icon_die16 icon_die16c SuppressChat
+	global icon_die16 icon_die16c SuppressChat drd_id
 
 	if {$SuppressChat} {
 		return
@@ -8341,7 +8298,37 @@ proc DisplayDieRoll {from recipientlist title result details} {
 	$w.1.text insert end [format_with_style $result fullresult] fullresult
 	ChatAttribution $w.1.text $from $recipientlist
 	if {$title != {}} {
-		$w.1.text insert end [format_with_style $title title] title 
+		global display_styles
+		if [catch {
+			foreach title_block [split $title "\u2016"] {
+				set title_parts [split $title_block "\u2261"]
+				switch [llength $title_parts] {
+					0 {
+						# title was empty?
+						error "bug - uncaught empty title string"
+					}
+					1 {
+						set title_fg $display_styles(fg_title)
+						set title_bg [::tk::Darken $title_fg 40]
+					}
+					2 {
+						set title_fg [lindex $title_parts 1]
+						set title_bg [::tk::Darken $title_fg 40]
+					}
+					default {
+						set title_fg [lindex $title_parts 1]
+						set title_bg [lindex $title_parts 2]
+					}
+				}
+
+				set wt $w.1.text.[incr drd_id]
+				label $wt -padx 2 -pady 2 -relief groove -foreground $title_fg -background $title_bg -font $display_styles(font_title) -borderwidth 2 -text [lindex $title_parts 0]
+				$w.1.text window create end -align bottom -window $wt -padx 2
+			}
+		} err] {
+			DEBUG 0 "unable to set title block: $err"
+			$w.1.text insert end [format_with_style $title title] title 
+		}
 	}
 #				critspec  {$w.1.text insert end "  [lindex $tuple 1]" [lindex $tuple 0]}
 	if [catch {
@@ -8717,7 +8704,7 @@ proc DisplayChatMessage {from recipientlist message args} {
 			best bonus comment constant critlabel critspec dc diebonus diespec discarded
 			exceeded fail from fullmax fullresult iteration label max maximized maxroll 
 			met min moddelim normal operator repeat result roll separator short sf success 
-			title to until worst system
+			title to until worst system subtotal
 		} {
 			set options {}
 			foreach {stylekey optkey} "fg_$tag -foreground bg_$tag -background overstrike_$tag -overstrike font_$tag -font underline_$tag -underline offset_$tag -offset" {
@@ -8941,11 +8928,14 @@ proc TranscribeDieRoll {from recipientlist title result details} {
 				# moddelim  " | "
 				# critspec	"c..."
 				# critlabel	"Confirm:"
+				# subtotal      "(n)"
 				switch -exact [lindex $tuple 0] {
 					discarded	{append message "(DISCARDED: [lindex $tuple 1])"}
 					maxroll		{append message "(MAXIMIZED: [lindex $tuple 1])"}
 					diebonus	{append message "(per-die bonus [lindex $tuple 1])"}
 					fullmax     {append message "MAXIMIZED ROLL: [lindex $tuple 1]"}
+					subtotal    {append message "([lindex $tuple 1])"}
+					roll        {append message "{[lindex $tuple 1]}"}
 					default 	{append message [lindex $tuple 1]}
 				}
 			}
