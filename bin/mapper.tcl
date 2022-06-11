@@ -1,18 +1,18 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______             ______         ___    _______     _______     #
-# (  ____ \(       )(  ___  ) Game      / ___  \       /   )  / ___   )   / ___   )    #
-# | (    \/| () () || (   ) | Master's  \/   \  \     / /) |  \/   )  |   \/   )  |    #
-# | |      | || || || (___) | Assistant    ___) /    / (_) (_     /   )       /   )    #
-# | | ____ | |(_)| ||  ___  |             (___ (    (____   _)  _/   /      _/   /     #
-# | | \_  )| |   | || (   ) |                 ) \        ) (   /   _/      /   _/      #
-# | (___) || )   ( || )   ( | Mapper    /\___/  / _      | |  (   (__/\ _ (   (__/\    #
-# (_______)|/     \||/     \| Client    \______/ (_)     (_)  \_______/(_)\_______/    #
+#  _______  _______  _______             ______         ___    _______     ______      #
+# (  ____ \(       )(  ___  ) Game      / ___  \       /   )  / ___   )   / ___  \     #
+# | (    \/| () () || (   ) | Master's  \/   \  \     / /) |  \/   )  |   \/   \  \    #
+# | |      | || || || (___) | Assistant    ___) /    / (_) (_     /   )      ___) /    #
+# | | ____ | |(_)| ||  ___  |             (___ (    (____   _)  _/   /      (___ (     #
+# | | \_  )| |   | || (   ) |                 ) \        ) (   /   _/           ) \    #
+# | (___) || )   ( || )   ( | Mapper    /\___/  / _      | |  (   (__/\ _ /\___/  /    #
+# (_______)|/     \||/     \| Client    \______/ (_)     (_)  \_______/(_)\______/     #
 #                                                                                      #
 ########################################################################################
 #
 # GMA Mapper Client with background I/O processing.
-# @[00]@| GMA 4.3.13
+# @[00]@| GMA 4.4.0
 # @[01]@|
 # @[10]@| Copyright © 1992–2022 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
@@ -53,10 +53,10 @@
 # @[52]@| defect of the software.
 #
 # Auto-configure values
-set GMAMapperVersion {3.42.2}       ;# @@##@@
+set GMAMapperVersion {3.42.3}       ;# @@##@@
 set GMAMapperFileFormat {17}        ;# @@##@@
-set GMAMapperProtocol {332}         ;# @@##@@
-set GMAVersionNumber {4.3.13}            ;# @@##@@
+set GMAMapperProtocol {333}         ;# @@##@@
+set GMAVersionNumber {4.4.0}            ;# @@##@@
 # legacy variables (TODO: change to new ones)
 set MapperVersion $GMAMapperVersion
 set FileVersion $GMAMapperFileFormat
@@ -545,7 +545,7 @@ proc default_style_data {} {
 		fmt_exceeded	{exceeded DC by %s}
 		fmt_fail        {(%s) }
 		fmt_fullmax		maximized
-		fmt_fullresult	{%s }
+		fmt_fullresult	{%s}
 		fmt_iteration	{ (roll #%s)}
 		fmt_label		{ %s}
 		fmt_max			{max %s}
@@ -7866,6 +7866,7 @@ proc ITreceive socketID {
 							global local_user GMAMapperVersion
 							ITsend [list AUTH $response $local_user "mapper $GMAMapperVersion"]
                             end_progress $auth_prog
+							ITsend [list ALLOW [list DICE-COLOR-BOXES]]
 						} err]} {
 							say "Failed to understand server's challenge or compute our response ($err)"
 							exit 1
@@ -7877,9 +7878,10 @@ proc ITreceive socketID {
 							say "Error loading chat history: $err (Warning only)"
 						}
 					} else {
-                        # no support/need for authentication
-                        set ITpending_auth false
-                    }
+						# no support/need for authentication
+						set ITpending_auth false
+						ITsend [list ALLOW [list DICE-COLOR-BOXES]]
+				        }
 				}
 			}
 			DENIED {
@@ -8349,6 +8351,7 @@ proc DisplayDieRoll {from recipientlist title result details} {
 	$w.1.text configure -state normal
 	$w.1.text image create end -align baseline -image $icon -padx 2
 	$w.1.text insert end [format_with_style $result fullresult] fullresult
+	$w.1.text insert end " "
 	ChatAttribution $w.1.text $from $recipientlist
 	if {$title != {}} {
 		global display_styles

@@ -1,11 +1,17 @@
 Game Master's Assistant / Mapper Client
 Release Notes
-Version 3.42.2 * Thursday, 9th June, 2022
+Version 3.42.3 * Saturday, 11th June, 2022
 
 Represents:
- * Supported GMA Mapper Version: 3.42.2      <!-- @@##@@ -->
+ * Supported GMA Mapper Version: 3.42.3      <!-- @@##@@ -->
  * Supported GMA Mapper File Format: 17	      <!-- @@##@@ -->
- * Supported GMA Mapper Protocol: 332         <!-- @@##@@ -->
+ * Supported GMA Mapper Protocol: 333         <!-- @@##@@ -->
+
+# 3.42.3
+## Enhancements
+Improved styling of die-roll results is now an opt-in feature for clients.
+Added code to the client to tell the server that it supports that feature.
+Adjusted display style of die roll result number so the background doesn't carry over into the space between that and the name of the person sending the die roll.
 
 # 3.42.2
 ## Enhancements
