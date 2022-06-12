@@ -1,18 +1,18 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______             ______         ___    _______     ______      #
-# (  ____ \(       )(  ___  ) Game      / ___  \       /   )  / ___   )   / ___  \     #
-# | (    \/| () () || (   ) | Master's  \/   \  \     / /) |  \/   )  |   \/   \  \    #
-# | |      | || || || (___) | Assistant    ___) /    / (_) (_     /   )      ___) /    #
-# | | ____ | |(_)| ||  ___  |             (___ (    (____   _)  _/   /      (___ (     #
-# | | \_  )| |   | || (   ) |                 ) \        ) (   /   _/           ) \    #
-# | (___) || )   ( || )   ( | Mapper    /\___/  / _      | |  (   (__/\ _ /\___/  /    #
-# (_______)|/     \||/     \| Client    \______/ (_)     (_)  \_______/(_)\______/     #
+#  _______  _______  _______             ______         ___    _______        ___      #
+# (  ____ \(       )(  ___  ) Game      / ___  \       /   )  / ___   )      /   )     #
+# | (    \/| () () || (   ) | Master's  \/   \  \     / /) |  \/   )  |     / /) |     #
+# | |      | || || || (___) | Assistant    ___) /    / (_) (_     /   )    / (_) (_    #
+# | | ____ | |(_)| ||  ___  |             (___ (    (____   _)  _/   /    (____   _)   #
+# | | \_  )| |   | || (   ) |                 ) \        ) (   /   _/          ) (     #
+# | (___) || )   ( || )   ( | Mapper    /\___/  / _      | |  (   (__/\ _      | |     #
+# (_______)|/     \||/     \| Client    \______/ (_)     (_)  \_______/(_)     (_)     #
 #                                                                                      #
 ########################################################################################
 #
 # GMA Mapper Client with background I/O processing.
-# @[00]@| GMA 4.4.0
+# @[00]@| GMA 4.4.1
 # @[01]@|
 # @[10]@| Copyright © 1992–2022 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
@@ -53,10 +53,10 @@
 # @[52]@| defect of the software.
 #
 # Auto-configure values
-set GMAMapperVersion {3.42.3}       ;# @@##@@
+set GMAMapperVersion {3.42.4}       ;# @@##@@
 set GMAMapperFileFormat {17}        ;# @@##@@
 set GMAMapperProtocol {333}         ;# @@##@@
-set GMAVersionNumber {4.4.0}            ;# @@##@@
+set GMAVersionNumber {4.4.1}            ;# @@##@@
 # legacy variables (TODO: change to new ones)
 set MapperVersion $GMAMapperVersion
 set FileVersion $GMAMapperFileFormat
@@ -5388,10 +5388,19 @@ proc RenderSomeone {w id} {
 		} else {
 			set Xstart [expr ($x-$mob_reach)]
 			set yy [expr ($y-$mob_reach)]
-			if {$MOB(REACH:$id)} {
-				set hashbit 1
-			} else {
-				set hashbit 2
+			switch $MOB(REACH:$id) {
+				1 {
+					# reach weapons
+					set hashbit 1
+				}
+				2 {
+					# extended melee zone
+					set hashbit 3
+				}
+				default {
+					# normal melee zone
+					set hashbit 2
+				}
 			}
 			set color $MOB(COLOR:$id)
 			foreach row $mob_matrix {
@@ -6697,7 +6706,7 @@ proc DoContext {x y} {
 		.contextMenu delete 3
 		.contextMenu insert 3 command -command "" -label "Toggle Death" -state disabled
 		.contextMenu delete 4
-		.contextMenu insert 4 command -command "" -label "Toggle Reach" -state disabled
+		.contextMenu insert 4 command -command "" -label "Cycle Reach" -state disabled
 		.contextMenu delete 5
 		.contextMenu insert 5 command -command "" -label "Toggle Spell Area" -state disabled
 		.contextMenu delete 6
@@ -6719,7 +6728,7 @@ proc DoContext {x y} {
 		.contextMenu delete 3
 		.contextMenu insert 3 command -command "KillPerson $mob_id" -label "Toggle Death for $MOB(NAME:$mob_id)"
 		.contextMenu delete 4
-		.contextMenu insert 4 command -command "ToggleReach $mob_id" -label "Toggle Reach for $MOB(NAME:$mob_id)"
+		.contextMenu insert 4 command -command "ToggleReach $mob_id" -label "Cycle Reach for $MOB(NAME:$mob_id)"
 		.contextMenu delete 5
 		.contextMenu insert 5 command -command "ToggleSpellArea $mob_id" -label "Toggle Spell Area for $MOB(NAME:$mob_id)"
 		.contextMenu delete 6
@@ -6770,7 +6779,7 @@ proc DoContext {x y} {
 		.contextMenu delete 3
 		.contextMenu insert 3 cascade -menu .contextMenu.kill -label "Toggle Death"
 		.contextMenu delete 4
-		.contextMenu insert 4 cascade -menu .contextMenu.reach -label "Toggle Reach"
+		.contextMenu insert 4 cascade -menu .contextMenu.reach -label "Cycle Reach"
 		.contextMenu delete 5
 		.contextMenu insert 5 cascade -menu .contextMenu.aoe -label "Toggle Spell Area"
 		.contextMenu delete 6
@@ -6815,7 +6824,7 @@ menu .contextMenu.mmode -tearoff 0
 .contextMenu add command -command {AddPlayerMenu player} -label {Add Player...}				;# 1
 .contextMenu add command -command {AddPlayerMenu monster} -label {Add Monster...}			;# 2
 .contextMenu add command -command "" -label {Toggle Death} -state disabled					;# 3
-.contextMenu add command -command "" -label {Toggle Reach} -state disabled					;# 4
+.contextMenu add command -command "" -label {Cycle Reach} -state disabled					;# 4
 .contextMenu add command -command "" -label {Toggle Spell Area} -state disabled				;# 5
 .contextMenu add command -command "" -label {Polymorph} -state disabled						;# 6
 .contextMenu add command -command "" -label {Change Size} -state disabled					;# 7
@@ -7112,7 +7121,11 @@ proc DragMOBAoE {id w x y} {
 
 proc ToggleReach id {
 	global canvas MOB
-	set MOB(REACH:$id) [expr !$MOB(REACH:$id)]
+	if {[info exists MOB(REACH:$id)]} {
+		set MOB(REACH:$id) [expr ($MOB(REACH:$id) + 1) % 3]
+	} else {
+		set MOB(REACH:$id) 1
+	}
 	RenderSomeone $canvas $id
 	SendMobChanges $id REACH
 }
