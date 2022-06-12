@@ -1,8 +1,8 @@
 .\" vim:set syntax=nroff:
-.\" *** 332 ***
+.\" *** 333 ***
 '\" <<ital-is-var>>
 '\" <<bold-is-fixed>>
-.TH MAPPER 6 "GMA Toolkit 4.4.0" 11-Jun-2022 "Games" \" @@mp@@
+.TH MAPPER 6 "GMA Toolkit 4.4.1" 11-Jun-2022 "Games" \" @@mp@@
 .SH NAME
 mapper \- GMA battle grid map
 .SH SYNOPSIS
@@ -1565,7 +1565,7 @@ the meaning of the other elements of the list.
 Unless otherwise noted, there is no response expected from
 these commands.
 .LP
-This describes protocol verion 332. These notes are intended to be 
+This describes protocol verion 333. These notes are intended to be 
 detailed enough to implement a client from and should be considered
 the definitive reference to the protocol.
 .LP
@@ -1598,6 +1598,12 @@ take place, and these are easy to add to the server's initial greeting to the cl
 The following special comments are currently recognized:
 '\" <<list>>
 .TP 5
+.BI "// CALENDAR // " system
+Declares which calendaring system the various dates and times are based upon.
+In the future this may be promoted to a protocol command, but for the time being
+the mapper doesn't necessarily need to know this so it's an advisory comment
+for now.
+.TP 
 .BI "// MAPPER UPDATE // " version " " file
 The latest available
 .B mapper
@@ -1864,6 +1870,35 @@ Due to implementation limitations of the framework used,
 always uses GIF format files.
 .RE
 .TP
+.BI "ALLOW " feature-list
+The client MAY send this command to the server after logging in. This
+tells the server that the client supports one or more optional features.
+The
+.I feature-list
+parameter is a TCL list, each element giving the name of a feature
+the client supports. If the list is empty, the server assumes
+no optional features are supported.
+Currently, only one feature is recognized here:
+.RS
+.TP
+.B DICE-COLOR-BOXES
+The client supports formatting controls in the die-roll title string
+sent to the server in the 
+.B D
+command and received from the server via the
+.B ROLL
+command. Specifically, the title may consist of multiple sub-titles 
+separated by U+2016 characters (||). Each of these may also have a
+suffix consisting of the U+2261 (\[==]) character followed by a color name
+or 
+.BI # rrggbb
+color code, indicating the foreground color for that part of the title.
+A second such suffix may be added to indicate the background color.
+If this feature is not enabled, these formatting codes are stripped out
+by the server before sending die roll results to a client which isn't
+prepared to interpret them.
+.RE
+.TP
 .BI "AUTH " response " \fR[\fP" user " " client \fR]\fP
 If the server included a challenge string (see the
 .B OK
@@ -2004,7 +2039,7 @@ items are deleted.
 .LP
 The
 .I message-ID
-paramter is a sequence ID for this command in a manner identical to the
+parameter is a sequence ID for this command in a manner identical to the
 .B TO
 command.
 .RE
@@ -2199,11 +2234,11 @@ result in the server sending the
 .B DD=
 command back to the requesting client. 
 .TP
-.BI "DSM " condition " " shape " " color
+.BI "DSM " condition " " shape " " color " " \fR[\fPdescription\fR]\fP
 Define a new status marker for creatures with the named
 .IR condition .
 If there was already a marker defined for that condition, it is replaced with the new
-definition. If either 
+definition. If either
 .I shape
 or
 .I color
@@ -2217,7 +2252,7 @@ attribute as documented in
 .BR mapper (5).
 '\" <<desc>>
 .RS
-.TP 10
+.TP 12
 .I condition
 This is an aribtrarily-named string that describes the creature's condition that will be noted
 with a special mark on their token. The mapper comes with the following conditions pre-defined:
@@ -2388,6 +2423,9 @@ If it begins with
 .RB \*(lq .. \*(rq
 then the effect is the same, but the dashes are shorter.
 .RE
+.TP
+.I description
+If present, this field describes the effect of the condition on a creature.
 '\" <</>>
 .RE
 .TP
@@ -2730,7 +2768,7 @@ No-op. Ignore if received.
 Place a creature token on the map. This may be used to define a new creature object
 if no object with the given
 .I id
-already exists, or replaces an existing token with the (possibly different) paramters
+already exists, or replaces an existing token with the (possibly different) parameters
 given.
 .RS
 '\" <<desc>>
@@ -2857,7 +2895,7 @@ state of the game. This should catch up the client to match what the other map c
 If a parameter with the word
 .B CHAT
 is added, then the chat message history is synced to the client instead of the map contents.
-In this case the optional paramter
+In this case the optional parameter
 .I target
 may be used to get only a subset of the chat history. If 
 .I target
@@ -3027,7 +3065,7 @@ The wiki page
 .B "https://www.madscience.zone/gamers/wiki/GmaSoftwareDevelopment/Protocols/MapperProtocol"
 contains more detail on the map protocol, but this manpage is the definitive reference
 to the protocol.
-.SH AUTHOR
+.SH AUTHORS
 .LP
 Steve Willoughby / steve@madscience.zone;
 John Mechalas (elevation and movement modes).
@@ -3051,8 +3089,13 @@ the server tracks game state, simply exiting and restarting the map client accom
 the same effect (possibly better). Now this button requests a "sync" operation with the
 server. 
 .LP
-This document also describes map protocol version 332,
+This document also describes map protocol version 333,
 which added the
+.B ALLOW
+command.
+.LP
+Version 332
+added the
 .B GRANTED
 server response, guaranteeing that
 .B AUTH

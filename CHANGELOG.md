@@ -1,17 +1,32 @@
 Game Master's Assistant / Mapper Client
 Release Notes
-Version 3.42.3 * Saturday, 11th June, 2022
+Version 3.42.4 * Saturday, 11th June, 2022
 
 Represents:
- * Supported GMA Mapper Version: 3.42.3      <!-- @@##@@ -->
+ * Supported GMA Mapper Version: 3.42.4      <!-- @@##@@ -->
  * Supported GMA Mapper File Format: 17	      <!-- @@##@@ -->
  * Supported GMA Mapper Protocol: 333         <!-- @@##@@ -->
+
+# 3.42.4
+## Enhancements
+Improved display of creature status. Removed the confusing aspect that hovering
+the mouse anywhere in the threat zone put the creature's stats at the top of the
+window (since in combat many creatures are in overlapping threat zones). Now,
+the status is implemented as a "tooltip" when hovering over the creature token
+itself, and contains greater detail about the conditions in effect for the creature.
+
+Changed the "toggle reach" menu to "cycle reach". It now cycles between three different
+reach modes: normal, reach, and extended. The latter is an extended threat zone
+that includes the reach area but also the adjacent spaces.
+
+Now supports mapper protocol version 333.
 
 # 3.42.3
 ## Enhancements
 Improved styling of die-roll results is now an opt-in feature for clients.
 Added code to the client to tell the server that it supports that feature.
 Adjusted display style of die roll result number so the background doesn't carry over into the space between that and the name of the person sending the die roll.
+
 
 # 3.42.2
 ## Enhancements
