@@ -1615,114 +1615,139 @@ proc blur_hp {maxhp lethal} {
 
 proc CreateHealthStatsToolTip {mob_id} {
 	global MOB
-	global ClockDisplay
-	global DHS_Saved_ClockDisplay
-
-	if {$mob_id eq {}} {
+	if {$mob_id eq {} || ![info exists MOB(NAME:$mob_id)]} {
 		return {}
 	}
 
 	# get the list of applied conditions
 	set conditions {}
+
+	if {$MOB(KILLED:$mob_id)} {
+		set dead 1
+	} else {
+		set dead 0
+	}
+
 	if [info exists MOB(_CONDITION:$mob_id)] {
 		lappend conditions $MOB(_CONDITION:$mob_id)
 	}
 	if [info exists MOB(STATUSLIST:$mob_id)] {
 		lappend conditions {*}$MOB(STATUSLIST:$mob_id)
 	}
-	if {[info exists MOB(HEALTH:$mob_id)
-
-
-
 	if {[info exists MOB(HEALTH:$mob_id)]} {
-		set h $MOB(HEALTH:$mob_id)
-	} else {
-		set h {}
-	}
-
-	if {$MOB(KILLED:$mob_id)} {
-		set health "DEAD"
-		set dead 1
-	} else {
-		set health {}
-		set dead 0
-	}
-
-
-
-
-
-
-		if {[info exists MOB(STATUSLIST:$mob_id)] && $MOB(STATUSLIST:$mob_id) ne {}} {
-			append health " :: " $MOB(STATUSLIST:$mob_id)
+		DistributeZero $MOB(HEALTH:$mob_id) maxhp lethal nonlethal con flatp stablep hcondition server_blur_pct
+		if {$flatp ne {} && $flatp && [lsearch -exact $conditions flat-footed] < 0} {
+			lappend conditions flat-footed
 		}
+		if {$stablep ne {} && $stablep && [lsearch -exact $conditions stable] < 0} {
+			lappend conditions stable
+		}
+		set tiptext "$MOB(NAME:$mob_id):"
 
-		if {[llength $h] < 7} {
-			set ClockDisplay [format ":: %s %s" $MOB(NAME:$mob_id) $health]
+		global blur_all blur_pct
+		set client_blur {}
+		set server_blur {}
+		if {$blur_all || $MOB(TYPE:$mob_id) ne {player}} {
+			set hp_remaining [blur_hp $maxhp $lethal]
+			if {$blur_pct > 0} {
+				set client_blur [format "\u00B1%d%%" $blur_pct]
+			}
 		} else {
-			DistributeVars $h maxhp lethal nonlethal grace flatp stablep condition server_blur_hp
-			global blur_all blur_pct
-			set client_blur {}
-			set server_blur {}
-			if {$blur_all || $MOB(TYPE:$mob_id) ne {player}} {
-				set hp_remaining [blur_hp $maxhp $lethal]
-				if {$blur_pct > 0} {
-					set client_blur [format "(to %d%%)" $blur_pct]
-				}
-			} else {
-				set hp_remaining [expr $maxhp - $lethal]
-			}
-
-			if {$server_blur_hp ne {} && $server_blur_hp > 0} {
-				set server_blur [format "(to %d%%)" $server_blur_hp]
-			}
-
-			if {!$dead} {
-				if {$MOB(TYPE:$mob_id) eq {player}} {
-					set health [format "%d/%d HP %s %s" $hp_remaining $maxhp $client_blur $server_blur]
-					if {$nonlethal != 0} {
-						append health [format " (%d NL)" $nonlethal]
+			set hp_remaining [expr $maxhp - $lethal]
+		}
+		if {$server_blur_pct ne {} && $server_blur_pct > 0} {
+			set server_blur [format "\u00B1%d%%" $server_blur_pct]
+		}
+		if {!$dead} {
+			if {$MOB(TYPE:$mob_id) eq {player}} {
+				if {$maxhp == 0} {
+					if {$lethal == 0} {
+						append tiptext " no lethal wounds"
+					} else {
+						append tiptext [format " %d%s%s lethal wounds" $lethal $client_blur $server_blur]
 					}
 				} else {
-					if {$maxhp == 0} {
-						set health [format "%d lethal %d non %s %s" $lethal $nonlethal $client_blur $server_blur]
-					} else {
-						if {$lethal > $maxhp} {
-							set health "DYING"
+					append tiptext [format " %d/%d%s%s HP" $hp_remaining $maxhp $client_blur $server_blur]
+				}
+				if {$nonlethal != 0} {
+					append tiptext [format " (%d non-lethal)" $nonlethal]
+				}
+			} else {
+				# not a player; so we're not quite as direct about health status
+				if {$maxhp == 0} {
+					# we don't know the creatures's hit point total
+					append tiptext [format " %d%s%s lethal damage" $lethal $client_blur $server_blur]
+					if {$nonlethal != 0} {
+						append tiptext [format " (%d non-lethal)" $nonlethal]
+					}
+				} else {
+					# otherwise we know more about what the damage means in context
+					if {$lethal > $maxhp} {
+						if {[lsearch -exact $conditions dying] < 0} {
+							lappend conditions dying
 						} else {
-							set health [format "%d%% HP %s %s" [expr (100 * $hp_remaining) / $maxhp] $client_blur $server_blur]
+							append tiptext [format " %d%%%s%s HP" [expr (100 * $hp_remaining)/$maxhp] $client_blur $server_blur]
 							if {$nonlethal != 0 && $maxhp != $lethal} {
-								append health [format " (%d%% NL)" [expr (100 * $nonlethal) / $hp_remaining]]
+								append tiptext [format " (%d%% of remaining hp non-lethal)" [expr (100*$nonlethal)/$hp_remaining]]
 							}
 						}
 					}
 				}
 			}
-			if {$flatp} {
-				append health " Flat-footed"
-			}
-			if {$stablep} {
-				append health " Stabilized"
-			}
-			if {[info exists MOB(_CONDITION:$mob_id)] && $MOB(_CONDITION:$mob_id) ne {}} {
-				append health " \[$MOB(_CONDITION:$mob_id)\]"
-			}
-			if {[info exists MOB(ELEV:$mob_id)] && $MOB(ELEV:$mob_id) != 0} {
-				append health [format " Elev %d'" $MOB(ELEV:$mob_id)]
-			}
-			if {[info exists MOB(MOVEMODE:$mob_id)] && $MOB(MOVEMODE:$mob_id) ne {}} {
-				append health [format " (%s)" $MOB(MOVEMODE:$mob_id)]
-			}
-			if {[info exists MOB(STATUSLIST:$mob_id)] && $MOB(STATUSLIST:$mob_id) ne {}} {
-				append health " :: " $MOB(STATUSLIST:$mob_id)
-			}
-			set ClockDisplay ":: $MOB(NAME:$mob_id) $health"
 		}
-	} else {
-		set ClockDisplay $DHS_Saved_ClockDisplay
-		set DHS_Saved_ClockDisplay {}
 	}
+
+	if {[info exists MOB(ELEV:$mob_id)] && $MOB(ELEV:$mob_id) != 0} {
+		append tiptext [format "; elevation %d ft" $MOB(ELEV:$mob_id)]
+	}
+	if {[info exists MOB(MOVEMODE:$mob_id)] && $MOB(MOVEMODE:$mob_id) != {}} {
+		switch -exact -- $MOB(MOVEMODE:$mob_id) {
+			land {
+			}
+			fly - climb - burrow {
+				append tiptext [format " (%sing)" $MOB(MOVEMODE:$mob_id)]
+			}
+			swim {
+				append tiptext " (swimming)"
+			}
+			default {
+				append tiptext [format " (%s)" $MOB(MOVEMODE:$mob_id)]
+			}
+		}
+	}
+
+	# add conditions
+	global MarkerDescription
+
+	foreach status $conditions {
+		if {[info exists MarkerDescription($status)]} {
+			append tiptext "\n[reflowText 80 $MarkerDescription($status)]"
+		} else {
+			append tiptext "\n$status."
+		}
+	}
+
+	return $tiptext
 }
+
+
+proc reflowText {maxlen text} {
+	set output {}
+	set current {}
+	foreach word [split $text] {
+		if {[string length $current] + [llength $current] + [string length $word] >= $maxlen} {
+			lappend output [join $current]
+			set current [list "    " $word]
+		} else {
+			lappend current $word
+		}
+	}
+	if {[llength $current] > 0} {
+		lappend output [join $current]
+	}
+	return [join $output "\n"]
+}
+
 proc DisplayHealthStats {mob_id} {
 	global MOB
 	global ClockDisplay
@@ -5048,7 +5073,7 @@ proc DefineStatusMarker {condition shape color description} {
 		set MarkerColor($condition) $color
 		set MarkerShape($condition) $shape
 		if {$description eq {}} {
-			if {![array exists MarkerDescription($condition)]} {
+			if {![info exists MarkerDescription($condition)]} {
 				set MarkerDescription($condition) $condition
 			}
 		} else {
@@ -5848,6 +5873,19 @@ proc RenderSomeone {w id} {
 #					}
 				}
 			}
+		}
+	}
+}
+
+proc DistributeZero {v args} {
+	set i 0
+	foreach name $args {
+		upvar $name t
+		if {$i >= [llength $v]} {
+			set t 0
+		} else {
+			set t [lindex $v $i]
+			incr i
 		}
 	}
 }
