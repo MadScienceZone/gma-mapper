@@ -1628,13 +1628,28 @@ proc CreateHealthStatsToolTip {mob_id} {
 		set dead 0
 	}
 
-	if [info exists MOB(_CONDITION:$mob_id)] {
-		lappend conditions $MOB(_CONDITION:$mob_id)
+	if {[info exists MOB(_CONDITION:$mob_id)] && $MOB(_CONDITION:$mob_id) ne {}} {
+		switch -exact -- $MOB(_CONDITION:$mob_id) {
+			dead {
+				set dead 1
+			}
+			flat {
+				lappend conditions flat-footed
+			}
+			default {
+				lappend conditions $MOB(_CONDITION:$mob_id)
+			}
+		}
 	}
-	if [info exists MOB(STATUSLIST:$mob_id)] {
+	if {[info exists MOB(STATUSLIST:$mob_id)] && [llength $MOB(STATUSLIST:$mob_id)] > 0} {
 		lappend conditions {*}$MOB(STATUSLIST:$mob_id)
 	}
 	if {[info exists MOB(HEALTH:$mob_id)]} {
+		if [info exists MOB(_CONDITION:$mob_id)] {
+			DEBUG 0 "$mob_id: $MOB(NAME:$mob_id): $MOB(HEALTH:$mob_id); _CONDITION='$MOB(_CONDITION:$mob_id)'"
+		} else {
+			DEBUG 0 "$mob_id: $MOB(NAME:$mob_id): $MOB(HEALTH:$mob_id)"
+		}
 		DistributeZero $MOB(HEALTH:$mob_id) maxhp lethal nonlethal con flatp stablep hcondition server_blur_pct
 		if {$flatp ne {} && $flatp && [lsearch -exact $conditions flat-footed] < 0} {
 			lappend conditions flat-footed
@@ -1650,7 +1665,7 @@ proc CreateHealthStatsToolTip {mob_id} {
 		if {$blur_all || $MOB(TYPE:$mob_id) ne {player}} {
 			set hp_remaining [blur_hp $maxhp $lethal]
 			if {$blur_pct > 0} {
-				set client_blur [format "\u00B1%d%%" $blur_pct]
+				set client_blur [format "(\u00B1%d%%)" $blur_pct]
 			}
 		} else {
 			set hp_remaining [expr $maxhp - $lethal]
@@ -1685,15 +1700,17 @@ proc CreateHealthStatsToolTip {mob_id} {
 					if {$lethal > $maxhp} {
 						if {[lsearch -exact $conditions dying] < 0} {
 							lappend conditions dying
-						} else {
-							append tiptext [format " %d%%%s%s HP" [expr (100 * $hp_remaining)/$maxhp] $client_blur $server_blur]
-							if {$nonlethal != 0 && $maxhp != $lethal} {
-								append tiptext [format " (%d%% of remaining hp non-lethal)" [expr (100*$nonlethal)/$hp_remaining]]
-							}
+						} 
+					} else {
+						append tiptext [format " %d%%%s%s HP" [expr (100 * $hp_remaining)/$maxhp] $client_blur $server_blur]
+						if {$nonlethal != 0 && $maxhp != $lethal} {
+							append tiptext [format " (%d%% of remaining hp non-lethal)" [expr (100*$nonlethal)/$hp_remaining]]
 						}
 					}
 				}
 			}
+		} else {
+			append tiptext " dead."
 		}
 	}
 
