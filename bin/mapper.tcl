@@ -1645,11 +1645,6 @@ proc CreateHealthStatsToolTip {mob_id} {
 		lappend conditions {*}$MOB(STATUSLIST:$mob_id)
 	}
 	if {[info exists MOB(HEALTH:$mob_id)]} {
-		if [info exists MOB(_CONDITION:$mob_id)] {
-			DEBUG 0 "$mob_id: $MOB(NAME:$mob_id): $MOB(HEALTH:$mob_id); _CONDITION='$MOB(_CONDITION:$mob_id)'"
-		} else {
-			DEBUG 0 "$mob_id: $MOB(NAME:$mob_id): $MOB(HEALTH:$mob_id)"
-		}
 		DistributeZero $MOB(HEALTH:$mob_id) maxhp lethal nonlethal con flatp stablep hcondition server_blur_pct
 		if {$flatp ne {} && $flatp && [lsearch -exact $conditions flat-footed] < 0} {
 			lappend conditions flat-footed
@@ -8477,6 +8472,8 @@ proc EndDD {count checksum} {
 	global icon_delete icon_die16 dark_mode
 	set cs [cs_final $DDchk]
 
+	set checksum 0	; # TODO fix checksum error in unicode data stream
+
 	DEBUG 2 "End preset data stream, $DDcnt records, check $cs"
 	if {[array size DDdata] != $count - $DDdup} {
 		DEBUG 0 "INTERNAL ERROR in data stream: Received $DDcnt records ($DDdup duplicate), buffer has [array size DDdata]!"
@@ -8725,6 +8722,19 @@ proc _collapse_extra {w i} {
 	}
 }
 
+proc cleanupDieRollSpec {spec} {
+	set parts [split $spec =]
+	if {[llength $parts] < 2} {
+		return $spec
+	}
+	set res {}
+	foreach title_block [split [lindex $parts 0] "\u2016"] {
+		lappend res [lindex [split $title_block "\u2261"] 0]
+	}
+	return [join [list [join $res "\u2016"] [lindex $parts 1]] =]
+}
+
+		
 proc _render_die_roller {w width height type args} {
 	global dice_preset_data recent_die_rolls icon_delete icon_die16
 	global dark_mode last_known_size display_styles
@@ -8819,7 +8829,7 @@ proc _render_die_roller {w width height type args} {
 				pack [label $w.preset$i.plus -text +] -side left
 				pack [entry $w.preset$i.extra -width 3] -side left
 				pack [label $w.preset$i.name -text ${pname}:  -anchor w -font Tf12 -foreground [expr $dark_mode ? {{cyan}} : {{blue}}] {*}[lindex $row_bg [expr $i % 2]]] -side left -padx 2
-				pack [label $w.preset$i.def -text $def -anchor w {*}[lindex $row_bg [expr $i % 2]]] -side left -expand 0 -fill none
+				pack [label $w.preset$i.def -text [cleanupDieRollSpec $def] -anchor w {*}[lindex $row_bg [expr $i % 2]]] -side left -expand 0 -fill none
 				pack [button $w.preset$i.del -image $icon_delete -command "DeleteDieRollPreset {$preset_name}"] -side right
 				tooltip::tooltip $w.preset$i.name $desc
 				tooltip::tooltip $w.preset$i.def $desc
