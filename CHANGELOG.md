@@ -3,7 +3,7 @@ Release Notes
 Version 3.42.4 * Saturday, 11th June, 2022
 
 Represents:
- * Supported GMA Mapper Version: 3.42.4      <!-- @@##@@ -->
+ * Supported GMA Mapper Version: 3.42.5      <!-- @@##@@ -->
  * Supported GMA Mapper File Format: 17	      <!-- @@##@@ -->
  * Supported GMA Mapper Protocol: 333         <!-- @@##@@ -->
 
