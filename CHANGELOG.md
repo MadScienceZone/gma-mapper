@@ -9,9 +9,8 @@ Represents:
 
 # 3.42.6
 ## Fixes
-Corrected Unicode encoding (makes UTF-8 always assumed; this corrects a problem
-seen on Windows platforms where the default encoding was incompatible, which messed
-up die-roll formatting).
+* Corrected Unicode encoding (makes UTF-8 always assumed; this corrects a problem seen on Windows platforms where the default encoding was incompatible, which messed up die-roll formatting).
+* Now clears the status display on startup when not authenticating to a server.
 
 # 3.42.5
 ## Fixes
