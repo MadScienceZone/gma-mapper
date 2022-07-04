@@ -11023,4 +11023,5 @@ if {$ITpreamble && $IThost ne {}} {
     report_progress "Mapper Client Ready (awaiting server login to complete)"
 } else {
     report_progress "Mapper Client Ready"
+    after 5000 {report_progress {}}
 }
