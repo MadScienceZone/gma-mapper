@@ -53,7 +53,7 @@
 # @[52]@| defect of the software.
 #
 # Auto-configure values
-set GMAMapperVersion {3.42.5}       ;# @@##@@
+set GMAMapperVersion {3.42.6}     ;# @@##@@
 set GMAMapperFileFormat {17}        ;# @@##@@
 set GMAMapperProtocol {333}         ;# @@##@@
 set GMAVersionNumber {4.4.1}            ;# @@##@@
@@ -61,6 +61,7 @@ set GMAVersionNumber {4.4.1}            ;# @@##@@
 set MapperVersion $GMAMapperVersion
 set FileVersion $GMAMapperFileFormat
 set ProtocolVersion $GMAMapperProtocol
+encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
 # The following are some system-dependent values you may need to tweak.
