@@ -7,6 +7,16 @@ Represents:
  * Supported GMA Mapper File Format: 17	      <!-- @@##@@ -->
  * Supported GMA Mapper Protocol: 333         <!-- @@##@@ -->
 
+# 3.42.6
+## Fixes
+Corrected Unicode encoding (makes UTF-8 always assumed; this corrects a problem
+seen on Windows platforms where the default encoding was incompatible, which messed
+up die-roll formatting).
+
+# 3.42.5
+## Fixes
+Cleaned up display of die-roll presets and status displays.
+
 # 3.42.4
 ## Enhancements
 Improved display of creature status. Removed the confusing aspect that hovering
