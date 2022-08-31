@@ -55,7 +55,7 @@
 # Auto-configure values
 set GMAMapperVersion {3.42.7}     ;# @@##@@
 set GMAMapperFileFormat {17}        ;# @@##@@
-set GMAMapperProtocol {333}         ;# @@##@@
+set GMAMapperProtocol {400}         ;# @@##@@
 set GMAVersionNumber {4.4.3}            ;# @@##@@
 # legacy variables (TODO: change to new ones)
 set MapperVersion $GMAMapperVersion
@@ -764,7 +764,7 @@ if {$tcl_platform(os) eq "Darwin"} {
 
 set ICON_DIR [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end-1 end lib MadScienceZone GMA Mapper icons]]]
 set BIN_DIR [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end end]]]
-foreach module {scrolledframe ustar gmautil} {
+foreach module {scrolledframe ustar gmautil gmaproto} {
 	source [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end end $module.tcl]]]
 }
 
