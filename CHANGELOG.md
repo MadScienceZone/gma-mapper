@@ -1,11 +1,16 @@
-Game Master's Assistant / Mapper Client
-Release Notes
-Version 3.42.4 * Saturday, 11th June, 2022
+# Game Master's Assistant / Mapper Client
+# Release Notes
+## Current Version Information
+ * Supported GMA Mapper Version: 3.42.7      <!-- @@##@@ -->
+ * Supported GMA Mapper File Format: 17	     <!-- @@##@@ -->
+ * Supported GMA Mapper Protocol: 333        <!-- @@##@@ -->
+ * Effective Date: 30-Aug-2022               <!-- @@##@@ -->
 
-Represents:
- * Supported GMA Mapper Version: 3.42.6      <!-- @@##@@ -->
- * Supported GMA Mapper File Format: 17	      <!-- @@##@@ -->
- * Supported GMA Mapper Protocol: 333         <!-- @@##@@ -->
+# 3.42.7
+## Fixes
+* Changes creature token labels to have a background color behind them (which matches
+the creature's threat zone color) so token label text won't get lost in the map image or
+canvas color. Fixes [Issue #34](https://github.com/MadScienceZone/gma-mapper/issues/34).
 
 # 3.42.6
 ## Fixes
