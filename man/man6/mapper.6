@@ -1424,8 +1424,9 @@ The mapper will automatically draw an \*(lqX\*(rq across the creature
 token in addition to switching to the \*(lqdead\*(rq image (if images
 are used).
 .TP
-.BI "Toggle Reach for " name
-Flips on/off the extra threat zone for reach weapons.
+.BI "Cycle Reach for " name
+Cycles's the creatures reach threat zone between normal, reach, and extended (both reach and
+adjacent foes threatened).
 .TP
 .BI "Toggle Spell Area for " name
 Defines a spell effect which is described as a radius \*(lqcentered on you\*(rq (or some
@@ -2840,8 +2841,8 @@ but along the
 axis.
 .TP
 .I reach
-Boolean value; if true, the creature is wielding a reach weapon and thus has an extended
-threat zone.
+Integer value; if 0, the creature's threat zone is normal. If 1, they have a reach weapon.
+If 2, both zones are threatened.
 .RE
 '\" <</>>
 .TP
