@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______             ______         ___    _______      ______     #
-# (  ____ \(       )(  ___  ) Game      / ___  \       /   )  / ___   )    / ____ \    #
-# | (    \/| () () || (   ) | Master's  \/   \  \     / /) |  \/   )  |   ( (    \/    #
-# | |      | || || || (___) | Assistant    ___) /    / (_) (_     /   )   | (____      #
-# | | ____ | |(_)| ||  ___  |             (___ (    (____   _)  _/   /    |  ___ \     #
-# | | \_  )| |   | || (   ) |                 ) \        ) (   /   _/     | (   ) )    #
-# | (___) || )   ( || )   ( | Mapper    /\___/  / _      | |  (   (__/\ _ ( (___) )    #
-# (_______)|/     \||/     \| Client    \______/ (_)     (_)  \_______/(_) \_____/     #
+#  _______  _______  _______             ______         ___    _______     ______      #
+# (  ____ \(       )(  ___  ) Game      / ___  \       /   )  / ___   )   / ___  \     #
+# | (    \/| () () || (   ) | Master's  \/   \  \     / /) |  \/   )  |   \/   )  )    #
+# | |      | || || || (___) | Assistant    ___) /    / (_) (_     /   )       /  /     #
+# | | ____ | |(_)| ||  ___  |             (___ (    (____   _)  _/   /       /  /      #
+# | | \_  )| |   | || (   ) |                 ) \        ) (   /   _/       /  /       #
+# | (___) || )   ( || )   ( | Mapper    /\___/  / _      | |  (   (__/\ _  /  /        #
+# (_______)|/     \||/     \| Client    \______/ (_)     (_)  \_______/(_) \_/         #
 #                                                                                      #
 ########################################################################################
 #
@@ -53,7 +53,7 @@
 # @[52]@| defect of the software.
 #
 # Auto-configure values
-set GMAMapperVersion {3.42.6}     ;# @@##@@
+set GMAMapperVersion {3.42.7}     ;# @@##@@
 set GMAMapperFileFormat {17}        ;# @@##@@
 set GMAMapperProtocol {333}         ;# @@##@@
 set GMAVersionNumber {4.4.3}            ;# @@##@@
@@ -5525,7 +5525,14 @@ proc RenderSomeone {w id} {
 		DEBUG 3 "$image_pfx:$zoom = $TILE_SET($image_pfx:$zoom)"
 		$w create oval [expr $x*$iscale] [expr $y*$iscale] [expr ($x+$mob_size)*$iscale] [expr ($y+$mob_size)*$iscale] -fill $fillcolor -tags "mob MF#$id M#$id MN#$id allMOB"
 		$w create image [expr $x*$iscale] [expr $y*$iscale] -anchor nw -image $TILE_SET($image_pfx:$zoom) -tags "mob M#$id MN#$id allMOB"
-		$w create text [expr $x*$iscale] [expr $y*$iscale] -anchor nw -fill black -font [FontBySize $MOB(SIZE:$id)] -text $mob_name -tags "M#$id MF#$id MT#$id allMOB"
+		#$w create text [expr $x*$iscale] [expr $y*$iscale] -anchor nw -fill black -font [FontBySize $MOB(SIZE:$id)] -text $mob_name -tags "M#$id MF#$id MT#$id allMOB"
+		set nametag_w "$w.nt_$id"
+		if {[winfo exists $nametag_w]} {
+			$nametag_w configure -font [FontBySize $MOB(SIZE:$id)] -text $mob_name
+		} else {
+			label $nametag_w -background [::tk::Darken $MOB(COLOR:$id) 40] -foreground white -font [FontBySize $MOB(SIZE:$id)] -text $mob_name 
+		}
+		$w create window [expr $x*$iscale] [expr $y*$iscale] -anchor w -window $nametag_w -tags "M#$id MF#$id MT#$id allMOB"
 	} else {
 		DEBUG 3 "No $image_pfx:$zoom found in TILE_SET"
 		$w create oval [expr $x*$iscale] [expr $y*$iscale] [expr ($x+$mob_size)*$iscale] [expr ($y+$mob_size)*$iscale] -fill $fillcolor -tags "mob MF#$id M#$id MN#$id allMOB"
@@ -7031,10 +7038,9 @@ proc RemovePerson id {
 	foreach key [array names MOB *:$id] {
 		unset MOB($key)
 	}
-	catch {
-		destroy $canvas.ms$id
-		destroy $canvas.z$id
-	}
+	catch { destroy $canvas.ms$id }
+	catch { destroy $canvas.z$id }
+	catch {	destroy $canvas.nt_$id }
 	#error "RemovePerson called!"
 }
 
