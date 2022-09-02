@@ -764,7 +764,7 @@ if {$tcl_platform(os) eq "Darwin"} {
 
 set ICON_DIR [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end-1 end lib MadScienceZone GMA Mapper icons]]]
 set BIN_DIR [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end end]]]
-foreach module {scrolledframe ustar gmautil gmaproto} {
+foreach module {scrolledframe ustar gmautil gmaproto gmafile} {
 	source [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end end $module.tcl]]]
 }
 
@@ -2087,18 +2087,42 @@ proc saf_loadfile {file oldcd args} {
 # players, too:
 # P field:id value
 #
+proc require_arr {aname id args} {
+	upvar $aname arr
+	foreach a $args {
+		if {![info exists arr($a:$id)]} {
+			error "object $id missing required attribute $a"
+		}
+	}
+}
+proc default_arr {aname id args} {
+	upvar $aname arr
+	foreach a $args {
+		if {![info exists arr($a:$id)]} {
+			set arr($a:$id) {}
+		}
+	}
+}
 
+#
+# This is a little convoluted but is so because it's in a transition
+# between data formats. The old file was a simple data dump of the
+# internal arrays holding map data, while the new format is a bit
+# better structured.
+# But since we are still using the old data format internally, there's
+# some converting back and forth that we do for the time being.
+#
 proc loadfile {merge file args} {
-####	global OBJ OBJ_NEXT_ID OBJ_FILE OBJ_MODIFIED OBJ_XL MOB_XL
 	global OBJ OBJ_FILE OBJ_MODIFIED OBJ_XL ClockDisplay LastFileComment
 	set no_send [expr {$args} eq {{-nosend}}]
+
+	set LastFileComment {}
 	
 	if {$OBJ_MODIFIED && !$merge && !$no_send
 	&& [tk_messageBox -type yesno -default no -icon warning -title "Abandon changes to $OBJ_FILE?"\
 		-message "You have unsaved changes to this map.  Do you want to abandon them and load a new map anyway?"]\
 		ne "yes"} {
 		return
-
 	}
 
 	global okToLoadMonsters okToLoadPlayers
@@ -2145,7 +2169,7 @@ proc loadfile {merge file args} {
 
 	while {[catch {
         set f [open $file r]
-        set f_size [file size $file]
+        #set f_size [file size $file]
     } err]} {
 		if {[tk_messageBox -type retrycancel -icon error -default cancel -title "Error opening file"\
 			-message "Unable to open $file: $err" -parent .] eq "cancel"} {
@@ -2153,226 +2177,393 @@ proc loadfile {merge file args} {
 		}
 	}
 
-	#resetZoom
-
 	if {!$merge} {
 		cleargrid
-		#set OBJ_NEXT_Z 0
 	}
 
-	#
-	# Read first line for metadata
-	#
-#	set totalElements 0
-#	set totalPlayers  0
-#	set totalMonsters 0
-#	set totalFiles    0
-#	set totalImages   0
-#	set loadedElements 0
-#	set loadedPlayers  0
-#	set loadedMonsters 0
-#	set loadedFiles    0
-#	set loadedImages   0
-	set meta_timestamp  {}
-	set LastFileComment {}
+	set file_data [::gmafile::load_from_file $f]
+	close $f
 
-	if {[gets $f v] >= 0} {
-		if {[regexp {^__MAPPER__:([0-9]+)$} [lindex $v 0] vv vid]} {
-			global FileVersion		
-			if {$vid > $FileVersion} {
-				tk_messageBox -type ok -icon error -title "Unsupported file format"\
-					-message "Map file $file is a version $vid format file. You need to upgrade your mapper client to read this file." -parent .
-				return
-			}
-			if {$FileVersion >= 12} {
-				if {[llength $v] != 2 || [llength [lindex $v 1]] < 2} {
-					tk_messageBox -type ok -icon error -title "Invalid file"\
-						-message "Map file $file is a version $vid format file, but the metadata field is incorrect. Not reading this file." -parent .
-					return
+	lassign $file_data meta_data record_data
+	set ClockDisplay "Loading [dict get $meta_data Location]..."
+	update
+
+	if {[catch {
+		#
+		# Convert old-format data elements to new format
+		#
+		array unset OldObjs
+		array unset OldMobs
+		foreach record $record_data {
+			lassign $record element_type element_data
+			if {$element_type eq "RAW"} {
+				if {[lindex $element_data 0] eq "P" || [lindex $element_data 0] eq "M"} {
+					set OldMobs([lindex $element_data 1]) [lrange $element_data 2 end]
+				} else {
+					set OldObjs([lindex $element_data 0]) [lrange $element_data 1 end]
 				}
-				DistributeVars [lindex $v 1] LastFileComment meta_timestamp
 			}
-		} else {
-			tk_messageBox -type ok -icon warning -title "Unsupported file format"\
-				-message "Map file $file has no metadata. We don't know if we're compatible with it, but we'll try to load it anyway. You should update your map files." -parent .
-			seek $f 0 start
 		}
-	} else {
-		tk_messageBox -type ok -icon warning -title "Can't read file"\
-			-message "Map file $file can't be read or may be empty." -parent .
+
+		foreach mob_id [array names OldMobs NAME:*] {
+			set mob_id [string range $mob_id 5 end]
+			require_arr OldMobs $mob_id NAME
+			default_arr OldMobs $mob_id GX GY HEALTH ELEV MOVEMODE COLOR NOTE SKIN SKINSIZE SIZE STATUSLIST AOE AREA REACH KILLED DIM
+			if {$OldMobs(HEALTH:$mob_id) eq {}} {
+				set health {}
+			} else {
+				lassign $OldMobs(HEALTH:$mob_id) max ld nld con ff stab cond blur
+				set health [dict create \
+					MaxHP $max \
+					LethalDamage $ld \
+					NonLethalDamage $nld \
+					Con $con \
+					IsFlatFooted $ff \
+					IsStable $stab \
+					Condition $cond \
+					HPBlur $blur \
+				]
+			}
+			if {$OldMobs(AOE:$mob_id) eq {}} {
+				set aoe {}
+			} else {
+				lassign $OldMobs(AOE:$mob_id) r c
+				set aoe [dict create \
+					Radius $r \
+					Color $c \
+				]
+			}
+
+			lappend record_data [list CREATURE [dict create \
+				ID $mob_id \
+				Name $OldMobs(NAME:$mob_id) \
+				Health $health \
+				Gx $OldMobs(GX:$mob_id) \
+				Gy $OldMobs(GY:$mob_id) \
+				Skin $OldMobs(SKIN:$mob_id) \
+				SkinSize $OldMobs(SKINSIZE:$mob_id) \
+				Elev $OldMobs(ELEV:$mob_id) \
+				Color $OldMobs(COLOR:$mob_id) \
+				Note $OldMobs(NOTE:$mob_id) \
+				Size $OldMobs(SIZE:$mob_id) \
+				Area $OldMobs(AREA:$mob_id) \
+				StatusList $OldMobs(STATUSLIST:$mob_id) \
+				AoE  $aoe \
+				MoveMode [::gmaproto::to_enum MoveMode $OldMobs(MOVEMODE:$mob_id)] \
+				Reach $OldMobs(REACH:$mob_id) \
+				Killed $OldMobs(KILLED:$mob_id) \
+				Dim $OldMobs(DIM:$mob_id) \
+				CreatureType [::gmaproto::to_enum CreatureType $OldMobs(TYPE:$mob_id)] \
+			]]
+		}
+
+		foreach obj_id [array names OldObjs TYPE:*] {
+			set obj_id [string range $obj_id 5 end]
+			require_arr OldObjs $obj_id X Y Z
+			default_arr OldObjs $obj_id POINTS LINE FILL WIDTH LAYER LEVEL GROUP DASH HIDDEN LOCKED
+			set obj_type $OldObjs(TYPE:$obj_id)
+
+			switch -exact -- $obj_type {
+				arc - circ {
+					default_arr OldObjs $obj_id ARCMODE START EXTENT
+				}
+				line {
+					default_arr OldObjs $obj_id ARROW
+				}
+				poly {
+					default_arr OldObjs $obj_id SPLINE JOIN
+				}
+				rect {
+				}
+				saoe {
+					require_arr OldObjs $obj_id AOESHAPE
+					default_arr OldObjs $obj_id ARCMODE START EXTENT
+				}
+				text {
+					require_arr OldObjs $obj_id TEXT FONT
+					default_arr OldObjs $obj_id ANCHOR
+				}
+				tile {
+					default_arr OldObjs $obj_id IMAGE BBHEIGHT BBWIDTH
+				}
+				default {
+					error "map element of unsupported type $obj_type"
+				}
+			}
+
+			set points {}
+			foreach {x y} $OldObjs(POINTS:$obj_id) {
+				lappend points [dict create X $x Y $y]
+			}
+
+			set element [dict create \
+				ID $obj_id \
+				X $OldObjs(X:$obj_id) \
+				Y $OldObjs(Y:$obj_id) \
+				Points $points \
+				Z $OldObjs(Z:$obj_id) \
+				Line $OldObjs(LINE:$obj_id) \
+				Fill $OldObjs(FILL:$obj_id) \
+				Width $OldObjs(WIDTH:$obj_id) \
+				Layer $OldObjs(LAYER:$obj_id) \
+				Level $OldObjs(LEVEL:$obj_id) \
+				Group $OldObjs(GROUP:$obj_id) \
+				Dash [::gmaproto::to_enum Dash $OldObjs(DASH:$obj_id)] \
+				Hidden $OldObjs(HIDDEN:$obj_id) \
+				Locked $OldObjs(LOCKED:$obj_id) \
+			]
+
+			switch -exact -- $obj_type {
+				arc {
+					dict set element ArcMode [::gmaproto::to_enum ArcMode $OldObjs(ARCMODE:$obj_id)]
+					dict set element Start $OldObjs(START:$obj_id)
+					dict set element Extent $OldObjs(EXTENT:$obj_id)
+					lappend record_data [list ARC $element]
+				}
+				circ {
+					dict set element ArcMode [::gmaproto::to_enum ArcMode $OldObjs(ARCMODE:$obj_id)]
+					dict set element Start $OldObjs(START:$obj_id)
+					dict set element Extent $OldObjs(EXTENT:$obj_id)
+					lappend record_data [list CIRC $element]
+				}
+				line {
+					dict set element Arrow [::gmaproto::to_enum Arrow $OldObjs(ARROW:$obj_id)]
+					lappend record_data [list LINE $element]
+				}
+				poly {
+					dict set element Spline $OldObjs(SPLINE:$obj_id)
+					dict set element Join [::gmaproto::to_enum Join $OldObjs(JOIN:$obj_id)]
+					lappend record_data [list POLY $element]
+				}
+				rect {
+					lappend record_data [list RECT $element]
+				}
+				saoe {
+					set shape [::gmaproto::to_enum AoEShape $OldObjs(AOESHAPE:$obj_id)]
+					dict set element AoEShape $shape
+					if {$shape == 0 || $shape == 1} {
+						dict set element ArcMode [::gmaproto::to_enum ArcMode $OldObjs(ARCMODE:$obj_id)]
+						dict set element Start $OldObjs(START:$obj_id)
+						dict set element Extent $OldObjs(EXTENT:$obj_id)
+					}
+							
+					lappend record_data [list SAOE $element]
+				}
+				text {
+					# value is {family size normal underline bold overstrike roman italic}
+					lassign $OldObjs(FONT:$obj_id) family size
+					set weight 0
+					set slant 0
+					if {[info exists OldObjs(ANCHOR:$obj_id)]} {
+						set anchor [::gmaproto::to_enum Anchor $OldObjs(ANCHOR:$obj_id)]
+					} else {
+						set anchor 0
+					}
+
+					foreach option [lrange $OldObjs(FONT:$obj_id) 2 end] {
+						switch -exact -- $option {
+							normal { set weight 0 }
+							bold   { set weight 1 }
+							roman  { set slant 0  }
+							italic { set slant 1  }
+						}
+					}
+					dict set element Text $OldObjs(TEXT:$obj_id)
+					dict set element Font [dict create \
+						Family $family \
+						Size $size \
+						Weight $weight \
+						Slant $slant \
+						Anchor $anchor \
+					]
+					lappend record_data [list TEXT $element]
+				} tile {
+					dict set element Image $OldObjs(IMAGE:$obj_id)
+					dict set element BBHeight $OldObjs(BBHEIGHT:$obj_id)
+					dict set element BBWidth $OldObjs(BBWIDTH:$obj_id)
+					lappend record_data [list TILE $element]
+				}
+			}
+		}
+
+		#
+		# Digest read-in data and pass on to peers (maybe)
+		#
+		foreach record $record_data {
+			lassign $record element_type element_data
+			if {$element_type eq "RAW"} {
+				continue
+			}
+			if {$element_type eq "CREATURE"} {
+				puts "getting creature"
+				set id [dict get $element_data ID]
+				puts "id=$id"
+				set ctype [dict get $element_data CreatureType]
+				if {$ctype == 2} {
+					set prefix P
+					loadElement [list $prefix TYPE:$id player]
+				} else {
+					set prefix M
+					loadElement [list $prefix TYPE:$id monster]
+				}
+				foreach fld {Name Gx Gy Elev Color Note Skin SkinSize Size StatusList Area Reach Killed Dim} {
+					loadElement [list $prefix [string toupper $fld]:$id [dict get $element_data $fld]]
+				}
+				if {[dict get $element_data AoE] ne {}} {
+					loadElement [list $prefix AOE:$id radius [dict get $element_data AoE Radius] [dict get $element_data AoE Color]]
+				}
+				loadElement [list $prefix MOVEMODE:$id [::gmaproto::from_enum MoveMode [dict get $element_data MoveMode]]]
+				if {[dict get $element_data Health] ne {}} {
+					loadElement [list $prefix HEALTH:$id [list [dict get $element_data Health MaxHP] [dict get $element_data Health LethalDamage] [dict get $element_data Health NonLethalDamage] [dict get $element_data Health Con] [dict get $element_data Health IsFlatFooted] [dict get $element_data Health IsStable] [dict get $element_data Health Condition] [dict get $element_data Health HPBlur]]]
+				}
+				if {!$no_send} {
+					::gmaproto::_protocol_send PS {*}$element_data
+				}
+				continue
+			} else {
+				#
+				# accept data common to all map elements
+				#
+				puts "getting common ID from $element_data"
+				set id [dict get $element_data ID]
+				puts "id=$id"
+				foreach fld {X Y Z Line Fill Width Layer Level Group Hidden Locked} {
+					loadElement [list [string toupper $fld]:$id [dict get $element_data $fld]]
+				}
+				set p {}
+				foreach pt [dict get $element_data Points] {
+					lappend p [dict get $pt X]
+					lappend p [dict get $pt Y]
+				}
+				loadElement [list POINTS:$id $p]
+				loadElement [list DASH:$id [::gmaproto::from_enum Dash [dict get $element_data Dash]]]
+				#
+				# now element-specific stuff
+				#
+				switch -exact -- $element_type {
+					ARC - CIRC {
+						loadElement [list TYPE:$id [string tolower $element_type]]
+						loadElement [list ARCMODE:$id [::gmaproto::from_enum ArcMode [dict get $element_data ArcMode]]]
+						loadElement [list START:$id [dict get $element_data Start]]
+						loadElement [list EXTENT:$id [dict get $element_data Extent]]
+					}
+					IMG {
+						DEBUG 2 "Defining image $element_data"
+						set image_id [dict get $element_data Name]
+						foreach instance [dict get $element_data Sizes] {
+							DEBUG 2 "...$instance"
+
+							if {![dict get $instance IsLocalFile]} {
+								DEBUG 3 "Image is on server. Retrieving..."
+								set image_zoom [dict get $instance Zoom]
+								set image_filename [dict get $instance File]
+								fetch_image $image_id $image_zoom $image_filename
+								global TILE_ID
+								set TILE_ID([tile_id $image_id $image_zoom]) $image_filename
+								if {!$SafMode && !$no_send} {
+									::gmaproto::add_image $image_id [list [dict create File $image_filename ImageData {} IsLocalFile false Zoom $image_zoom]]
+								}
+							} else {
+								if {[catch {set image_file [open $image_filename r]} err]} {
+									DEBUG 0 "Can't open image file $image_filename for $image_id at zoom $image_zoom: $err"
+									continue
+								}
+
+								fconfigure $image_file -encoding binary -translation binary 
+								if [catch {set image_data [read $image_file]} err] {
+									DEBUG 0 "Can't read data from image file $image_filename: $err"
+									close $image_file
+									continue
+								}
+								close $image_file
+
+								global TILE_SET
+								if [info exists TILE_SET([tile_id $image_id $image_zoom])] {
+									DEBUG 1 "Replacing existing image $TILE_SET([tile_id $image_id $image_zoom]) for ${image_id} x$image_zoom"
+									image delete $TILE_SET([tile_id $image_id $image_zoom])
+									unset TILE_SET([tile_id $image_id $image_zoom])
+								}
+								if [catch {set TILE_SET([tile_id $image_id $image_zoom]) [image create photo -format gif -data $image_data]} err] {
+									DEBUG 0 "Can't use data read from image file $image_filename: $err"
+									continue
+								}
+								DEBUG 3 "Created image $TILE_SET([tile_id $image_id $image_zoom]) for $image_id, zoom $image_zoom len=[string length $image_data]"
+								#
+								# Looks like the image is valid.  Send it to everyone else too...
+								#
+								if {!$SafMode && !$no_send} {
+									::gmaproto::add_image $image_id [list [dict create File {} ImageData $image_data IsLocalFile true Zoom $image_zoom]]
+								}
+							}
+						}
+						continue	;# don't send this at bottom of loop
+					}
+					LINE {
+						loadElement [list TYPE:$id line]
+						loadElement [list ARROW:$id [::gmaproto::from_enum Arrow [dict get $element_data Arrow]]]
+					}
+					MAP {
+						set map_id [dict get $element_data File]
+						DEBUG 2 "Defining map file $map_id"
+						if [catch {
+							set cache_filename [fetch_map_file $map_id]
+							DEBUG 1 "Pre-load: map ID $map_id cached as $cache_filename"
+						} err] {
+							if {$err eq {NOSUCH}} {
+								DEBUG 0 "We were asked to pre-load map file with ID $map_id but the server doesn't have it"
+							} else {
+								say "Error retrieving map ID $map_id from server: $err"
+							}
+						}
+						if {!$no_send} {
+							::gmaproto::load_from $map_id true false
+						}
+						continue	;# skip sending to clients below
+					}
+					POLY {
+						loadElement [list TYPE:$id poly]
+						loadElement [list SPLINE:$id [dict get $element_data Spline]]
+						loadElement [list JOIN:$id [::gmaproto::from_enum Join [dict get $element_data Join]]]
+					}
+					RECT {
+						loadElement [list TYPE:$id rect]
+					}
+					SAOE {
+						loadElement [list TYPE:$id saoe]
+						set shape [dict get $element_data AoEShape]
+						loadElement [list AOESHAPE:$id [::gmaproto::from_enum AoEShape $shape]]
+						if {$shape == 0 || $shape == 1} {
+							loadElement [list ARCMODE:$id [::gmaproto::from_enum ArcMode [dict get $element_data ArcMode]]]
+							loadElement [list START:$id [dict get $element_data Start]]
+							loadElement [list EXTENT:$id [dict get $element_data Extent]]
+						}
+					}
+					TEXT {
+						loadElement [list TYPE:$id text]
+						loadElement [list TEXT:$id [dict get $element_data Text]]
+					}
+					TILE {
+						loadElement [list TYPE:$id tile]
+					}
+					RAW {
+						continue
+					}
+				}
+
+				if {!$no_send} {
+					::gmaproto::ls $element_type $element_data
+				}
+			}
+		}
+	} err]} {
+		catch { cleargrid }
+		catch { unset OBJ }
+		tk_messageBox -type ok -icon error -title "Error loading file"\
+			-message $err -parent .
+		set ClockDisplay $oldcd
 		return
 	}
 
-#	set totalObjects [expr $totalElements + $totalPlayers + $totalMonsters + $totalFiles + $totalImages]
-
-	# count objects to load
-#	set totalObjects 0
-#	while {[gets $f v] >= 0} {
-#		incr totalObjects
-#	}
-#	seek $f 0 start
-#	set loadedObjects 0
-		
-	catch {unset OBJ_XL}
-#	catch {unset MOB_XL}
-#	global okToLoadPlayers okToLoadMonsters
-#	set okToLoadPlayers ?
-#	set okToLoadMonsters ?
-	set ClockDisplay "Loading $LastFileComment..."
-	update
-
-	if {!$no_send} {
-		StartSendElementSet $merge
-        set f_prog [begin_progress * "Loading $LastFileComment..." $f_size -send]
-    } else {
-        set f_prog [begin_progress * "Loading $LastFileComment..." $f_size]
-	}
-	while {[gets $f v] >= 0} {
-#		incr loadedObjects
-#		if {$loadedObjects % 10 == 0} {
-#			set ClockDisplay [format "Loading %03d/%03d (%d%%)" $loadedObjects $totalObjects [expr $totalObjects > 0 ? $loadedObjects * 100 / $totalObjects : 0]]
-#			update
-#		}
-
-
-# Loading 999/999 obj, 999/999 pc, 999/999 npc, 999/999 img, 999/999 map; 999%
-# set ClockDisplay [format "Loading %03d/%03d obj, %02d/%02d pc, %02d/%02d npc, %03d/%03d img, %02d/%02d map; %3d%%" $loadedElements $totalElements $loadedPlayers $totalPlayers $loadedMonsters $totalMonsters $loadedImages $totalImages $loadedFiles $totalFiles [expr ($totalObjects > 0) ? ($loadedElements+$loadedPlayers+$loadedMonsters+$loadedImages+$loadedFiles) * 100 / $totalObjects : 0]]
-# update
-
-
-		if [catch {set LL [llength $v]} err] {
-			tk_messageBox -type ok -icon error -title "Error loading file"\
-				-message $err -parent .
-			if {!$no_send} {
-				FinishSendElementSet
-                end_progress $f_prog -send
-			} else {
-                end_progress $f_prog
-            }
-			set ClockDisplay $oldcd
-			return
-		}
-		if {[string range $v 0 10] eq {__MAPPER__:}} {
-			tk_messageBox -type ok -icon error -title "Error loading file"\
-				-message "Metadata line must appear first in map file." -parent .
-			if {!$no_send} {
-				FinishSendElementSet
-                end_progress $f_prog -send
-			} else {
-                end_progress $f_prog
-            }
-			set ClockDisplay $oldcd
-			return
-		}
-			
-		if {$LL == 4 && [lindex $v 0] eq "I"} {
-			DistributeVars $v xx image_id image_zoom image_filename
-			DEBUG 2 "Defining image $image_id at zoom $image_zoom from $image_filename"
-			if {[string range $image_filename 0 0] eq "@"} {
-				DEBUG 3 "Image is found on server. Retrieving..."
-				set image_filename [string range $image_filename 1 end]
-				fetch_image $image_id $image_zoom $image_filename
-				global TILE_ID
-				set TILE_ID([tile_id $image_id $image_zoom]) $image_filename
-				if {!$SafMode && !$no_send} {
-					DEBUG 3 "Sending on to other clients..."
-					ITsend [list AI@ $image_id $image_zoom $image_filename]
-                    update_progress $f_prog [tell $f] * -send
-				} else {
-                    update_progress $f_prog [tell $f] *
-                }
-			} else {
-				if [catch {set image_file [open $image_filename r]} err] {
-					DEBUG 0 "Can't open image file $image_filename for $image_id at zoom $image_zoom: $err"
-					continue
-				}
-				fconfigure $image_file -encoding binary -translation binary 
-				if [catch {set image_data [read $image_file]} err] {
-					DEBUG 0 "Can't read data from image file $image_filename: $err"
-					close $image_file
-					continue
-				}
-				close $image_file
-				global TILE_SET
-				if [info exists TILE_SET([tile_id $image_id $image_zoom])] {
-					DEBUG 1 "Replacing existing image $TILE_SET([tile_id $image_id $image_zoom]) for ${image_id} x$image_zoom"
-					image delete $TILE_SET([tile_id $image_id $image_zoom])
-					unset TILE_SET([tile_id $image_id $image_zoom])
-				}
-				if [catch {set TILE_SET([tile_id $image_id $image_zoom]) [image create photo -format gif -data $image_data]} err] {
-					DEBUG 0 "Can't use data read from image file $image_filename: $err"
-					continue
-				}
-				DEBUG 3 "Created image $TILE_SET([tile_id $image_id $image_zoom]) for $image_id, zoom $image_zoom len=[string length $image_data]"
-				#
-				# Looks like the image is valid.  Send it to everyone else too...
-				#
-				if {!$SafMode && !$no_send} {
-					set encoded_image [base64::encode -maxlen 1024 $image_data]
-					set image_cs [cs_init]
-					cs_update $image_cs $image_data
-					set image_chk [cs_final $image_cs]
-					ITsend [list AI $image_id $image_zoom]
-					foreach image_line $encoded_image {
-						ITsend [list AI: $image_line]
-					}
-					ITsend [list AI. [llength $encoded_image] $image_chk]
-				}
-			}
-			continue
-		}
-		if {$LL == 2 && [lindex $v 0] eq "F"} {
-			set map_id [lindex $v 1]
-			DEBUG 2 "Defining map file $map_id"
-			if [catch {
-				set cache_filename [fetch_map_file $map_id]
-				DEBUG 1 "Pre-load: map ID $map_id cached as $cache_filename"
-			} err] {
-				if {$err eq {NOSUCH}} {
-					DEBUG 0 "We were asked to pre-load map file with ID $map_id but the server doesn't have it"
-				} else {
-					say "Error retrieving map ID $map_id from server: $err"
-				}
-			}
-			if {!$no_send} {
-				ITsend [list M? $map_id]
-                update_progress $f_prog [tell $f] * -send
-			} else {
-                update_progress $f_prog [tell $f] *
-            }
-			continue
-		}
-
-		if {!$no_send} {
-			ContinueSendElementSet $v
-            update_progress $f_prog [tell $f] * -send
-		} else {
-            update_progress $f_prog [tell $f] *
-        }
-		if [catch {loadElement $v} err] {
-			catch { cleargrid }
-			catch { unset OBJ }
-			#set OBJ_NEXT_Z 0
-			close $f
-			tk_messageBox -type ok -icon error -title "Error loading file"\
-				-message $err -parent .
-			if {!$no_send} {
-				FinishSendElementSet
-                end_progress $f_prog -send
-			} else {
-                end_progress $f_prog
-            }
-			set ClockDisplay $oldcd
-			return
-		}
-	}
-	close $f
-	if {!$no_send} {
-		FinishSendElementSet
-        end_progress $f_prog -send
-	} else {
-        end_progress $f_prog
-    }
 	garbageCollectGrid
 	RefreshGrid 0
 	RefreshMOBs
@@ -2382,7 +2573,6 @@ proc loadfile {merge file args} {
 }
 
 proc unloadfile {file args} {
-####	global OBJ OBJ_NEXT_ID OBJ_FILE OBJ_MODIFIED OBJ_XL MOB_XL
 	global OBJ OBJ_FILE OBJ_MODIFIED OBJ_XL SafMode ClockDisplay
 	set no_send [expr {$args} eq {{-nosend}}]
 
@@ -2559,7 +2749,7 @@ proc loadElement {args} {
 
 
 proc savefile {} {
-	global OBJ OBJ_FILE MOB FileVersion LastFileComment 
+	global OBJ OBJ_FILE MOB FileVersion LastFileComment LastFileLocation
 
 	if {[set file [tk_getSaveFile -defaultextension .map -initialfile $OBJ_FILE -filetypes {
 		{{GMA Mapper Files} {.map}}
@@ -2576,55 +2766,197 @@ proc savefile {} {
 	set lock_objects [tk_messageBox -type yesno -icon question -title {Lock objects?} -message {Do you wish to lock all map objects in this file?} -detail {When locked, map objects cannot be further modified by clients. This helps avoid accidentally disturbing the map background while people are interacting with the map during a game.} -default yes]
 
 	::getstring::tk_getString .meta_comment LastFileComment {Map Name/Comment:}
-	set now [clock seconds]
-	puts $f [list "__MAPPER__:$FileVersion" [list $LastFileComment [list $now [clock format $now]]]]
-	
-	#
-	# take care to preserve object ordering
-	# XXX not really important now with Z coordinates
-	#
-	set objectlist {}
-	foreach obj [array names OBJ X:*] {
-		lappend objectlist [string range $obj 2 end]
+	::getstring::tk_getString .meta_location LastFileLocation {Map Location:}
+
+	set object_list {}
+	set element_ids {}
+	foreach n [array names OBJ X:*] {
+		lappend element_ids [string range $n 2 end]
 	}
-	foreach obj [lsort $objectlist] {
-		if {$lock_objects eq yes} {
-			puts $f [list LOCKED:$obj 1]
+	#
+	# convert old-style attributes as stored internally in this version
+	# of the map client to the new-style elements as stored in file format
+	# 20 and later.
+	#
+	foreach element_id $element_ids {
+		set element_type {}
+		set element_data [dict create ID $element_id]
+		foreach {k v} [array get OBJ *:$element_id] {
+			lassign [split $k :] attr id
+			if {$id ne $element_id} {
+				error "unexpected obj ID mismatch saving $element_id (found $k key)"
+			}
+			switch -exact -- $attr {
+				TYPE {
+					set element_type [string toupper $v]
+					continue
+				}
+				ANCHOR {
+					# ignore this one
+					continue
+				}
+				X - Y - Z {
+					# the new name is the same as the old one
+				}
+				POINTS {
+					set attr Points
+					set plist {}
+					foreach {x y} $v {
+						lappend plist [dict create X $x Y $y]
+					}
+					set v $plist
+					puts "plst $plist"
+				}
+				LINE - FILL - WIDTH - LAYER - LEVEL - GROUP - HIDDEN - LOCKED - START - EXTENT - SPLINE - TEXT - IMAGE {
+					set attr [string totitle $attr]
+				}
+				DASH - ARROW - JOIN {
+					set attr [string totitle $attr]
+					set v [::gmaproto::to_enum $attr $v]
+				}
+				ARCMODE {
+					set attr ArcMode
+					set v [::gmaproto::to_enum $attr $v]
+				}
+				AOESHAPE {
+					set attr AoEShape
+					set v [::gmaproto::to_enum $attr $v]
+				}
+				FONT {
+					# value is {family size normal underline bold overstrike roman italic}
+					lassign $v family size
+					set weight 0
+					set slant 0
+					if {[info exists OBJ(ANCHOR:$element_id)]} {
+						set anchor [::gmaproto::to_enum Anchor $OBJ(ANCHOR:$element_id)]
+					} else {
+						set anchor 0
+					}
+
+					foreach option [lrange $v 2 end] {
+						switch -exact -- $option {
+							normal { set weight 0 }
+							bold   { set weight 1 }
+							roman  { set slant 0  }
+							italic { set slant 1  }
+						}
+					}
+					set v [dict create
+						Family $family
+						Size $size
+						Weight $weight
+						Slant $slant
+						Anchor $anchor
+					]
+				}
+
+				BBHEIGHT {
+					set attr BBHeight
+				}
+				BBWIDTH {
+					set attr BBWidth
+				}
+				default {
+					# We aren't looking for this value, just skip it now
+					continue
+				}
+			}
+			dict set element_data $attr $v
 		}
-		foreach key [array names OBJ *:$obj] {
-			puts $f [list $key $OBJ($key)]
+
+		if {$element_type eq {}} {
+			error "object $element_id missing TYPE field; can't save"
 		}
+
+		lappend object_list [list $element_type $element_data]
 	}
 
 	#
-	# save the player positions, if any
+	# Now collect the creatures
 	#
-	set objectlist {}
+	set mob_ids {}
 	foreach obj [array names MOB NAME:*] {
-		lappend objectlist [string range $obj 5 end]
+		lappend mob_ids [string range $obj 5 end]
 	}
+
 	global MOB_IMAGE
-	foreach obj [lsort $objectlist] {
-		foreach key [array names MOB *:$obj] {
-			if {[string range $key 0 4] eq "NAME:" && [info exists MOB_IMAGE($MOB($key))]} {
-				set save_value "$MOB_IMAGE($MOB($key))=$MOB($key)"
-			} else {
-				set save_value $MOB($key)
-			}
+	foreach mob_id $mob_ids {
+		set mob_type 0
+		set mob_data [dict create ID $mob_id]
+		foreach {k v} [array get MOB *:$mob_id] {
+			lassign [split $k :] attr id
 
-			if {[string range $key 0 0] eq {_}} {
-				DEBUG 3 "(skipping attribute $key)"
-			} elseif {$MOB(TYPE:$obj) eq "player"} {
-				puts $f [list P $key $save_value]
-			} else {
-				puts $f [list M $key $save_value]
+			if {$id ne $mob_id} {
+				error "unexpected mob ID mismatch saving $mob_id (found $k key)"
 			}
+			switch -exact -- $attr {
+				NAME {
+					set attr Name
+					if {[info exists MOB_IMAGE($MOB($k))]} {
+						set v "$MOB_IMAGE($MOB(NAME:$k))=$MOB($k)"
+					}
+				}
+
+				TYPE {
+					if {$v eq "player"} {
+						set mob_type 2
+					} elseif {$v eq "monster"} {
+						set mob_type 1
+					} else {
+						error "invalid creature type $v"
+					}
+					set attr CreatureType
+					set v $mob_type
+				}
+
+				HEALTH {
+					if {[llength $v] == 0} {
+						continue
+					}
+					lassign $v max ld non con flat st cond blur
+					set v [dict create MaxHP $max LethalDamage $ld NonLethalDamage $non Con $con IsFlatFooted $flat IsStable $st Condition $cond HPBlur $blur ]
+				}
+
+				GX - GY - SKIN - ELEV - COLOR - NOTE - SIZE - AREA - REACH - KILLED - DIM {
+					set attr [string totitle $attr]
+				}
+
+				SKINSIZE {
+					set attr SkinSize
+				}
+
+				STATUSLIST {
+					set attr StatusList
+				}
+				
+				AOE {
+					if {[llength $v] == 0} {
+						continue
+					}
+					if {[llength $v] != 3} {
+						error "invalid AOE value for mob $mob_id"
+					}
+					set attr AoE
+					set v [dict create Radius [lindex $v 1] Color [lindex $v 2]]
+				}
+
+				MOVEMODE {
+					set attr MoveMode
+					set v [::gmaproto::to_enum $attr $v]
+				}
+
+				default {
+					# We aren't looking for this value, just skip it now
+					continue
+				}
+			}
+			dict set mob_data $attr $v
 		}
+
+		lappend object_list [list CREATURE $element_data]
 	}
 
-	#foreach {key value} [array get OBJ] {
-	#	puts $f [list $key $value]
-	#}
+	::gmafile::save_to_file $f [list [dict create Comment $LastFileComment Location $LastFileLocation] $object_list]
 	close $f
 	modifiedflag $file 0
 }
