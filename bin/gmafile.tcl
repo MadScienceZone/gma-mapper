@@ -66,7 +66,7 @@ namespace eval ::gmafile {
 	variable max_version 20
 
 	array set _data_payload {
-		META     {Timestamp i DateTime s Comment s Location s}
+		__META__ {Timestamp i DateTime s Comment s Location s}
 		ARC      {ArcMode i Start f Extent f ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		CIRC     {ArcMode i Start f Extent f ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		CREATURE {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l Elev i Color s Note s Size s Area s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i}
@@ -89,21 +89,22 @@ proc ::gmafile::save_to_file {f objlist} {
 	lassign $objlist meta objs
 	if {![dict exists $meta Timestamp]} {
 		set now [clock seconds]
-		dict set meta Timestamp $now DateTime [clock format $now -format "%d-%b-%Y %H:%M:%S"]
+		dict set meta Timestamp $now 
+		dict set meta DateTime [clock format $now -format "%d-%b-%Y %H:%M:%S"]
 	} elseif {![dict exists $meta DateTime]} {
 		dict set meta DateTime [clock format [dict get $meta Timestamp] -format "%d-%b-%Y %H:%M:%S"]
 	}
 	::json::write aligned true
 	::json::write indented true
-	puts $f "__META__ [::gmaproto::_encode_payload $meta $::gmafile::_data_payload(META)]"
+	puts $f "\u00ab__META__\u00bb [::gmaproto::_encode_payload $meta $::gmafile::_data_payload(__META__)]"
 	foreach r $objs {
 		lassign $r record_type record_data
 		if {![info exists ::gmafile::_data_payload($record_type)]} {
 			error "unable to save record of type '$record_type' to map file"
 		}
-		puts $f "__${record_type}__ [::gmaproto::_encode_payload $record_data $::gmafile::_data_payload($record_type)]"
+		puts $f "\u00ab${record_type}\u00bb [::gmaproto::_encode_payload $record_data $::gmafile::_data_payload($record_type)]"
 	}
-	puts $f "__EOF__"
+	puts $f "\u00ab__EOF__\u00bb"
 }
 
 #
@@ -148,27 +149,27 @@ proc ::gmafile::load_from_file {f} {
 				continue
 			}
 
-			if {$v eq "__EOF__"} {
+			if {$v eq "\u00ab__EOF__\u00bb"} {
 				return [list $meta $objlist]
 			}
 
 			#
 			# start of __type__ json
 			#
-			if {![regexp {^__(.*?)__ (.+)$} $v vv record_type json_data]} {
+			if {![regexp "^\u00ab(.*?)\u00bb (.+)\$" $v vv record_type json_data]} {
 				error "invalid map file format: unexpected data"
 			}
 			#
 			# look for start of next record
 			#
-			while {[gets $f v] >= 0} {
-				if {[string range $v 0 1] eq "__"} {
+			while {[set status [gets $f v]] >= 0} {
+				if {[string range $v 0 0] eq "\u00ab"} {
 					#
 					# we've read the whole packet now; process it
 					#
 					if {[info exists ::gmafile::_data_payload($record_type)]} {
 						set data [::gmaproto::_construct [::json::json2dict $json_data] $::gmafile::_data_payload($record_type)]
-						if {$record_type eq {META}} {
+						if {$record_type eq {__META__}} {
 							set meta $data
 						} else {
 							lappend objlist [list $record_type $data]
@@ -183,6 +184,9 @@ proc ::gmafile::load_from_file {f} {
 				} else {
 					append json_data $v
 				}
+			}
+			if {$status < 0} {
+				break
 			}
 		}
 	}
@@ -201,7 +205,6 @@ proc ::gmafile::load_legacy_map_file {f vid oldmeta} {
 	set LastFileComment {}
 	set meta [dict create Version $vid]
 
-	puts "f=$f,vid=$vid,oldmeta=$oldmeta"
 	if {$vid >= 12} {
 		if {[llength $oldmeta] < 2} {
 			error "Map file is a version $vid file, but the metadata field is incorrect. Not reading this file."

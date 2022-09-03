@@ -43,16 +43,18 @@ over multiple following lines, all of which must be indented by at least
 one space or tab, except for the final closing \*(lq}\*(rq which must be on
 a line by itself (not indented).
 .LP
+The delimiter characters \[Fo] and \[Fc] are Unicode codepoints U+AB and U+BB respectively.
+.LP
 JSON field names are case-sensitive. Their values are strings unless otherwise
 noted.
 .LP
 The final line of the file MUST be the text
-.B __EOF__
+.B \[Fo]__EOF__\[Fc]
 to indicate the end of the data.
 .LP
 The following data records MAY be present:
 .TP
-.B __META__
+.B \[Fo]__META__\[Fc]
 File metadata. The JSON object may contain the following fields:
 .RS
 .TP
@@ -72,7 +74,7 @@ Random comments about the file.
 The name or description of the location described by the file.
 .RE
 .TP
-.I element_type
+.BI \[Fo] element_type \[Fc]
 Defines a map element using a JSON structure identical to the JSON
 data defined in the mapper protocol in
 .BR mapper (6)
@@ -91,7 +93,7 @@ This includes
 and
 .BR TILE .
 .TP
-.B IMG
+.B \[Fo]IMG\[Fc]
 Declares the server ID by which a named image may be retrieved by the client
 (or a local pathname if the file is local)
 using a JSON data structure similar to that of the
@@ -99,13 +101,13 @@ using a JSON data structure similar to that of the
 server command.
 See the example below.
 .TP
-.B MAP
+.B \[Fo]MAP\[Fc]
 Declares the existence of a map file which may be retrieved from the server
 using a JSON data structure identical to that of the
 .B L
 server command.
 .TP
-.B CREATURE
+.B \[Fo]CREATURE\[Fc]
 Places a creature token on the map using a JSON structure identical to that used
 by the
 .B PS
@@ -1080,12 +1082,12 @@ server command.
 .na
 \fB
 __MAPPER__:20
-__META__ {
+\[Fo]__META__\[Fc] {
   "Timestamp": 1650611775,
   "DateTime": "Fri Apr 22 00:16:15 PDT 2022",
   "Location": "Room 12 of the Dungeon"
 }
-LINE {
+\[Fo]LINE\[Fc] {
   "ID": 1,
   "Fill": "#00e400",
   "X": 425,
@@ -1099,7 +1101,7 @@ LINE {
   ],
   "Width": 5
 }
-RECT {
+\[Fo]RECT\[Fc] {
   "ID": 2,
   "Line": "black",
   "Fill": "#00e400",
@@ -1111,14 +1113,14 @@ RECT {
     {"X": 807, "Y": 443}
   ]
 }
-IMG {
+\[Fo]IMG\[Fc] {
   "Name": "re5_e2",
   "Sizes": [
     {"File": "SJy9rpbTDElsCfklYHMvsgre5_e2@50", "Zoom": 1.0},
     {"File": "SJy9rpbTDElsCfklYHMvsgre5_e2@100", "Zoom": 2.0}
   ]
 }
-__EOF__
+\[Fo]__EOF__\[Fc]
 \fP
 .fi
 .ad
