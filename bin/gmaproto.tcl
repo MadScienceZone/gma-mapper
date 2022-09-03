@@ -263,9 +263,9 @@ proc ::gmaproto::_encode_payload {input_dict type_dict} {
 					}
 				}
 				? {
-					if {[string is true $v]} {
+					if {[string is true -strict $v]} {
 						dict set a $f true
-					}
+					} 
 				}
 				b {
 					if {$v ne {}} {

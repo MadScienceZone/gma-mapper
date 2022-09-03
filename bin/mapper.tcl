@@ -1708,6 +1708,8 @@ proc CreateHealthStatsToolTip {mob_id} {
 		} else {
 			append tiptext " dead."
 		}
+	} else {
+		set tiptext "$MOB(NAME:$mob_id): \[no health info\]"
 	}
 
 	if {[info exists MOB(ELEV:$mob_id)] && $MOB(ELEV:$mob_id) != 0} {
@@ -2198,9 +2200,11 @@ proc loadfile {merge file args} {
 			lassign $record element_type element_data
 			if {$element_type eq "RAW"} {
 				if {[lindex $element_data 0] eq "P" || [lindex $element_data 0] eq "M"} {
-					set OldMobs([lindex $element_data 1]) [lrange $element_data 2 end]
+					#set OldMobs([lindex $element_data 1]) [lrange $element_data 2 end]
+					set OldMobs([lindex $element_data 1]) [lindex $element_data 2]
 				} else {
-					set OldObjs([lindex $element_data 0]) [lrange $element_data 1 end]
+					#set OldObjs([lindex $element_data 0]) [lrange $element_data 1 end]
+					set OldObjs([lindex $element_data 0]) [lindex $element_data 1]
 				}
 			}
 		}
@@ -2351,7 +2355,7 @@ proc loadfile {merge file args} {
 				}
 				text {
 					# value is {family size normal underline bold overstrike roman italic}
-					lassign $OldObjs(FONT:$obj_id) family size
+					lassign [lindex $OldObjs(FONT:$obj_id) 0] family size
 					set weight 0
 					set slant 0
 					if {[info exists OldObjs(ANCHOR:$obj_id)]} {
@@ -2395,9 +2399,7 @@ proc loadfile {merge file args} {
 				continue
 			}
 			if {$element_type eq "CREATURE"} {
-				puts "getting creature"
 				set id [dict get $element_data ID]
-				puts "id=$id"
 				set ctype [dict get $element_data CreatureType]
 				if {$ctype == 2} {
 					set prefix P
@@ -2424,9 +2426,7 @@ proc loadfile {merge file args} {
 				#
 				# accept data common to all map elements
 				#
-				puts "getting common ID from $element_data"
 				set id [dict get $element_data ID]
-				puts "id=$id"
 				foreach fld {X Y Z Line Fill Width Layer Level Group Hidden Locked} {
 					loadElement [list [string toupper $fld]:$id [dict get $element_data $fld]]
 				}
@@ -2541,9 +2541,22 @@ proc loadfile {merge file args} {
 					TEXT {
 						loadElement [list TYPE:$id text]
 						loadElement [list TEXT:$id [dict get $element_data Text]]
+
+						set tclfont [list [dict get $element_data Font Family] [dict get $element_data Font Size]]
+						if {[dict get $element_data Font Weight] != 0} {
+							lappend tclfont "bold"
+						}
+						if {[dict get $element_data Font Slant] != 0} {
+							lappend tclfont "italic"
+						}
+						loadElement [list FONT:$id [list $tclfont]]
+						loadElement [list ANCHOR:$id [::gmaproto::from_enum Anchor [dict get $element_data Font Anchor]]]
 					}
 					TILE {
 						loadElement [list TYPE:$id tile]
+						loadElement [list IMAGE:$id [dict get $element_data Image]]
+						loadElement [list BBHEIGHT:$id [dict get $element_data BBHeight]]
+						loadElement [list BBWIDTH:$id [dict get $element_data BBWidth]]
 					}
 					RAW {
 						continue
@@ -2642,6 +2655,7 @@ proc loadElement {args} {
 	global okToLoadMonsters okToLoadPlayers
 	global OBJ OBJ_NEXT_Z FLASH_OBJ_LIST FLASH_MOB_LIST
 	set flashmode 0
+
 
 	# usage: loadElement ?-flash? data
 	if {[lindex $args 0] eq "-flash"} {
@@ -2805,7 +2819,6 @@ proc savefile {} {
 						lappend plist [dict create X $x Y $y]
 					}
 					set v $plist
-					puts "plst $plist"
 				}
 				LINE - FILL - WIDTH - LAYER - LEVEL - GROUP - HIDDEN - LOCKED - START - EXTENT - SPLINE - TEXT - IMAGE {
 					set attr [string totitle $attr]
@@ -2824,7 +2837,8 @@ proc savefile {} {
 				}
 				FONT {
 					# value is {family size normal underline bold overstrike roman italic}
-					lassign $v family size
+					set attr Font
+					lassign [lindex $v 0] family size
 					set weight 0
 					set slant 0
 					if {[info exists OBJ(ANCHOR:$element_id)]} {
@@ -2841,12 +2855,12 @@ proc savefile {} {
 							italic { set slant 1  }
 						}
 					}
-					set v [dict create
-						Family $family
-						Size $size
-						Weight $weight
-						Slant $slant
-						Anchor $anchor
+					set v [dict create \
+						Family $family \
+						Size $size \
+						Weight $weight \
+						Slant $slant \
+						Anchor $anchor \
 					]
 				}
 
@@ -2893,7 +2907,7 @@ proc savefile {} {
 				NAME {
 					set attr Name
 					if {[info exists MOB_IMAGE($MOB($k))]} {
-						set v "$MOB_IMAGE($MOB(NAME:$k))=$MOB($k)"
+						set v "$MOB_IMAGE($MOB($k))=$MOB($k)"
 					}
 				}
 
@@ -2914,6 +2928,7 @@ proc savefile {} {
 						continue
 					}
 					lassign $v max ld non con flat st cond blur
+					set attr Health
 					set v [dict create MaxHP $max LethalDamage $ld NonLethalDamage $non Con $con IsFlatFooted $flat IsStable $st Condition $cond HPBlur $blur ]
 				}
 
@@ -2953,7 +2968,7 @@ proc savefile {} {
 			dict set mob_data $attr $v
 		}
 
-		lappend object_list [list CREATURE $element_data]
+		lappend object_list [list CREATURE $mob_data]
 	}
 
 	::gmafile::save_to_file $f [list [dict create Comment $LastFileComment Location $LastFileLocation] $object_list]
