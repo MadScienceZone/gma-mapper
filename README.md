@@ -2,7 +2,7 @@
 # Important Note
 I don't know how I managed it, but somehow the git history got messed up recently.
 I have repaired the damage and what is on the `main` branch is stable and correct.
-The most recent release, v3.42.7, is fine to pull and use as-is.
+The more recent releases, since v3.42.7, are fine to pull and use as-is.
 
 However, if you have been working on a clone of the repo from earlier than 3.42.7,
 it might be best to just re-clone a fresh copy of the repo at this point and move
