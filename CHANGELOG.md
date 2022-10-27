@@ -6,6 +6,10 @@
  * Supported GMA Mapper Protocol: 333        <!-- @@##@@ -->
  * Effective Date: 26-Oct-2022               <!-- @@##@@ -->
 
+# 3.43.0
+## Enhancements
+Added C80 size code for colossal things with space 80 feet and reach 80 feet.
+
 # 3.42.7
 ## Fixes
 * Changes creature token labels to have a background color behind them (which matches
