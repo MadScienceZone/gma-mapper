@@ -3365,7 +3365,7 @@ proc RefreshGrid {show} {
 				line {
 					$canvas create line "$X $Y $POINTS"\
 						-fill $OBJ(FILL:$id) -width $OBJ(WIDTH:$id) -tags [list obj$id allOBJ] \
-						-dash $OBJ(DASH:$id) -arrow $OBJ(ARROW:$id)
+						-dash $OBJ(DASH:$id) -arrow $OBJ(ARROW:$id) -arrowshape [list 15 18  8]
 				}
 				rect {
 					$canvas create rectangle "$X $Y $POINTS"\
@@ -3704,7 +3704,7 @@ proc StartObj {w x y} {
 			$canvas create window $x [expr $y - 20] -window $canvas.distanceLabel -tags [list obj_distance$OBJ_CURRENT allOBJ]
 		}
 		line {
-			$canvas create line [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] -fill $OBJ(FILL:$OBJ_CURRENT) -width $OBJ_WIDTH -tags [list obj$OBJ_CURRENT allOBJ] -dash $DASHSTYLE -arrow $ARROWSTYLE
+			$canvas create line [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] -fill $OBJ(FILL:$OBJ_CURRENT) -width $OBJ_WIDTH -tags [list obj$OBJ_CURRENT allOBJ] -dash $DASHSTYLE -arrow $ARROWSTYLE -arrowshape [list 15 18  8]
 			bind $canvas <1> "NextPoint $canvas %x %y"
 			set OBJ(ARROW:$OBJ_CURRENT) $ARROWSTYLE
 		}
@@ -3811,7 +3811,7 @@ proc StartObj {w x y} {
 			set a_y [SnapCoordAlways $y]
 			$canvas create line [expr $a_x-10] $a_y [expr $a_x+10] $a_y -fill $OBJ(FILL:$OBJ_CURRENT) -width 4 -tags [list obj$OBJ_CURRENT allOBJ]
 			$canvas create line $a_x [expr $a_y-10] $a_x [expr $a_y+10] -fill $OBJ(FILL:$OBJ_CURRENT) -width 4 -tags [list obj$OBJ_CURRENT allOBJ]
-			$canvas create line $a_x $a_y $a_x $a_y -dash - -fill $OBJ(FILL:$OBJ_CURRENT) -width 3 -tags [list obj$OBJ_CURRENT obj_locator$OBJ_CURRENT allOBJ] -arrow last
+			$canvas create line $a_x $a_y $a_x $a_y -dash - -fill $OBJ(FILL:$OBJ_CURRENT) -width 3 -tags [list obj$OBJ_CURRENT obj_locator$OBJ_CURRENT allOBJ] -arrow last -arrowshape [list 15 18  8]
 			bind $canvas <1> "LastAoePoint $canvas %x %y"
 			set DistanceLabelText {}
 			set OBJ(AOESHAPE:$OBJ_CURRENT) $AOE_SHAPE
@@ -5976,7 +5976,7 @@ proc RenderSomeone {w id} {
 					#
 
 					if {$target($target_id) > 0} {
-						$w create line $AOx $AOy $ADx $ADy -arrow last -fill red -width 5 -tags "MArrows M#$threatening_mob_id M#$target_id"
+						$w create line $AOx $AOy $ADx $ADy -arrow last -fill red -width 5 -tags "MArrows M#$threatening_mob_id M#$target_id" -arrowshape [list 15 18  8]
 					}
 #					if {$target($target_id) & 2} {
 #						$w create line $AOx $AOy $ADx $ADy -arrow last -fill red -width 5 -tags "MArrows M#$threatening_mob_id M#$target_id"
@@ -7219,7 +7219,7 @@ proc DragMOBAoE {id w x y} {
 	#DEBUG 1 "Setting MOB $id AoE ($MOB(GX:$id),$MOB(GY:$id))-($gx,$gy)=$r"
 	RenderSomeone $w $id
 	$w create line [expr $MOB(GX:$id) * $iscale] [expr $MOB(GY:$id) * $iscale] [expr $gx * $iscale] [expr $gy * $iscale] \
-		-fill black -width 3 -dash - -arrow last -tags [list M#$id AoElocator#$id]
+		-fill black -width 3 -dash - -arrow last -tags [list M#$id AoElocator#$id] -arrowshape [list 15 18  8]
 }
 
 proc ToggleReach id {
