@@ -1,14 +1,18 @@
 # Game Master's Assistant / Mapper Client
 # Release Notes
 ## Current Version Information
- * Supported GMA Mapper Version: 3.43.0      <!-- @@##@@ -->
+ * Supported GMA Mapper Version: 3.44.0      <!-- @@##@@ -->
  * Supported GMA Mapper File Format: 17	     <!-- @@##@@ -->
  * Supported GMA Mapper Protocol: 333        <!-- @@##@@ -->
- * Effective Date: 26-Oct-2022               <!-- @@##@@ -->
+ * Effective Date: 20-Nov-2022               <!-- @@##@@ -->
+
+# 3.44.0
+## Enhancements
+* Enlarged arrowheads for line objects so they're more visible.
 
 # 3.43.0
 ## Enhancements
-Added C80 size code for colossal things with space 80 feet and reach 80 feet.
+* Added C80 size code for colossal things with space 80 feet and reach 80 feet.
 
 # 3.42.7
 ## Fixes

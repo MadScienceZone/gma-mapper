@@ -1,18 +1,18 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______             ______         ___    ______      _______     #
-# (  ____ \(       )(  ___  ) Game      / ___  \       /   )  / ___  \    (  __   )    #
-# | (    \/| () () || (   ) | Master's  \/   \  \     / /) |  \/   \  \   | (  )  |    #
-# | |      | || || || (___) | Assistant    ___) /    / (_) (_    ___) /   | | /   |    #
-# | | ____ | |(_)| ||  ___  |             (___ (    (____   _)  (___ (    | (/ /) |    #
-# | | \_  )| |   | || (   ) |                 ) \        ) (        ) \   |   / | |    #
-# | (___) || )   ( || )   ( | Mapper    /\___/  / _      | |  /\___/  / _ |  (__) |    #
-# (_______)|/     \||/     \| Client    \______/ (_)     (_)  \______/ (_)(_______)    #
+#  _______  _______  _______             ______         ___       ___       _______    #
+# (  ____ \(       )(  ___  ) Game      / ___  \       /   )     /   )     (  __   )   #
+# | (    \/| () () || (   ) | Master's  \/   \  \     / /) |    / /) |     | (  )  |   #
+# | |      | || || || (___) | Assistant    ___) /    / (_) (_  / (_) (_    | | /   |   #
+# | | ____ | |(_)| ||  ___  |             (___ (    (____   _)(____   _)   | (/ /) |   #
+# | | \_  )| |   | || (   ) |                 ) \        ) (       ) (     |   / | |   #
+# | (___) || )   ( || )   ( | Mapper    /\___/  / _      | |       | |   _ |  (__) |   #
+# (_______)|/     \||/     \| Client    \______/ (_)     (_)       (_)  (_)(_______)   #
 #                                                                                      #
 ########################################################################################
 #
 # GMA Mapper Client with background I/O processing.
-# @[00]@| GMA 4.4.3
+# @[00]@| GMA 4.5.0
 # @[01]@|
 # @[10]@| Copyright © 1992–2022 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
@@ -53,10 +53,10 @@
 # @[52]@| defect of the software.
 #
 # Auto-configure values
-set GMAMapperVersion {3.43.0}     ;# @@##@@
+set GMAMapperVersion {3.44.0}     ;# @@##@@
 set GMAMapperFileFormat {17}        ;# @@##@@
 set GMAMapperProtocol {333}         ;# @@##@@
-set GMAVersionNumber {4.4.3}            ;# @@##@@
+set GMAVersionNumber {4.5.0}            ;# @@##@@
 # legacy variables (TODO: change to new ones)
 set MapperVersion $GMAMapperVersion
 set FileVersion $GMAMapperFileFormat
