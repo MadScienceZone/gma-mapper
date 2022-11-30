@@ -81,9 +81,47 @@ namespace eval ::gmafile {
 	}
 }
 
+
 #
 # save_to_file fileobj { meta {{type dict}, ...} }
+# save_arrays_to_file fileobj metadict elements elementtypes creatures
 #
+proc ::gmafile::save_arrays_to_file {f meta elements elementtypes creatures} {
+	set objlist {}
+	upvar 1 $elements e
+	upvar 1 $elementtypes t
+	upvar 1 $creatures c
+
+	foreach id [array names e] {
+		set d $e($id)
+
+		if {![info exists t($id)]} {
+			::gmafile::_diag "WARNING: Saving map element $id which has no type (not saved)"
+			::DEBUG 0 "WARNING: Saving map element $id which has no type (not saved)"
+			continue
+		}
+		
+		if {$t($id) ne [dict get $d ID]} {
+			::gmafile::_diag "WARNING: Saving map element $id ($t($id)): it thinks its ID is [dict get $d ID]"
+			::DEBUG 0 "WARNING: Saving map element $id ($t($id)): it thinks its ID is [dict get $d ID]"
+		}
+
+		if [catch {set ot [::gmaproto::ObjTypeToGMAType $t($id)]} err] {
+			::gmafile::_diag "WARNING: Saving map element $id ($t($id)): $err (not saved)"
+			::DEBUG 0 "WARNING: Saving map element $id ($t($id)): $err (not saved)"
+			continue
+		}
+
+		lappend objlist [list $ot $d]
+	}
+
+	foreach id [array names c] {
+		lappend objlist [list CREATURE $c($id)]
+	}
+
+	::gmafile::save_to_file $f [list $meta $objlist]
+}
+
 proc ::gmafile::save_to_file {f objlist} {
 	puts $f "__MAPPER__:$::gmafile::version"
 	lassign $objlist meta objs
@@ -222,11 +260,25 @@ proc ::gmafile::load_legacy_map_file {f vid oldmeta} {
 		error "Map file has no metadata. Not loaded since it's probably in an old format."
 	}
 
+	set file_lines {}
+	while {[gets $f v] >= 0} {
+		lappend file_lines $v
+	}
+	return [::gmafile::load_legacy_map_data $v $meta]
+}
+
+# load_legacy_map_data lines metadict -> metadict objlist
+# objlist is:
+#   IMG	dict<Name:<id>,Sizes:[dict<File,ImageData,IsLocalFile,Zoom>,...]>
+#   MAP dict<File,IsLocalFile,CacheOnly,Merge>
+#   RAW line
+#
+proc ::gmafile::load_legacy_map_data {vlist meta} {
 	::gmafile::_diag "Loading [dict get $meta Comment]..."
 	set imagedict {}
 	set file_data {}
 
-	while {[gets $f v] >= 0} {
+	foreach v $vlist {
 		if [catch {set LL [llength $v]} err] {
 			error "Error loading file: $err"
 		}
@@ -273,4 +325,248 @@ proc ::gmafile::load_legacy_map_file {f vid oldmeta} {
 
 proc ::gmafile::_diag {message} {
 	puts $message
+}
+
+# convert_elements filedata -> dictlist
+# Converts old-style RAW stream elements to new-style dictionaries
+proc ::gmafile::upgrade_elements {filedata} {
+	array unset OldObjs
+	array unset OldMobs
+	set new_filedata {}
+	foreach record $filedata {
+		lassign $record element_type element_data
+		if {$element_type eq "RAW"} {
+			if {[lindex $element_data 0] eq "P" || [lindex $element_data 0] eq "M"} {
+				# P <attr>:<id> <data>		player obj attribute
+				# M <attr>:<id> <data>		monster obj attribute
+				set OldMobs([lindex $element_data 1]) [lindex $element_data 2]
+			} else {
+				# <attr>:<id> <data>		map element obj attribute
+				set OldObjs([lindex $element_data 0]) [lindex $element_data 1]
+			}
+		} else {
+			# keep new-style elements as-is
+			lappend new_filedata $record
+		}
+	}
+
+	# Now collect creature information and emit new records for them
+	foreach mob_id [array names OldMobs NAME:*] {
+		set mob_id [string range $mob_id 5 end]
+		::gmafile::require_arr OldMobs $mob_id NAME
+		::gmafile::default_arr OldMobs $mob_id -value 0 GX GY SKIN ELEV REACH KILLED DIM
+		::gmafile::default_arr OldMobs $mob_id HEALTH MOVEMODE COLOR NOTE SKIN SKINSIZE SIZE STATUSLIST AOE AREA
+
+		if {$OldMobs(HEALTH:$mob_id) eq {}} {
+			set health {}
+		} else {
+			lassign $OldMobs(HEALTH:$mob_id) max ld nld con ff stab cond blur
+			set health [dict create MaxHP $max LethalDamage $ld NonLethalDamage $nld Con $con IsFlatFooted $ff IsStable $stab Condition $cond HPBlur $blur]
+		}
+		if {$OldMobs(AOE:$mob_id) eq {}} {
+			set aoe {}
+		} else {
+			lassign $OldMobs(AOE:$mob_id) r c
+			set aoe [dict create Radius $r Color $c]
+		}
+
+		lappend new_filedata [list PS [dict create \
+			ID $mob_id \
+			Name $OldMobs(NAME:$mob_id) \
+			Health $health \
+			Gx $OldMobs(GX:$mob_id) \
+			Gy $OldMobs(GY:$mob_id) \
+			Skin $OldMobs(SKIN:$mob_id) \
+			SkinSize $OldMobs(SKINSIZE:$mob_id) \
+			Elev $OldMobs(ELEV:$mob_id) \
+			Color $OldMobs(COLOR:$mob_id) \
+			Note $OldMobs(NOTE:$mob_id) \
+			Size $OldMobs(SIZE:$mob_id) \
+			Area $OldMobs(AREA:$mob_id) \
+			StatusList $OldMobs(STATUSLIST:$mob_id) \
+			AoE  $aoe \
+			MoveMode [::gmaproto::to_enum MoveMode $OldMobs(MOVEMODE:$mob_id)] \
+			Reach $OldMobs(REACH:$mob_id) \
+			Killed $OldMobs(KILLED:$mob_id) \
+			Dim $OldMobs(DIM:$mob_id) \
+			CreatureType [::gmaproto::to_enum CreatureType $OldMobs(TYPE:$mob_id)] \
+		]]
+	}
+
+	# Now do the same with other map elements
+	foreach obj_id [array names OldObjs TYPE:*] {
+		set obj_id [string range $obj_id 5 end]
+		require_arr OldObjs $obj_id X Y Z
+		default_add OldObjs $obj_id -value 0 WIDTH HIDDEN LOCKED
+		default_arr OldObjs $obj_id POINTS LINE FILL LAYER LEVEL GROUP DASH
+		set obj_type $OldObjs(TYPE:$obj_id)
+
+		switch -exact -- $obj_type {
+			arc - circ {
+				default_arr OldObjs $obj_id -value 0 START EXTENT
+				default_arr OldObjs $obj_id ARCMODE
+			}
+			line {
+				default_arr OldObjs $obj_id ARROW
+			}
+			poly {
+				default_arr OldObjs $obj_id -value 0 SPLINE
+				default_arr OldObjs $obj_id JOIN
+			}
+			rect {
+			}
+			saoe {
+				require_arr OldObjs $obj_id AOESHAPE
+				default_arr OldObjs $obj_id ARCMODE START EXTENT
+			}
+			text {
+				require_arr OldObjs $obj_id TEXT FONT
+				default_arr OldObjs $obj_id ANCHOR
+			}
+			tile {
+				default_arr OldObjs $obj_id -value 0 BBHEIGHT BBWIDTH
+				default_arr OldObjs $obj_id IMAGE
+			}
+			default {
+				error "map element of unsupported type $obj_type"
+			}
+		}
+
+		set points {}
+		foreach {x y} $OldObjs(POINTS:$obj_id) {
+			lappend points [dict create X $x Y $y]
+		}
+
+		set element [dict create \
+			ID $obj_id \
+			X $OldObjs(X:$obj_id) \
+			Y $OldObjs(Y:$obj_id) \
+			Points $points \
+			Z $OldObjs(Z:$obj_id) \
+			Line $OldObjs(LINE:$obj_id) \
+			Fill $OldObjs(FILL:$obj_id) \
+			Width $OldObjs(WIDTH:$obj_id) \
+			Layer $OldObjs(LAYER:$obj_id) \
+			Level $OldObjs(LEVEL:$obj_id) \
+			Group $OldObjs(GROUP:$obj_id) \
+			Dash [::gmaproto::to_enum Dash $OldObjs(DASH:$obj_id)] \
+			Hidden $OldObjs(HIDDEN:$obj_id) \
+			Locked $OldObjs(LOCKED:$obj_id) \
+		]
+
+		switch -exact -- $obj_type {
+			arc {
+				dict set element ArcMode [::gmaproto::to_enum ArcMode $OldObjs(ARCMODE:$obj_id)]
+				dict set element Start $OldObjs(START:$obj_id)
+				dict set element Extent $OldObjs(EXTENT:$obj_id)
+				lappend new_filedata [list LS-ARC $element]
+			}
+			circ {
+				dict set element ArcMode [::gmaproto::to_enum ArcMode $OldObjs(ARCMODE:$obj_id)]
+				dict set element Start $OldObjs(START:$obj_id)
+				dict set element Extent $OldObjs(EXTENT:$obj_id)
+				lappend new_filedata [list LS-CIRC $element]
+			}
+			line {
+				dict set element Arrow [::gmaproto::to_enum Arrow $OldObjs(ARROW:$obj_id)]
+				lappend new_filedata [list LS-LINE $element]
+			}
+			poly {
+				dict set element Spline $OldObjs(SPLINE:$obj_id)
+				dict set element Join [::gmaproto::to_enum Join $OldObjs(JOIN:$obj_id)]
+				lappend new_filedata [list LS-POLY $element]
+			}
+			rect {
+				lappend new_filedata [list LS-RECT $element]
+			}
+			saoe {
+				set shape [::gmaproto::to_enum AoEShape $OldObjs(AOESHAPE:$obj_id)]
+				dict set element AoEShape $shape
+				if {$shape == 0 || $shape == 1} {
+					dict set element ArcMode [::gmaproto::to_enum ArcMode $OldObjs(ARCMODE:$obj_id)]
+					dict set element Start $OldObjs(START:$obj_id)
+					dict set element Extent $OldObjs(EXTENT:$obj_id)
+				}
+						
+				lappend new_filedata [list LS-SAOE $element]
+			}
+			text {
+				# value is {family size normal underline bold overstrike roman italic}
+				lassign [lindex $OldObjs(FONT:$obj_id) 0] family size
+				set weight 0
+				set slant 0
+				if {[info exists OldObjs(ANCHOR:$obj_id)]} {
+					set anchor [::gmaproto::to_enum Anchor $OldObjs(ANCHOR:$obj_id)]
+				} else {
+					set anchor 0
+				}
+
+				foreach option [lrange $OldObjs(FONT:$obj_id) 2 end] {
+					switch -exact -- $option {
+						normal { set weight 0 }
+						bold   { set weight 1 }
+						roman  { set slant 0  }
+						italic { set slant 1  }
+					}
+				}
+				dict set element Text $OldObjs(TEXT:$obj_id)
+				dict set element Font [dict create \
+					Family $family \
+					Size $size \
+					Weight $weight \
+					Slant $slant \
+					Anchor $anchor \
+				]
+				lappend new_filedata [list LS-TEXT $element]
+			} 
+			tile {
+				dict set element Image $OldObjs(IMAGE:$obj_id)
+				dict set element BBHeight $OldObjs(BBHEIGHT:$obj_id)
+				dict set element BBWidth $OldObjs(BBWIDTH:$obj_id)
+				lappend new_filedata [list LS-TILE $element]
+			}
+			default {
+				::gmafile::_diag "Ignoring object $obj_id since we can't figure out what it is."
+			}
+		}
+	}
+	return $new_filedata
+}
+
+proc ::gmafile::require_arr {aname id args} {
+	upvar $aname arr
+	foreach a $args {
+		if {![info exists arr($a:$id)]} {
+			error "object $id missing required attribute $a"
+		}
+	}
+}
+
+# default_arr arrayname objid ?-value v? ?--? attr ?...?
+proc ::gmafile::default_arr {aname id args} {
+	upvar $aname arr
+	set value {}
+	
+	while {[string range [lindex $args 0] 0 0] eq "-"} {
+		set optname [::gmautil::lpop args 0]
+		if {$optname eq "--"} {
+			break
+		} elseif {$optname eq "-value"} {
+			if {[llength $args] < 1} {
+				error "-value option requires an argument"
+			}
+			set value [::gmautil::lpop args 0]
+		} else {
+			error "unknown option $optname; must be -value or --"
+		}
+	}
+	if {[llength $args] < 1} {
+		error "default_arr requires at least one attribute name"
+	}
+
+	foreach a $args {
+		if {![info exists arr($a:$id)]} {
+			set arr($a:$id) $value
+		}
+	}
 }

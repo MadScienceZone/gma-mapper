@@ -1,4 +1,94 @@
 #!/usr/bin/env wish
+# TODO
+# 		::gmaproto::set_debug f
+# 		::gmaproto::dial host port user pass proxy pport puser ppass client
+# (auto)	::gmaproto::redial
+# (auto)	::gmaproto::background_redial 1
+# (auto)	::gmaproto::receive sock
+# (auto,hook)	::gmaproto::_dispatch	(from receive: _read_poll and do something until it comes up empty)
+# 		::gmaproto::json_bool n -> true|false
+# 		::gmaproto::to_enum type strvalue -> int
+# 		::gmaproto::from_enum type int -> strvalue
+#
+# 		::gmaproto::_protocol_send command ?k1 v1 k2 v2 ...?
+# 		::gmaproto::_protocol_encode_list {cmd dict} -> {cmd json}
+# 		::gmaproto::_protocol_encode cmd dict -> {cmd json}
+# (auto)	::gmaproto::_encode_payload inputdict typedict -> json
+# (auto)	::gmaproto::_construct inputdict typedict -> dict (with cleanup and defaulting)
+# 		::gmaproto::_raw_send message
+# (auto)	::gmaproto::_transmit	(send pending stuff)
+# (auto)	::gmaproto::parse_data_packet raw -> {cmd|UNDEFINED|ERROR dict|protocol|comment}	(from _read_poll)
+# (auto)	::gmaproto::_initial_read_poll -> {cmd dict}
+# (auto)	::gmaproto::_read_poll -> {cmd dict}
+# (auto)	::gmaproto::_repackage_legacy_packet cmd oldstyleparams -> {cmd json}		
+# (auto)	::gmaproto::_login
+# (auto)	::gmaproto::auth_response challenge(b64) -> response(b64)
+# (auto)	::gmaproto::_start_stream cmd dict
+# (auto)	::gmaproto::_continue_stream cmd dict ckdata ?-append|-lappend?
+# (auto)	::gmaproto::_end_stream cmd len cs -> dict
+#		::gmaproto::new_id -> uuid
+#		::gmautil::is_git path -> bool
+# (auto)	::gmautil::verify data signature -> bool
+#		::gmautil::version_compare v1 v2 -> <0|0|>0
+#		::gmautil::lpop listvar index -> removed_element
+#		::gmautil::upgrade dest_dir_list tmp baseurl basefile oldv newv strip_prefix launch msg_cb curlproxy curlpath
+# (auto)	::gmautil::_intall_file dest_dir_list prefix cb pfx header data
+# (auto)	::gmautil::_countdown sec cb pfx
+# 		::gmautil::rdist minargs maxargs cmd arglist ?var ...?
+# 		::gmautil::my_os -> string
+# 		::gmautil::my_arch -> string
+# 		::gmafile::save_to_file f {meta {{type dict} ...}}
+# 		::gmafile::load_from_file f -> {meta {{type dict} ...}}
+# (auto)	::gmafile::load_legacy_map_file f vid oldmeta -> {meta {{type dict} ...}}
+# (auto)	::gmafile::load_legacy_map_data linelist meta -> {meta {{IMG|MAP|RAW list} ...}}
+# (auto)	::gmafile::upgrade_elements {{IMG|MAP|RAW list} ...} -> {{type dict} ...}
+#		::gmafile::require_arr aname id ?attr ...?
+#		::gmafile::default_arr aname id ?-value v? ?--? ?attr ...?
+#
+# 		
+#
+# ::gmaproto::protocol sending commands
+# 	adjust_view x y
+# 	chat_message msg sender recips to_all? to_gm?
+# 	clear objid
+# 	clear_chat silent? target
+# 	clear_from serverid
+# 	combat_mode enabled?
+# 	comment text
+# 	define_dice_presets plist app?
+# 	filter_dice_presets re
+# 	load_from serverid cache? merge?
+# 	mark x y
+# 	query_dice_presets
+# 	add_image name sizes
+# 	query_image name size
+# 	query_peers
+# 	place_someone objid co name area size type gx gy reach? health skin skin_sizes elev note statuslist aoe movemode killed? dim?
+# 	polo
+# 	roll_dice spec recips all? gm?
+# 	sync_chat target
+# 	toolbar enabled?
+# 	update_clock a r
+# 	update_obj_attributes objid kvdict
+# 	add_obj_attributes objid attr vs
+# 	remove_obj_attributes objid attr vs
+# 	update_status_marker cond shape color
+# 	write_only ismain?
+# 	subscribe msglist
+# 	allow featurelist
+# 	ls type dict
+# 	update_progress id title value max done		id=* to generate, max=*|0 for none
+#
+# Requires these functions be available here:
+#X	::DEBUG level message
+#X	::say message
+#X	::DefinePlayerCharacter dict
+#X	::report_progress msg
+#X	::DefineStatusMarker dict
+# 	::DoCommand<cmd> dict
+#X	::DoCommandError cmd dict error
+#
+# 	
 ########################################################################################
 #  _______  _______  _______             ______         ___       ___       _______    #
 # (  ____ \(       )(  ___  ) Game      / ___  \       /   )     /   )     (  __   )   #
@@ -53,14 +143,10 @@
 # @[52]@| defect of the software.
 #
 # Auto-configure values
-set GMAMapperVersion {3.44.0}     ;# @@##@@
-set GMAMapperFileFormat {17}        ;# @@##@@
+set GMAMapperVersion {4.0.0}     ;# @@##@@
+set GMAMapperFileFormat {20}        ;# @@##@@
 set GMAMapperProtocol {400}         ;# @@##@@
 set GMAVersionNumber {4.4.3}            ;# @@##@@
-# legacy variables (TODO: change to new ones)
-set MapperVersion $GMAMapperVersion
-set FileVersion $GMAMapperFileFormat
-set ProtocolVersion $GMAMapperProtocol
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -129,6 +215,9 @@ set cache_too_old_days 2
 # just use SSH tunnels instead).
 #
 set ITproxy {}
+set ITproxyuser {}
+set ITproxypass {}
+set ITproxyport 0
 #
 #---------------------------[END CONFIG]--------------------------------------
 #
@@ -144,7 +233,7 @@ proc begin_progress { id title max args } {
             set id [new_id]
         }
         if {$args eq {-send}} {
-            ITsend [list // BEGIN $id $max $title]
+			::gmaproto::update_progress $id $title 0 $max false
         }
         grid .toolbar2.progbar -row 0 -column 2 -sticky e
         set ClockProgress 0
@@ -177,7 +266,7 @@ proc update_progress { id value newmax args } {
         DEBUG 1 "update_progress [list $id $value $newmax $args]"
         global ClockProgress progress_stack progress_data ClockDisplay
         if {$args eq {-send}} {
-            ITsend [list // UPDATE $id $value $newmax]
+			::gmaproto::update_progress $id {} $value $newmax false
         }
         if [info exists progress_data($id:title)] {
             if {$newmax ne {} && $newmax ne "*"} {
@@ -213,7 +302,7 @@ proc end_progress {id args} {
     if [catch {
         global ClockProgress progress_stack progress_data ClockDisplay
         if {$args eq {-send}} {
-            ITsend [list // END $id]
+			::gmaproto::update_progress $id {} {} {} true
         }
         if {$progress_data($id:max) eq "*"} {
             .toolbar2.progbar stop
@@ -299,6 +388,33 @@ proc SplitCreatureImageName {name} {
 
 # Stirge #1
 
+proc GMAFontToTkFont {gfont} {
+	set font [list [dict get $gfont Family] [dict get $gfont Size]]
+	if {[dict get $gfont Weight] == 1} {
+		lappend font "bold"
+	}
+	if {[dict get $gfont Slant] == 1} {
+		lappend font "italic"
+	}
+	return $font
+}
+
+proc TkFontToGMAFont {tkfont} {
+	# may be packaged in an outer list for historical reasons;
+	# if so, unwrap it
+	if {[llength $tkfont] == 1} {
+		set tkfont [lindex $tkfont 0]
+	}
+	if {[llength $tkfont] >= 2} {
+		set d [dict create Family [lindex $tkfont 0] Size [lindex $tkfont 1] Slant 0 Weight 0]
+		if {[lsearch -exact $tkfont italic] >= 0} {dict set d Slant 1}
+		if {[lsearch -exact $tkfont bold] >= 0} {dict set d Weight 1}
+		return $d
+	}
+	DEBUG 0 "unable to read tk font value $tkfont; assuming it's the family name only"
+	return [dict create Family $tkfont Size 10 Slant 0 Weight 0]
+}
+
 proc ScaleFont {fontspec factor} {
 	array set _base_font_info [font actual $fontspec]
 	if [info exists _base_font_info(-size)] {
@@ -325,15 +441,15 @@ proc AcceptCreatureImageName {name} {
 
 set PI 3.14159265358979323
 
-proc CheckProtocolCompatibility {v} {
-	global ProtocolVersion
-	DEBUG 1 "Service protocol is $v; we support up to $ProtocolVersion."
-	if {$v > $ProtocolVersion} {
-		say "This map client only supports map protocols up to version $ProtocolVersion. This server uses version $v. YOU SHOULD UPGRADE your mapper client before proceeding."
-	} elseif {$v < $ProtocolVersion} {
-		say "This map client supports map protocol version $ProtocolVersion. Your server is at version $v. While the map won't mind this, it may issue commands the other clients and server won't know how to interpret. YOU SHOULD UPGRADE the rest of your GMA system to the same version."
-	}
-}
+#DEL#proc CheckProtocolCompatibility {v} {
+#DEL#	global GMAMapperProtocol
+#DEL#	DEBUG 1 "Service protocol is $v; we support up to $GMAMapperProtocol."
+#DEL#	if {$v > $GMAMapperProtocol} {
+#DEL#		say "This map client only supports map protocols up to version $GMAMapperProtocol. This server uses version $v. YOU SHOULD UPGRADE your mapper client before proceeding."
+#DEL#	} elseif {$v < $GMAMapperProtocol} {
+#DEL#		say "This map client supports map protocol version $GMAMapperProtocol. Your server is at version $v. While the map won't mind this, it may issue commands the other clients and server won't know how to interpret. YOU SHOULD UPGRADE the rest of your GMA system to the same version."
+#DEL#	}
+#DEL#}
 # 
 # Okay, here's the deal.
 #
@@ -367,6 +483,14 @@ set DEBUG_level 0
 set GridEnable 1
 
 
+# Objects are stored in these arrays:
+#   OBJdata -- graphics drawn on-screen
+#   OBJtype -- type of each object
+#   MOBdata -- creatures
+#   MOBid   -- map of creature name to ID
+# These associate the object ID with a dict of information about the object.
+#
+# Previously, we did this:
 #
 # Objects are stored in these arrays:
 #   OBJ     -- graphics drawn on-screen
@@ -394,6 +518,12 @@ set GridEnable 1
 # Z coordinates.
 
 set DEBUG_file {}
+proc DEBUG0 {msg} {
+	puts ":: $msg"
+	catch {
+		DEBUG 0 $msg
+	}
+}
 proc DEBUG {level msg} {
 	global DEBUG_level DEBUG_file path_DEBUG_file dark_mode
 
@@ -726,33 +856,33 @@ proc new_id {} {
 	return [string tolower [string map {- {}} [::uuid::uuid generate]]]
 }
 
-# SHA256 checksum calculation (if possible)
-if [catch {
-	package require sha256
-}] {
-	DEBUG 0 "WARNING: SHA256 support missing (install Tcllib!); data stream validation will NOT occur!"
-	proc cs_init {} { return {}}
-	proc cs_upate {t s} {}
-	proc cs_final {t} {return {}}
-	proc cs_match {expected advertised} {return 1}
-} else {
-	proc cs_init {} {
-		return [::sha2::SHA256Init]
-	}
-	proc cs_update {t s} {
-		::sha2::SHA256Update $t $s
-	}
-	proc cs_final {t} {
-		return [::base64::encode [::sha2::SHA256Final $t]]
-	}
-	proc cs_match {expected advertised} {
-		if [string equal $advertised {}] {
-			DEBUG 1 "WARNING: remote data stream did not include checksum!"
-			return 1
-		}
-		return [string equal $advertised $expected]
-	}
-}
+#DEL## SHA256 checksum calculation (if possible)
+#DEL#if [catch {
+#DEL#	package require sha256
+#DEL#}] {
+#DEL#	DEBUG 0 "WARNING: SHA256 support missing (install Tcllib!); data stream validation will NOT occur!"
+#DEL#	proc cs_init {} { return {}}
+#DEL#	proc cs_upate {t s} {}
+#DEL#	proc cs_final {t} {return {}}
+#DEL#	proc cs_match {expected advertised} {return 1}
+#DEL#} else {
+#DEL#	proc cs_init {} {
+#DEL#		return [::sha2::SHA256Init]
+#DEL#	}
+#DEL#	proc cs_update {t s} {
+#DEL#		::sha2::SHA256Update $t $s
+#DEL#	}
+#DEL#	proc cs_final {t} {
+#DEL#		return [::base64::encode [::sha2::SHA256Final $t]]
+#DEL#	}
+#DEL#	proc cs_match {expected advertised} {
+#DEL#		if [string equal $advertised {}] {
+#DEL#			DEBUG 1 "WARNING: remote data stream did not include checksum!"
+#DEL#			return 1
+#DEL#		}
+#DEL#		return [string equal $advertised $expected]
+#DEL#	}
+#DEL#}
 
 if {$tcl_platform(os) eq "Darwin"} {
 	set BUTTON_RIGHT <2>
@@ -794,17 +924,17 @@ set MajorGuideLineOffset {0 0}
 report_progress "parsing configuration and command-line arguments"
 proc usage {} {
 	global argv0
-	global MapperVersion
+	global GMAMapperVersion
 	global stderr
 	global ChatHistoryLimit
 
-	puts $stderr "This is mapper, version $MapperVersion"
+	puts $stderr "This is mapper, version $GMAMapperVersion"
 	puts $stderr "Usage: $argv0 \[-display name\] \[-geometry value\] \[other wish options...\] -- \[--help]"
 	puts $stderr {        [-A] [-a] [-B] [-b pct] [-C file] [-c name[:color]] [-D] [-d]}
 	puts $stderr {        [-G n[+x[:y]]] [-g n[+x[:y]]] [-h hostname] [-k] [-l] [-M moduleID]}
 	puts $stderr {        [-n] [-P pass] [-p port] [-s stylefile] [-t transcriptfile] [-u name]}
 	puts $stderr {        [-x proxyurl] [-X proxyhost] [--button-size size] [--chat-history n]}
-	puts $stderr {        [--curl-path path] [--curl-url-base url] [--generate-config path]}
+	puts $stderr {        [--curl-path path] [--curl-url-base url] [--debug-protocol] [--generate-config path]}
 	puts $stderr {        [--generate-style-config path] [--mkdir-path path] [--nc-path path]}
 	puts $stderr {        [--no-blur-all] [--scp-path path] [--scp-dest dir] [--scp-server hostname]}
 	puts $stderr {        [--update-url url] [mapfiles...]}
@@ -818,6 +948,7 @@ proc usage {} {
 	puts $stderr {   -C, --config:      Read options from specified file (subsequent options further modify)}
 	puts $stderr {   -c, --character:   Add another character name for menu}
 	puts $stderr {   -D, --debug:       Increase debug output level}
+	puts $stderr {       --debug-protocol: Show a transcript of network I/O data in debug window}
 	puts $stderr {   -d, --dark:        Adjust colors for dark mode}
 	puts $stderr {   -G, --major:       Set major grid guidlines every n (offset by x and/or y)}
 	puts $stderr {   -g, --guide:       Set minor grid guidlines every n (offset by x and/or y)}
@@ -834,10 +965,6 @@ proc usage {} {
 	puts $stderr {   -u, --username:    Set the name you go by on your game server}
 	puts $stderr {   -x, --proxy-url:   Proxy url for retrieving image data (usually like -x http://proxy.example.com:8080)}
 	puts $stderr {   -X, --proxy-host:  SOCKS 5 proxy host and port for SSH/SCP (usually like -X proxy.example.com:8080)}
-#	puts $stderr {   -P: SOCKS5 password}
-#	puts $stderr {   -S: SOCKS5 proxy hostname}
-#	puts $stderr {   -U: SOCKS5 username}
-#	puts $stderr {   -s: SOCKS5 proxy TCP port}
 	global CURLpath CURLserver SCPpath SSHpath SCPdest SCPserver NCpath SERVER_MKDIRpath
 	puts $stderr "   --chat-history:   number of chat messages to retain between sessions \[$ChatHistoryLimit\]"
 	puts $stderr "   --curl-path:      pathname of curl command to invoke \[$CURLpath\]"
@@ -858,7 +985,6 @@ proc usage {} {
 # Initiative Tracking
 set IThost {}
 set ITport 2323
-set ITsock {}
 set ITbuffer {}
 set ITpassword {}
 set MasterClient 0
@@ -931,6 +1057,7 @@ for {set argi 0} {$argi < $argc} {incr argi} {
                 lappend OptAddCharacters $charToAdd
 			}
 		-D - --debug  { incr DEBUG_level }
+		--debug-protocol { ::gmaproto::set_debug ::DEBUG0}
 		-d - --dark {set dark_mode 1}
 		--help { usage }
 		-h - --host { 
@@ -985,7 +1112,7 @@ for {set argi 0} {$argi < $argc} {incr argi} {
 				usage
 			}
 			DEBUG 2 "Loading map from file $option"
-			loadfile 1 $option
+			loadfile $option -merge
 		}
 	}
 }
@@ -1245,7 +1372,6 @@ foreach icon_name {
 }
 
 set canvas [canvas .c -height $canh -width $canw -scrollregion [list 0 0 $cansw $cansh] -xscrollcommand {.xs set} -yscrollcommand {.ys set}]
-#set canvas [canvas .c -height $cansh -width $cansw -xscrollcommand {.xs set} -yscrollcommand {.ys set}]
 
 grid [frame .toolbar] -sticky ew
 grid [frame .toolbar2] -sticky ew
@@ -1345,8 +1471,8 @@ grid \
 	 [button .toolbar.snap -image $icon_snap_0 -command gridsnap] \
 	 [button .toolbar.width -image [set icon_width_$initialwidth] -command setwidth] \
 	 [label  .toolbar.sp2  -text "   "] \
-	 [button .toolbar.clear -image $icon_clear -command {cleargrid; ITsend [list CLR E*]}] \
-	 [button .toolbar.clearp -image $icon_clear_players -command {clearplayers *; ITsend [list CLR P*]; ITsend [list CLR M*]}] \
+	 [button .toolbar.clear -image $icon_clear -command {cleargrid; ::gmaproto::clear E*}] \
+	 [button .toolbar.clearp -image $icon_clear_players -command {clearplayers *; ::gmaproto::clear P*; ::gmaproto::clear M*}] \
 	 [label  .toolbar.sp3  -text "   "] \
 	 [button .toolbar.combat -image $icon_combat -command togglecombat] \
 	 [button .toolbar.showhp -image $icon_heart -command toggleShowHealthStats] \
@@ -1359,8 +1485,8 @@ grid \
 	 [button .toolbar.zi   -image $icon_zoom_in -command {zoomInBy 2}] \
 	 [button .toolbar.zo   -image $icon_zoom_out -command {zoomInBy 0.5}] \
 	 [button .toolbar.refresh -image $icon_zoom -command resetZoom] \
-	 [button .toolbar.load -image $icon_open -command {loadfile 0 {}}] \
-	 [button .toolbar.merge -image $icon_merge -command {loadfile 1 {}}] \
+	 [button .toolbar.load -image $icon_open -command {loadfile {}}] \
+	 [button .toolbar.merge -image $icon_merge -command {loadfile {} -merge}] \
 	 [button .toolbar.unload -image $icon_unload -command {unloadfile {}}] \
 	 [button .toolbar.sync -image $icon_blank -command {} -state disabled] \
 	 [button .toolbar.saf  -image $icon_saf -command toggleSafMode] \
@@ -1383,19 +1509,19 @@ $mm add cascade -menu $mm.view -label View
 $mm add cascade -menu $mm.play -label Play
 $mm add cascade -menu $mm.help -label Help
 menu $mm.file
-$mm.file add command -command {loadfile 0 {}} -label "Load Map File..."
-$mm.file add command -command {loadfile 1 {}} -label "Merge Map File..."
+$mm.file add command -command {loadfile {}} -label "Load Map File..."
+$mm.file add command -command {loadfile {} -merge} -label "Merge Map File..."
 $mm.file add command -command savefile -label "Save Map File..."
 $mm.file add separator
 $mm.file add command -command exitchk -label Exit
 menu $mm.edit
 $mm.edit add command -command playtool -label "Normal Play Mode"
 $mm.edit add separator
-$mm.edit add command -command {cleargrid; ITsend [list CLR E*]} -label "Clear All Map Elements"
-$mm.edit add command -command {clearplayers monster; ITsend [list CLR M*]} -label "Clear All Monsters"
-$mm.edit add command -command {clearplayers player; ITsend [list CLR P*]} -label "Clear All Players"
-$mm.edit add command -command {clearplayers *; ITsend [list CLR P*]; ITsend [list CLR M*]} -label "Clear All Creatures"
-$mm.edit add command -command {cleargrid; clearplayers *; ITsend [list CLR *]} -label "Clear All Objects"
+$mm.edit add command -command {cleargrid; ::gmaproto::clear E*} -label "Clear All Map Elements"
+$mm.edit add command -command {clearplayers monster; ::gmaproto::clear M*} -label "Clear All Monsters"
+$mm.edit add command -command {clearplayers player; ::gmaproto::clear P*} -label "Clear All Players"
+$mm.edit add command -command {clearplayers *; ::gmaproto::clear P*; ::gmaproto::clear M*} -label "Clear All Creatures"
+$mm.edit add command -command {cleargrid; clearplayers *; ::gmaproto::clear *} -label "Clear All Objects"
 $mm.edit add separator
 $mm.edit add command -command linetool -label "Draw Lines"
 $mm.edit add command -command recttool -label "Draw Rectangles"
@@ -1438,9 +1564,9 @@ menu $mm.help
 $mm.help add command -command {aboutMapper} -label "About Mapper..."
 
 proc configureChatCapability {} {
-	global ITsock icon_blank
+	global icon_blank
 
-	if {$ITsock eq {}} {
+	if {![::gmaproto::is_connected]} {
 		.toolbar.chat configure -image $icon_blank -state disabled
 		tooltip::tooltip .toolbar.chat "Chat/die roll tool is not available unless connected to a server."
 	}
@@ -1451,7 +1577,7 @@ proc configureSafCapability {} {
 
 	if {$SCPdest eq {} || $SCPserver eq {}} {
 		.toolbar.saf configure -image $icon_blank -state disabled
-		tooltip::tooltip .toolbar.saf "Store-and-forward mode is not configured for this client."
+		
 	}
 }
 
@@ -1578,21 +1704,17 @@ proc toggleShowHealthStats {} {
 proc togglecombat {} {
 	global MOB_COMBATMODE
 	setCombatMode [expr !$MOB_COMBATMODE]
-	ITsend [list CO $MOB_COMBATMODE]
+	::gmaproto::combat_mode $MOB_COMBATMODE
 }
 
 proc SyncFromServer {} {
 	cleargrid
 	clearplayers *
-	ITsend SYNC
+	::gmaproto::sync
 }
 
 proc ReconnectToServer {} {
-	global ITreceive_queue
-	DEBUG 1 "IPC incoming queue was $ITreceive_queue"
-	set ITreceive_queue {}
-	DEBUG 1 "-now cleared"
-	ITsend POLO
+	::gmaproto::redial
 }
 
 set DHS_Saved_ClockDisplay {}
@@ -1615,50 +1737,49 @@ proc blur_hp {maxhp lethal} {
 }
 
 proc CreateHealthStatsToolTip {mob_id} {
-	global MOB
-	if {$mob_id eq {} || ![info exists MOB(NAME:$mob_id)]} {
+	global MOBdata
+	if {$mob_id eq {} || ![info exists MOBdata($mob_id)]} {
 		return {}
 	}
 
 	# get the list of applied conditions
 	set conditions {}
+	set has_health_info false
+	set dead [dict get $MOBdata($mob_id) Killed]
 
-	if {$MOB(KILLED:$mob_id)} {
-		set dead 1
-	} else {
-		set dead 0
+	if {[dict exists $MOBdata($mob_id) Health] && [dict get $MOBdata($mob_id) Health] ne {}} {
+		set has_health_info true
+		::gmautil::dassign [dict get $MOBdata($mob_id) Health] \
+			MaxHP 			maxhp \
+			LethalDamage 	lethal \
+			NonLethalDamage	nonlethal \
+			Con 			con \
+			IsFlatFooted 	flatp \
+			IsStable 		stablep \
+			HPBlur			server_blur_pct \
+			Condition		condition
+		if {$condition ne {}} {
+			switch -exact -- $condition {
+				dead { set dead true }
+				flat { lappend conditions flat-footed }
+				default { lappend conditions $condition }
+			}
+		}
 	}
 
-	if {[info exists MOB(_CONDITION:$mob_id)] && $MOB(_CONDITION:$mob_id) ne {}} {
-		switch -exact -- $MOB(_CONDITION:$mob_id) {
-			dead {
-				set dead 1
-			}
-			flat {
-				lappend conditions flat-footed
-			}
-			default {
-				lappend conditions $MOB(_CONDITION:$mob_id)
-			}
-		}
+	if {[llength [set statuslist [dict get $MOBdata($mob_id) StatusList]]] > 0} {
+		lappend conditions {*}$statuslist
 	}
-	if {[info exists MOB(STATUSLIST:$mob_id)] && [llength $MOB(STATUSLIST:$mob_id)] > 0} {
-		lappend conditions {*}$MOB(STATUSLIST:$mob_id)
-	}
-	if {[info exists MOB(HEALTH:$mob_id)]} {
-		DistributeZero $MOB(HEALTH:$mob_id) maxhp lethal nonlethal con flatp stablep hcondition server_blur_pct
-		if {$flatp ne {} && $flatp && [lsearch -exact $conditions flat-footed] < 0} {
-			lappend conditions flat-footed
-		}
-		if {$stablep ne {} && $stablep && [lsearch -exact $conditions stable] < 0} {
-			lappend conditions stable
-		}
-		set tiptext "$MOB(NAME:$mob_id):"
+
+	if {$flatp && [lsearch -exact $conditions flat-footed] < 0} {lappend conditions flat-footed}
+	if {$stablep && [lsearch -exact $conditions stable] < 0} {lappend conditions stable}
+	if {$has_health_info} {
+		set tiptext "[dict get $MOBdata($mob_id) Name]:"
 
 		global blur_all blur_pct
 		set client_blur {}
 		set server_blur {}
-		if {$blur_all || $MOB(TYPE:$mob_id) ne {player}} {
+		if {$blur_all || [dict get $MOBdata($mob_id) CreatureType] != 2} {
 			set hp_remaining [blur_hp $maxhp $lethal]
 			if {$blur_pct > 0} {
 				set client_blur [format "(\u00B1%d%%)" $blur_pct]
@@ -1666,11 +1787,15 @@ proc CreateHealthStatsToolTip {mob_id} {
 		} else {
 			set hp_remaining [expr $maxhp - $lethal]
 		}
-		if {$server_blur_pct ne {} && $server_blur_pct > 0} {
+		if {$server_blur_pct > 0} {
+			# server blur overrides local one
+			set client_blur {}
+			set hp_remaining [expr $maxhp - $lethal]
 			set server_blur [format "\u00B1%d%%" $server_blur_pct]
 		}
 		if {!$dead} {
-			if {$MOB(TYPE:$mob_id) eq {player}} {
+			if {[dict get $MOBdata($mob_id) CreatureType] == 2} {
+				# player
 				if {$maxhp == 0} {
 					if {$lethal == 0} {
 						append tiptext " no lethal wounds"
@@ -1712,22 +1837,20 @@ proc CreateHealthStatsToolTip {mob_id} {
 		set tiptext "$MOB(NAME:$mob_id): \[no health info\]"
 	}
 
-	if {[info exists MOB(ELEV:$mob_id)] && $MOB(ELEV:$mob_id) != 0} {
-		append tiptext [format "; elevation %d ft" $MOB(ELEV:$mob_id)]
+	if {[set elevation [dict get $MOBdata($mob_id) Elev]] != 0} {
+		append tiptext [format "; elevation %d ft" $elevation]
 	}
-	if {[info exists MOB(MOVEMODE:$mob_id)] && $MOB(MOVEMODE:$mob_id) != {}} {
-		switch -exact -- $MOB(MOVEMODE:$mob_id) {
-			land {
-			}
-			fly - climb - burrow {
-				append tiptext [format " (%sing)" $MOB(MOVEMODE:$mob_id)]
-			}
-			swim {
-				append tiptext " (swimming)"
-			}
-			default {
-				append tiptext [format " (%s)" $MOB(MOVEMODE:$mob_id)]
-			}
+	switch -exact -- [set movemode [::gmaproto::from_enum MoveMode [dict get $MOBdata($mob_id) MoveMode]]] {
+		land - {} {
+		}
+		fly - climb - burrow {
+			append tiptext [format " (%sing)" $movemode]
+		}
+		swim {
+			append tiptext " (swimming)"
+		}
+		default {
+			append tiptext [format " (%s)" $movemode]
 		}
 	}
 
@@ -1763,100 +1886,100 @@ proc reflowText {maxlen text} {
 	return [join $output "\n"]
 }
 
-proc DisplayHealthStats {mob_id} {
-	global MOB
-	global ClockDisplay
-	global DHS_Saved_ClockDisplay
-
-	if {$mob_id ne {}} {
-		if {[string range $ClockDisplay 0 1] ne {::}} {
-			set DHS_Saved_ClockDisplay $ClockDisplay
-		}
-
-		if {[info exists MOB(HEALTH:$mob_id)]} {
-			set h $MOB(HEALTH:$mob_id)
-		} else {
-			set h {}
-		}
-
-		if {$MOB(KILLED:$mob_id)} {
-			set health "DEAD"
-			set dead 1
-		} else {
-			set health {}
-			set dead 0
-		}
-
-		if {[info exists MOB(STATUSLIST:$mob_id)] && $MOB(STATUSLIST:$mob_id) ne {}} {
-			append health " :: " $MOB(STATUSLIST:$mob_id)
-		}
-
-		if {[llength $h] < 7} {
-			set ClockDisplay [format ":: %s %s" $MOB(NAME:$mob_id) $health]
-		} else {
-			DistributeVars $h maxhp lethal nonlethal grace flatp stablep condition server_blur_hp
-			global blur_all blur_pct
-			set client_blur {}
-			set server_blur {}
-			if {$blur_all || $MOB(TYPE:$mob_id) ne {player}} {
-				set hp_remaining [blur_hp $maxhp $lethal]
-				if {$blur_pct > 0} {
-					set client_blur [format "(to %d%%)" $blur_pct]
-				}
-			} else {
-				set hp_remaining [expr $maxhp - $lethal]
-			}
-
-			if {$server_blur_hp ne {} && $server_blur_hp > 0} {
-				set server_blur [format "(to %d%%)" $server_blur_hp]
-			}
-
-			if {!$dead} {
-				if {$MOB(TYPE:$mob_id) eq {player}} {
-					set health [format "%d/%d HP %s %s" $hp_remaining $maxhp $client_blur $server_blur]
-					if {$nonlethal != 0} {
-						append health [format " (%d NL)" $nonlethal]
-					}
-				} else {
-					if {$maxhp == 0} {
-						set health [format "%d lethal %d non %s %s" $lethal $nonlethal $client_blur $server_blur]
-					} else {
-						if {$lethal > $maxhp} {
-							set health "DYING"
-						} else {
-							set health [format "%d%% HP %s %s" [expr (100 * $hp_remaining) / $maxhp] $client_blur $server_blur]
-							if {$nonlethal != 0 && $maxhp != $lethal} {
-								append health [format " (%d%% NL)" [expr (100 * $nonlethal) / $hp_remaining]]
-							}
-						}
-					}
-				}
-			}
-			if {$flatp} {
-				append health " Flat-footed"
-			}
-			if {$stablep} {
-				append health " Stabilized"
-			}
-			if {[info exists MOB(_CONDITION:$mob_id)] && $MOB(_CONDITION:$mob_id) ne {}} {
-				append health " \[$MOB(_CONDITION:$mob_id)\]"
-			}
-			if {[info exists MOB(ELEV:$mob_id)] && $MOB(ELEV:$mob_id) != 0} {
-				append health [format " Elev %d'" $MOB(ELEV:$mob_id)]
-			}
-			if {[info exists MOB(MOVEMODE:$mob_id)] && $MOB(MOVEMODE:$mob_id) ne {}} {
-				append health [format " (%s)" $MOB(MOVEMODE:$mob_id)]
-			}
-			if {[info exists MOB(STATUSLIST:$mob_id)] && $MOB(STATUSLIST:$mob_id) ne {}} {
-				append health " :: " $MOB(STATUSLIST:$mob_id)
-			}
-			set ClockDisplay ":: $MOB(NAME:$mob_id) $health"
-		}
-	} else {
-		set ClockDisplay $DHS_Saved_ClockDisplay
-		set DHS_Saved_ClockDisplay {}
-	}
-}
+##DEL proc DisplayHealthStats {mob_id} {
+##DEL 	global MOB
+##DEL 	global ClockDisplay
+##DEL 	global DHS_Saved_ClockDisplay
+##DEL 
+##DEL 	if {$mob_id ne {}} {
+##DEL 		if {[string range $ClockDisplay 0 1] ne {::}} {
+##DEL 			set DHS_Saved_ClockDisplay $ClockDisplay
+##DEL 		}
+##DEL 
+##DEL 		if {[info exists MOB(HEALTH:$mob_id)]} {
+##DEL 			set h $MOB(HEALTH:$mob_id)
+##DEL 		} else {
+##DEL 			set h {}
+##DEL 		}
+##DEL 
+##DEL 		if {$MOB(KILLED:$mob_id)} {
+##DEL 			set health "DEAD"
+##DEL 			set dead 1
+##DEL 		} else {
+##DEL 			set health {}
+##DEL 			set dead 0
+##DEL 		}
+##DEL 
+##DEL 		if {[info exists MOB(STATUSLIST:$mob_id)] && $MOB(STATUSLIST:$mob_id) ne {}} {
+##DEL 			append health " :: " $MOB(STATUSLIST:$mob_id)
+##DEL 		}
+##DEL 
+##DEL 		if {[llength $h] < 7} {
+##DEL 			set ClockDisplay [format ":: %s %s" $MOB(NAME:$mob_id) $health]
+##DEL 		} else {
+##DEL 			lassign $h maxhp lethal nonlethal grace flatp stablep condition server_blur_hp
+##DEL 			global blur_all blur_pct
+##DEL 			set client_blur {}
+##DEL 			set server_blur {}
+##DEL 			if {$blur_all || $MOB(TYPE:$mob_id) ne {player}} {
+##DEL 				set hp_remaining [blur_hp $maxhp $lethal]
+##DEL 				if {$blur_pct > 0} {
+##DEL 					set client_blur [format "(to %d%%)" $blur_pct]
+##DEL 				}
+##DEL 			} else {
+##DEL 				set hp_remaining [expr $maxhp - $lethal]
+##DEL 			}
+##DEL 
+##DEL 			if {$server_blur_hp ne {} && $server_blur_hp > 0} {
+##DEL 				set server_blur [format "(to %d%%)" $server_blur_hp]
+##DEL 			}
+##DEL 
+##DEL 			if {!$dead} {
+##DEL 				if {$MOB(TYPE:$mob_id) eq {player}} {
+##DEL 					set health [format "%d/%d HP %s %s" $hp_remaining $maxhp $client_blur $server_blur]
+##DEL 					if {$nonlethal != 0} {
+##DEL 						append health [format " (%d NL)" $nonlethal]
+##DEL 					}
+##DEL 				} else {
+##DEL 					if {$maxhp == 0} {
+##DEL 						set health [format "%d lethal %d non %s %s" $lethal $nonlethal $client_blur $server_blur]
+##DEL 					} else {
+##DEL 						if {$lethal > $maxhp} {
+##DEL 							set health "DYING"
+##DEL 						} else {
+##DEL 							set health [format "%d%% HP %s %s" [expr (100 * $hp_remaining) / $maxhp] $client_blur $server_blur]
+##DEL 							if {$nonlethal != 0 && $maxhp != $lethal} {
+##DEL 								append health [format " (%d%% NL)" [expr (100 * $nonlethal) / $hp_remaining]]
+##DEL 							}
+##DEL 						}
+##DEL 					}
+##DEL 				}
+##DEL 			}
+##DEL 			if {$flatp} {
+##DEL 				append health " Flat-footed"
+##DEL 			}
+##DEL 			if {$stablep} {
+##DEL 				append health " Stabilized"
+##DEL 			}
+##DEL 			if {[info exists MOB(_CONDITION:$mob_id)] && $MOB(_CONDITION:$mob_id) ne {}} {
+##DEL 				append health " \[$MOB(_CONDITION:$mob_id)\]"
+##DEL 			}
+##DEL 			if {[info exists MOB(ELEV:$mob_id)] && $MOB(ELEV:$mob_id) != 0} {
+##DEL 				append health [format " Elev %d'" $MOB(ELEV:$mob_id)]
+##DEL 			}
+##DEL 			if {[info exists MOB(MOVEMODE:$mob_id)] && $MOB(MOVEMODE:$mob_id) ne {}} {
+##DEL 				append health [format " (%s)" $MOB(MOVEMODE:$mob_id)]
+##DEL 			}
+##DEL 			if {[info exists MOB(STATUSLIST:$mob_id)] && $MOB(STATUSLIST:$mob_id) ne {}} {
+##DEL 				append health " :: " $MOB(STATUSLIST:$mob_id)
+##DEL 			}
+##DEL 			set ClockDisplay ":: $MOB(NAME:$mob_id) $health"
+##DEL 		}
+##DEL 	} else {
+##DEL 		set ClockDisplay $DHS_Saved_ClockDisplay
+##DEL 		set DHS_Saved_ClockDisplay {}
+##DEL 	}
+##DEL }
 
 proc setCombatMode {mode} {
 	global MOB_COMBATMODE MOB_BLINK ClockDisplay
@@ -1879,7 +2002,10 @@ proc setCombatMode {mode} {
 
 #
 # drawing objects
+#   OBJdata(<id>)		<dict>
+#   OBJtype(<id>)		<type>
 #
+#---OLD---
 #  OBJ(TYPE:<id>)   line|rect|arc|circ|poly
 #  OBJ(X:<id>)      origin x
 #  OBJ(Y:<id>)      origin y
@@ -1908,82 +2034,82 @@ set OBJ_FILE "untitled"
 #
 # return the new ID number
 #
-proc mergeElement {vid vtag value} {
-#OLD CODE---TRANSLATE FILE'S INTEGERS TO OUR OWN SEQUENCE
-#
-#	global OBJ OBJ_NEXT_ID OBJ_XL
-#
-#	if {![info exists OBJ_XL($vid)]} {
-#		# new object ID, set up translation
-#		set OBJ_XL($vid) [incr OBJ_NEXT_ID]
-#		#puts "\[DEBUG\] obj xl $vid => $OBJ_NEXT_ID"
-#	}
-#	set id $OBJ_XL($vid)
-#	set OBJ(${vtag}:$id) $value
-#	#puts "\[DEBUG\] /${vtag}/ /$id/  <- /$value/"
-#
-#NEW CODE---USE UUID FOR OBJECTS, GENERATING THEM IF NECESSARY
-#
-	global OBJ OBJ_XL OBJ_NEXT_Z
-	if {[string length $vid] == 32} {
-		# already a UUID (naive but probably adequate assumption), just keep it
-		# (also assumes they have a Z coordinate and all that good stuff already)
-		set id $vid
-	} else {
-		# translate vid -> new UUID
-		if {![info exists OBJ_XL($vid)]} {
-			set id [new_id]
-			set OBJ_XL($vid) $id
-			# add Z coordinate (will be overridden if object has its own)
-			set OBJ(Z:$id) [incr OBJ_NEXT_ID]
-		} else {
-			set id $OBJ_XL($vid)
-		}
-	}
-	set OBJ(${vtag}:$id) $value
-	if {$vtag eq "Z" && $value > $OBJ_NEXT_Z} {
-		set OBJ_NEXT_Z $value
-	}
-	return $id
-}
+##DEL proc mergeElement {vid vtag value} {
+##DEL #OLD CODE---TRANSLATE FILE'S INTEGERS TO OUR OWN SEQUENCE
+##DEL #
+##DEL #	global OBJ OBJ_NEXT_ID OBJ_XL
+##DEL #
+##DEL #	if {![info exists OBJ_XL($vid)]} {
+##DEL #		# new object ID, set up translation
+##DEL #		set OBJ_XL($vid) [incr OBJ_NEXT_ID]
+##DEL #		#puts "\[DEBUG\] obj xl $vid => $OBJ_NEXT_ID"
+##DEL #	}
+##DEL #	set id $OBJ_XL($vid)
+##DEL #	set OBJ(${vtag}:$id) $value
+##DEL #	#puts "\[DEBUG\] /${vtag}/ /$id/  <- /$value/"
+##DEL #
+##DEL #NEW CODE---USE UUID FOR OBJECTS, GENERATING THEM IF NECESSARY
+##DEL #
+##DEL 	global OBJ OBJ_XL OBJ_NEXT_Z
+##DEL 	if {[string length $vid] == 32} {
+##DEL 		# already a UUID (naive but probably adequate assumption), just keep it
+##DEL 		# (also assumes they have a Z coordinate and all that good stuff already)
+##DEL 		set id $vid
+##DEL 	} else {
+##DEL 		# translate vid -> new UUID
+##DEL 		if {![info exists OBJ_XL($vid)]} {
+##DEL 			set id [new_id]
+##DEL 			set OBJ_XL($vid) $id
+##DEL 			# add Z coordinate (will be overridden if object has its own)
+##DEL 			set OBJ(Z:$id) [incr OBJ_NEXT_ID]
+##DEL 		} else {
+##DEL 			set id $OBJ_XL($vid)
+##DEL 		}
+##DEL 	}
+##DEL 	set OBJ(${vtag}:$id) $value
+##DEL 	if {$vtag eq "Z" && $value > $OBJ_NEXT_Z} {
+##DEL 		set OBJ_NEXT_Z $value
+##DEL 	}
+##DEL 	return $id
+##DEL }
 
-proc mergePerson {vid vtag value} {
-	global MOB 
-	global PC_IDs
+##DEL proc mergePerson {vid vtag value} {
+##DEL 	global MOB 
+##DEL 	global PC_IDs
+##DEL 
+##DEL 	set id $vid
+##DEL 	if {$vtag eq "NAME"} {
+##DEL 		#
+##DEL 		# Detect player with ID not matching our static list
+##DEL 		#
+##DEL 		set value [AcceptCreatureImageName $value]
+##DEL 		if {[info exists PC_IDs($value)] && $PC_IDs($value) ne $id} {
+##DEL 			DEBUG 0 "Conflict with ID of merged PC $value ($id should be $PC_IDs($value); RECOMMEND CORRECTING DATA AND RELOADING."
+##DEL 		}
+##DEL 		set MOB(ID:$value) $id
+##DEL 		DEBUG 4 "----> set MOB(ID:$value) $id"
+##DEL 	}
+##DEL 	set MOB(${vtag}:$id) $value
+##DEL 	DEBUG 4 "----> set MOB(${vtag}:$id) $value"
+##DEL 	return $id
+##DEL }
 
-	set id $vid
-	if {$vtag eq "NAME"} {
-		#
-		# Detect player with ID not matching our static list
-		#
-		set value [AcceptCreatureImageName $value]
-		if {[info exists PC_IDs($value)] && $PC_IDs($value) ne $id} {
-			DEBUG 0 "Conflict with ID of merged PC $value ($id should be $PC_IDs($value); RECOMMEND CORRECTING DATA AND RELOADING."
-		}
-		set MOB(ID:$value) $id
-		DEBUG 4 "----> set MOB(ID:$value) $id"
-	}
-	set MOB(${vtag}:$id) $value
-	DEBUG 4 "----> set MOB(${vtag}:$id) $value"
-	return $id
-}
-
-proc garbageCollectGrid {} {
-	global OBJ
-
-	foreach key [array names OBJ] {
-		if {![regexp {^[_A-Z]+:([0-9a-fA-F_#]+)$} $key xx id]} {
-			unset OBJ($key)
-			DEBUG 2 "\[GC\] REMOVED BOGUS KEY /$key/ from object list (invalid key)"
-			continue
-		}
-		if {![info exists OBJ(TYPE:$id)]} {
-			unset OBJ($key)
-			DEBUG 2 "\[GC\] REMOVED EXTRA KEY /$key/ from object list (undefined object)"
-			continue
-		}
-	}
-}
+##DEL proc garbageCollectGrid {} {
+##DEL 	global OBJdata
+##DEL 
+##DEL 	foreach key [array names OBJ] {
+##DEL 		if {![regexp {^[_A-Z]+:([0-9a-fA-F_#]+)$} $key xx id]} {
+##DEL 			unset OBJ($key)
+##DEL 			DEBUG 2 "\[GC\] REMOVED BOGUS KEY /$key/ from object list (invalid key)"
+##DEL 			continue
+##DEL 		}
+##DEL 		if {![info exists OBJ(TYPE:$id)]} {
+##DEL 			unset OBJ($key)
+##DEL 			DEBUG 2 "\[GC\] REMOVED EXTRA KEY /$key/ from object list (undefined object)"
+##DEL 			continue
+##DEL 		}
+##DEL 	}
+##DEL }
 
 #
 # To support Store-and-Forward mode, saf_loadfile
@@ -2079,72 +2205,83 @@ proc saf_loadfile {file oldcd args} {
 	return 1
 }
 
-#
-# new file format:
-# field:id value
-#
-# monsters now saved; format for them is:
-# M field:id value
-#
-# players, too:
-# P field:id value
-#
-proc require_arr {aname id args} {
-	upvar $aname arr
-	foreach a $args {
-		if {![info exists arr($a:$id)]} {
-			error "object $id missing required attribute $a"
-		}
-	}
-}
-proc default_arr {aname id args} {
-	upvar $aname arr
-	foreach a $args {
-		if {![info exists arr($a:$id)]} {
-			set arr($a:$id) {}
-		}
-	}
-}
+#DEL##
+#DEL## new file format:
+#DEL## field:id value
+#DEL##
+#DEL## monsters now saved; format for them is:
+#DEL## M field:id value
+#DEL##
+#DEL## players, too:
+#DEL## P field:id value
+#DEL##
+#DEL#proc require_arr {aname id args} {
+#DEL#	upvar $aname arr
+#DEL#	foreach a $args {
+#DEL#		if {![info exists arr($a:$id)]} {
+#DEL#			error "object $id missing required attribute $a"
+#DEL#		}
+#DEL#	}
+#DEL#}
+#DEL#proc default_arr {aname id args} {
+#DEL#	upvar $aname arr
+#DEL#	foreach a $args {
+#DEL#		if {![info exists arr($a:$id)]} {
+#DEL#			set arr($a:$id) {}
+#DEL#		}
+#DEL#	}
+#DEL#}
+#DEL#
 
-#
-# This is a little convoluted but is so because it's in a transition
-# between data formats. The old file was a simple data dump of the
-# internal arrays holding map data, while the new format is a bit
-# better structured.
-# But since we are still using the old data format internally, there's
-# some converting back and forth that we do for the time being.
-#
-proc loadfile {merge file args} {
-	global OBJ OBJ_FILE OBJ_MODIFIED OBJ_XL ClockDisplay LastFileComment
-	set no_send [expr {$args} eq {{-nosend}}]
+# loadfile file ?-merge? ?-nosend? ?-force?
+# Load the contents of the named file into memory and display.
+#   if file is empty, prompt user to select one.
+#   -force: ignore unsaved changes
+#   -merge:	don't erase the current contents first
+#   -nosend: don't send the loaded elements to peers as well.
+
+proc loadfile {file args} {
+	global LastFileComment OBJ_MODIFIED OBJ_FILE
+#	global okToLoadMonsters okToLoadPlayers
+	global ClockDisplay
+	global SafMode
+	global TILE_ID
+	global MOBdata MOBid OBJdata OBJtype
+	global canvas
+
+	set mergep false
+	set sendp true
+	set forcep false
+	if {[lsearch -exact $args -force] >= 0} { set forcep true }
+	if {[lsearch -exact $args -merge] >= 0} { set mergep true }
+	if {[lsearch -exact $args -nosend] >= 0} { set sendp false }
 
 	set LastFileComment {}
-	
-	if {$OBJ_MODIFIED && !$merge && !$no_send
-	&& [tk_messageBox -type yesno -default no -icon warning -title "Abandon changes to $OBJ_FILE?"\
-		-message "You have unsaved changes to this map.  Do you want to abandon them and load a new map anyway?"]\
-		ne "yes"} {
+	if {$OBJ_MODIFIED && !$mergep && !$forcep && [tk_messageBox \
+		-type yesno -default no -icon warning \
+		-title "Abandon changes to $OBJ_FILE?"\
+		-message "You have unsaved changes to this map. Do you want to abandon them and load a new map anyway?"\
+	] ne "yes"} {
 		return
 	}
 
-	global okToLoadMonsters okToLoadPlayers
-	if {$no_send} {
-		set okToLoadMonsters yes
-		set okToLoadPlayers yes
-	} else {
-		set okToLoadPlayers ?
-		set okToLoadMonsters ?
-	}
+#	if {$sendp} {
+#		set okToLoadPlayers [set okToLoadMonsters "?"]
+#	} else {
+#		set okToLoadPlayers [set okToLoadMonsters "yes"]
+#	}
 
 	if {$file eq {}} {
 		if {[set file [tk_getOpenFile -defaultextension .map -filetypes {
 			{{GMA Mapper Files} {.map}}
-			{{All Files}        *}
-		} -parent . -title "Load current map from..."]] eq {}} return
+			{{All Files} *}
+		} -parent . -title "Load current map from..."]] eq {}} {
+			return
+		}
 	}
 
 	set oldcd $ClockDisplay
-
+	
 	#
 	# Store-and-Forward Mode:
 	#  (1) Ensure we have a cached version from the server
@@ -2152,7 +2289,6 @@ proc loadfile {merge file args} {
 	#  (3) Send CLR unless merging then M@ to peers
 	#  (4) Proceed to load the local file
 	#
-	global SafMode
 	if {$SafMode} {
 		if {![saf_loadfile $file $oldcd]} {
 			return
@@ -2160,18 +2296,15 @@ proc loadfile {merge file args} {
 		# Now the server has an updated version of our file and we confirmed we can
 		# download it.
 		# Tell the others
-		if {!$merge} {
-			ITsend [list CLR *]
-		}
-		if {!$no_send} {
-			ITsend [list M@ [cache_map_id $file]]
+		if {$sendp} {
+			::gmaproto::load_from [cache_map_id $file] false $mergep
+			set sendp false
 		}
 		set ClockDisplay $oldcd
 	}
 
 	while {[catch {
         set f [open $file r]
-        #set f_size [file size $file]
     } err]} {
 		if {[tk_messageBox -type retrycancel -icon error -default cancel -title "Error opening file"\
 			-message "Unable to open $file: $err" -parent .] eq "cancel"} {
@@ -2179,415 +2312,608 @@ proc loadfile {merge file args} {
 		}
 	}
 
-	if {!$merge} {
+	if {!$mergep} {
 		cleargrid
 	}
 
-	set file_data [::gmafile::load_from_file $f]
-	close $f
-
-	lassign $file_data meta_data record_data
-	set ClockDisplay "Loading [dict get $meta_data Location]..."
-	update
-
-	if {[catch {
-		#
-		# Convert old-format data elements to new format
-		#
-		array unset OldObjs
-		array unset OldMobs
-		foreach record $record_data {
-			lassign $record element_type element_data
-			if {$element_type eq "RAW"} {
-				if {[lindex $element_data 0] eq "P" || [lindex $element_data 0] eq "M"} {
-					#set OldMobs([lindex $element_data 1]) [lrange $element_data 2 end]
-					set OldMobs([lindex $element_data 1]) [lindex $element_data 2]
-				} else {
-					#set OldObjs([lindex $element_data 0]) [lrange $element_data 1 end]
-					set OldObjs([lindex $element_data 0]) [lindex $element_data 1]
-				}
-			}
-		}
-
-		foreach mob_id [array names OldMobs NAME:*] {
-			set mob_id [string range $mob_id 5 end]
-			require_arr OldMobs $mob_id NAME
-			default_arr OldMobs $mob_id GX GY HEALTH ELEV MOVEMODE COLOR NOTE SKIN SKINSIZE SIZE STATUSLIST AOE AREA REACH KILLED DIM
-			if {$OldMobs(HEALTH:$mob_id) eq {}} {
-				set health {}
-			} else {
-				lassign $OldMobs(HEALTH:$mob_id) max ld nld con ff stab cond blur
-				set health [dict create \
-					MaxHP $max \
-					LethalDamage $ld \
-					NonLethalDamage $nld \
-					Con $con \
-					IsFlatFooted $ff \
-					IsStable $stab \
-					Condition $cond \
-					HPBlur $blur \
-				]
-			}
-			if {$OldMobs(AOE:$mob_id) eq {}} {
-				set aoe {}
-			} else {
-				lassign $OldMobs(AOE:$mob_id) r c
-				set aoe [dict create \
-					Radius $r \
-					Color $c \
-				]
-			}
-
-			lappend record_data [list CREATURE [dict create \
-				ID $mob_id \
-				Name $OldMobs(NAME:$mob_id) \
-				Health $health \
-				Gx $OldMobs(GX:$mob_id) \
-				Gy $OldMobs(GY:$mob_id) \
-				Skin $OldMobs(SKIN:$mob_id) \
-				SkinSize $OldMobs(SKINSIZE:$mob_id) \
-				Elev $OldMobs(ELEV:$mob_id) \
-				Color $OldMobs(COLOR:$mob_id) \
-				Note $OldMobs(NOTE:$mob_id) \
-				Size $OldMobs(SIZE:$mob_id) \
-				Area $OldMobs(AREA:$mob_id) \
-				StatusList $OldMobs(STATUSLIST:$mob_id) \
-				AoE  $aoe \
-				MoveMode [::gmaproto::to_enum MoveMode $OldMobs(MOVEMODE:$mob_id)] \
-				Reach $OldMobs(REACH:$mob_id) \
-				Killed $OldMobs(KILLED:$mob_id) \
-				Dim $OldMobs(DIM:$mob_id) \
-				CreatureType [::gmaproto::to_enum CreatureType $OldMobs(TYPE:$mob_id)] \
-			]]
-		}
-
-		foreach obj_id [array names OldObjs TYPE:*] {
-			set obj_id [string range $obj_id 5 end]
-			require_arr OldObjs $obj_id X Y Z
-			default_arr OldObjs $obj_id POINTS LINE FILL WIDTH LAYER LEVEL GROUP DASH HIDDEN LOCKED
-			set obj_type $OldObjs(TYPE:$obj_id)
-
-			switch -exact -- $obj_type {
-				arc - circ {
-					default_arr OldObjs $obj_id ARCMODE START EXTENT
-				}
-				line {
-					default_arr OldObjs $obj_id ARROW
-				}
-				poly {
-					default_arr OldObjs $obj_id SPLINE JOIN
-				}
-				rect {
-				}
-				saoe {
-					require_arr OldObjs $obj_id AOESHAPE
-					default_arr OldObjs $obj_id ARCMODE START EXTENT
-				}
-				text {
-					require_arr OldObjs $obj_id TEXT FONT
-					default_arr OldObjs $obj_id ANCHOR
-				}
-				tile {
-					default_arr OldObjs $obj_id IMAGE BBHEIGHT BBWIDTH
-				}
-				default {
-					error "map element of unsupported type $obj_type"
-				}
-			}
-
-			set points {}
-			foreach {x y} $OldObjs(POINTS:$obj_id) {
-				lappend points [dict create X $x Y $y]
-			}
-
-			set element [dict create \
-				ID $obj_id \
-				X $OldObjs(X:$obj_id) \
-				Y $OldObjs(Y:$obj_id) \
-				Points $points \
-				Z $OldObjs(Z:$obj_id) \
-				Line $OldObjs(LINE:$obj_id) \
-				Fill $OldObjs(FILL:$obj_id) \
-				Width $OldObjs(WIDTH:$obj_id) \
-				Layer $OldObjs(LAYER:$obj_id) \
-				Level $OldObjs(LEVEL:$obj_id) \
-				Group $OldObjs(GROUP:$obj_id) \
-				Dash [::gmaproto::to_enum Dash $OldObjs(DASH:$obj_id)] \
-				Hidden $OldObjs(HIDDEN:$obj_id) \
-				Locked $OldObjs(LOCKED:$obj_id) \
-			]
-
-			switch -exact -- $obj_type {
-				arc {
-					dict set element ArcMode [::gmaproto::to_enum ArcMode $OldObjs(ARCMODE:$obj_id)]
-					dict set element Start $OldObjs(START:$obj_id)
-					dict set element Extent $OldObjs(EXTENT:$obj_id)
-					lappend record_data [list ARC $element]
-				}
-				circ {
-					dict set element ArcMode [::gmaproto::to_enum ArcMode $OldObjs(ARCMODE:$obj_id)]
-					dict set element Start $OldObjs(START:$obj_id)
-					dict set element Extent $OldObjs(EXTENT:$obj_id)
-					lappend record_data [list CIRC $element]
-				}
-				line {
-					dict set element Arrow [::gmaproto::to_enum Arrow $OldObjs(ARROW:$obj_id)]
-					lappend record_data [list LINE $element]
-				}
-				poly {
-					dict set element Spline $OldObjs(SPLINE:$obj_id)
-					dict set element Join [::gmaproto::to_enum Join $OldObjs(JOIN:$obj_id)]
-					lappend record_data [list POLY $element]
-				}
-				rect {
-					lappend record_data [list RECT $element]
-				}
-				saoe {
-					set shape [::gmaproto::to_enum AoEShape $OldObjs(AOESHAPE:$obj_id)]
-					dict set element AoEShape $shape
-					if {$shape == 0 || $shape == 1} {
-						dict set element ArcMode [::gmaproto::to_enum ArcMode $OldObjs(ARCMODE:$obj_id)]
-						dict set element Start $OldObjs(START:$obj_id)
-						dict set element Extent $OldObjs(EXTENT:$obj_id)
-					}
-							
-					lappend record_data [list SAOE $element]
-				}
-				text {
-					# value is {family size normal underline bold overstrike roman italic}
-					lassign [lindex $OldObjs(FONT:$obj_id) 0] family size
-					set weight 0
-					set slant 0
-					if {[info exists OldObjs(ANCHOR:$obj_id)]} {
-						set anchor [::gmaproto::to_enum Anchor $OldObjs(ANCHOR:$obj_id)]
-					} else {
-						set anchor 0
-					}
-
-					foreach option [lrange $OldObjs(FONT:$obj_id) 2 end] {
-						switch -exact -- $option {
-							normal { set weight 0 }
-							bold   { set weight 1 }
-							roman  { set slant 0  }
-							italic { set slant 1  }
-						}
-					}
-					dict set element Text $OldObjs(TEXT:$obj_id)
-					dict set element Font [dict create \
-						Family $family \
-						Size $size \
-						Weight $weight \
-						Slant $slant \
-						Anchor $anchor \
-					]
-					lappend record_data [list TEXT $element]
-				} tile {
-					dict set element Image $OldObjs(IMAGE:$obj_id)
-					dict set element BBHeight $OldObjs(BBHEIGHT:$obj_id)
-					dict set element BBWidth $OldObjs(BBWIDTH:$obj_id)
-					lappend record_data [list TILE $element]
-				}
-			}
-		}
-
-		#
-		# Digest read-in data and pass on to peers (maybe)
-		#
-		foreach record $record_data {
-			lassign $record element_type element_data
-			if {$element_type eq "RAW"} {
-				continue
-			}
-			if {$element_type eq "CREATURE"} {
-				set id [dict get $element_data ID]
-				set ctype [dict get $element_data CreatureType]
-				if {$ctype == 2} {
-					set prefix P
-					loadElement [list $prefix TYPE:$id player]
-				} else {
-					set prefix M
-					loadElement [list $prefix TYPE:$id monster]
-				}
-				foreach fld {Name Gx Gy Elev Color Note Skin SkinSize Size StatusList Area Reach Killed Dim} {
-					loadElement [list $prefix [string toupper $fld]:$id [dict get $element_data $fld]]
-				}
-				if {[dict get $element_data AoE] ne {}} {
-					loadElement [list $prefix AOE:$id radius [dict get $element_data AoE Radius] [dict get $element_data AoE Color]]
-				}
-				loadElement [list $prefix MOVEMODE:$id [::gmaproto::from_enum MoveMode [dict get $element_data MoveMode]]]
-				if {[dict get $element_data Health] ne {}} {
-					loadElement [list $prefix HEALTH:$id [list [dict get $element_data Health MaxHP] [dict get $element_data Health LethalDamage] [dict get $element_data Health NonLethalDamage] [dict get $element_data Health Con] [dict get $element_data Health IsFlatFooted] [dict get $element_data Health IsStable] [dict get $element_data Health Condition] [dict get $element_data Health HPBlur]]]
-				}
-				if {!$no_send} {
-					::gmaproto::_protocol_send PS {*}$element_data
-				}
-				continue
-			} else {
-				#
-				# accept data common to all map elements
-				#
-				set id [dict get $element_data ID]
-				foreach fld {X Y Z Line Fill Width Layer Level Group Hidden Locked} {
-					loadElement [list [string toupper $fld]:$id [dict get $element_data $fld]]
-				}
-				set p {}
-				foreach pt [dict get $element_data Points] {
-					lappend p [dict get $pt X]
-					lappend p [dict get $pt Y]
-				}
-				loadElement [list POINTS:$id $p]
-				loadElement [list DASH:$id [::gmaproto::from_enum Dash [dict get $element_data Dash]]]
-				#
-				# now element-specific stuff
-				#
-				switch -exact -- $element_type {
-					ARC - CIRC {
-						loadElement [list TYPE:$id [string tolower $element_type]]
-						loadElement [list ARCMODE:$id [::gmaproto::from_enum ArcMode [dict get $element_data ArcMode]]]
-						loadElement [list START:$id [dict get $element_data Start]]
-						loadElement [list EXTENT:$id [dict get $element_data Extent]]
-					}
-					IMG {
-						DEBUG 2 "Defining image $element_data"
-						set image_id [dict get $element_data Name]
-						foreach instance [dict get $element_data Sizes] {
-							DEBUG 2 "...$instance"
-
-							if {![dict get $instance IsLocalFile]} {
-								DEBUG 3 "Image is on server. Retrieving..."
-								set image_zoom [dict get $instance Zoom]
-								set image_filename [dict get $instance File]
-								fetch_image $image_id $image_zoom $image_filename
-								global TILE_ID
-								set TILE_ID([tile_id $image_id $image_zoom]) $image_filename
-								if {!$SafMode && !$no_send} {
-									::gmaproto::add_image $image_id [list [dict create File $image_filename ImageData {} IsLocalFile false Zoom $image_zoom]]
-								}
-							} else {
-								if {[catch {set image_file [open $image_filename r]} err]} {
-									DEBUG 0 "Can't open image file $image_filename for $image_id at zoom $image_zoom: $err"
-									continue
-								}
-
-								fconfigure $image_file -encoding binary -translation binary 
-								if [catch {set image_data [read $image_file]} err] {
-									DEBUG 0 "Can't read data from image file $image_filename: $err"
-									close $image_file
-									continue
-								}
-								close $image_file
-
-								global TILE_SET
-								if [info exists TILE_SET([tile_id $image_id $image_zoom])] {
-									DEBUG 1 "Replacing existing image $TILE_SET([tile_id $image_id $image_zoom]) for ${image_id} x$image_zoom"
-									image delete $TILE_SET([tile_id $image_id $image_zoom])
-									unset TILE_SET([tile_id $image_id $image_zoom])
-								}
-								if [catch {set TILE_SET([tile_id $image_id $image_zoom]) [image create photo -format gif -data $image_data]} err] {
-									DEBUG 0 "Can't use data read from image file $image_filename: $err"
-									continue
-								}
-								DEBUG 3 "Created image $TILE_SET([tile_id $image_id $image_zoom]) for $image_id, zoom $image_zoom len=[string length $image_data]"
-								#
-								# Looks like the image is valid.  Send it to everyone else too...
-								#
-								if {!$SafMode && !$no_send} {
-									::gmaproto::add_image $image_id [list [dict create File {} ImageData $image_data IsLocalFile true Zoom $image_zoom]]
-								}
-							}
-						}
-						continue	;# don't send this at bottom of loop
-					}
-					LINE {
-						loadElement [list TYPE:$id line]
-						loadElement [list ARROW:$id [::gmaproto::from_enum Arrow [dict get $element_data Arrow]]]
-					}
-					MAP {
-						set map_id [dict get $element_data File]
-						DEBUG 2 "Defining map file $map_id"
-						if [catch {
-							set cache_filename [fetch_map_file $map_id]
-							DEBUG 1 "Pre-load: map ID $map_id cached as $cache_filename"
-						} err] {
-							if {$err eq {NOSUCH}} {
-								DEBUG 0 "We were asked to pre-load map file with ID $map_id but the server doesn't have it"
-							} else {
-								say "Error retrieving map ID $map_id from server: $err"
-							}
-						}
-						if {!$no_send} {
-							::gmaproto::load_from $map_id true false
-						}
-						continue	;# skip sending to clients below
-					}
-					POLY {
-						loadElement [list TYPE:$id poly]
-						loadElement [list SPLINE:$id [dict get $element_data Spline]]
-						loadElement [list JOIN:$id [::gmaproto::from_enum Join [dict get $element_data Join]]]
-					}
-					RECT {
-						loadElement [list TYPE:$id rect]
-					}
-					SAOE {
-						loadElement [list TYPE:$id saoe]
-						set shape [dict get $element_data AoEShape]
-						loadElement [list AOESHAPE:$id [::gmaproto::from_enum AoEShape $shape]]
-						if {$shape == 0 || $shape == 1} {
-							loadElement [list ARCMODE:$id [::gmaproto::from_enum ArcMode [dict get $element_data ArcMode]]]
-							loadElement [list START:$id [dict get $element_data Start]]
-							loadElement [list EXTENT:$id [dict get $element_data Extent]]
-						}
-					}
-					TEXT {
-						loadElement [list TYPE:$id text]
-						loadElement [list TEXT:$id [dict get $element_data Text]]
-
-						set tclfont [list [dict get $element_data Font Family] [dict get $element_data Font Size]]
-						if {[dict get $element_data Font Weight] != 0} {
-							lappend tclfont "bold"
-						}
-						if {[dict get $element_data Font Slant] != 0} {
-							lappend tclfont "italic"
-						}
-						loadElement [list FONT:$id [list $tclfont]]
-						loadElement [list ANCHOR:$id [::gmaproto::from_enum Anchor [dict get $element_data Font Anchor]]]
-					}
-					TILE {
-						loadElement [list TYPE:$id tile]
-						loadElement [list IMAGE:$id [dict get $element_data Image]]
-						loadElement [list BBHEIGHT:$id [dict get $element_data BBHeight]]
-						loadElement [list BBWIDTH:$id [dict get $element_data BBWidth]]
-					}
-					RAW {
-						continue
-					}
-				}
-
-				if {!$no_send} {
-					::gmaproto::ls $element_type $element_data
-				}
-			}
-		}
-	} err]} {
-		catch { cleargrid }
-		catch { unset OBJ }
-		tk_messageBox -type ok -icon error -title "Error loading file"\
-			-message $err -parent .
-		set ClockDisplay $oldcd
+	if [catch {
+		set file_data [::gmafile::load_from_file $f]
+		close $f
+	} err] {
+		say "Error loading map data from file: $err"
+		catch {close $f}
 		return
 	}
 
-	garbageCollectGrid
-	RefreshGrid 0
+	lassign $file_data meta_data record_data		;# record data is {{type dict} ...}
+	set ClockDisplay "Loading [dict get $meta_data Location]..."
+	update
+
+	if [catch {
+		foreach record $record_data {
+			lassign $record element_type d
+			switch -exact -- $element_type {
+				IMG {
+					DEBUG 2 "Defining image $d"
+					set image_id [dict get $d Name]
+					foreach instance [dict get $d Sizes] {
+						DEBUG 2 "... $instance"
+						if {![dict get $instance IsLocalFile]} {
+							DEBUG 3 "Image is supposed to be on the server. Retrieving..."
+							::gmautil::dassign $instance Zoom image_zoom File image_filename
+							fetch_image $image_id $image_zoom $image_filename
+							set TILE_ID([tile_id $image_id $image_zoom]) $image_filename
+						} else {
+							if {[catch {set image_file [open $image_filename r]} err]} {
+								DEBUG 0 "Can't open image file $image_filename for $image_id at zoom $image_zoom: $err"
+								continue
+							}
+							fconfigure $image_file -encoding binary -translation binary
+							if [catch {set image_data [read $image_file]} err] {
+								DEBUG 0 "Can't read data from image file $image_filename: $err"
+								close $image_file
+								continue
+							}
+							close $image_file
+
+							if [info exists TILE_SET([tile_id $image_id $image_zoom])] {
+								DEBUG 1 "Replacing existing image $TILE_SET([tile_id $image_id $image_zoom]) for ${image_id} x$image_zoom"
+								image delete $TILE_SET([tile_id $image_id $image_zoom])
+								unset TILE_SET([tile_id $image_id $image_zoom])
+							}
+							if [catch {set TILE_SET([tile_id $image_id $image_zoom]) [image create photo -format gif -data $image_data]} err] {
+								DEBUG 0 "Can't use data read from image file $image_filename: $err"
+								continue
+							}
+							DEBUG 3 "Created image $TILE_SET([tile_id $image_id $image_zoom]) for $image_id, zoom $image_zoom len=[string length $image_data]"
+							#
+							# Looks like the image is valid.  Send it to everyone else too...
+							# This is deprecated but we'll do it anyway for now.
+							#
+							if {$sendp} {
+								DEBUG 0 "Sending raw image data like this is deprecated. You should upload image files to the server instead and just refernce them in map files."
+								::gmaproto::add_image $image_id [list [dict create ImageData $image_data Zoom $image_zoom]]
+							}
+						}
+					}
+					if {$sendp} {
+						::gmaproto::add_image $image_id [dict get $d Sizes]
+					}
+				}
+				MAP {
+					set map_id [dict get $element_data File]
+					DEBUG 2 "Defining map file $map_id"
+					if [catch {
+						set cache_filename [fetch_map_file $map_id]
+						DEBUG 1 "Pre-load: map ID $map_id cached as $cache_filename"
+					} err] {
+						if {$err eq {NOSUCH}} {
+							DEBUG 0 "We were asked to pre-load map file with ID $map_id but the server doesn't have it"
+						} else {
+							say "Error retrieving map ID $map_id from server: $err"
+						}
+					}
+					if {$sendp} {
+						::gmaproto::load_from $map_id true false
+					}
+				}
+				CREATURE {
+					PlaceSomeone $canvas $d
+					if {$sendp} {
+						::gmaproto::place_someone_d $d
+					}
+				}
+				default {
+					if [catch {set etype [::gmaproto::GMATypeToObjType $element_type]} err] {
+						DEBUG 0 "Can't load element of unknown type $element_type."
+						continue
+					}
+					set OBJdata([dict get $d ID]) $d
+					set OBJtype([dict get $d ID]) $etype
+					if {$sendp} {
+						::gmaproto::ls $element_type $d
+					}
+				}
+			}
+		}
+	} err] {
+		say "Failed to import data: $err"
+		return
+	}
+
+	RefreshGrid false
 	RefreshMOBs
-	modifiedflag $file 0
+	modifiedflag $file false
 	set ClockDisplay $oldcd
 	update
 }
+# TODO use explicit -force (was implied before by !-nosend)
+# TODO make sure commands that send updates to peers don't when we're the receiver
 
+#DEL##
+#DEL## This is a little convoluted but is so because it's in a transition
+#DEL## between data formats. The old file was a simple data dump of the
+#DEL## internal arrays holding map data, while the new format is a bit
+#DEL## better structured.
+#DEL## But since we are still using the old data format internally, there's
+#DEL## some converting back and forth that we do for the time being.
+#DEL##
+#DEL#proc loadfile {merge file args} {
+#DEL#	global OBJ OBJ_FILE OBJ_MODIFIED OBJ_XL ClockDisplay LastFileComment
+#DEL#	set no_send [expr {$args} eq {{-nosend}}]
+#DEL#
+#DEL#	set LastFileComment {}
+#DEL#	
+#DEL#	if {$OBJ_MODIFIED && !$merge && !$no_send
+#DEL#	&& [tk_messageBox -type yesno -default no -icon warning -title "Abandon changes to $OBJ_FILE?"\
+#DEL#		-message "You have unsaved changes to this map.  Do you want to abandon them and load a new map anyway?"]\
+#DEL#		ne "yes"} {
+#DEL#		return
+#DEL#	}
+#DEL#
+#DEL#	global okToLoadMonsters okToLoadPlayers
+#DEL#	if {$no_send} {
+#DEL#		set okToLoadMonsters yes
+#DEL#		set okToLoadPlayers yes
+#DEL#	} else {
+#DEL#		set okToLoadPlayers ?
+#DEL#		set okToLoadMonsters ?
+#DEL#	}
+#DEL#
+#DEL#	if {$file eq {}} {
+#DEL#		if {[set file [tk_getOpenFile -defaultextension .map -filetypes {
+#DEL#			{{GMA Mapper Files} {.map}}
+#DEL#			{{All Files}        *}
+#DEL#		} -parent . -title "Load current map from..."]] eq {}} return
+#DEL#	}
+#DEL#
+#DEL#	set oldcd $ClockDisplay
+#DEL#
+#DEL#	#
+#DEL#	# Store-and-Forward Mode:
+#DEL#	#  (1) Ensure we have a cached version from the server
+#DEL#	#  (2) If we don't, or it's older than the local one, upload the local file to the server and try again
+#DEL#	#  (3) Send CLR unless merging then M@ to peers
+#DEL#	#  (4) Proceed to load the local file
+#DEL#	#
+#DEL#	global SafMode
+#DEL#	if {$SafMode} {
+#DEL#		if {![saf_loadfile $file $oldcd]} {
+#DEL#			return
+#DEL#		}
+#DEL#		# Now the server has an updated version of our file and we confirmed we can
+#DEL#		# download it.
+#DEL#		# Tell the others
+#DEL#		if {!$no_send} {
+#DEL#			::gmaproto::load_from [cache_map_id $file] $merge
+#DEL#		}
+#DEL#		set ClockDisplay $oldcd
+#DEL#	}
+#DEL#
+#DEL#	while {[catch {
+#DEL#        set f [open $file r]
+#DEL#        #set f_size [file size $file]
+#DEL#    } err]} {
+#DEL#		if {[tk_messageBox -type retrycancel -icon error -default cancel -title "Error opening file"\
+#DEL#			-message "Unable to open $file: $err" -parent .] eq "cancel"} {
+#DEL#				return
+#DEL#		}
+#DEL#	}
+#DEL#
+#DEL#	if {!$merge} {
+#DEL#		cleargrid
+#DEL#	}
+#DEL#
+#DEL#	set file_data [::gmafile::load_from_file $f]
+#DEL#	close $f
+#DEL#
+#DEL#	lassign $file_data meta_data record_data
+#DEL#	set ClockDisplay "Loading [dict get $meta_data Location]..."
+#DEL#	update
+#DEL#
+#DEL#	if {[catch {
+#DEL#		#
+#DEL#		# Convert old-format data elements to new format
+#DEL#		#
+#DEL#		array unset OldObjs
+#DEL#		array unset OldMobs
+#DEL#		foreach record $record_data {
+#DEL#			lassign $record element_type element_data
+#DEL#			if {$element_type eq "RAW"} {
+#DEL#				if {[lindex $element_data 0] eq "P" || [lindex $element_data 0] eq "M"} {
+#DEL#					#set OldMobs([lindex $element_data 1]) [lrange $element_data 2 end]
+#DEL#					set OldMobs([lindex $element_data 1]) [lindex $element_data 2]
+#DEL#				} else {
+#DEL#					#set OldObjs([lindex $element_data 0]) [lrange $element_data 1 end]
+#DEL#					set OldObjs([lindex $element_data 0]) [lindex $element_data 1]
+#DEL#				}
+#DEL#			}
+#DEL#		}
+#DEL#
+#DEL#		foreach mob_id [array names OldMobs NAME:*] {
+#DEL#			set mob_id [string range $mob_id 5 end]
+#DEL#			require_arr OldMobs $mob_id NAME
+#DEL#			default_arr OldMobs $mob_id GX GY HEALTH ELEV MOVEMODE COLOR NOTE SKIN SKINSIZE SIZE STATUSLIST AOE AREA REACH KILLED DIM
+#DEL#			if {$OldMobs(HEALTH:$mob_id) eq {}} {
+#DEL#				set health {}
+#DEL#			} else {
+#DEL#				lassign $OldMobs(HEALTH:$mob_id) max ld nld con ff stab cond blur
+#DEL#				set health [dict create \
+#DEL#					MaxHP $max \
+#DEL#					LethalDamage $ld \
+#DEL#					NonLethalDamage $nld \
+#DEL#					Con $con \
+#DEL#					IsFlatFooted $ff \
+#DEL#					IsStable $stab \
+#DEL#					Condition $cond \
+#DEL#					HPBlur $blur \
+#DEL#				]
+#DEL#			}
+#DEL#			if {$OldMobs(AOE:$mob_id) eq {}} {
+#DEL#				set aoe {}
+#DEL#			} else {
+#DEL#				lassign $OldMobs(AOE:$mob_id) r c
+#DEL#				set aoe [dict create \
+#DEL#					Radius $r \
+#DEL#					Color $c \
+#DEL#				]
+#DEL#			}
+#DEL#
+#DEL#			lappend record_data [list CREATURE [dict create \
+#DEL#				ID $mob_id \
+#DEL#				Name $OldMobs(NAME:$mob_id) \
+#DEL#				Health $health \
+#DEL#				Gx $OldMobs(GX:$mob_id) \
+#DEL#				Gy $OldMobs(GY:$mob_id) \
+#DEL#				Skin $OldMobs(SKIN:$mob_id) \
+#DEL#				SkinSize $OldMobs(SKINSIZE:$mob_id) \
+#DEL#				Elev $OldMobs(ELEV:$mob_id) \
+#DEL#				Color $OldMobs(COLOR:$mob_id) \
+#DEL#				Note $OldMobs(NOTE:$mob_id) \
+#DEL#				Size $OldMobs(SIZE:$mob_id) \
+#DEL#				Area $OldMobs(AREA:$mob_id) \
+#DEL#				StatusList $OldMobs(STATUSLIST:$mob_id) \
+#DEL#				AoE  $aoe \
+#DEL#				MoveMode [::gmaproto::to_enum MoveMode $OldMobs(MOVEMODE:$mob_id)] \
+#DEL#				Reach $OldMobs(REACH:$mob_id) \
+#DEL#				Killed $OldMobs(KILLED:$mob_id) \
+#DEL#				Dim $OldMobs(DIM:$mob_id) \
+#DEL#				CreatureType [::gmaproto::to_enum CreatureType $OldMobs(TYPE:$mob_id)] \
+#DEL#			]]
+#DEL#		}
+#DEL#
+#DEL#		foreach obj_id [array names OldObjs TYPE:*] {
+#DEL#			set obj_id [string range $obj_id 5 end]
+#DEL#			require_arr OldObjs $obj_id X Y Z
+#DEL#			default_arr OldObjs $obj_id POINTS LINE FILL WIDTH LAYER LEVEL GROUP DASH HIDDEN LOCKED
+#DEL#			set obj_type $OldObjs(TYPE:$obj_id)
+#DEL#
+#DEL#			switch -exact -- $obj_type {
+#DEL#				arc - circ {
+#DEL#					default_arr OldObjs $obj_id ARCMODE START EXTENT
+#DEL#				}
+#DEL#				line {
+#DEL#					default_arr OldObjs $obj_id ARROW
+#DEL#				}
+#DEL#				poly {
+#DEL#					default_arr OldObjs $obj_id SPLINE JOIN
+#DEL#				}
+#DEL#				rect {
+#DEL#				}
+#DEL#				saoe {
+#DEL#					require_arr OldObjs $obj_id AOESHAPE
+#DEL#					default_arr OldObjs $obj_id ARCMODE START EXTENT
+#DEL#				}
+#DEL#				text {
+#DEL#					require_arr OldObjs $obj_id TEXT FONT
+#DEL#					default_arr OldObjs $obj_id ANCHOR
+#DEL#				}
+#DEL#				tile {
+#DEL#					default_arr OldObjs $obj_id IMAGE BBHEIGHT BBWIDTH
+#DEL#				}
+#DEL#				default {
+#DEL#					error "map element of unsupported type $obj_type"
+#DEL#				}
+#DEL#			}
+#DEL#
+#DEL#			set points {}
+#DEL#			foreach {x y} $OldObjs(POINTS:$obj_id) {
+#DEL#				lappend points [dict create X $x Y $y]
+#DEL#			}
+#DEL#
+#DEL#			set element [dict create \
+#DEL#				ID $obj_id \
+#DEL#				X $OldObjs(X:$obj_id) \
+#DEL#				Y $OldObjs(Y:$obj_id) \
+#DEL#				Points $points \
+#DEL#				Z $OldObjs(Z:$obj_id) \
+#DEL#				Line $OldObjs(LINE:$obj_id) \
+#DEL#				Fill $OldObjs(FILL:$obj_id) \
+#DEL#				Width $OldObjs(WIDTH:$obj_id) \
+#DEL#				Layer $OldObjs(LAYER:$obj_id) \
+#DEL#				Level $OldObjs(LEVEL:$obj_id) \
+#DEL#				Group $OldObjs(GROUP:$obj_id) \
+#DEL#				Dash [::gmaproto::to_enum Dash $OldObjs(DASH:$obj_id)] \
+#DEL#				Hidden $OldObjs(HIDDEN:$obj_id) \
+#DEL#				Locked $OldObjs(LOCKED:$obj_id) \
+#DEL#			]
+#DEL#
+#DEL#			switch -exact -- $obj_type {
+#DEL#				arc {
+#DEL#					dict set element ArcMode [::gmaproto::to_enum ArcMode $OldObjs(ARCMODE:$obj_id)]
+#DEL#					dict set element Start $OldObjs(START:$obj_id)
+#DEL#					dict set element Extent $OldObjs(EXTENT:$obj_id)
+#DEL#					lappend record_data [list ARC $element]
+#DEL#				}
+#DEL#				circ {
+#DEL#					dict set element ArcMode [::gmaproto::to_enum ArcMode $OldObjs(ARCMODE:$obj_id)]
+#DEL#					dict set element Start $OldObjs(START:$obj_id)
+#DEL#					dict set element Extent $OldObjs(EXTENT:$obj_id)
+#DEL#					lappend record_data [list CIRC $element]
+#DEL#				}
+#DEL#				line {
+#DEL#					dict set element Arrow [::gmaproto::to_enum Arrow $OldObjs(ARROW:$obj_id)]
+#DEL#					lappend record_data [list LINE $element]
+#DEL#				}
+#DEL#				poly {
+#DEL#					dict set element Spline $OldObjs(SPLINE:$obj_id)
+#DEL#					dict set element Join [::gmaproto::to_enum Join $OldObjs(JOIN:$obj_id)]
+#DEL#					lappend record_data [list POLY $element]
+#DEL#				}
+#DEL#				rect {
+#DEL#					lappend record_data [list RECT $element]
+#DEL#				}
+#DEL#				saoe {
+#DEL#					set shape [::gmaproto::to_enum AoEShape $OldObjs(AOESHAPE:$obj_id)]
+#DEL#					dict set element AoEShape $shape
+#DEL#					if {$shape == 0 || $shape == 1} {
+#DEL#						dict set element ArcMode [::gmaproto::to_enum ArcMode $OldObjs(ARCMODE:$obj_id)]
+#DEL#						dict set element Start $OldObjs(START:$obj_id)
+#DEL#						dict set element Extent $OldObjs(EXTENT:$obj_id)
+#DEL#					}
+#DEL#							
+#DEL#					lappend record_data [list SAOE $element]
+#DEL#				}
+#DEL#				text {
+#DEL#					# value is {family size normal underline bold overstrike roman italic}
+#DEL#					lassign [lindex $OldObjs(FONT:$obj_id) 0] family size
+#DEL#					set weight 0
+#DEL#					set slant 0
+#DEL#					if {[info exists OldObjs(ANCHOR:$obj_id)]} {
+#DEL#						set anchor [::gmaproto::to_enum Anchor $OldObjs(ANCHOR:$obj_id)]
+#DEL#					} else {
+#DEL#						set anchor 0
+#DEL#					}
+#DEL#
+#DEL#					foreach option [lrange $OldObjs(FONT:$obj_id) 2 end] {
+#DEL#						switch -exact -- $option {
+#DEL#							normal { set weight 0 }
+#DEL#							bold   { set weight 1 }
+#DEL#							roman  { set slant 0  }
+#DEL#							italic { set slant 1  }
+#DEL#						}
+#DEL#					}
+#DEL#					dict set element Text $OldObjs(TEXT:$obj_id)
+#DEL#					dict set element Font [dict create \
+#DEL#						Family $family \
+#DEL#						Size $size \
+#DEL#						Weight $weight \
+#DEL#						Slant $slant \
+#DEL#						Anchor $anchor \
+#DEL#					]
+#DEL#					lappend record_data [list TEXT $element]
+#DEL#				} tile {
+#DEL#					dict set element Image $OldObjs(IMAGE:$obj_id)
+#DEL#					dict set element BBHeight $OldObjs(BBHEIGHT:$obj_id)
+#DEL#					dict set element BBWidth $OldObjs(BBWIDTH:$obj_id)
+#DEL#					lappend record_data [list TILE $element]
+#DEL#				}
+#DEL#			}
+#DEL#		}
+#DEL#
+#DEL#		#
+#DEL#		# Digest read-in data and pass on to peers (maybe)
+#DEL#		#
+#DEL#		foreach record $record_data {
+#DEL#			lassign $record element_type element_data
+#DEL#			if {$element_type eq "RAW"} {
+#DEL#				continue
+#DEL#			}
+#DEL#			if {$element_type eq "CREATURE"} {
+#DEL#				set id [dict get $element_data ID]
+#DEL#				set ctype [dict get $element_data CreatureType]
+#DEL#				if {$ctype == 2} {
+#DEL#					set prefix P
+#DEL#					loadElement [list $prefix TYPE:$id player]
+#DEL#				} else {
+#DEL#					set prefix M
+#DEL#					loadElement [list $prefix TYPE:$id monster]
+#DEL#				}
+#DEL#				foreach fld {Name Gx Gy Elev Color Note Skin SkinSize Size StatusList Area Reach Killed Dim} {
+#DEL#					loadElement [list $prefix [string toupper $fld]:$id [dict get $element_data $fld]]
+#DEL#				}
+#DEL#				if {[dict get $element_data AoE] ne {}} {
+#DEL#					loadElement [list $prefix AOE:$id radius [dict get $element_data AoE Radius] [dict get $element_data AoE Color]]
+#DEL#				}
+#DEL#				loadElement [list $prefix MOVEMODE:$id [::gmaproto::from_enum MoveMode [dict get $element_data MoveMode]]]
+#DEL#				if {[dict get $element_data Health] ne {}} {
+#DEL#					loadElement [list $prefix HEALTH:$id [list [dict get $element_data Health MaxHP] [dict get $element_data Health LethalDamage] [dict get $element_data Health NonLethalDamage] [dict get $element_data Health Con] [dict get $element_data Health IsFlatFooted] [dict get $element_data Health IsStable] [dict get $element_data Health Condition] [dict get $element_data Health HPBlur]]]
+#DEL#				}
+#DEL#				if {!$no_send} {
+#DEL#					::gmaproto::_protocol_send PS {*}$element_data
+#DEL#				}
+#DEL#				continue
+#DEL#			} else {
+#DEL#				#
+#DEL#				# accept data common to all map elements
+#DEL#				#
+#DEL#				set id [dict get $element_data ID]
+#DEL#				foreach fld {X Y Z Line Fill Width Layer Level Group Hidden Locked} {
+#DEL#					loadElement [list [string toupper $fld]:$id [dict get $element_data $fld]]
+#DEL#				}
+#DEL#				set p {}
+#DEL#				foreach pt [dict get $element_data Points] {
+#DEL#					lappend p [dict get $pt X]
+#DEL#					lappend p [dict get $pt Y]
+#DEL#				}
+#DEL#				loadElement [list POINTS:$id $p]
+#DEL#				loadElement [list DASH:$id [::gmaproto::from_enum Dash [dict get $element_data Dash]]]
+#DEL#				#
+#DEL#				# now element-specific stuff
+#DEL#				#
+#DEL#				switch -exact -- $element_type {
+#DEL#					ARC - CIRC {
+#DEL#						loadElement [list TYPE:$id [string tolower $element_type]]
+#DEL#						loadElement [list ARCMODE:$id [::gmaproto::from_enum ArcMode [dict get $element_data ArcMode]]]
+#DEL#						loadElement [list START:$id [dict get $element_data Start]]
+#DEL#						loadElement [list EXTENT:$id [dict get $element_data Extent]]
+#DEL#					}
+#DEL#					IMG {
+#DEL#						DEBUG 2 "Defining image $element_data"
+#DEL#						set image_id [dict get $element_data Name]
+#DEL#						foreach instance [dict get $element_data Sizes] {
+#DEL#							DEBUG 2 "...$instance"
+#DEL#
+#DEL#							if {![dict get $instance IsLocalFile]} {
+#DEL#								DEBUG 3 "Image is on server. Retrieving..."
+#DEL#								set image_zoom [dict get $instance Zoom]
+#DEL#								set image_filename [dict get $instance File]
+#DEL#								fetch_image $image_id $image_zoom $image_filename
+#DEL#								global TILE_ID
+#DEL#								set TILE_ID([tile_id $image_id $image_zoom]) $image_filename
+#DEL#								if {!$SafMode && !$no_send} {
+#DEL#									::gmaproto::add_image $image_id [list [dict create File $image_filename ImageData {} IsLocalFile false Zoom $image_zoom]]
+#DEL#								}
+#DEL#							} else {
+#DEL#								if {[catch {set image_file [open $image_filename r]} err]} {
+#DEL#									DEBUG 0 "Can't open image file $image_filename for $image_id at zoom $image_zoom: $err"
+#DEL#									continue
+#DEL#								}
+#DEL#
+#DEL#								fconfigure $image_file -encoding binary -translation binary 
+#DEL#								if [catch {set image_data [read $image_file]} err] {
+#DEL#									DEBUG 0 "Can't read data from image file $image_filename: $err"
+#DEL#									close $image_file
+#DEL#									continue
+#DEL#								}
+#DEL#								close $image_file
+#DEL#
+#DEL#								global TILE_SET
+#DEL#								if [info exists TILE_SET([tile_id $image_id $image_zoom])] {
+#DEL#									DEBUG 1 "Replacing existing image $TILE_SET([tile_id $image_id $image_zoom]) for ${image_id} x$image_zoom"
+#DEL#									image delete $TILE_SET([tile_id $image_id $image_zoom])
+#DEL#									unset TILE_SET([tile_id $image_id $image_zoom])
+#DEL#								}
+#DEL#								if [catch {set TILE_SET([tile_id $image_id $image_zoom]) [image create photo -format gif -data $image_data]} err] {
+#DEL#									DEBUG 0 "Can't use data read from image file $image_filename: $err"
+#DEL#									continue
+#DEL#								}
+#DEL#								DEBUG 3 "Created image $TILE_SET([tile_id $image_id $image_zoom]) for $image_id, zoom $image_zoom len=[string length $image_data]"
+#DEL#								#
+#DEL#								# Looks like the image is valid.  Send it to everyone else too...
+#DEL#								#
+#DEL#								if {!$SafMode && !$no_send} {
+#DEL#									::gmaproto::add_image $image_id [list [dict create File {} ImageData $image_data IsLocalFile true Zoom $image_zoom]]
+#DEL#								}
+#DEL#							}
+#DEL#						}
+#DEL#						continue	;# don't send this at bottom of loop
+#DEL#					}
+#DEL#					LINE {
+#DEL#						loadElement [list TYPE:$id line]
+#DEL#						loadElement [list ARROW:$id [::gmaproto::from_enum Arrow [dict get $element_data Arrow]]]
+#DEL#					}
+#DEL#					MAP {
+#DEL#						set map_id [dict get $element_data File]
+#DEL#						DEBUG 2 "Defining map file $map_id"
+#DEL#						if [catch {
+#DEL#							set cache_filename [fetch_map_file $map_id]
+#DEL#							DEBUG 1 "Pre-load: map ID $map_id cached as $cache_filename"
+#DEL#						} err] {
+#DEL#							if {$err eq {NOSUCH}} {
+#DEL#								DEBUG 0 "We were asked to pre-load map file with ID $map_id but the server doesn't have it"
+#DEL#							} else {
+#DEL#								say "Error retrieving map ID $map_id from server: $err"
+#DEL#							}
+#DEL#						}
+#DEL#						if {!$no_send} {
+#DEL#							::gmaproto::load_from $map_id true false
+#DEL#						}
+#DEL#						continue	;# skip sending to clients below
+#DEL#					}
+#DEL#					POLY {
+#DEL#						loadElement [list TYPE:$id poly]
+#DEL#						loadElement [list SPLINE:$id [dict get $element_data Spline]]
+#DEL#						loadElement [list JOIN:$id [::gmaproto::from_enum Join [dict get $element_data Join]]]
+#DEL#					}
+#DEL#					RECT {
+#DEL#						loadElement [list TYPE:$id rect]
+#DEL#					}
+#DEL#					SAOE {
+#DEL#						loadElement [list TYPE:$id saoe]
+#DEL#						set shape [dict get $element_data AoEShape]
+#DEL#						loadElement [list AOESHAPE:$id [::gmaproto::from_enum AoEShape $shape]]
+#DEL#						if {$shape == 0 || $shape == 1} {
+#DEL#							loadElement [list ARCMODE:$id [::gmaproto::from_enum ArcMode [dict get $element_data ArcMode]]]
+#DEL#							loadElement [list START:$id [dict get $element_data Start]]
+#DEL#							loadElement [list EXTENT:$id [dict get $element_data Extent]]
+#DEL#						}
+#DEL#					}
+#DEL#					TEXT {
+#DEL#						loadElement [list TYPE:$id text]
+#DEL#						loadElement [list TEXT:$id [dict get $element_data Text]]
+#DEL#
+#DEL#						set tclfont [list [dict get $element_data Font Family] [dict get $element_data Font Size]]
+#DEL#						if {[dict get $element_data Font Weight] != 0} {
+#DEL#							lappend tclfont "bold"
+#DEL#						}
+#DEL#						if {[dict get $element_data Font Slant] != 0} {
+#DEL#							lappend tclfont "italic"
+#DEL#						}
+#DEL#						loadElement [list FONT:$id [list $tclfont]]
+#DEL#						loadElement [list ANCHOR:$id [::gmaproto::from_enum Anchor [dict get $element_data Font Anchor]]]
+#DEL#					}
+#DEL#					TILE {
+#DEL#						loadElement [list TYPE:$id tile]
+#DEL#						loadElement [list IMAGE:$id [dict get $element_data Image]]
+#DEL#						loadElement [list BBHEIGHT:$id [dict get $element_data BBHeight]]
+#DEL#						loadElement [list BBWIDTH:$id [dict get $element_data BBWidth]]
+#DEL#					}
+#DEL#					RAW {
+#DEL#						continue
+#DEL#					}
+#DEL#				}
+#DEL#
+#DEL#				if {!$no_send} {
+#DEL#					::gmaproto::ls $element_type $element_data
+#DEL#				}
+#DEL#			}
+#DEL#		}
+#DEL#	} err]} {
+#DEL#		catch { cleargrid }
+#DEL#		catch { unset OBJ }
+#DEL#		tk_messageBox -type ok -icon error -title "Error loading file"\
+#DEL#			-message $err -parent .
+#DEL#		set ClockDisplay $oldcd
+#DEL#		return
+#DEL#	}
+#DEL#
+#DEL#	garbageCollectGrid
+#DEL#	RefreshGrid 0
+#DEL#	RefreshMOBs
+#DEL#	modifiedflag $file 0
+#DEL#	set ClockDisplay $oldcd
+#DEL#	update
+#DEL#}
+
+# unloadfile file ?-nosend? ?-force?
 proc unloadfile {file args} {
-	global OBJ OBJ_FILE OBJ_MODIFIED OBJ_XL SafMode ClockDisplay
-	set no_send [expr {$args} eq {{-nosend}}]
+	global OBJdata OBJ_FILE OBJ_MODIFIED SafMode ClockDisplay
+
+	set sendp true
+	set forcep false
+	if {[lsearch -exact $args -force] >= 0}  {set forcep true}
+	if {[lsearch -exact $args -nosend] >= 0} {set sendp false}
 
 	if {$file eq {}} {
 		if {[set file [tk_getOpenFile -defaultextension .map -filetypes {
@@ -2599,7 +2925,7 @@ proc unloadfile {file args} {
     #
     # If we're being told remotely to do this, don't prompt the user
     # 
-    if {!$no_send} {
+    if {!$force} {
         if {[tk_messageBox -type yesno -default no -icon warning -title "Remove Elements?"\
             -message "Do you really want to DELETE all elements from file $file?"] ne "yes"} {
             return
@@ -2622,11 +2948,13 @@ proc unloadfile {file args} {
 		# Now the server has an updated version of our file and we confirmed we can
 		# download it.
 		# Tell the others
-		if {!$no_send} {
-			ITsend [list CLR@ [cache_map_id $file]]
+		if {$sendp} {
+			::gmaproto::clear_from [cache_map_id $file]
 		}
 		set ClockDisplay $oldcd
+		set sendp false
 	}
+
 
 	while {[catch {set f [open $file r]} err]} {
 		if {[tk_messageBox -type retrycancel -icon error -default cancel -title "Error opening file"\
@@ -2635,135 +2963,421 @@ proc unloadfile {file args} {
 		}
 	}
 
-	while {[gets $f v] >= 0} {
-		if [regexp {^TYPE:([0-9a-zA-Z_#]+)} [lindex $v 0] vv vid] {
-			DEBUG 2 "Removing $file element $vid"
-			if {$SafMode || $no_send} {
-				KillObjById $vid -nosend
+	if [catch {
+		set file_data [::gmafile::load_from_file $f]
+		close $f
+	} err] {
+		say "Error unloading map data from file: $err"
+		catch {close $f}
+		return
+	}
+	lassign $file_data meta_data record_data
+	foreach record $record_data {
+		lassign $record rec_type d
+		if {[dict exists $d ID]} {
+			if {$sendp} {
+				KillObjById [dict get $d ID]
 			} else {
-				KillObjById $vid
+				KillObjById [dict get $d ID] -nosend
 			}
 		}
 	}
-	close $f
-	garbageCollectGrid
-	RefreshGrid 0
+	RefreshGrid false
 }
 
-
-proc loadElement {args} {
-	global okToLoadMonsters okToLoadPlayers
-	global OBJ OBJ_NEXT_Z FLASH_OBJ_LIST FLASH_MOB_LIST
-	set flashmode 0
-
-
-	# usage: loadElement ?-flash? data
-	if {[lindex $args 0] eq "-flash"} {
-		set v [lindex $args 1]
-		set flashmode 1
-	} else {
-		set v [lindex $args 0]
-	}
-
-	#
-	# Ensure that lines are all 2-element TCL lists of the
-	# form "<tag> <value>", where <tag> is "<LETTERS>:<digits>"
-	# 
-	# or 3-elements TCL lists with M or P as first element
-	#
-	set err "Syntax error in map file"
-	if {[catch {set L [llength $v]} err]} {
-		error "Format error in file line \"$v\": $err"
-	}
-
-
-	if {$L == 3} {
-		# new format player or monster 
-		if {[lindex $v 0] eq "M"} {
-			if {$okToLoadMonsters eq "?"} {
-				set okToLoadMonsters [tk_messageBox -type yesno -icon question -title "File contains monsters"\
-					-message "Do you wish to load the monsters from this file as well?" -parent .\
-					-default yes]
-			}
-			if {$okToLoadMonsters ne "yes"} {
-				return
-			}
-		} elseif {[lindex $v 0] eq "P"} {
-			if {$okToLoadPlayers eq "?"} {
-				set okToLoadPlayers [tk_messageBox -type yesno -icon question -title "File contains players"\
-					-message "Do you wish to load the players saved to this file as well?" -parent .\
-					-default yes]
-			}
-			if {$okToLoadPlayers ne "yes"} {
-				return
-			}
-		} else {
-			error "Syntax error in line \"$v\" of data file: invalid tag"
-		}
-		if {![regexp {^([A-Z_]+):([0-9a-zA-Z_#]+)$} [lindex $v 1] vv vtag vid]
-		|| [catch {set vid [mergePerson $vid $vtag [lindex $v 2]]} err]} {
-			error "Error setting creature map value \"$v\": $err"
-		}
-		if {$flashmode && $vtag eq "NAME"} {
-			lappend FLASH_MOB_LIST $vid
-		}
-	} else {
-		if {$L == 2 && [lindex $v 0] eq {F}} {
-			#
-			# F id 
-			# fetch stored map file
-			#
-			if [catch fetch_map_file [lindex $v 1] err] {
-				if {$err eq {NOSUCH}} {
-					DEBUG 0 "Warning: File ID [lindex $v 1] is not available on the server."
-				} else {
-					DEBUG 0 "Error retrieving file ID [lindex $v 1]: $err"
-				}
-			}
-		} else {
-			if { $L != 2
-			|| ![regexp {^([A-Z_]+):([0-9a-fA-F_#]+)$} [lindex $v 0] vv vtag vid]
-			|| [catch {set vid [mergeElement $vid $vtag [lindex $v 1]]} err]} {
-				error "Error setting map value \"$v\": $err"
-			}
-			if {$flashmode && $vtag eq "X"} {
-				lappend FLASH_OBJ_LIST $vid
-			}
-
-			#
-			# handle backward compatibility with old file formats
-			#
-			if {[string range $vv 0 3] eq {TYPE}} {
-				switch -exact -- [lindex $v 1] {
-					line {
-						if {![info exists OBJ(ARROW:$vid)]}  {set OBJ(ARROW:$vid) none}
-						if {![info exists OBJ(DASH:$vid)]}   {set OBJ(DASH:$vid) {}}
-					}
-					poly {
-						if {![info exists OBJ(JOIN:$vid)]}   {set OBJ(JOIN:$vid) bevel}
-						if {![info exists OBJ(SPLINE:$vid)]} {set OBJ(SPLINE:$vid) 0}
-						if {![info exists OBJ(DASH:$vid)]}   {set OBJ(DASH:$vid) {}}
-					}
-					arc {
-						if {![info exists OBJ(ARCMODE:$vid)]} {set OBJ(ARCMODE:$vid) pieslice}
-						if {![info exists OBJ(START:$vid)]}   {set OBJ(START:$vid) 0}
-						if {![info exists OBJ(EXTENT:$vid)]}  {set OBJ(EXTENT:$vid) 359}
-						if {![info exists OBJ(DASH:$vid)]}   {set OBJ(DASH:$vid) {}}
-					}
-					rect -
-					circ {
-						if {![info exists OBJ(DASH:$vid)]}   {set OBJ(DASH:$vid) {}}
-					}
-				}
-			}
-		}
-	}
-}
+#DEL#proc unloadfile {file args} {
+#DEL#	global OBJ OBJ_FILE OBJ_MODIFIED OBJ_XL SafMode ClockDisplay
+#DEL#	set no_send [expr {$args} eq {{-nosend}}]
+#DEL#
+#DEL#	if {$file eq {}} {
+#DEL#		if {[set file [tk_getOpenFile -defaultextension .map -filetypes {
+#DEL#			{{GMA Mapper Files} {.map}}
+#DEL#			{{All Files}        *}
+#DEL#		} -parent . -title "Delete elements from..."]] eq {}} return
+#DEL#	}
+#DEL#
+#DEL#    #
+#DEL#    # If we're being told remotely to do this, don't prompt the user
+#DEL#    # 
+#DEL#    if {!$no_send} {
+#DEL#        if {[tk_messageBox -type yesno -default no -icon warning -title "Remove Elements?"\
+#DEL#            -message "Do you really want to DELETE all elements from file $file?"] ne "yes"} {
+#DEL#            return
+#DEL#        }
+#DEL#    }
+#DEL#
+#DEL#	set oldcd $ClockDisplay
+#DEL#
+#DEL#	#
+#DEL#	# Store-and-Forward Mode:
+#DEL#	#  (1) Ensure we have a cached version from the server
+#DEL#	#  (2) If we don't, or it's older than the local one, upload the local file to the server and try again
+#DEL#	#  (3) Send CLR@ to peers
+#DEL#	#  (4) Proceed to unload the local file
+#DEL#	#
+#DEL#	if {$SafMode} {
+#DEL#		if {![saf_loadfile $file $oldcd]} {
+#DEL#			return
+#DEL#		}
+#DEL#		# Now the server has an updated version of our file and we confirmed we can
+#DEL#		# download it.
+#DEL#		# Tell the others
+#DEL#		if {!$no_send} {
+#DEL#			::gmaproto::clear_from [cache_map_id $file]
+#DEL#		}
+#DEL#		set ClockDisplay $oldcd
+#DEL#	}
+#DEL#
+#DEL#	while {[catch {set f [open $file r]} err]} {
+#DEL#		if {[tk_messageBox -type retrycancel -icon error -default cancel -title "Error opening file"\
+#DEL#			-message "Unable to open $file: $err" -parent .] eq "cancel"} {
+#DEL#				return
+#DEL#		}
+#DEL#	}
+#DEL#
+#DEL#	while {[gets $f v] >= 0} {
+#DEL#		if [regexp {^TYPE:([0-9a-zA-Z_#]+)} [lindex $v 0] vv vid] {
+#DEL#			DEBUG 2 "Removing $file element $vid"
+#DEL#			if {$SafMode || $no_send} {
+#DEL#				KillObjById $vid -nosend
+#DEL#			} else {
+#DEL#				KillObjById $vid
+#DEL#			}
+#DEL#		}
+#DEL#	}
+#DEL#	close $f
+#DEL#	garbageCollectGrid
+#DEL#	RefreshGrid 0
+#DEL#}
 
 
+#DEL#proc loadElement {args} {
+#DEL#	global okToLoadMonsters okToLoadPlayers
+#DEL#	global OBJ OBJ_NEXT_Z FLASH_OBJ_LIST FLASH_MOB_LIST
+#DEL#	set flashmode 0
+#DEL#
+#DEL#
+#DEL#	# usage: loadElement ?-flash? data
+#DEL#	if {[lindex $args 0] eq "-flash"} {
+#DEL#		set v [lindex $args 1]
+#DEL#		set flashmode 1
+#DEL#	} else {
+#DEL#		set v [lindex $args 0]
+#DEL#	}
+#DEL#
+#DEL#	#
+#DEL#	# Ensure that lines are all 2-element TCL lists of the
+#DEL#	# form "<tag> <value>", where <tag> is "<LETTERS>:<digits>"
+#DEL#	# 
+#DEL#	# or 3-elements TCL lists with M or P as first element
+#DEL#	#
+#DEL#	set err "Syntax error in map file"
+#DEL#	if {[catch {set L [llength $v]} err]} {
+#DEL#		error "Format error in file line \"$v\": $err"
+#DEL#	}
+#DEL#
+#DEL#
+#DEL#	if {$L == 3} {
+#DEL#		# new format player or monster 
+#DEL#		if {[lindex $v 0] eq "M"} {
+#DEL#			if {$okToLoadMonsters eq "?"} {
+#DEL#				set okToLoadMonsters [tk_messageBox -type yesno -icon question -title "File contains monsters"\
+#DEL#					-message "Do you wish to load the monsters from this file as well?" -parent .\
+#DEL#					-default yes]
+#DEL#			}
+#DEL#			if {$okToLoadMonsters ne "yes"} {
+#DEL#				return
+#DEL#			}
+#DEL#		} elseif {[lindex $v 0] eq "P"} {
+#DEL#			if {$okToLoadPlayers eq "?"} {
+#DEL#				set okToLoadPlayers [tk_messageBox -type yesno -icon question -title "File contains players"\
+#DEL#					-message "Do you wish to load the players saved to this file as well?" -parent .\
+#DEL#					-default yes]
+#DEL#			}
+#DEL#			if {$okToLoadPlayers ne "yes"} {
+#DEL#				return
+#DEL#			}
+#DEL#		} else {
+#DEL#			error "Syntax error in line \"$v\" of data file: invalid tag"
+#DEL#		}
+#DEL#		if {![regexp {^([A-Z_]+):([0-9a-zA-Z_#]+)$} [lindex $v 1] vv vtag vid]
+#DEL#		|| [catch {set vid [mergePerson $vid $vtag [lindex $v 2]]} err]} {
+#DEL#			error "Error setting creature map value \"$v\": $err"
+#DEL#		}
+#DEL#		if {$flashmode && $vtag eq "NAME"} {
+#DEL#			lappend FLASH_MOB_LIST $vid
+#DEL#		}
+#DEL#	} else {
+#DEL#		if {$L == 2 && [lindex $v 0] eq {F}} {
+#DEL#			#
+#DEL#			# F id 
+#DEL#			# fetch stored map file
+#DEL#			#
+#DEL#			if [catch fetch_map_file [lindex $v 1] err] {
+#DEL#				if {$err eq {NOSUCH}} {
+#DEL#					DEBUG 0 "Warning: File ID [lindex $v 1] is not available on the server."
+#DEL#				} else {
+#DEL#					DEBUG 0 "Error retrieving file ID [lindex $v 1]: $err"
+#DEL#				}
+#DEL#			}
+#DEL#		} else {
+#DEL#			if { $L != 2
+#DEL#			|| ![regexp {^([A-Z_]+):([0-9a-fA-F_#]+)$} [lindex $v 0] vv vtag vid]
+#DEL#			|| [catch {set vid [mergeElement $vid $vtag [lindex $v 1]]} err]} {
+#DEL#				error "Error setting map value \"$v\": $err"
+#DEL#			}
+#DEL#			if {$flashmode && $vtag eq "X"} {
+#DEL#				lappend FLASH_OBJ_LIST $vid
+#DEL#			}
+#DEL#
+#DEL#			#
+#DEL#			# handle backward compatibility with old file formats
+#DEL#			#
+#DEL#			if {[string range $vv 0 3] eq {TYPE}} {
+#DEL#				switch -exact -- [lindex $v 1] {
+#DEL#					line {
+#DEL#						if {![info exists OBJ(ARROW:$vid)]}  {set OBJ(ARROW:$vid) none}
+#DEL#						if {![info exists OBJ(DASH:$vid)]}   {set OBJ(DASH:$vid) {}}
+#DEL#					}
+#DEL#					poly {
+#DEL#						if {![info exists OBJ(JOIN:$vid)]}   {set OBJ(JOIN:$vid) bevel}
+#DEL#						if {![info exists OBJ(SPLINE:$vid)]} {set OBJ(SPLINE:$vid) 0}
+#DEL#						if {![info exists OBJ(DASH:$vid)]}   {set OBJ(DASH:$vid) {}}
+#DEL#					}
+#DEL#					arc {
+#DEL#						if {![info exists OBJ(ARCMODE:$vid)]} {set OBJ(ARCMODE:$vid) pieslice}
+#DEL#						if {![info exists OBJ(START:$vid)]}   {set OBJ(START:$vid) 0}
+#DEL#						if {![info exists OBJ(EXTENT:$vid)]}  {set OBJ(EXTENT:$vid) 359}
+#DEL#						if {![info exists OBJ(DASH:$vid)]}   {set OBJ(DASH:$vid) {}}
+#DEL#					}
+#DEL#					rect -
+#DEL#					circ {
+#DEL#						if {![info exists OBJ(DASH:$vid)]}   {set OBJ(DASH:$vid) {}}
+#DEL#					}
+#DEL#				}
+#DEL#			}
+#DEL#		}
+#DEL#	}
+#DEL#}
 
+
+
+#DEL#proc savefile {} {
+#DEL#	global OBJ OBJ_FILE MOB GMAMapperFileFormat LastFileComment LastFileLocation
+#DEL#
+#DEL#	if {[set file [tk_getSaveFile -defaultextension .map -initialfile $OBJ_FILE -filetypes {
+#DEL#		{{GMA Mapper Files} {.map}}
+#DEL#		{{All Files}        *}
+#DEL#	} -parent . -title "Save current map as..."]] eq {}} return
+#DEL#
+#DEL#	while {[catch {set f [open $file w]} err]} {
+#DEL#		if {[tk_messageBox -type retrycancel -icon error -default cancel -title "Error opening file"\
+#DEL#			-message "Unable to open $file: $err" -parent .] eq "cancel"} {
+#DEL#			return
+#DEL#		}
+#DEL#	}
+#DEL#
+#DEL#	set lock_objects [tk_messageBox -type yesno -icon question -title {Lock objects?} -message {Do you wish to lock all map objects in this file?} -detail {When locked, map objects cannot be further modified by clients. This helps avoid accidentally disturbing the map background while people are interacting with the map during a game.} -default yes]
+#DEL#
+#DEL#	::getstring::tk_getString .meta_comment LastFileComment {Map Name/Comment:}
+#DEL#	::getstring::tk_getString .meta_location LastFileLocation {Map Location:}
+#DEL#
+#DEL#	set object_list {}
+#DEL#	set element_ids {}
+#DEL#	foreach n [array names OBJ X:*] {
+#DEL#		lappend element_ids [string range $n 2 end]
+#DEL#	}
+#DEL#	#
+#DEL#	# convert old-style attributes as stored internally in this version
+#DEL#	# of the map client to the new-style elements as stored in file format
+#DEL#	# 20 and later.
+#DEL#	#
+#DEL#	foreach element_id $element_ids {
+#DEL#		set element_type {}
+#DEL#		set element_data [dict create ID $element_id]
+#DEL#		foreach {k v} [array get OBJ *:$element_id] {
+#DEL#			lassign [split $k :] attr id
+#DEL#			if {$id ne $element_id} {
+#DEL#				error "unexpected obj ID mismatch saving $element_id (found $k key)"
+#DEL#			}
+#DEL#			switch -exact -- $attr {
+#DEL#				TYPE {
+#DEL#					set element_type [string toupper $v]
+#DEL#					continue
+#DEL#				}
+#DEL#				ANCHOR {
+#DEL#					# ignore this one
+#DEL#					continue
+#DEL#				}
+#DEL#				X - Y - Z {
+#DEL#					# the new name is the same as the old one
+#DEL#				}
+#DEL#				POINTS {
+#DEL#					set attr Points
+#DEL#					set plist {}
+#DEL#					foreach {x y} $v {
+#DEL#						lappend plist [dict create X $x Y $y]
+#DEL#					}
+#DEL#					set v $plist
+#DEL#				}
+#DEL#				LINE - FILL - WIDTH - LAYER - LEVEL - GROUP - HIDDEN - LOCKED - START - EXTENT - SPLINE - TEXT - IMAGE {
+#DEL#					set attr [string totitle $attr]
+#DEL#				}
+#DEL#				DASH - ARROW - JOIN {
+#DEL#					set attr [string totitle $attr]
+#DEL#					set v [::gmaproto::to_enum $attr $v]
+#DEL#				}
+#DEL#				ARCMODE {
+#DEL#					set attr ArcMode
+#DEL#					set v [::gmaproto::to_enum $attr $v]
+#DEL#				}
+#DEL#				AOESHAPE {
+#DEL#					set attr AoEShape
+#DEL#					set v [::gmaproto::to_enum $attr $v]
+#DEL#				}
+#DEL#				FONT {
+#DEL#					# value is {family size normal underline bold overstrike roman italic}
+#DEL#					set attr Font
+#DEL#					lassign [lindex $v 0] family size
+#DEL#					set weight 0
+#DEL#					set slant 0
+#DEL#					if {[info exists OBJ(ANCHOR:$element_id)]} {
+#DEL#						set anchor [::gmaproto::to_enum Anchor $OBJ(ANCHOR:$element_id)]
+#DEL#					} else {
+#DEL#						set anchor 0
+#DEL#					}
+#DEL#
+#DEL#					foreach option [lrange $v 2 end] {
+#DEL#						switch -exact -- $option {
+#DEL#							normal { set weight 0 }
+#DEL#							bold   { set weight 1 }
+#DEL#							roman  { set slant 0  }
+#DEL#							italic { set slant 1  }
+#DEL#						}
+#DEL#					}
+#DEL#					set v [dict create \
+#DEL#						Family $family \
+#DEL#						Size $size \
+#DEL#						Weight $weight \
+#DEL#						Slant $slant \
+#DEL#						Anchor $anchor \
+#DEL#					]
+#DEL#				}
+#DEL#
+#DEL#				BBHEIGHT {
+#DEL#					set attr BBHeight
+#DEL#				}
+#DEL#				BBWIDTH {
+#DEL#					set attr BBWidth
+#DEL#				}
+#DEL#				default {
+#DEL#					# We aren't looking for this value, just skip it now
+#DEL#					continue
+#DEL#				}
+#DEL#			}
+#DEL#			dict set element_data $attr $v
+#DEL#		}
+#DEL#
+#DEL#		if {$element_type eq {}} {
+#DEL#			error "object $element_id missing TYPE field; can't save"
+#DEL#		}
+#DEL#
+#DEL#		lappend object_list [list $element_type $element_data]
+#DEL#	}
+#DEL#
+#DEL#	#
+#DEL#	# Now collect the creatures
+#DEL#	#
+#DEL#	set mob_ids {}
+#DEL#	foreach obj [array names MOB NAME:*] {
+#DEL#		lappend mob_ids [string range $obj 5 end]
+#DEL#	}
+#DEL#
+#DEL#	global MOB_IMAGE
+#DEL#	foreach mob_id $mob_ids {
+#DEL#		set mob_type 0
+#DEL#		set mob_data [dict create ID $mob_id]
+#DEL#		foreach {k v} [array get MOB *:$mob_id] {
+#DEL#			lassign [split $k :] attr id
+#DEL#
+#DEL#			if {$id ne $mob_id} {
+#DEL#				error "unexpected mob ID mismatch saving $mob_id (found $k key)"
+#DEL#			}
+#DEL#			switch -exact -- $attr {
+#DEL#				NAME {
+#DEL#					set attr Name
+#DEL#					if {[info exists MOB_IMAGE($MOB($k))]} {
+#DEL#						set v "$MOB_IMAGE($MOB($k))=$MOB($k)"
+#DEL#					}
+#DEL#				}
+#DEL#
+#DEL#				TYPE {
+#DEL#					if {$v eq "player"} {
+#DEL#						set mob_type 2
+#DEL#					} elseif {$v eq "monster"} {
+#DEL#						set mob_type 1
+#DEL#					} else {
+#DEL#						error "invalid creature type $v"
+#DEL#					}
+#DEL#					set attr CreatureType
+#DEL#					set v $mob_type
+#DEL#				}
+#DEL#
+#DEL#				HEALTH {
+#DEL#					if {[llength $v] == 0} {
+#DEL#						continue
+#DEL#					}
+#DEL#					lassign $v max ld non con flat st cond blur
+#DEL#					set attr Health
+#DEL#					set v [dict create MaxHP $max LethalDamage $ld NonLethalDamage $non Con $con IsFlatFooted $flat IsStable $st Condition $cond HPBlur $blur ]
+#DEL#				}
+#DEL#
+#DEL#				GX - GY - SKIN - ELEV - COLOR - NOTE - SIZE - AREA - REACH - KILLED - DIM {
+#DEL#					set attr [string totitle $attr]
+#DEL#				}
+#DEL#
+#DEL#				SKINSIZE {
+#DEL#					set attr SkinSize
+#DEL#				}
+#DEL#
+#DEL#				STATUSLIST {
+#DEL#					set attr StatusList
+#DEL#				}
+#DEL#				
+#DEL#				AOE {
+#DEL#					if {[llength $v] == 0} {
+#DEL#						continue
+#DEL#					}
+#DEL#					if {[llength $v] != 3} {
+#DEL#						error "invalid AOE value for mob $mob_id"
+#DEL#					}
+#DEL#					set attr AoE
+#DEL#					set v [dict create Radius [lindex $v 1] Color [lindex $v 2]]
+#DEL#				}
+#DEL#
+#DEL#				MOVEMODE {
+#DEL#					set attr MoveMode
+#DEL#					set v [::gmaproto::to_enum $attr $v]
+#DEL#				}
+#DEL#
+#DEL#				default {
+#DEL#					# We aren't looking for this value, just skip it now
+#DEL#					continue
+#DEL#				}
+#DEL#			}
+#DEL#			dict set mob_data $attr $v
+#DEL#		}
+#DEL#
+#DEL#		lappend object_list [list CREATURE $mob_data]
+#DEL#	}
+#DEL#
+#DEL#	::gmafile::save_to_file $f [list [dict create Comment $LastFileComment Location $LastFileLocation] $object_list]
+#DEL#	close $f
+#DEL#	modifiedflag $file 0
+#DEL#}
+#
 proc savefile {} {
-	global OBJ OBJ_FILE MOB FileVersion LastFileComment LastFileLocation
+	global OBJdata OBJtype MOBdata MOBid OBJ_FILE LastFileComment LastFileLocation
 
 	if {[set file [tk_getSaveFile -defaultextension .map -initialfile $OBJ_FILE -filetypes {
 		{{GMA Mapper Files} {.map}}
@@ -2782,198 +3396,19 @@ proc savefile {} {
 	::getstring::tk_getString .meta_comment LastFileComment {Map Name/Comment:}
 	::getstring::tk_getString .meta_location LastFileLocation {Map Location:}
 
-	set object_list {}
-	set element_ids {}
-	foreach n [array names OBJ X:*] {
-		lappend element_ids [string range $n 2 end]
-	}
-	#
-	# convert old-style attributes as stored internally in this version
-	# of the map client to the new-style elements as stored in file format
-	# 20 and later.
-	#
-	foreach element_id $element_ids {
-		set element_type {}
-		set element_data [dict create ID $element_id]
-		foreach {k v} [array get OBJ *:$element_id] {
-			lassign [split $k :] attr id
-			if {$id ne $element_id} {
-				error "unexpected obj ID mismatch saving $element_id (found $k key)"
-			}
-			switch -exact -- $attr {
-				TYPE {
-					set element_type [string toupper $v]
-					continue
-				}
-				ANCHOR {
-					# ignore this one
-					continue
-				}
-				X - Y - Z {
-					# the new name is the same as the old one
-				}
-				POINTS {
-					set attr Points
-					set plist {}
-					foreach {x y} $v {
-						lappend plist [dict create X $x Y $y]
-					}
-					set v $plist
-				}
-				LINE - FILL - WIDTH - LAYER - LEVEL - GROUP - HIDDEN - LOCKED - START - EXTENT - SPLINE - TEXT - IMAGE {
-					set attr [string totitle $attr]
-				}
-				DASH - ARROW - JOIN {
-					set attr [string totitle $attr]
-					set v [::gmaproto::to_enum $attr $v]
-				}
-				ARCMODE {
-					set attr ArcMode
-					set v [::gmaproto::to_enum $attr $v]
-				}
-				AOESHAPE {
-					set attr AoEShape
-					set v [::gmaproto::to_enum $attr $v]
-				}
-				FONT {
-					# value is {family size normal underline bold overstrike roman italic}
-					set attr Font
-					lassign [lindex $v 0] family size
-					set weight 0
-					set slant 0
-					if {[info exists OBJ(ANCHOR:$element_id)]} {
-						set anchor [::gmaproto::to_enum Anchor $OBJ(ANCHOR:$element_id)]
-					} else {
-						set anchor 0
-					}
-
-					foreach option [lrange $v 2 end] {
-						switch -exact -- $option {
-							normal { set weight 0 }
-							bold   { set weight 1 }
-							roman  { set slant 0  }
-							italic { set slant 1  }
-						}
-					}
-					set v [dict create \
-						Family $family \
-						Size $size \
-						Weight $weight \
-						Slant $slant \
-						Anchor $anchor \
-					]
-				}
-
-				BBHEIGHT {
-					set attr BBHeight
-				}
-				BBWIDTH {
-					set attr BBWidth
-				}
-				default {
-					# We aren't looking for this value, just skip it now
-					continue
-				}
-			}
-			dict set element_data $attr $v
-		}
-
-		if {$element_type eq {}} {
-			error "object $element_id missing TYPE field; can't save"
-		}
-
-		lappend object_list [list $element_type $element_data]
+	if {[catch {
+		::gmafile::save_arrays_to_file $f [dict create\
+			Comment $LastFileComment\
+			Location $LastFileLocation\
+		] OBJdata OBJtype MOBdata
+		close $f
+	} err]} {
+		say "Error writing map file to disk: $err"
+		catch {close $f}
+		return
 	}
 
-	#
-	# Now collect the creatures
-	#
-	set mob_ids {}
-	foreach obj [array names MOB NAME:*] {
-		lappend mob_ids [string range $obj 5 end]
-	}
-
-	global MOB_IMAGE
-	foreach mob_id $mob_ids {
-		set mob_type 0
-		set mob_data [dict create ID $mob_id]
-		foreach {k v} [array get MOB *:$mob_id] {
-			lassign [split $k :] attr id
-
-			if {$id ne $mob_id} {
-				error "unexpected mob ID mismatch saving $mob_id (found $k key)"
-			}
-			switch -exact -- $attr {
-				NAME {
-					set attr Name
-					if {[info exists MOB_IMAGE($MOB($k))]} {
-						set v "$MOB_IMAGE($MOB($k))=$MOB($k)"
-					}
-				}
-
-				TYPE {
-					if {$v eq "player"} {
-						set mob_type 2
-					} elseif {$v eq "monster"} {
-						set mob_type 1
-					} else {
-						error "invalid creature type $v"
-					}
-					set attr CreatureType
-					set v $mob_type
-				}
-
-				HEALTH {
-					if {[llength $v] == 0} {
-						continue
-					}
-					lassign $v max ld non con flat st cond blur
-					set attr Health
-					set v [dict create MaxHP $max LethalDamage $ld NonLethalDamage $non Con $con IsFlatFooted $flat IsStable $st Condition $cond HPBlur $blur ]
-				}
-
-				GX - GY - SKIN - ELEV - COLOR - NOTE - SIZE - AREA - REACH - KILLED - DIM {
-					set attr [string totitle $attr]
-				}
-
-				SKINSIZE {
-					set attr SkinSize
-				}
-
-				STATUSLIST {
-					set attr StatusList
-				}
-				
-				AOE {
-					if {[llength $v] == 0} {
-						continue
-					}
-					if {[llength $v] != 3} {
-						error "invalid AOE value for mob $mob_id"
-					}
-					set attr AoE
-					set v [dict create Radius [lindex $v 1] Color [lindex $v 2]]
-				}
-
-				MOVEMODE {
-					set attr MoveMode
-					set v [::gmaproto::to_enum $attr $v]
-				}
-
-				default {
-					# We aren't looking for this value, just skip it now
-					continue
-				}
-			}
-			dict set mob_data $attr $v
-		}
-
-		lappend object_list [list CREATURE $mob_data]
-	}
-
-	::gmafile::save_to_file $f [list [dict create Comment $LastFileComment Location $LastFileLocation] $object_list]
-	close $f
-	modifiedflag $file 0
+	modifiedflag $file false
 }
 
 proc modifiedflag {file state} {
@@ -3013,23 +3448,19 @@ proc colorpick {type} {
 }
 
 proc RemoveObject id {
-	global OBJ canvas animatePlacement
-	$canvas delete obj$id
+	global OBJdata OBJtype canvas animatePlacement
 
+	$canvas delete obj$id
 	if $animatePlacement update
-#	foreach key {TYPE X Y Z LEVEL GROUP HIDDEN POINTS FILL LINE LAYER WIDTH JOIN SPLINE ARCMODE START EXTENT} {
-#		catch { unset OBJ(${key}:$id) }
-#	}
-	foreach key [array name OBJ *:$id] {
-		catch { unset OBJ($key) }
-	}
+	catch { unset OBJdata($id) }
+	catch { unset OBJtype($id) }
 }
 
 proc cleargrid {} {
-	global OBJ canvas
+	global OBJdata OBJtype canvas
 
-	foreach obj [array names OBJ X:*] {
-		set id [string range $obj 2 end]
+	set olist [array names OBJdata]
+	foreach id $olist {
 		RemoveObject $id
 	}
 	modifiedflag "untitled" 0
@@ -3118,6 +3549,7 @@ proc canceltool {} {
 		kill {.toolbar.kill configure -relief raised}
 		aoe  {.toolbar.aoe  configure -relief raised}
 		move {.toolbar.move configure -relief raised}
+		ruler {.toolbar.ruler configure -relief raised}
 		text {
 			global CURRENT_TEXT_WIDGET
 			.toolbar.text configure -relief raised
@@ -3170,7 +3602,7 @@ proc canceltool {} {
 # on the board with the special ID AOE_GLOBAL_BOUND
 #
 proc aoeboundtool {} {
-	global OBJ canvas OBJ_MODE JOINSTYLE SPLINE
+	global canvas OBJ_MODE JOINSTYLE SPLINE
 	global icon_join_bevel icon_spline_0
 	canceltool
 	bind $canvas <1> "StartObj $canvas %x %y"
@@ -3189,7 +3621,7 @@ proc aoeboundtool {} {
 }
 
 proc aoetool {} {
-	global OBJ canvas OBJ_MODE AOE_SHAPE AOE_SPREAD
+	global canvas OBJ_MODE AOE_SHAPE AOE_SPREAD
 	global icon_radius icon_cone icon_ray icon_spread icon_no_spread
 	canceltool
 	bind $canvas <1> "StartObj $canvas %x %y"
@@ -3208,7 +3640,7 @@ proc aoetool {} {
 }
 
 proc rulertool {} {
-	global OBJ canvas OBJ_MODE
+	global canvas OBJ_MODE
 	canceltool
 	bind $canvas <1> "StartObj $canvas %x %y"
 	bind $canvas <Motion> "ObjDrag $canvas %x %y"
@@ -3220,7 +3652,7 @@ proc rulertool {} {
 }
 
 proc linetool {} {
-	global OBJ canvas OBJ_MODE ARROWSTYLE DASHSTYLE icon_arrow_none icon_dash0
+	global canvas OBJ_MODE ARROWSTYLE DASHSTYLE icon_arrow_none icon_dash0
 	canceltool
 	bind $canvas <1> "StartObj $canvas %x %y"
 	bind $canvas <Motion> "ObjDrag $canvas %x %y"
@@ -3238,7 +3670,7 @@ proc linetool {} {
 }
 
 proc polytool {} {
-	global OBJ canvas OBJ_MODE JOINSTYLE SPLINE
+	global canvas OBJ_MODE JOINSTYLE SPLINE
 	global icon_join_bevel icon_spline_0 icon_dash0 DASHSTYLE
 	canceltool
 	bind $canvas <1> "StartObj $canvas %x %y"
@@ -3492,7 +3924,7 @@ proc toggleAoeSpread {} {
 }
 
 proc recttool {} {
-	global OBJ canvas OBJ_MODE 
+	global canvas OBJ_MODE 
 	global icon_dash0 DASHSTYLE
 	canceltool
 	bind $canvas <1> "StartObj $canvas %x %y"
@@ -3508,7 +3940,7 @@ proc recttool {} {
 }
 
 proc circtool {} {
-	global OBJ canvas OBJ_MODE
+	global canvas OBJ_MODE
 	global icon_dash0 DASHSTYLE
 	canceltool
 	bind $canvas <1> "StartObj $canvas %x %y"
@@ -3524,7 +3956,7 @@ proc circtool {} {
 }
 
 proc arctool {} {
-	global OBJ canvas OBJ_MODE ARCMODE icon_arc_pieslice
+	global canvas OBJ_MODE ARCMODE icon_arc_pieslice
 	global icon_dash0 DASHSTYLE
 	canceltool
 	bind $canvas <1> "StartObj $canvas %x %y"
@@ -3543,7 +3975,7 @@ proc arctool {} {
 }
 
 proc toggleArcMode {} {
-	global OBJ OBJ_CURRENT ARCMODE icon_arc_arc icon_arc_pieslice icon_arc_chord
+	global OBJ_CURRENT ARCMODE icon_arc_arc icon_arc_pieslice icon_arc_chord
 
 	if {$ARCMODE eq "pieslice"} {
 		set ARCMODE "chord"
@@ -3607,9 +4039,9 @@ set CURRENT_TEXT_WIDGET {}
 set CURRENT_FONT {TkDefaultFont}
 set ARCMODE pieslice
 
-proc cmp_obj_attr {a b} {
-	global OBJ
-	set z [expr $OBJ($a) - $OBJ($b)]
+proc cmp_obj_attr_z {a b} {
+	global OBJdata
+	set z [expr [dict get $OBJdata($a) Z] - [dict get $OBJdata($b) Z]]
 	if $z {
 		return $z
 	}
@@ -3620,25 +4052,13 @@ proc cmp_obj_attr {a b} {
 # Compare elements of OBJ based on the values of these attributes
 # passed but giving precedence to image tiles
 #
-proc cmp_obj_attr_img {a b} {
-	global OBJ
-#	# this is a shortcut which assumes a 2-character prefix like Z:
-#	# on the attribute, but avoids a slower function to derive the object
-#	# ID
-#	set at $OBJ(TYPE:[string range $a 2 end])
-#	set bt $OBJ(TYPE:[string range $b 2 end])
-#	if {$at ne $bt} {
-#		if {$at eq {tile}} {
-#			return -1
-#		} elseif {$bt eq {tile}} {
-#			return 1
-#		}
-#	}
-	set z [expr $OBJ($a) - $OBJ($b)]
+# (reverted back to be the same as cmp_obj_attr_z for now)
+proc cmp_obj_attr_z_img {a b} {
+	global OBJdata
+	set z [expr [dict get $OBJdata($a) Z] - [dict get $OBJdata($b) Z]]
 	if $z {
 		return $z
 	}
-	# fall back to ID order if at same Z level
 	return [string compare $a $b]
 }
 
@@ -3647,24 +4067,24 @@ proc cmp_obj_attr_img {a b} {
 # sort keys are ID:<name>. The monster ID is at $OBJ(ID:<name>).
 #
 proc major_mob_sort {id} {
-	global MOB
+	global MOBdata
 
-	if {$MOB(KILLED:$id)} {return 0}
-	if {$MOB(TYPE:$id) eq "monster"} {return 1}
+	if {[dict get $MOBdata($id) Killed]} {return 0}
+	if {[dict get $MOBdata($id) CreatureType] != 2} {return 1}
 	return 2
 }
 
 proc cmp_mob_living {a b} {
-	global MOB
-	set id_a $MOB($a)
-	set id_b $MOB($b)
-	set ord_a [major_mob_sort $id_a]
-	set ord_b [major_mob_sort $id_b]
+	global MOBdata
+#	set id_a $MOB($a)
+#	set id_b $MOB($b)
+	set ord_a [major_mob_sort $a]
+	set ord_b [major_mob_sort $b]
 
-	DEBUG 4 "cmp_mob_living $a $b: id_a=$id_a id_b=$id_b ord_a=$ord_a ord_b=$ord_b"
+	DEBUG 4 "cmp_mob_living $a $b: ord_a=$ord_a ord_b=$ord_b"
 	if {$ord_a == $ord_b} {
-		DEBUG 4 "-> [string compare $id_a $id_b] (minor sort)"
-		return [string compare $id_a $id_b]
+		DEBUG 4 "-> [string compare $a $b] (minor sort)"
+		return [string compare $a $b]
 	}
 	DEBUG 4 "-> [expr $ord_a - $ord_b] (major sort)"
 	return [expr $ord_a - $ord_b]
@@ -3672,119 +4092,122 @@ proc cmp_mob_living {a b} {
 
 
 proc RefreshGrid {show} {
-	global canvas OBJ ARCMODE SPLINE zoom animatePlacement
+	global canvas OBJdata OBJtype ARCMODE SPLINE zoom animatePlacement
 	global AoeZoneLast
 	set AoeZoneLast {}
 	#
 	# draw in Z coordinate order within 2 groups: image tiles, everything else,
 	# with the grid sitting on top
 	#
-	set display_list [lsort -integer -command cmp_obj_attr_img [array names OBJ Z:*]]
-	foreach Zid $display_list {
-		set id [string range $Zid 2 end]
-	    if [catch {
-		if {[info exists OBJ(X:$id)]} {
+	set display_list [lsort -integer -command cmp_obj_attr_z_img [array names OBJdata]]
+	foreach id $display_list {
+	  if [catch {
+		if {[info exists OBJtype($id)]} {
 			$canvas delete obj$id
 			if $animatePlacement update
 			#DEBUG 3 "rendering object $id $OBJ(TYPE:$id)"
-			foreach var {POINTS X Y} {
-				catch {unset $var}
-				if {[info exists OBJ($var:$id)]} {
-					if {$zoom != 1} {
-						foreach x $OBJ($var:$id) {
-							lappend $var [expr $x * $zoom]
-							#DEBUG 3 "scale x$zoom: $var $id $x->[set $var]"
-						}
-					} else {
-						set $var $OBJ($var:$id)
-						#DEBUG 3 "no scale: $var $id $OBJ($var:$id)->[set $var]"
-					}
+			#
+			# Get universal element attributes
+			#
+			::gmautil::dassign $OBJdata($id) X X Y Y Z Z Points _Points Line Line Fill Fill Width Width Layer Layer Level Level Group Group Dash _Dash Hidden Hidden Locked Locked
+			set Dash [::gmaproto::from_enum Dash ${_Dash}]
+			
+			#
+			# apply zoom factor
+			#
+			catch {unset Points}
+			if {$zoom != 1} {
+				X = [expr $X * $zoom]
+				Y = [expr $Y * $zoom]
+				foreach x ${_Points} {
+					lappend Points [expr [dict get $x X] * $zoom]
+					lappend Points [expr [dict get $x Y] * $zoom]
+				}
+			} else {
+				foreach x ${_Points} {
+					lappend Points [dict get $x X]
+					lappend Points [dict get $x Y]
 				}
 			}
-				
-			switch $OBJ(TYPE:$id) {
-				poly {
-					$canvas create polygon "$X $Y $POINTS"\
-						-fill $OBJ(FILL:$id) -outline $OBJ(LINE:$id) -width $OBJ(WIDTH:$id) -tags [list obj$id allOBJ]\
-						-joinstyle $OBJ(JOIN:$id) -smooth [expr $OBJ(SPLINE:$id) != 0] \
-						-splinesteps $OBJ(SPLINE:$id) -dash $OBJ(DASH:$id)
-				}
-				line {
-					$canvas create line "$X $Y $POINTS"\
-						-fill $OBJ(FILL:$id) -width $OBJ(WIDTH:$id) -tags [list obj$id allOBJ] \
-						-dash $OBJ(DASH:$id) -arrow $OBJ(ARROW:$id) -arrowshape [list 15 18  8]
-				}
-				rect {
-					$canvas create rectangle "$X $Y $POINTS"\
-						-fill $OBJ(FILL:$id) -outline $OBJ(LINE:$id) -width $OBJ(WIDTH:$id) \
-						-dash $OBJ(DASH:$id) -tags [list obj$id allOBJ]
+
+			switch $OBJtype($id) {
+				arc {
+					$canvas create arc "$X $Y $Points"\
+						-fill $Fill -outline $Line \
+						-style [::gmaproto::from_enum ArcMode [dict get $OBJdata($id) ArcMode]] \
+						-start [dict get $OBJdata($id) Start] -extent [dict get $OBJdata($id) Extent] \
+						-dash $Dash -width $Width -tags [list obj$id allOBJ]
 				}
 				circ {
-					$canvas create oval "$X $Y $POINTS"\
-						-fill $OBJ(FILL:$id) -outline $OBJ(LINE:$id) -width $OBJ(WIDTH:$id) \
-						-dash $OBJ(DASH:$id) -tags [list obj$id allOBJ]
+					$canvas create oval "$X $Y $Points"\
+						-fill $Fill -outline $Line -width $Width -dash $Dash -tags [list obj$id allOBJ]
 				}
-				arc {
-					$canvas create arc "$X $Y $POINTS"\
-						-fill $OBJ(FILL:$id) -outline $OBJ(LINE:$id) -style $OBJ(ARCMODE:$id) \
-						-start $OBJ(START:$id) -extent $OBJ(EXTENT:$id)\
-						-dash $OBJ(DASH:$id) \
-						-width $OBJ(WIDTH:$id) -tags [list obj$id allOBJ]
+				line {
+					$canvas create line "$X $Y $Points"\
+						-fill $Fill -width $Width -tags [list obj$id allOBJ] \
+						-dash $Dash -arrow [::gmaproto::from_enum Arrow [dict get $OBJdata($id) Arrow]] \
+						-arrowshape [list 15 18  8]
+				}
+				poly {
+					set Spline [dict get $OBJdata($id) Spline]
+					$canvas create polygon "$X $Y $Points"\
+						-fill $Fill -outline $Line -width $Width -tags [list obj$id allOBJ]\
+						-joinstyle [::gmaproto::from_enum Join [dict get $OBJdata($id) Join]] \
+						-smooth [expr $Spline != 0] -splinesteps $Spline -dash $Dash
+				}
+				rect {
+					$canvas create rectangle "$X $Y $Points"\
+						-fill $Fill -outline $Line -width $Width -dash $Dash -tags [list obj$id allOBJ]
+				}
+				aoe - saoe {
+					$canvas create line [expr $X-10] $Y [expr $X+10] $Y $X $Y $X [expr $Y-10] $X [expr $Y+10]\
+						-fill $Fill -width 3 -tags [list obj$id allOBJ]
+					lassign $Points tx ty
+					$canvas create oval [expr $tx-10] [expr $ty-10] [expr $tx+10] [expr $ty+10] -width 3 -outline $Fill -tags [list obj$id]
+					$canvas create line [expr $tx-5] [expr $ty-5] [expr $tx+5] [expr $ty+5] -width 3 -fill $Fill -tags [list obj$id]
+					$canvas create line [expr $tx-5] [expr $ty+5] [expr $tx+5] [expr $ty-5] -width 3 -fill $Fill -tags [list obj$id]
+					DrawAoeZone $canvas $id "$X $Y $Points"
 				}
 				text {
-					$canvas create text $X $Y -fill $OBJ(FILL:$id) -anchor $OBJ(ANCHOR:$id) -font [ScaleFont [lindex $OBJ(FONT:$id) 0] $zoom] -justify left -text $OBJ(TEXT:$id) -tags [list obj$id allOBJ]
-				}
-				aoe {
-					$canvas create line [expr $X-10] $Y [expr $X+10] $Y $X $Y $X [expr $Y-10] $X [expr $Y+10]\
-						-fill $OBJ(FILL:$id) -width 3 -tags [list obj$id allOBJ]
-					DistributeVars $POINTS tx ty
-					$canvas create oval [expr $tx-10] [expr $ty-10] [expr $tx+10] [expr $ty+10] -width 3 -outline $OBJ(FILL:$id) -tags [list obj$id]
-					$canvas create line [expr $tx-5] [expr $ty-5] [expr $tx+5] [expr $ty+5] -width 3 -fill $OBJ(FILL:$id) -tags [list obj$id]
-					$canvas create line [expr $tx-5] [expr $ty+5] [expr $tx+5] [expr $ty-5] -width 3 -fill $OBJ(FILL:$id) -tags [list obj$id]
-					DrawAoeZone $canvas $id "$X $Y $POINTS"
+					::gmautil::dassign $OBJdata($id) Text Text Font Font Anchor _Anchor
+					::gmautil::dassign $Font Family FontFamily Size FontSize WeightFontWei
+					set Anchor [::gmaproto::from_enum Anchor ${_Anchor}]
+
+					$canvas create text $X $Y -fill $Fill -anchor $Anchor -font [ScaleFont [GMAFontToTkFont $Font] $zoom] \
+						-justify left -text $Text -tags [list obj$id allOBJ]
 				}
 				tile {
 					global TILE_SET
 					# TYPE tile
 					# X,Y  upper left corner
 					# IMAGE image ID
-					set tile_id [FindImage $OBJ(IMAGE:$id) $zoom]
+					set tile_id [FindImage [dict get $OBJdata($id) Image] $zoom]
 					if [info exists TILE_SET($tile_id)] {
 						$canvas create image $X $Y -anchor nw -image $TILE_SET($tile_id) -tags [list obj$id tiles allOBJ]
 					} else {
-						DEBUG 1 "Warning: no image $tile_id for $OBJ(IMAGE:$id) @ $zoom available. Looking for it..."
+						DEBUG 1 "Warning: no image $tile_id for [dict get $OBJdata($id) Image] @ $zoom available. Looking for it..."
 						global TILE_ATTR
-						if {[info exists OBJ(_TILEID:$id)]} {
-							set bbti $OBJ(_TILEID:$id)
-							if {[info exists TILE_ATTR(BBWIDTH:$bbti)] && [info exists TILE_ATTR(BBHEIGHT:$bbti)]} {
-								set bbxx [expr $X + $TILE_ATTR(BBWIDTH:$bbti)]
-								set bbyy [expr $Y + $TILE_ATTR(BBHEIGHT:$bbti)]
-								$canvas create polygon "$X $Y $bbxx $Y $bbxx $bbyy $X $bbyy $X $Y $bbxx $bbyy $X $bbyy $bbxx $Y" \
-									-fill {} -outline red -width 5 -tags [list obj$id allOBJ]
-								$canvas create text [expr $X + ($TILE_ATTR(BBWIDTH:$bbti)/2)] [expr $Y + ($TILE_ATTR(BBHEIGHT:$bbti)/2)] -fill red -anchor center -text $bbti -tags [list obj$id allOBJ]
-							}
+						::gmautil::dassign $OBJdata($id) BBHeight BBHeight BBWidth BBWidth Image bbti
+						if {$BBHeight > 0 && $BBWidth > 0} {
+							set bbxx [expr $X + $BBwidth]
+							set bbyy [expr $Y + $BBHeight]
+							$canvas create polygon "$X $Y $bbxx $Y $bbxx $bbyy $X $bbyy $X $Y $bbxx $bbyy $X $bbyy $bbxx $Y" \
+								-fill {} -outline red -width 5 -tags [list obj$id allOBJ bbox$id]
+							$canvas create text [expr $X + ($BBWidth/2)] [expr $Y + ($BBHeight/2)] -fill red -anchor center -text $bbti -tags [list obj$id allOBJ bbox$id]
 						}
 					}
 				}
 				default {
-					say "ERROR: weird object $id; type=$OBJ(TYPE:$id)"
+					say "ERROR: weird object $id; type=$OBJtype($id)"
 				}
 			}
 			if $show {
 				update
 			}
 		}
-	    } err] {
-			global OBJ_XL
-			set file_id (unknown)
-			foreach kk [array names OBJ_XL] {
-				if {$OBJ_XL($kk) == $id} {
-					set file_id $kk
-					break
-				}
-			}
-	        say "ERROR: Unable to render object $id (file obj $file_id): $err"
-	    }
+	  } err] {
+		say "ERROR: Unable to render object $id: $err"
+	  }
 	}
 	$canvas raise grid
 	update
@@ -3792,105 +4215,108 @@ proc RefreshGrid {show} {
 
 #
 # update the visual display of an on-screen object to match
-# the values in the OBJ array.
+# the values in the OBJdata array.
 #
 proc UpdateObjectDisplay {id} {
-	global canvas OBJ ARCMODE SPLINE zoom animatePlacement
-	if [catch {
-		if {[info exists OBJ(X:$id)]} {
-			foreach var {POINTS X Y} {
-				catch {unset $var}
-				if {[info exists OBJ($var:$id)]} {
-					if {$zoom != 1} {
-						foreach x $OBJ($var:$id) {
-							lappend $var [expr $x * $zoom]
-						}
-					} else {
-						set $var $OBJ($var:$id)
-					}
-				}
-			}
-				
-			switch $OBJ(TYPE:$id) {
-				poly {
-					$canvas coords obj$id "$X $Y $POINTS"
-					$canvas itemconfigure obj$id -fill $OBJ(FILL:$id) -outline $OBJ(LINE:$id) -width $OBJ(WIDTH:$id) \
-						-joinstyle $OBJ(JOIN:$id) -smooth [expr $OBJ(SPLINE:$id) != 0] -splinesteps $OBJ(SPLINE:$id)
-				}
-				line {
-					$canvas coords obj$id "$X $Y $POINTS"
-					$canvas itemconfigure obj$id -fill $OBJ(FILL:$id) -width $OBJ(WIDTH:$id)
-				}
-				rect {
-					$canvas coords obj$id "$X $Y $POINTS"
-					$canvas itemconfigure obj$id -fill $OBJ(FILL:$id) -outline $OBJ(LINE:$id) -width $OBJ(WIDTH:$id)
-				}
-				circ {
-					$canvas coords obj$id "$X $Y $POINTS"
-					$canvas itemconfigure obj$id -fill $OBJ(FILL:$id) -outline $OBJ(LINE:$id) -width $OBJ(WIDTH:$id)
-				}
-				arc {
-					$canvas coords obj$id "$X $Y $POINTS"
-					$canvas itemconfigure obj$id -fill $OBJ(FILL:$id) -outline $OBJ(LINE:$id) -style $OBJ(ARCMODE:$id) \
-						-start $OBJ(START:$id) -extent $OBJ(EXTENT:$id)\
-						-width $OBJ(WIDTH:$id)
-				}
-				text {
-					$canvas coords obj$id "$X $Y"
-					$canvas itemconfigure obj$id -fill $OBJ(FILL:$id) \
-						-font $OBJ(FONT:$id) -anchor $OBJ(ANCHOR:$id) -text $OBJ(TEXT:$id)
-				}
-				aoe {
-					$canvas delete obj$id
-					$canvas create line [expr $X-10] $Y [expr $X+10] $Y $X $Y $X [expr $Y-10] $X [expr $Y+10]\
-						-fill $OBJ(FILL:$id) -width 3 -tags [list obj$id allOBJ]
-					DistributeVars $POINTS tx ty
-					$canvas create oval [expr $tx-10] [expr $ty-10] [expr $tx+10] [expr $ty+10] -width 3 -outline $OBJ(FILL:$id) -tags [list obj$id]
-					$canvas create line [expr $tx-5] [expr $ty-5] [expr $tx+5] [expr $ty+5] -width 3 -fill $OBJ(FILL:$id) -tags [list obj$id]
-					$canvas create line [expr $tx-5] [expr $ty+5] [expr $tx+5] [expr $ty-5] -width 3 -fill $OBJ(FILL:$id) -tags [list obj$id]
-					DrawAoeZone $canvas $id "$X $Y $POINTS"
-				}
-				tile {
-					global TILE_SET
-					# TYPE tile
-					# X,Y  upper left corner
-					# IMAGE image ID
-					set tile_id [FindImage $OBJ(IMAGE:$id) $zoom]
-					if [info exists TILE_SET($tile_id)] {
-						$canvas coords obj$id $X $Y
-						$canvas itemconfigure obj$id -image $TILE_SET($tile_id)
-					} else {
-						DEBUG 1 "Warning: no image $tile_id for $OBJ(IMAGE:$id) @ $zoom available. Looking for it..."
-						global TILE_ATTR
-						if {[info exists OBJ(_TILEID:$id)]} {
-							set bbti $OBJ(_TILEID:$id)
-							if {[info exists TILE_ATTR(BBWIDTH:$bbti)] && [info exists TILE_ATTR(BBHEIGHT:$bbti)]} {
-								set bbxx [expr $X + $TILE_ATTR(BBWIDTH:$bbti)]
-								set bbyy [expr $Y + $TILE_ATTR(BBHEIGHT:$bbti)]
-								$canvas create polygon "$X $Y $bbxx $Y $bbxx $bbyy $X $bbyy $X $Y $bbxx $bbyy $X $bbyy $bbxx $Y" \
-									-fill {} -outline red -width 5 -tags [list obj$id allOBJ]
-								$canvas create text [expr $X + ($TILE_ATTR(BBWIDTH:$bbti)/2)] [expr $Y + ($TILE_ATTR(BBHEIGHT:$bbti)/2)] -fill red -anchor center -text $bbti -tags [list obj$id allOBJ]
-							}
-						}
-					}
-				}
-				default {
-					say "ERROR: weird object $id; type=$OBJ(TYPE:$id)"
-				}
-			}
-			update
+	global canvas OBJdata OBJtype zoom animatePlacement
+
+	if {![info exists $OBJdata($id)]} {
+		DEBUG 0 "UpdateObjectDisplay: $id does not exist in OBJdata."
+		return
+	}
+
+	if {![info exists $OBJtype($id)]} {
+		DEBUG 0 "UpdateObjectDisplay: $id does not seem to have a type."
+		return
+	}
+
+	::gmautil::dassign $OBJdata($id) X X Y Y Z Z Points _Points Line Line Fill Fill Width Width Layer Layer Level Level Group Group Dash _Dash Hidden Hidden Locked Locked
+	set Dash [::gmaproto::from_enum Dash ${_Dash}]
+	
+	#
+	# apply zoom factor
+	#
+	catch {unset Points}
+	if {$zoom != 1} {
+		X = [expr $X * $zoom]
+		Y = [expr $Y * $zoom]
+		foreach x ${_Points} {
+			lappend Points [expr [dict get $x X] * $zoom]
+			lappend Points [expr [dict get $x Y] * $zoom]
 		}
-	    } err] {
-			global OBJ_XL
-			set file_id (unknown)
-			foreach kk [array names OBJ_XL] {
-				if {$OBJ_XL($kk) == $id} {
-					set file_id $kk
-					break
-				}
+	} else {
+		foreach x ${_Points} {
+			lappend Points [dict get $x X]
+			lappend Points [dict get $x Y]
+		}
+	}
+
+	if [catch {
+		switch $OBJtype($id) {
+			arc {
+				$canvas coords obj$id "$X $Y $Points"
+				$canvas itemconfigure obj$id -fill $Fill -outline $Line \
+					-style [::gmaproto::from_enum ArcMode [dict get $OBJdata($id) ArcMode]] \
+					-start [dict get $OBJdata($id) Start] -extent [dict get $OBJdata($id) Extent] \
+					-dash $Dash -width $Width
 			}
-	        say "ERROR: Unable to render object $id (file obj $file_id): $err"
-	    }
+			circ {
+				$canvas coords obj$id "$X $Y $Points"
+				$canvas itemconfigure obj$id -fill $Fill -outline $Line -width $Width -dash $Dash
+			}
+			line {
+				$canvas coords obj$id "$X $Y $Points"
+				$canvas itemconfigure obj$id -fill $Fill -width $Width \
+					-dash $Dash -arrow [::gmaproto::from_enum Arrow [dict get $OBJdata($id) Arrow]]
+			}
+			poly {
+				$canvas coords obj$id "$X $Y $Points"
+				$canvas itemconfigure obj$id -fill $Fill -outline $Line -width $Width \
+					-joinstyle [::gmaproto::from_enum Join [dict get $OBJdata($id) Join]] \
+					-smooth [expr $Spline != 0] -splinesteps $Spline -dash $Dash
+			}
+			rect {
+				$canvas coords obj$id "$X $Y $Points"
+				$canvas itemconfigure obj$id -fill $Fill -outline $Line -width $Width -dash $Dash
+			}
+			aoe - saoe {
+				$canvas delete obj$id
+				$canvas create line [expr $X-10] $Y [expr $X+10] $Y $X $Y $X [expr $Y-10] $X [expr $Y+10]\
+					-fill $Fill -width 3 -tags [list obj$id allOBJ]
+				lassign $Points tx ty
+				$canvas create oval [expr $tx-10] [expr $ty-10] [expr $tx+10] [expr $ty+10] -width 3 -outline $Fill -tags [list obj$id]
+				$canvas create line [expr $tx-5] [expr $ty-5] [expr $tx+5] [expr $ty+5] -width 3 -fill $Fill -tags [list obj$id]
+				$canvas create line [expr $tx-5] [expr $ty+5] [expr $tx+5] [expr $ty-5] -width 3 -fill $Fill -tags [list obj$id]
+				DrawAoeZone $canvas $id "$X $Y $Points"
+			}
+			text {
+				$canvas coords obj$id "$X $Y"
+				::gmautil::dassign $OBJdata($id) Text Text Font Font Anchor _Anchor
+				::gmautil::dassign $Font Family FontFamily Size FontSize WeightFontWei
+				set Anchor [::gmaproto::from_enum Anchor ${_Anchor}]
+
+				$canvas itemconfigure obj$id -fill $Fill -anchor $Anchor -font [ScaleFont [GMAFontToTkFont $Font] $zoom] \
+					-justify left -text $Text
+			}
+			tile {
+				global TILE_SET
+				# TYPE tile
+				# X,Y  upper left corner
+				# IMAGE image ID
+				set tile_id [FindImage [dict get $OBJdata($id) Image] $zoom]
+				if [info exists TILE_SET($tile_id)] {
+					$canvas coords obj$id $X $Y
+					$canvas itemconfigure obj$id -image $TILE_SET($tile_id)
+					$canvas delete bbox$id
+				} 
+			}
+			default {
+				say "ERROR: weird object $id; type=$OBJtype($id)"
+			}
+		}
+    } err] {
+        say "ERROR: Unable to render object $id: $err"
+    }
 	$canvas raise grid
 	update
 }
@@ -4008,15 +4434,19 @@ proc ShowDiceSyntax {} {
 	# XXX TODO presets
 }
 
-
+# Begin drawing a new object of some type on the screen
+# OBJ_MODE will be nil, line, rect, poly, circ, arc, kill, aoe, move, text, tile, aoebound, ruler
 proc StartObj {w x y} {
-	global OBJ OBJ_CURRENT canvas OBJ_SNAP OBJ_MODE OBJ_COLOR OBJ_WIDTH OBJ_MODIFIED ARCMODE
+	global OBJtype OBJdata OBJ_CURRENT canvas OBJ_SNAP OBJ_MODE OBJ_COLOR OBJ_WIDTH OBJ_MODIFIED ARCMODE
 	global NoFill JOINSTYLE SPLINE DASHSTYLE ARROWSTYLE
 	global BUTTON_MIDDLE BUTTON_RIGHT
 	global OBJ_NEXT_Z zoom
 	global animatePlacement
 
 	modifiedflag - 1
+	#
+	# special case for aoebound tool; there is only one of these
+	#
 	if {$OBJ_MODE == "aoebound"} {
 		set OBJ_CURRENT AOE_GLOBAL_BOUND
 		$w delete obj$OBJ_CURRENT
@@ -4024,63 +4454,173 @@ proc StartObj {w x y} {
 	} else {
 		set OBJ_CURRENT [new_id]
 	}
-	set OBJ(POINTS:$OBJ_CURRENT) {}
-	if {$OBJ_MODE ne "tile"} {
-		if $NoFill {
-			set OBJ(FILL:$OBJ_CURRENT) {}
-		} else {
-			set OBJ(FILL:$OBJ_CURRENT) $OBJ_COLOR(fill)
-		}
-		if {$OBJ_MODE ne "text"} {
-			set OBJ(LINE:$OBJ_CURRENT) $OBJ_COLOR(line)
-			set OBJ(WIDTH:$OBJ_CURRENT) $OBJ_WIDTH
-			set OBJ(DASH:$OBJ_CURRENT) $DASHSTYLE
-		}
+
+	#
+	# set up new element object in storage
+	#
+	if $NoFill {
+		set fill_color {}
+	} else {
+		set fill_color $OBJ_COLOR(fill)
 	}
-	set OBJ(LAYER:$OBJ_CURRENT) walls
-	bind $canvas $BUTTON_MIDDLE "EndObj $canvas"
-	bind . <Key-Escape> "EndObj $canvas"
-	set OBJ(TYPE:$OBJ_CURRENT) $OBJ_MODE
+	set dash [::gmaproto::to_enum Dash $DASHSTYLE]
+	set layer walls
 	set x [$canvas canvasx $x]
 	set y [$canvas canvasy $y]
-	set OBJ(Z:$OBJ_CURRENT) [incr OBJ_NEXT_Z]
+	set z [incr OBJ_NEXT_Z]
+
 	switch $OBJ_MODE {
+		nil - kill - move { 
+			DEBUG 0 "Called StartObj($w,$x,$y) for $OBJ_MODE tool. Why?" 
+			return
+		}
+		aoe - saoe {
+			global DistanceLabelText AOE_SHAPE AOE_START
+			set a_x [SnapCoordAlways $x]
+			set a_y [SnapCoordAlways $y]
+
+			set OBJtype($OBJ_CURRENT) aoe
+			set OBJdata($OBJ_CURRENT) [::gmaproto::new_dict LS-SAOE ID $OBJ_CURRENT \
+				X [expr $a_x / $zoom] Y [expr $a_y / $zoom] Z 99999999 \
+				Fill $fill_color Line $OBJ_COLOR(line) Width $OBJ_WIDTH Dash $dash Layer $layer \
+				AoEShape [::gmaproto::to_enum AoEShape $AOE_SHAPE] \
+			]
+
+			$canvas create line [expr $a_x-10] $a_y [expr $a_x+10] $a_y -fill $fill_color -width 4 -tags [list obj$OBJ_CURRENT allOBJ]
+			$canvas create line $a_x [expr $a_y-10] $a_x [expr $a_y+10] -fill $fill_color -width 4 -tags [list obj$OBJ_CURRENT allOBJ]
+			$canvas create line $a_x $a_y $a_x $a_y -dash - -fill $fill_color -width 3 -tags [list obj$OBJ_CURRENT obj_locator$OBJ_CURRENT allOBJ] -arrow last -arrowshape [list 15 18  8]
+			bind $canvas <1> "LastAoePoint $canvas %x %y"
+			set DistanceLabelText {}
+			switch $AOE_SHAPE {
+				radius {
+					$canvas create oval $a_x $a_y $a_x $a_y \
+						-outline $OBJ_COLOR(line) -width 3 -dash - \
+						-tags [list obj$OBJ_CURRENT obj_locator_radius$OBJ_CURRENT allOBJ]
+				}
+				cone   {
+					$canvas create arc $a_x $a_y $a_x $a_y -dash - \
+						-outline $OBJ_COLOR(line) -width 3 -start 0 -extent 90 \
+						-tags [list obj$OBJ_CURRENT obj_locator_cone3_$OBJ_CURRENT allOBJ]
+				}
+			}
+			$canvas create window $a_x [expr $a_y - 20] -window $canvas.distanceLabel -tags [list obj_distance$OBJ_CURRENT allOBJ]
+			set AOE_START [list [CanvasToGrid $a_x] [CanvasToGrid $a_y]]
+		}
+		aoebound {
+			# TODO X,Y are [expr [SnapCoord $x(y)] / $zoom]
+			# TODO Z is 99999999
+			$canvas create line [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] -width 3 -fill $OBJ_COLOR(line) -tags [list obj$OBJ_CURRENT allOBJ] -dash -
+			bind $canvas <1> "NextPoint $canvas %x %y"
+		}
+		arc { 
+			set OBJtype($OBJ_CURRENT) arc
+			set OBJdata($OBJ_CURRENT) [::gmaproto::new_dict LS-ARC ID $OBJ_CURRENT \
+				X [expr [SnapCoord $x] / $zoom] Y [expr [SnapCoord $y] / $zoom] Z $z \
+				Fill $fill_color Line $OBJ_COLOR(line) Width $OBJ_WIDTH \
+				Dash $dash Layer $layer]
+			$canvas create arc  [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] -fill $OBJ(FILL:$OBJ_CURRENT) -outline $OBJ_COLOR(line) -width $OBJ_WIDTH -tags [list obj$OBJ_CURRENT allOBJ] -style $ARCMODE -start 0 -extent 359 -dash $DASHSTYLE
+			bind $canvas <1> "LastArcPoint $canvas %x %y"
+			set OBJ(ARCMODE:$OBJ_CURRENT) $ARCMODE
+		}
+		circ { 
+			set OBJtype($OBJ_CURRENT) circ
+			set OBJdata($OBJ_CURRENT) [::gmaproto::new_dict LS-CIRC ID $OBJ_CURRENT \
+				X [expr [SnapCoord $x] / $zoom] Y [expr [SnapCoord $y] / $zoom] Z $z \
+				Fill $fill_color Line $OBJ_COLOR(line) \
+				Width $OBJ_WIDTH Dash $dash Layer $layer]
+			$canvas create oval [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] -fill $fill_color -outline $OBJ_COLOR(line) -width $OBJ_WIDTH -tags [list obj$OBJ_CURRENT allOBJ] -dash $DASHSTYLE
+			bind $canvas <1> "LastPoint $canvas %x %y"
+		}
+		line { 
+			set arrow [::gmaproto::to_enum Arrow $ARROWSTYLE]
+			set OBJtype($OBJ_CURRENT) line
+			set OBJdata($OBJ_CURRENT) [::gmaproto::new_dict LS-LINE ID $OBJ_CURRENT \
+				X [expr [SnapCoord $x] / $zoom] Y [expr [SnapCoord $y] / $zoom] Z $z \
+				Fill $fill_color Line $OBJ_COLOR(line) Width $OBJ_WIDTH \
+				Dash $dash Layer $layer Arrow $arrow]
+			$canvas create line [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] -fill $fill_color -width $OBJ_WIDTH -tags [list obj$OBJ_CURRENT allOBJ] -dash $DASHSTYLE -arrow $ARROWSTYLE -arrowshape [list 15 18 8]
+			bind $canvas <1> "NextPoint $canvas %x %y"
+		}
+		poly {
+			set OBJtype($OBJ_CURRENT) poly
+			set OBJdata($OBJ_CURRENT) [::gmaproto::new_dict LS-POLY ID $OBJ_CURRENT \
+				X [expr [SnapCoord $x] / $zoom] Y [expr [SnapCoord $y] / $zoom] Z $z \
+				Fill $fill_color Line $OBJ_COLOR(line) Width $OBJ_WIDTH Dash $dash Layer $layer\
+				Join [::gmaproto::to_enum Join $JOINSTYLE] \
+				Spline $SPLINE \
+			]
+			$canvas create polygon [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] -fill $fill_color -width $OBJ_WIDTH -outline $OBJ_COLOR(line) -tags [list obj$OBJ_CURRENT allOBJ] -joinstyle $JOINSTYLE -smooth [expr $SPLINE != 0] -splinesteps $SPLINE -dash $DASHSTYLE
+			bind $canvas <1> "NextPoint $canvas %x %y"
+		}
+		rect {
+			set OBJtype($OBJ_CURRENT) rect
+			set OBJdata($OBJ_CURRENT) [::gmaproto::new_dict LS-RECT ID $OBJ_CURRENT \
+				X [expr [SnapCoord $x] / $zoom] Y [expr [SnapCoord $y] / $zoom] Z $z \
+				Fill $fill_color Line $OBJ_COLOR(line) Width $OBJ_WIDTH \
+				Dash $dash Layer $layer]
+			$canvas create rectangle [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] -fill $fill_color -outline $OBJ_COLOR(line) -width $OBJ_WIDTH -tags [list obj$OBJ_CURRENT allOBJ] -dash $DASHSTYLE
+			bind $canvas <1> "LastPoint $canvas %x %y"
+		}
 		ruler {
-			$canvas create line [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] -fill $OBJ(FILL:$OBJ_CURRENT) -width 3 -tags [list obj$OBJ_CURRENT allOBJ] -dash -
+			$canvas create line [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] \
+				-fill $fill_color -width 3 -tags [list obj$OBJ_CURRENT allOBJ] -dash -
 			bind $canvas <1> "NextPoint $canvas %x %y"
 			$canvas create window $x [expr $y - 20] -window $canvas.distanceLabel -tags [list obj_distance$OBJ_CURRENT allOBJ]
 		}
-		line {
-			$canvas create line [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] -fill $OBJ(FILL:$OBJ_CURRENT) -width $OBJ_WIDTH -tags [list obj$OBJ_CURRENT allOBJ] -dash $DASHSTYLE -arrow $ARROWSTYLE -arrowshape [list 15 18  8]
-			bind $canvas <1> "NextPoint $canvas %x %y"
-			set OBJ(ARROW:$OBJ_CURRENT) $ARROWSTYLE
+		text {
+			global CurrentTextString CurrentAnchor
+			global CURRENT_TEXT_WIDGET CURRENT_FONT zoom
+
+			if {$CurrentTextString eq {}} {
+				SelectText $x $y
+			}
+			if {$CurrentTextString ne {}} {
+				$canvas create text [SnapCoord $x] [SnapCoord $y] -anchor $CurrentAnchor \
+					-font [ScaleFont [lindex $CURRENT_FONT 0] $zoom] \
+					-justify left \
+					-text $CurrentTextString \
+					-fill $fill_color \
+					-tags "tiles obj$OBJ_CURRENT"
+
+				set OBJtype($OBJ_CURRENT) text
+				set OBJdata($OBJ_CURRENT) [::gmaproto::new_dict LS-TEXT ID $OBJ_CURRENT \
+					X [expr [SnapCoord $x] / $zoom] Y [expr [SnapCoord $y] / $zoom] Z $z \
+					Fill $fill_color Layer $layer Text $CurrentTextString \
+					Font [TkFontToGMAFont $CURRENT_FONT] \
+					Anchor [::gmaproto::to_enum Anchor $CurrentAnchor]\
+				]
+				set CURRENT_TEXT_WIDGET $OBJ_CURRENT
+			} else {
+				DEBUG 0 "Removing text object $OBJ_CURRENT"
+				catch {unset OBJdata($OBJ_CURRENT)}
+				catch {unset OBJtype($OBJ_CURRENT)}
+			}
+			EndObj $canvas
 		}
 		tile {
+			set OBJtype($OBJ_CURRENT) tile
+			set OBJdata($OBJ_CURRENT) [::gmaproto::new_dict LS-TILE ID $OBJ_CURRENT \
+				X [expr [SnapCoord $x / $zoom] Y [SnapCoord $y / $zoom] Z $z \
+				Layer $layer \
+			]
+
 			global CurrentStampTile TILE_SET
-			# If we don't have a current tile, make one try to set it
 			if {[llength $CurrentStampTile] == 0} {
 				SelectTile $x $y
 			}
-			# Have one now? stamp it
 			if {[llength $CurrentStampTile] > 0} {
 				set iid [lindex $CurrentStampTile 0]
 				if [info exists TILE_SET($iid)] {
 					$canvas create image [SnapCoord $x] [SnapCoord $y] -anchor nw -image $TILE_SET($iid) -tags "tiles obj$OBJ_CURRENT"
 				} else {
 					say "Unable to load image $CurrentStampTile. Be sure to define and upload it."
-					#catch {destroy .stbx}
-					#toplevel .stbx -class dialog
 					create_dialog .stbx
 					wm title .stbx "Image Not Found"
+
 					global STBX_X STBX_Y TILE_ATTR
 					set bbti [lindex $CurrentStampTile 0]
-					if {[info exists TILE_ATTR(BBWIDTH:$bbti)] && [info exists TILE_ATTR(BBHEIGHT:$bbti)]} {
-						set STBX_X $TILE_ATTR(BBWIDTH:$bbti)
-						set STBX_Y $TILE_ATTR(BBHEIGHT:$bbti)
-					} else {
-						set STBX_X 50
-						set STBX_Y 50
-					}
+					set STBX_X 50
+					set STBX_Y 50
 					pack [frame .stbx.1] \
 						 [frame .stbx.2] \
 						 [frame .stbx.3] \
@@ -4100,105 +4640,22 @@ proc StartObj {w x y} {
 						 -side right
 					SetTilePlaceHolder $OBJ_CURRENT $STBX_X $STBX_Y $bbti
 				}
-				set OBJ(IMAGE:$OBJ_CURRENT) [lindex $CurrentStampTile 1]
+				dict set OBJdata($OBJ_CURRENT) Image [lindex $CurrentStampTile 1]
 			} else {
-				DEBUG 0 "Removing OBJ(*:$OBJ_CURRENT)"
-				array unset OBJ *:$OBJ_CURRENT
+				DEBUG 0 "Removing image object$OBJ_CURRENT"
+				catch {unset OBJdata($OBJ_CURRENT)}
+				catch {unset OBJtype($OBJ_CURRENT)}
 			}
+			EndObj $canvas
 		}
-		text {
-			global CurrentTextString CurrentAnchor
-			global CURRENT_TEXT_WIDGET CURRENT_FONT zoom
-			if {$CurrentTextString eq {}} {
-				SelectText $x $y
-			}
-			if {$CurrentTextString ne {}} {
-				$canvas create text [SnapCoord $x] [SnapCoord $y] -anchor $CurrentAnchor \
-					-font [ScaleFont [lindex $CURRENT_FONT 0] $zoom] \
-					-justify left \
-					-text $CurrentTextString \
-					-fill $OBJ(FILL:$OBJ_CURRENT) \
-					-tags "tiles obj$OBJ_CURRENT"
-				set CURRENT_TEXT_WIDGET $OBJ_CURRENT
-				set OBJ(TEXT:$OBJ_CURRENT) $CurrentTextString
-				set OBJ(FONT:$OBJ_CURRENT) $CURRENT_FONT
-				set OBJ(ANCHOR:$OBJ_CURRENT) $CurrentAnchor
-			} else {
-				DEBUG 0 "Removing OBJ(*:$OBJ_CURRENT)"
-				array unset OBJ *:$OBJ_CURRENT
-			}
-		}
-		aoebound {
-			$canvas create line [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] -width 3 -fill $OBJ_COLOR(line) -tags [list obj$OBJ_CURRENT allOBJ] -dash -
-			bind $canvas <1> "NextPoint $canvas %x %y"
-		}
-		poly {
-			$canvas create polygon [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] -fill $OBJ(FILL:$OBJ_CURRENT) -width $OBJ_WIDTH -outline $OBJ_COLOR(line) -tags [list obj$OBJ_CURRENT allOBJ] -joinstyle $JOINSTYLE -smooth [expr $SPLINE != 0] -splinesteps $SPLINE -dash $DASHSTYLE
-			set OBJ(JOIN:$OBJ_CURRENT) $JOINSTYLE
-			set OBJ(SPLINE:$OBJ_CURRENT) $SPLINE
-			bind $canvas <1> "NextPoint $canvas %x %y"
-		}
-		rect {
-			$canvas create rectangle [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] -fill $OBJ(FILL:$OBJ_CURRENT) -outline $OBJ_COLOR(line) -width $OBJ_WIDTH -tags [list obj$OBJ_CURRENT allOBJ] -dash $DASHSTYLE
-			bind $canvas <1> "LastPoint $canvas %x %y"
-		}
-		circ {
-			$canvas create oval [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] -fill $OBJ(FILL:$OBJ_CURRENT) -outline $OBJ_COLOR(line) -width $OBJ_WIDTH -tags [list obj$OBJ_CURRENT allOBJ] -dash $DASHSTYLE
-			bind $canvas <1> "LastPoint $canvas %x %y"
-		}
-		arc  {
-			$canvas create arc  [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] -fill $OBJ(FILL:$OBJ_CURRENT) -outline $OBJ_COLOR(line) -width $OBJ_WIDTH -tags [list obj$OBJ_CURRENT allOBJ] -style $ARCMODE -start 0 -extent 359 -dash $DASHSTYLE
-			bind $canvas <1> "LastArcPoint $canvas %x %y"
-			set OBJ(ARCMODE:$OBJ_CURRENT) $ARCMODE
-		}
-		aoe {
-			global DistanceLabelText AOE_SHAPE AOE_START
-
-			set a_x [SnapCoordAlways $x]
-			set a_y [SnapCoordAlways $y]
-			$canvas create line [expr $a_x-10] $a_y [expr $a_x+10] $a_y -fill $OBJ(FILL:$OBJ_CURRENT) -width 4 -tags [list obj$OBJ_CURRENT allOBJ]
-			$canvas create line $a_x [expr $a_y-10] $a_x [expr $a_y+10] -fill $OBJ(FILL:$OBJ_CURRENT) -width 4 -tags [list obj$OBJ_CURRENT allOBJ]
-			$canvas create line $a_x $a_y $a_x $a_y -dash - -fill $OBJ(FILL:$OBJ_CURRENT) -width 3 -tags [list obj$OBJ_CURRENT obj_locator$OBJ_CURRENT allOBJ] -arrow last -arrowshape [list 15 18  8]
-			bind $canvas <1> "LastAoePoint $canvas %x %y"
-			set DistanceLabelText {}
-			set OBJ(AOESHAPE:$OBJ_CURRENT) $AOE_SHAPE
-			switch $AOE_SHAPE {
-				radius {
-					$canvas create oval $a_x $a_y $a_x $a_y \
-						-outline $OBJ_COLOR(line) -width 3 -dash - \
-						-tags [list obj$OBJ_CURRENT obj_locator_radius$OBJ_CURRENT allOBJ]
-				}
-				cone   {
-					#$canvas create line $a_x $a_y $a_x $a_y -dash - \
-					#	-fill $OBJ_COLOR(line) -width 3 -tags [list obj$OBJ_CURRENT obj_locator_cone1_$OBJ_CURRENT allOBJ]
-					#$canvas create line $a_x $a_y $a_x $a_y -dash - \
-					#	-fill $OBJ_COLOR(line) -width 3 -tags [list obj$OBJ_CURRENT obj_locator_cone2_$OBJ_CURRENT allOBJ]
-					$canvas create arc $a_x $a_y $a_x $a_y -dash - \
-						-outline $OBJ_COLOR(line) -width 3 -start 0 -extent 90 \
-						-tags [list obj$OBJ_CURRENT obj_locator_cone3_$OBJ_CURRENT allOBJ]
-				}
-			}
-			$canvas create window $a_x [expr $a_y - 20] -window $canvas.distanceLabel -tags [list obj_distance$OBJ_CURRENT allOBJ]
-			set AOE_START [list [CanvasToGrid $a_x] [CanvasToGrid $a_y]]
+		default {
+			DEBUG 0 "Called StartObj($w,$x,$y) with illegal mode $OBJ_MODE"
 		}
 	}
 
-	if {$OBJ_MODE == "aoe"} {
-		set OBJ(X:$OBJ_CURRENT) [expr $a_x / $zoom]
-		set OBJ(Y:$OBJ_CURRENT) [expr $a_y / $zoom]
-		set OBJ(Z:$OBJ_CURRENT) 99999999
-	} elseif {$OBJ_MODE == "aoebound"} {
-		set OBJ(X:$OBJ_CURRENT) [expr [SnapCoord $x] / $zoom]
-		set OBJ(Y:$OBJ_CURRENT) [expr [SnapCoord $y] / $zoom]
-		set OBJ(Z:$OBJ_CURRENT) 99999999
-	} elseif {$OBJ_MODE == "tile" || $OBJ_MODE == "text"} {
-		set OBJ(X:$OBJ_CURRENT) [expr [SnapCoord $x] / $zoom]
-		set OBJ(Y:$OBJ_CURRENT) [expr [SnapCoord $y] / $zoom]
-		EndObj $canvas
-	} else {
-		set OBJ(X:$OBJ_CURRENT) [expr [SnapCoord $x] / $zoom]
-		set OBJ(Y:$OBJ_CURRENT) [expr [SnapCoord $y] / $zoom]
-	}
+	bind $canvas $BUTTON_MIDDLE "EndObj $canvas"
+	bind . <Key-Escape> "EndObj $canvas"
+
 	$canvas raise grid
 	if $animatePlacement update
 }
@@ -4217,7 +4674,7 @@ proc ZoomVector { args } {
 }
 
 proc ObjAoeDrag {w x y} {
-	global OBJ OBJ_CURRENT OBJ_SNAP canvas zoom DistanceLabelText AOE_START
+	global OBJdata OBJ_CURRENT OBJ_SNAP canvas zoom DistanceLabelText AOE_START
 
 	set xx  [SnapCoordAlways [$canvas canvasx $x]]
 	set yy  [SnapCoordAlways [$canvas canvasy $y]]
@@ -4230,13 +4687,13 @@ proc ObjAoeDrag {w x y} {
 		set radius_grids [GridDistance [lindex $AOE_START 0] [lindex $AOE_START 1] $gx $gy]
 		set radius_feet  [expr $radius_grids * 5]
 		set r [expr $radius_grids * $iscale]
-		set x0	[expr $OBJ(X:$OBJ_CURRENT) * $zoom]
-		set y0	[expr $OBJ(Y:$OBJ_CURRENT) * $zoom]
+		set x0	[expr [dict get $OBJdata($OBJ_CURRENT) X] * $zoom]
+		set y0	[expr [dict get $OBJdata($OBJ_CURRENT) Y] * $zoom]
 
 		$w coords obj_locator$OBJ_CURRENT "$x0 $y0 $xx $yy"
 		set DistanceLabelText [format "%d feet" $radius_feet]
 		
-		switch $OBJ(AOESHAPE:$OBJ_CURRENT) {
+		switch [::gmaproto::from_enum AoEShape [dict get $OBJdata($OBJ_CURRENT) AoEShape]] {
 			radius {
 				$w coords obj_locator_radius$OBJ_CURRENT "[expr $x0-$r] [expr $y0-$r] [expr $x0+$r] [expr $y0+$r]"
 			}
@@ -4264,13 +4721,13 @@ proc ObjAoeDrag {w x y} {
 # DrawAoeZone canvas AOEobjID {x1 y1 x2 y2}
 # coordinates are assumed to already be scaled and snapped to the grid
 proc DrawAoeZone {w id coords} {
-	global OBJ iscale PI
+	global OBJdata iscale PI
 	
 	if {[llength $coords] != 4} {
 		say "ERROR: DrawAoeZone coordinates value {$coords} invalid"
 		return
 	}
-	DistributeVars $coords x0 y0 xx yy
+	lassign $coords x0 y0 xx yy
 	set gx0 [CanvasToGrid $x0]
 	set gy0 [CanvasToGrid $y0]
 	set gxx [CanvasToGrid $xx]
@@ -4278,7 +4735,9 @@ proc DrawAoeZone {w id coords} {
 	set radius_grids [GridDistance $gx0 $gy0 $gxx $gyy]
 	set r [expr $radius_grids * $iscale]
 
-	_DrawAoeZone $w $id $gx0 $gy0 $gxx $gyy $r $OBJ(FILL:$id) $OBJ(AOESHAPE:$id) [list AoEZoneCrossHatch$id obj$id allOBJ]
+	_DrawAoeZone $w $id $gx0 $gy0 $gxx $gyy $r [dict get $OBJdata($id) Fill] \
+		[::gmaproto::from_enum AoEShape [dict get $OBJdata($id) AoEShape]] \
+		[list AoEZoneCrossHatch$id obj$id allOBJ]
 }
 
 set AoeZoneLast {}
@@ -4553,12 +5012,12 @@ proc DrawAoeSpread {w x0 y0 r bounds tags color} {
 		set point [to_do get]
 		# add weights to this point's neighbors if they aren't already done
 		# as long as we haven't gone past our total distance
-		DistributeVars [split $point ,] c1 r1
+		lassign [split $point ,] c1 r1
 		#puts "Looking at neighbors of ($point) (column $c1, row $r1)"
 		foreach neighbor [NeighborsOf $c1 $r1] {
 			if {![info exists weights($neighbor)]} {
 				# we haven't already computed a value for this square, so proceed now...
-				DistributeVars [split $neighbor ,] cc rr
+				lassign [split $neighbor ,] cc rr
 				set my_weight 0
 				set ok 1
 				#
@@ -4633,7 +5092,7 @@ proc DrawAoeSpread {w x0 y0 r bounds tags color} {
 					if {[info exists weights($npoint)]} {
 						# this is a neighbor we've calculated a value for, so it affects us too
 						# are we coming at this square diagonally or adjacent?
-						DistributeVars [split $npoint ,] nc nr
+						lassign [split $npoint ,] nc nr
 						if {$nc == $cc || $nr == $rr} {
 							# we're going straight up or down
 							set wt [expr $adj_weight + $weights($npoint)]
@@ -4685,16 +5144,32 @@ proc DrawAoeGrid {w x1 y1 x2 y2 color id tags} {
 	}
 }
 
+proc PointsDictToList {p} {
+	set pts {}
+	foreach xy $p {
+		lappend pts [dict get $xy X]
+		lappend pts [dict get $xy Y]
+	}
+	return $pts
+}
+
+proc AllPointsFromObj {o} {
+	set pts {}
+	lappend pts [dict get $o X] [dict get $o Y]
+	lappend pts {*}[PointsDictToList [dict get $o Points]]
+	return $pts
+}
+
 proc ObjDrag {w x y} {
-	global OBJ OBJ_CURRENT OBJ_SNAP canvas zoom
+	global OBJdta OBJ_CURRENT OBJ_SNAP canvas zoom OBJ_MODE
 	if {$OBJ_CURRENT != 0} {
-		set new_coords "[ZoomVector $OBJ(X:$OBJ_CURRENT) $OBJ(Y:$OBJ_CURRENT) $OBJ(POINTS:$OBJ_CURRENT)] [SnapCoord [$canvas canvasx $x]] [SnapCoord [$canvas canvasy $y]]"
+		set new_coords "[AllPointsFromObj $OBJdata($OBJ_CURRENT)] [SnapCoord [$canvas canvasx $x]] [SnapCoord [$canvas canvasy $y]]"
 		if {[catch {
 			$w coords obj$OBJ_CURRENT $new_coords
 		} err]} {
 			DEBUG 0 "Warning: Updating $OBJ_CURRENT coordinates to $new_coords failed: $err"
 		}
-		if {$OBJ(TYPE:$OBJ_CURRENT) == "ruler"} {
+		if {$OBJ_MODE == "ruler"} {
 			global DistanceLabelText
 			set d [DistanceAlongRoute $new_coords]
 			set DistanceLabelText [format "%d grid%s, %d ft" $d [expr $d==1 ? {{}} : {{s}}] [expr $d*5] [expr ($d*5)==1 ? {{}} : {{s}}]]
@@ -4704,59 +5179,58 @@ proc ObjDrag {w x y} {
 }
 
 proc NextPoint {w x y} {
-	global OBJ OBJ_CURRENT OBJ_SNAP canvas zoom
+	global OBJdata OBJ_CURRENT OBJ_SNAP canvas zoom
 	set x [$canvas canvasx $x]
 	set y [$canvas canvasy $y]
-	lappend OBJ(POINTS:$OBJ_CURRENT) [expr [SnapCoord $x] / $zoom] [expr [SnapCoord $y] / $zoom]
-	$w coords obj$OBJ_CURRENT "[ZoomVector $OBJ(X:$OBJ_CURRENT) $OBJ(Y:$OBJ_CURRENT) $OBJ(POINTS:$OBJ_CURRENT)] [SnapCoord $x] [SnapCoord $y]"
+	dict lappend OBJdata($OBJ_CURRENT) Points [dict create X [expr [SnapCoord $x] / $zoom] Y [expr [SnapCoord $y] / $zoom]]
+	$w coords obj$OBJ_CURRENT "[ZoomVector {*}[AllPointsFromObj $OBJdata($OBJ_CURRENT)]] [SnapCoord $x] [SnapCoord $y]"
 	update
 }
 
 proc LastPoint {w x y} {
-	global OBJ OBJ_CURRENT OBJ_SNAP canvas zoom
+	global OBJdata OBJ_CURRENT OBJ_SNAP canvas zoom
 	set x [$canvas canvasx $x]
 	set y [$canvas canvasy $y]
-	lappend OBJ(POINTS:$OBJ_CURRENT) [expr [SnapCoord $x] / $zoom] [expr [SnapCoord $y] / $zoom]
+	dict lappend OBJdata($OBJ_CURRENT) Points [dict create X [expr [SnapCoord $x] / $zoom] Y [expr [SnapCoord $y] / $zoom]]
 	EndObj $w 
 }
 
 proc LastAoePoint {w x y} {
-	global OBJ OBJ_CURRENT OBJ_SNAP canvas zoom
+	global OBJdata OBJ_CURRENT OBJ_SNAP canvas zoom
 	set x [$canvas canvasx $x]
 	set y [$canvas canvasy $y]
 	set xx [SnapCoordAlways $x]
 	set yy [SnapCoordAlways $y]
-	lappend OBJ(POINTS:$OBJ_CURRENT) [expr $xx / $zoom] [expr $yy / $zoom]
+	dict lappend OBJdata($OBJ_CURRENT) Points [dict create X [expr $xx / $zoom] Y [expr $yy / $zoom]]
 	$w delete obj_distance$OBJ_CURRENT
 	$w delete obj_locator$OBJ_CURRENT
 	$w delete obj_locator_radius$OBJ_CURRENT
-	#$w delete obj_locator_cone1_$OBJ_CURRENT
-	#$w delete obj_locator_cone2_$OBJ_CURRENT
 	$w delete obj_locator_cone3_$OBJ_CURRENT
-	$canvas create oval [expr $xx-10] [expr $yy-10] [expr $xx+10] [expr $yy+10] -width 3 -outline $OBJ(FILL:$OBJ_CURRENT) -tags [list obj$OBJ_CURRENT]
-	$canvas create line [expr $xx-5] [expr $yy-5] [expr $xx+5] [expr $yy+5] -width 3 -fill $OBJ(FILL:$OBJ_CURRENT) -tags [list obj$OBJ_CURRENT]
-	$canvas create line [expr $xx-5] [expr $yy+5] [expr $xx+5] [expr $yy-5] -width 3 -fill $OBJ(FILL:$OBJ_CURRENT) -tags [list obj$OBJ_CURRENT]
+	$canvas create oval [expr $xx-10] [expr $yy-10] [expr $xx+10] [expr $yy+10] -width 3 -outline [dict get $OBJdata($OBJ_CURRENT) Fill] -tags [list obj$OBJ_CURRENT]
+	$canvas create line [expr $xx-5] [expr $yy-5] [expr $xx+5] [expr $yy+5] -width 3 -fill [dict get $OBJdata($OBJ_CURRENT) Fill] -tags [list obj$OBJ_CURRENT]
+	$canvas create line [expr $xx-5] [expr $yy+5] [expr $xx+5] [expr $yy-5] -width 3 -fill [dict get $OBJdata($OBJ_CURRENT) Fill] -tags [list obj$OBJ_CURRENT]
 	EndObj $w 
 }
 	
 proc LastArcPoint {w x y} {
-	global OBJ OBJ_CURRENT OBJ_SNAP canvas zoom
+	global OBJdata OBJ_CURRENT OBJ_SNAP canvas zoom
 	set x [$canvas canvasx $x]
 	set y [$canvas canvasy $y]
-	lappend OBJ(POINTS:$OBJ_CURRENT) [expr [SnapCoord $x] / $zoom] [expr [SnapCoord $y] / $zoom]
+	dict lappend OBJdata($OBJ_CURRENT) Points [dict create X [expr [SnapCoord $x] / $zoom] Y [expr [SnapCoord $y] / $zoom]]
 	bind $w <1>         "SetArcStartAngle $w %x %y"
 	bind $w <B1-Motion> "DragArcStartAngle $w %x %y"
 	bind $w <Motion>    "DragArcStartAngle $w %x %y"
 }
 
 proc DragArcStartAngle {w x y} {
-	global OBJ OBJ_CURRENT OBJ_SNAP ARCMODE canvas
-	#set x [$canvas canvasx $x]
-	#set y [$canvas canvasy $y]
-	set OBJ(START:$OBJ_CURRENT) [expr $x % 360]
-	set OBJ(EXTENT:$OBJ_CURRENT) [expr $y % 360]
-	set OBJ(ARCMODE:$OBJ_CURRENT) $ARCMODE
-	$w itemconfigure obj$OBJ_CURRENT -start $OBJ(START:$OBJ_CURRENT) -extent $OBJ(EXTENT:$OBJ_CURRENT) -style $ARCMODE
+	global OBJdata OBJ_CURRENT OBJ_SNAP ARCMODE canvas
+	dict set OBJdata($OBJ_CURRENT) Start [expr $x % 360]
+	dict set OBJdata($OBJ_CURRENT) Extent [expr $y % 360]
+	dict set OBJdata($OBJ_CURRENT) ArcMode [::gmaproto::to_enum ArcMode $ARCMODE]
+
+	$w itemconfigure obj$OBJ_CURRENT \
+		-start [dict get $OBJdata($OBJ_CURRENT) Start] \
+		-extent [dict get $OBJdata($OBJ_CURRENT) Extent] -style $ARCMODE
 }
 
 proc SetArcStartAngle {w x y} {
@@ -4766,35 +5240,42 @@ proc SetArcStartAngle {w x y} {
 }
 
 proc EndObj w {
-	global OBJ OBJ_CURRENT
+	global OBJdata OBJ_CURRENT OBJ_MODE
 	global BUTTON_MIDDLE BUTTON_RIGHT
-	if {$OBJ(TYPE:$OBJ_CURRENT) != "tile" 
-	&& $OBJ(TYPE:$OBJ_CURRENT) != "text" 
-	&& $OBJ(POINTS:$OBJ_CURRENT) == {}} {
+
+	if {[info exists OBJtype($OBJ_CURRENT)]} {
+		set t $OBJtype($OBJ_CURRENT)
+	} else {
+		set t $OBJ_MODE
+	}
+
+	if {$t != "tile" && $t != "text" && [llength [dict get $OBJdata($OBJ_CURRENT) Points]] == 0} {
 		$w delete obj$OBJ_CURRENT
 		RemoveObject $OBJ_CURRENT
 		$w delete obj_distance$OBJ_CURRENT
-	} elseif {$OBJ(TYPE:$OBJ_CURRENT) == "ruler"} {
+	} elseif {$t == "ruler"} {
 		# Rulers are only temporary. I suppose we could plant a flag at the endpoint or something
 		# but right now we don't need to.
 		$w delete obj$OBJ_CURRENT
 		RemoveObject $OBJ_CURRENT
 		$w delete obj_distance$OBJ_CURRENT
-	} elseif {$OBJ(TYPE:$OBJ_CURRENT) != "aoe"} {
-		$w coords obj$OBJ_CURRENT [ZoomVector $OBJ(X:$OBJ_CURRENT) $OBJ(Y:$OBJ_CURRENT) $OBJ(POINTS:$OBJ_CURRENT)]
+	} elseif {$t != "aoe"} {
+		$w coords obj$OBJ_CURRENT [ZoomVector {*}[AllPointsFromObj $OBJdata($OBJ_CURRENT)]]
 	}
 	bind $w <1> "StartObj $w %x %y"
 	bind $w $BUTTON_MIDDLE {}
 	bind . <Key-Escape> {}
 	update
-	if [info exists OBJ(TYPE:$OBJ_CURRENT)] {
-		StartSendElementSet 1
-		foreach key [array names OBJ *:$OBJ_CURRENT] {
-			ContinueSendElementSet [list $key $OBJ($key)]
-		}
-		FinishSendElementSet
-	}
+	send_element $OBJ_CURRENT
 	set OBJ_CURRENT 0
+}
+
+proc send_element {id} {
+	global OBJtype OBJdata
+
+	if [info exists OBJtype($id)] {
+		::gmaproto::ls [::gmaproto::ObjTypeToGMAType $OBJtype($id)] $OBJdata($id)
+	}
 }
 
 proc SquareGrid {w xx yy show} {
@@ -4886,47 +5367,38 @@ proc PopSomeoneToFront {w id} {
 	RenderSomeone $w $id
 }
 
-proc PlaceSomeone {w x y c n a s t id reach} {
-	global MOB NextMOBID OBJ_NEXT_Z canvas
+#proc PlaceSomeone {w x y c n a s t id reach} {}
+proc PlaceSomeone {w d} {
+	global MOBdata MOBid NextMOBID OBJ_NEXT_Z canvas
 
-	if {[info exists MOB(ID:$n)] && $id ne $MOB(ID:$n)} {
-		DEBUG 1 "Placing $n (ID $id) but already have one with ID $MOB(ID:$n)"
+	set n [dict get $d Name]
+	set id [dict get $d ID]
+	if {[info exists MOBid($n)] && $id ne $MOBid($n)} {
+		DEBUG 1 "Placing $n (ID $id) but already have one with ID $MOBid($n)"
 		DEBUG 1 "--Removing old one"
-		ITsend [list CLR $MOB(ID:$n)]
-		RemovePerson $MOB(ID:$n)
+		::gmaproto::clear $MOBid($n)	;# TODO ???
+		RemovePerson $MOBid($n)
 	}
 
-	if {![info exists MOB(NAME:$id)]} {
-		DEBUG 1 "--Adding new person $id"
-		set MOB(NAME:$id) $n
-		set MOB(ID:$n)    $id
-		set MOB(AREA:$id) $a
-		set MOB(SIZE:$id) $s
-		set MOB(KILLED:$id) 0
-		set MOB(SKIN:$id) 0
-		set MOB(NOTE:$id) {}
-		set MOB(DIM:$id) 0
-		set MOB(TYPE:$id) $t
-		set MOB(REACH:$id) $reach
-		set MOB(ELEV:$id) 0
-		set MOB(MOVEMODE:$id) {}
-		set MOB(HEALTH:$id) {}
-		DEBUG 1 "--Done"
+	if {![info exists MOBdata($id)]} {
+		DEBUG 1 "--Adding new person $n with ID $id"
+		set MOBid($n) $id
+		set MOBdata($id) $d
 	} else {
-		DEBUG 1 "PlaceSomeone $n using existing id $id"
+		DEBUG 1 "--PlaceSomeone $n using existing id $id (updating in-place)"
+		set MOBdata($id) [dict merge $MOBdata($id) $d]
 	}
-
-	set MOB(COLOR:$id) $c
 	MoveSomeone $w $id $x $y
 }
 
 proc MoveSomeone {w id x y} {
-	global MOB
+	global MOBdata
 
-	set MOB(GX:$id) $x
-	set MOB(GY:$id) $y
-
-	RenderSomeone $w $id
+	if [info exists MOBdata($id)] {
+		dict set MOBdata($id) Gx $x
+		dict set MOBdata($id) Gy $y
+		RenderSomeone $w $id
+	}
 }
 
 #
@@ -5222,10 +5694,10 @@ proc ReachMatrix {size} {
 }
 
 proc MOBCenterPoint {id} {
-	global MOB iscale
-	set x $MOB(GX:$id)
-	set y $MOB(GY:$id)
-	set r [expr [MonsterSizeValue $MOB(SIZE:$id)] / 2.0]
+	global MOBdata iscale
+	set x [dict get $MOBdata($id) Gx]
+	set y [dict get $MOBdata($id) Gy]
+	set r [expr [MonsterSizeValue [dict get $MOBdata($id) Size]] / 2.0]
 	return [list [expr ($x+$r)*$iscale] [expr ($y+$r)*$iscale] [expr $r*$iscale]]
 }
 
@@ -5244,10 +5716,10 @@ proc FindImage {image_pfx zoom} {
             if {![info exists TILE_RETRY($tile_id)]} {
                 # first reference: ask now and wait for 10
                 set TILE_RETRY($tile_id) 10
-                ITsend [list AI? $image_pfx $zoom]
+				::gmaproto::query_image $image_pfx $zoom
             } elseif {$TILE_RETRY($tile_id) <= 0} {
                 # subsequent times: ask every 50
-                ITsend [list AI? $image_pfx $zoom]
+				::gmaproto::query_image $image_pfx $zoom
                 set TILE_RETRY($tile_id) 50
             } else {
                 incr TILE_RETRY($tile_id) -1
@@ -5507,47 +5979,27 @@ array set MarkerDescription {
 	panicked    		{Panicked: drop anything held and flee at top speed along random path. -2 on saving throws, skill checks, ability checks. If cornered, cowers. Can use special abilities and spells to flee (MUST if that's the only way to escape).}
 }
 
-proc DefineStatusMarker {condition shape color description} {
-	global MarkerColor MarkerShape MarkerDescription
-	if {$shape eq {} || $color eq {}} {
-		array unset MarkerColor $condition
-		array unset MarkerShape $condition
-	} else {
-		set MarkerColor($condition) $color
-		set MarkerShape($condition) $shape
-		if {$description eq {}} {
-			if {![info exists MarkerDescription($condition)]} {
-				set MarkerDescription($condition) $condition
-			}
-		} else {
-			set MarkerDescription($condition) $description
-		}
-	}
-}
 
 proc CreatureStatusMarker {w id x y s} {
-	global MOB MarkerColor MarkerShape
+	global MOBdata MarkerColor MarkerShape
 	
 	# HEALTH conditions
 	#  normal/{} flat staggered unconscious stable disabled dying
 	# dying: half-slash through the token
 	set conditions {}
-	if [info exists MOB(_CONDITION:$id)] {
-		lappend conditions $MOB(_CONDITION:$id)
-	}
-	if [info exists MOB(STATUSLIST:$id)] {
-		foreach condition $MOB(STATUSLIST:$id) {
+	if [info exists MOBdata($id)] {
+		if {[dict get $MOBdata($id) Health] ne {}} {
+			if {[set condition [dict get $MOBdata($id) Health Condition]] ne {}} {
+				lappend conditions $condition
+			}
+			if [dict get $MOBdata($id) Health IsFlatFooted] {lappend conditions flat-footed}
+			if [dict get $MOBdata($id) Health IsStable]     {lappend conditions stable}
+		}
+		foreach condition [dict get $MOBdata($id) StatusList] {
 			lappend conditions $condition
 		}
 	}
-	if {[info exists MOB(HEALTH:$id)] && [llength $MOB(HEALTH:$id)] >= 6} {
-		if [lindex $MOB(HEALTH:$id) 4] {
-			lappend conditions flat-footed
-		}
-		if [lindex $MOB(HEALTH:$id) 5] {
-			lappend conditions stable
-		}
-	}
+
 	if {[llength $conditions] == 0} {
 		return
 	}
@@ -5572,7 +6024,7 @@ proc CreatureStatusMarker {w id x y s} {
 	foreach condition $conditions {
 		if {[info exists MarkerShape($condition)] && [info exists MarkerColor($condition)]} {
 			if {[set color $MarkerColor($condition)] eq {*}} {
-				set color $MOB(COLOR:$id)
+				set color [dict get $MOBdata($id) Color]
 			}
 			if {[string range $color 0 1] eq {--}} {
 				set color [string range $color 2 end]
@@ -5765,35 +6217,35 @@ proc CreatureStatusMarker {w id x y s} {
 
 proc RenderSomeone {w id} {
 	DEBUG 3 "RenderSomeone $w $id"
-	global MOB ThreatLineWidth iscale SelectLineWidth ThreatLineHatchWidth ReachLineColor
+	global MOBdata ThreatLineWidth iscale SelectLineWidth ThreatLineHatchWidth ReachLineColor
 	global HealthBarWidth HealthBarFrameWidth HealthBarConditionFrameWidth
 	global ShowHealthStats
 
-	set x $MOB(GX:$id)
-	set y $MOB(GY:$id)
-	DistributeVars [ReachMatrix $MOB(AREA:$id)] mob_area mob_reach mob_matrix
-	set mob_size [MonsterSizeValue $MOB(SIZE:$id)]
+	set x [dict get $MOBdata($id) Gx]
+	set y [dict get $MOBdata($id) Gy]
+	lassign [ReachMatrix [dict get $MOBdata($id) Area]] mob_area mob_reach mob_matrix
+	set mob_size [MonsterSizeValue [dict get $MOBdata($id) Size]]
 
 	# If somehow we have a misaligned creature that's at least "small",
 	# snap to even grid boundary
 	if {$mob_size >= 1 && ($x != int($x) || $y != int($y))} {
 		set x [expr int($x)]
 		set y [expr int($y)]
-		set MOB(GX:$id) $x
-		set MOB(GY:$id) $y
+		dict set MOBdata($id) Gx $x
+		dict set MOBdata($id) Gy $y
 	}
 
 	$w delete "M#$id"
 
-
 	# spell area of effect
-	if {[info exists MOB(AOE:$id)] && [llength $MOB(AOE:$id)] == 3} {
-		DistributeVars $MOB(AOE:$id) aoe_type aoe_radius aoe_color
+	if {[set AoE [dict get $MOBdata($id) AoE]] ne {}} {
+		set aoe_type radius
+		::gmautil::dassign $AoE Radius aoe_radius Color aoe_color
 		set aoe_radius [expr $aoe_radius * $iscale]; #convert to canvas units for rendering
 		switch $aoe_type {
 			radius {
-				set GX0 $MOB(GX:$id)
-				set GY0 $MOB(GY:$id)
+				set GX0 [dict get $MOBdata($id) Gx]
+				set GY0 [dict get $MOBdata($id) Gy]
 				set GXX [expr $GX0 * $iscale]
 				set GYY [expr $GY0 * $iscale]
 				#
@@ -5804,7 +6256,7 @@ proc RenderSomeone {w id} {
 				# this makes some overlapping draw calls, but gets the job done.
 				#
 				# Our (GX,GY) reference point is already at the upper left of the occupied space.
-				set sz [MonsterSizeValue $MOB(SIZE:$id)]
+				set sz [MonsterSizeValue [dict get $MOBdata($id) Size]]
 				for {set AoEx 0} {$AoEx <= $sz} {incr AoEx} {
 					_DrawAoeZone $w $id [expr $GX0+$AoEx] $GY0 [expr $GXX+$AoEx] $GYY $aoe_radius $aoe_color radius [list M#$id MA#$id allMOB MAzone]			
 					if {$sz >= 1} {
@@ -5820,18 +6272,32 @@ proc RenderSomeone {w id} {
 	}
 
 	# area of threat 
-	#$w create rectangle [expr $x*50] [expr $y*50] [expr ($x+1)*50] [expr ($y+1)*50] -outline red -tags "M#$id" -fill $MOB(COLOR:$id) -stipple gray25
 	global MOB_COMBATMODE
-	if {$MOB_COMBATMODE && !$MOB(KILLED:$id)} {
-		if {$MOB(DIM:$id)} {
-			$w create arc [expr ($x-$mob_area)*$iscale] [expr ($y-$mob_area)*$iscale] [expr ($x+$mob_size+$mob_area)*$iscale] [expr ($y+$mob_area+$mob_size)*$iscale] -outline $MOB(COLOR:$id) -width $ThreatLineWidth -tags "M#$id MC#$id MT=$MOB(TYPE:$id) allMOB MCzone" -dash . -start 0 -extent 359.9 -style arc
-			if {$MOB(REACH:$id)} {
-				$w create arc [expr ($x-$mob_reach)*$iscale] [expr ($y-$mob_reach)*$iscale] [expr ($x+$mob_size+$mob_reach)*$iscale] [expr ($y+$mob_reach+$mob_size)*$iscale] -outline $MOB(COLOR:$id) -width $ThreatLineWidth -tags "M#$id MR#$id MT=$MOB(TYPE:$id) allMOB MCzone" -dash . -start 0 -extent 359.9 -style arc
+	if {[dict get $MOBdata($id) CreatureType] == 2} {
+		set ctype player
+	} else {
+		set ctype monster
+	}
+	if {$MOB_COMBATMODE && ![dict get $MOBdata($id) Killed]} {
+		if [dict get $MOBdata($id) Dim] {
+			$w create arc [expr ($x-$mob_area)*$iscale] [expr ($y-$mob_area)*$iscale] \
+				[expr ($x+$mob_size+$mob_area)*$iscale] [expr ($y+$mob_area+$mob_size)*$iscale] \
+				-outline [dict get $MOBdata($id) Color] \
+				-width $ThreatLineWidth \
+				-tags "M#$id MC#$id MT=$ctype allMOB MCzone" \
+				-dash . -start 0 -extent 359.9 -style arc
+			if {[dict get $MOBdata($id) Reach] > 0} {
+				$w create arc [expr ($x-$mob_reach)*$iscale] [expr ($y-$mob_reach)*$iscale] \
+					[expr ($x+$mob_size+$mob_reach)*$iscale] [expr ($y+$mob_reach+$mob_size)*$iscale] \
+					-outline [dict get $MOBdata($id) Color] \
+					-width $ThreatLineWidth \
+					-tags "M#$id MR#$id MT=$ctype allMOB MCzone" \
+					-dash . -start 0 -extent 359.9 -style arc
 			}
 		} else {
 			set Xstart [expr ($x-$mob_reach)]
 			set yy [expr ($y-$mob_reach)]
-			switch $MOB(REACH:$id) {
+			switch [dict get $MOBdata($id) Reach] {
 				1 {
 					# reach weapons
 					set hashbit 1
@@ -5845,7 +6311,7 @@ proc RenderSomeone {w id} {
 					set hashbit 2
 				}
 			}
-			set color $MOB(COLOR:$id)
+			set color [dict get $MOBdata($id) Color]
 			foreach row $mob_matrix {
 				set xx $Xstart
 				foreach col $row {
@@ -5865,7 +6331,7 @@ proc RenderSomeone {w id} {
 										   [expr ($yy + $yb) * $iscale] \
 										   -fill $color \
 										   -width $ThreatLineHatchWidth \
-										   -tags "M#$id MF#$id MH#$id MT=$MOB(TYPE:$id) allMOB"
+										   -tags "M#$id MF#$id MH#$id MT=$ctype allMOB"
 						}
 					}
 					incr xx
@@ -5873,16 +6339,24 @@ proc RenderSomeone {w id} {
 				incr yy
 			}
 
-			$w create arc [expr ($x-$mob_area)*$iscale] [expr ($y-$mob_area)*$iscale] [expr ($x+$mob_size+$mob_area)*$iscale] [expr ($y+$mob_area+$mob_size)*$iscale] -outline red -width $ThreatLineWidth -tags "MF#$id M#$id MC#$id MT=$MOB(TYPE:$id) allMOB MCzone" -dash . -start 0 -extent 359.9 -style arc
-			if {$MOB(REACH:$id)} {
-				$w create arc [expr ($x-$mob_reach)*$iscale] [expr ($y-$mob_reach)*$iscale] [expr ($x+$mob_size+$mob_reach)*$iscale] [expr ($y+$mob_reach+$mob_size)*$iscale] -outline $ReachLineColor -width $ThreatLineWidth -tags "M#$id MF#$id MR#$id MT=$MOB(TYPE:$id) allMOB MCzone" -dash . -start 0 -extent 359.9 -style arc
+			$w create arc [expr ($x-$mob_area)*$iscale] [expr ($y-$mob_area)*$iscale] \
+				[expr ($x+$mob_size+$mob_area)*$iscale] [expr ($y+$mob_area+$mob_size)*$iscale] \
+				-outline red -width $ThreatLineWidth \
+				-tags "MF#$id M#$id MC#$id MT=$ctype allMOB MCzone" \
+				-dash . -start 0 -extent 359.9 -style arc
+			if {[dict get $MOBdata($id) Reach] > 0} {
+				$w create arc [expr ($x-$mob_reach)*$iscale] [expr ($y-$mob_reach)*$iscale] \
+					[expr ($x+$mob_size+$mob_reach)*$iscale] [expr ($y+$mob_reach+$mob_size)*$iscale] \
+					-outline $ReachLineColor -width $ThreatLineWidth \
+					-tags "M#$id MF#$id MR#$id MT=$ctype allMOB MCzone" \
+					-dash . -start 0 -extent 359.9 -style arc
 			}
 		}
 	}
 		
 	# nametag
 	global MOB_IMAGE
-	set mob_name [set mob_img_name $MOB(NAME:$id)]
+	set mob_name [set mob_img_name [dict get $MOBdata($id) Name]]
 	if [info exists MOB_IMAGE($mob_name)] {
 		set mob_img_name $MOB_IMAGE($mob_name)
 	} elseif [regexp {^(.*) #\d+$} $mob_name mob_full_name mob_creature_name mob_sequence] {
@@ -5893,9 +6367,9 @@ proc RenderSomeone {w id} {
 	# prefix to use based on skin selected and possibly if alive
 	#
 	set image_candidates {}
-	set skin_idx $MOB(SKIN:$id)
+	set skin_idx [dict get $MOBdata($id) Skin]
 
-	if {$MOB(KILLED:$id)} {
+	if {[dict get $MOBdata($id) Killed]} {
 		set fillcolor black
 		set textcolor white
 		set i_pfx "%"
@@ -5955,22 +6429,25 @@ proc RenderSomeone {w id} {
 		DEBUG 3 "$image_pfx:$zoom = $TILE_SET($image_pfx:$zoom)"
 		$w create oval [expr $x*$iscale] [expr $y*$iscale] [expr ($x+$mob_size)*$iscale] [expr ($y+$mob_size)*$iscale] -fill $fillcolor -tags "mob MF#$id M#$id MN#$id allMOB"
 		$w create image [expr $x*$iscale] [expr $y*$iscale] -anchor nw -image $TILE_SET($image_pfx:$zoom) -tags "mob M#$id MN#$id allMOB"
-		#$w create text [expr $x*$iscale] [expr $y*$iscale] -anchor nw -fill black -font [FontBySize $MOB(SIZE:$id)] -text $mob_name -tags "M#$id MF#$id MT#$id allMOB"
 		set nametag_w "$w.nt_$id"
 		if {[winfo exists $nametag_w]} {
-			$nametag_w configure -font [FontBySize $MOB(SIZE:$id)] -text $mob_name
+			$nametag_w configure -font [FontBySize [dict get $MOBdata($id) Size]] -text $mob_name
 		} else {
-			label $nametag_w -background [::tk::Darken $MOB(COLOR:$id) 40] -foreground white -font [FontBySize $MOB(SIZE:$id)] -text $mob_name 
+			label $nametag_w -background [::tk::Darken [dict get $MOBdata($id) Color] 40] \
+				-foreground white -font [FontBySize [dict get $MOBdata($id) Size]] -text $mob_name 
 		}
 		$w create window [expr $x*$iscale] [expr $y*$iscale] -anchor w -window $nametag_w -tags "M#$id MF#$id MT#$id allMOB"
 	} else {
 		DEBUG 3 "No $image_pfx:$zoom found in TILE_SET"
 		$w create oval [expr $x*$iscale] [expr $y*$iscale] [expr ($x+$mob_size)*$iscale] [expr ($y+$mob_size)*$iscale] -fill $fillcolor -tags "mob MF#$id M#$id MN#$id allMOB"
-		$w create text [expr ($x+(.5*$mob_size))*$iscale] [expr ($y+(.5*$mob_size))*$iscale] -fill $textcolor -font [FontBySize $MOB(SIZE:$id)] -text $mob_name -tags "M#$id MF#$id MT#$id allMOB"
+		$w create text [expr ($x+(.5*$mob_size))*$iscale] [expr ($y+(.5*$mob_size))*$iscale] -fill $textcolor \
+			-font [FontBySize [dict get $MOBdata($id) Size]] -text $mob_name -tags "M#$id MF#$id MT#$id allMOB"
 	}
-	if {$MOB(KILLED:$id)} {
-		$w create line [expr $x*$iscale] [expr $y*$iscale] [expr ($x+$mob_size)*$iscale] [expr ($y+$mob_size)*$iscale] -fill $MOB(COLOR:$id) -width 7 -tags "mob MF#$id M#$id MN#$id allMOB"
-		$w create line [expr $x*$iscale] [expr ($y+$mob_size)*$iscale] [expr ($x+$mob_size)*$iscale] [expr $y*$iscale] -fill $MOB(COLOR:$id) -width 7 -tags "mob MF#$id M#$id MN#$id allMOB"
+	if {[dict get $MOBdata($id) Killed]} {
+		$w create line [expr $x*$iscale] [expr $y*$iscale] [expr ($x+$mob_size)*$iscale] [expr ($y+$mob_size)*$iscale] \
+			-fill [dict get $MOBdata($id) Color] -width 7 -tags "mob MF#$id M#$id MN#$id allMOB"
+		$w create line [expr $x*$iscale] [expr ($y+$mob_size)*$iscale] [expr ($x+$mob_size)*$iscale] [expr $y*$iscale] \
+			-fill [dict get $MOBdata($id) Color] -width 7 -tags "mob MF#$id M#$id MN#$id allMOB"
 	}
 		
 	#
@@ -6001,64 +6478,64 @@ proc RenderSomeone {w id} {
 	#	bw					healthbar frame width
 	#	bc					healthbar frame color
 	#
-	set its_dead_jim $MOB(KILLED:$id)
-	set show_healthbar 0
+	set its_dead_jim [dict get $MOBdata($id) Killed]
+	set show_healthbar false 
 	set health {}
 	set maxhp 0
 	set lethal 0
 	set nonlethal 0
 	set grace 0
-	set flatp 0
-	set stablep 0
+	set flatp false
+	set stablep false
 	set server_blur_hp 0
-	if {[info exists MOB(_CONDITION:$id)]} {
-		set condition $MOB(_CONDITION:$id)
-	} else {
-		set condition {}
-	}
+	set condition {}
 
-	if {[info exists MOB(HEALTH:$id)]} {
-		set health $MOB(HEALTH:$id)
-		if {[llength $health] >= 7} {
-			set show_healthbar 1
-			DistributeVars $health maxhp lethal nonlethal grace flatp stablep condition server_blur_hp
-			global blur_all blur_pct
-			if {$blur_all || $MOB(TYPE:$id) ne {player}} {
-				set hp_remaining [blur_hp $maxhp $lethal]
-			} else {
-				set hp_remaining [expr $maxhp - $lethal]
-			}
-			DEBUG 2 "Health $id: $health max=$maxhp l=$lethal n=$nonlethal x=$grace ff=$flatp st=$stablep cond=$condition hpr=$hp_remaining ba=$blur_all b=$blur_pct server_b=$server_blur_hp"
-
-			if {$its_dead_jim} {
-				set condition {}
-			} elseif {$condition eq {}} {
-				# calculate condition automatically, otherwise it's forced
-				if {$maxhp <= 0 || ($maxhp-$lethal <= -$grace)} { 
-					set condition dead 
-					# We're making the change locally here instead of broadcasting it out
-					# because all the other map clients will be acting on the same logic
-					# themselves and we don't need a storm of "this creature died" messages.
-					set MOB(KILLED:$id) 1
-					set its_dead_jim 1
-					# Oh, no! We're already past the point where this would have been
-					# useful to know. Start over and re-render them as a corpse this time.
-					RenderSomeone $w $id
-					return
-				} elseif {$lethal > $maxhp && -$grace < $maxhp-$lethal} {
-					set condition dying
-				} elseif {$lethal == $maxhp} {
-					set condition disabled
-				} elseif {$nonlethal > 0 && $lethal+$nonlethal > $maxhp} {
-					set condition unconscious
-				} elseif {$nonlethal > 0 && $lethal+$nonlethal == $maxhp} {
-					set condition staggered
-				} elseif {$flatp} {
-					set condition flat
-				}
-			}
-			set MOB(_CONDITION:$id) $condition
+	if {[set hd [dict get $MOBdata($id) Health]] ne {}} {
+		::gmautil::dassign $hd \
+			Condition condition \
+			MaxHP maxhp \
+			LethalDamage lethal \
+			NonLethalDamage nonlethal \
+			Con grace \
+			IsFlatFooted flatp \
+			IsStable stablep \
+			HPBlur server_blur_hp
+		set show_healthbar true
+		global blur_all blur_pct
+		if {($blur_all || [dict get $MOBdata($id) CreatureType] != 2) && $server_blur_hp == 0} {
+			set hp_remaining [blur_hp $maxhp $lethal]
+		} else {
+			set hp_remaining [expr $maxhp - $lethal]
 		}
+
+		if {$its_dead_jim} {
+			set condition {}
+		} elseif {$condition eq {}} {
+			# calculate condition automatically, otherwise it's forced
+			if {$maxhp <= 0 || ($maxhp-$lethal <= -$grace)} { 
+				set condition dead 
+				# We're making the change locally here instead of broadcasting it out
+				# because all the other map clients will be acting on the same logic
+				# themselves and we don't need a storm of "this creature died" messages.
+				dict set MOBdata($id) Killed true
+				set its_dead_jim true
+				# Oh, no! We're already past the point where this would have been
+				# useful to know. Start over and re-render them as a corpse this time.
+				RenderSomeone $w $id
+				return
+			} elseif {$lethal > $maxhp && -$grace < $maxhp-$lethal} {
+				set condition dying
+			} elseif {$lethal == $maxhp} {
+				set condition disabled
+			} elseif {$nonlethal > 0 && $lethal+$nonlethal > $maxhp} {
+				set condition unconscious
+			} elseif {$nonlethal > 0 && $lethal+$nonlethal == $maxhp} {
+				set condition staggered
+			} elseif {$flatp} {
+				set condition flat
+			}
+		}
+##		set MOB(_CONDITION:$id) $condition
 		# x,y 		grid coords
 		# mob_size	grids across/down
 		# iscale	multiplier to turn grids to pixels
@@ -6074,7 +6551,7 @@ proc RenderSomeone {w id} {
 
 		set bw $HealthBarFrameWidth
 		set bc black
-	} 
+	}
 
 	CreatureStatusMarker $w $id [expr $x*$iscale] [expr $y*$iscale] [expr $mob_size*$iscale]
 	if {$MOB_COMBATMODE} {
@@ -6169,18 +6646,10 @@ proc RenderSomeone {w id} {
 	# Elevation tag
 	# 
 
-	# in case we loaded up an old creature token without elevation
-	# or movement mode, set defaults on them now
-	if {![info exists MOB(ELEV:$id)]} {
-		set MOB(ELEV:$id) 0
-	}
-	if {![info exists MOB(MOVEMODE:$id)]} {
-		set MOB(MOVEMODE:$id) {}
-	}
-	if {$MOB(ELEV:$id) != 0} {
+	if {[set elev [dict get $MOBdata($id) Elev]] != 0} {
 		set fillcolor black
 		set textcolor white
-		switch $MOB(MOVEMODE:$id) {
+		switch [::gmaproto::from_enum MoveMode [dict get $MOBdata($id) MoveMode]] {
 			fly { 
 				set textcolor black
 				set fillcolor deepskyblue
@@ -6199,27 +6668,29 @@ proc RenderSomeone {w id} {
 			catch {label $w.z$id -text {} -foreground $textcolor -background $fillcolor}
 		}
 		$w create window [expr ($x+($mob_size))*$iscale] [expr ($y)*$iscale] -tags "M#$id MELEV#$id allMOB" -anchor ne -window $w.z$id 
-		$w.z$id configure -foreground $textcolor -background $fillcolor -text $MOB(ELEV:$id) -font [FontBySize $MOB(SIZE:$id)]
+		$w.z$id configure -foreground $textcolor -background $fillcolor -text $elev -font [FontBySize [dict get $MOBdata($id) Size]]
 	}
 
 	#
 	# Status tag
 	#
-	if {[info exists MOB(NOTE:$id)] && ![string equal $MOB(NOTE:$id) {}]} {
+	if {[set noteText [dict get $MOBdata($id) Note]] ne {}} {
 		if {![winfo exists $w.ms$id]} {
 			catch {label $w.ms$id -text {} -foreground white -background blue}
 		}
-		$w create window [expr ($x+($mob_size))*$iscale] [expr ($y+$mob_size)*$iscale] -tags "M#$id MT#$id allMOB" -anchor se -window $w.ms$id 
-		$w.ms$id configure -text $MOB(NOTE:$id) -font [FontBySize $MOB(SIZE:$id)]
-		#$w create text [expr ($x+(.5*$mob_size))*$iscale] [expr ($y+$mob_size)*$iscale] -fill red -text $MOB(NOTE:$id) -tags "M#$id MF#$id MT#$id allMOB" -anchor s
+		$w create window [expr ($x+($mob_size))*$iscale] [expr ($y+$mob_size)*$iscale] \
+			-tags "M#$id MT#$id allMOB" -anchor se -window $w.ms$id 
+		$w.ms$id configure -text $noteText -font [FontBySize [dict get $MOBdata($id) Size]]
 	}
-	#$w itemconfigure g$x,$y -fill $MOB(COLOR:$id) -stipple gray25
 
 	#
 	# selection
 	#
-	if {[info exists MOB(_SELECTED:$id)] && $MOB(_SELECTED:$id)} {
-		$w create rectangle [expr $x*$iscale] [expr $y*$iscale] [expr ($x+$mob_size)*$iscale] [expr ($y+$mob_size)*$iscale] -outline blue -width $SelectLineWidth -tags "M#$id allMOB" ;#-fill $MOB(COLOR:$id) -stipple gray25
+	global MOB_SELECTED
+	if {[info exists MOB_SELECTED($id)] && $MOB_SELECTED($id)} {
+		$w create rectangle [expr $x*$iscale] [expr $y*$iscale] \
+			[expr ($x+$mob_size)*$iscale] [expr ($y+$mob_size)*$iscale] \
+			-outline blue -width $SelectLineWidth -tags "M#$id allMOB"
 	}
 	#
 	# Threat zones
@@ -6233,13 +6704,12 @@ proc RenderSomeone {w id} {
 		$w delete "MArrows"
 		DEBUG 4 "Deleting arrows, redrawing them"
 
-		foreach tag [array names MOB NAME:*] {
-			set mob_id [string range $tag 5 end]
+		foreach mob_id [array names MOBdata] {
 			DEBUG 1 "Looking for location of $mob_id"
-			if {!$MOB(KILLED:$mob_id)} {
-				set xx $MOB(GX:$mob_id)
-				set yy $MOB(GY:$mob_id)
-				set sz [MonsterSizeValue $MOB(SIZE:$mob_id)]
+			if {![dict get $MOBdata($mob_id) Killed]} {
+				set xx [dict get $MOBdata($mob_id) Gx]
+				set yy [dict get $MOBdata($mob_id) Gy]
+				set sz [MonsterSizeValue [dict get $MOBdata($mob_id) Size]]
 				DEBUG 1 "- Found at ($xx,$yy), size=$sz:"
 				for {set xi 0} {$xi < $sz} {incr xi} {
 					for {set yi 0} {$yi < $sz} {incr yi} {
@@ -6250,18 +6720,17 @@ proc RenderSomeone {w id} {
 			}
 		}
 
-		foreach threatening_tag [array names MOB NAME:*] {
-			set threatening_mob_id [string range $threatening_tag 5 end]
+		foreach threatening_mob_id [array names MOBdata] {
 			DEBUG 1 "Checking who $threatening_mob_id is threatening"
-			if {$MOB(KILLED:$threatening_mob_id)} continue
-			DistributeVars [ReachMatrix $MOB(AREA:$threatening_mob_id)] ar re mat
-			DistributeVars [MOBCenterPoint $threatening_mob_id] xc yc rc
-			set sz [MonsterSizeValue $MOB(SIZE:$threatening_mob_id)]
+			if {[dict get $MOBdata($threatening_mob_id) Killed]} continue
+			lassign [ReachMatrix [dict get $MOBdata($threatening_mob_id) Area]] ar re mat
+			lassign [MOBCenterPoint $threatening_mob_id] xc yc rc
+			set sz [MonsterSizeValue [dict get $MOBdata($threatening_mob_id) Size]]
 			DEBUG 1 "-- area $ar reach $re ($xc,$yc) r=$rc"
-			set Xstart [expr ($MOB(GX:$threatening_mob_id) - $re)]
-			set yy [expr ($MOB(GY:$threatening_mob_id) - $re)]
+			set Xstart [expr ([dict get $MOBdata($threatening_mob_id) Gx] - $re)]
+			set yy [expr ([dict get $MOBdata($threatening_mob_id) Gy] - $re)]
 			array unset target
-			if {$MOB(REACH:$threatening_mob_id)} {
+			if {[dict get $MOBdata($threatening_mob_id) Reach] > 0} {
 				set matbit 1
 			} else {
 				set matbit 2
@@ -6275,7 +6744,7 @@ proc RenderSomeone {w id} {
 							DEBUG 1 "---- something is here: $WhereIsMOB($xx,$yy)"
 							foreach target_id $WhereIsMOB($xx,$yy) {
 								if {$target_id ne $threatening_mob_id
-								&& $MOB(TYPE:$target_id) ne $MOB(TYPE:$threatening_mob_id)
+								&& [dict get $MOBdata($target_id) CreatureType] != [dict get $MOBdata($threatening_mob_id) CreatureType]
 								&& (![info exists target($target_id)] 
 									|| $target($target_id) < $col)} {
 										DEBUG 1 "----- target($target_id) <- $col"
@@ -6297,7 +6766,7 @@ proc RenderSomeone {w id} {
 				# between their center points.
 				#
 				#set R [expr hypot($Txc-$xc, $Tyc-$yc)]
-				DistributeVars [MOBCenterPoint $target_id] Txc Tyc Trc
+				lassign [MOBCenterPoint $target_id] Txc Tyc Trc
 				set dx [expr $Txc-$xc]
 				set dy [expr $Tyc-$yc]
 				set theta [expr atan2(-$dy,-$dx)]
@@ -6325,38 +6794,33 @@ proc RenderSomeone {w id} {
 					if {$target($target_id) > 0} {
 						$w create line $AOx $AOy $ADx $ADy -arrow last -fill red -width 5 -tags "MArrows M#$threatening_mob_id M#$target_id" -arrowshape [list 15 18  8]
 					}
-#					if {$target($target_id) & 2} {
-#						$w create line $AOx $AOy $ADx $ADy -arrow last -fill red -width 5 -tags "MArrows M#$threatening_mob_id M#$target_id"
-#					} elseif {$MOB(REACH:$threatening_mob_id)} {
-#						$w create line $AOx $AOy $ADx $ADy -arrow last -fill $ReachLineColor -width 3 -tags "MArrows M#$threatening_mob_id M#$target_id"
-#					}
 				}
 			}
 		}
 	}
 }
 
-proc DistributeZero {v args} {
-	set i 0
-	foreach name $args {
-		upvar $name t
-		if {$i >= [llength $v]} {
-			set t 0
-		} else {
-			set t [lindex $v $i]
-			incr i
-		}
-	}
-}
+##DEL proc DistributeZero {v args} {
+##DEL 	set i 0
+##DEL 	foreach name $args {
+##DEL 		upvar $name t
+##DEL 		if {$i >= [llength $v]} {
+##DEL 			set t 0
+##DEL 		} else {
+##DEL 			set t [lindex $v $i]
+##DEL 			incr i
+##DEL 		}
+##DEL 	}
+##DEL }
 
-proc DistributeVars {v args} {
-	set i 0
-	foreach name $args {
-		upvar $name t
-		set t [lindex $v $i]
-		incr i
-	}
-}
+##DEL proc DistributeVars {v args} {
+##DEL 	set i 0
+##DEL 	foreach name $args {
+##DEL 		upvar $name t
+##DEL 		set t [lindex $v $i]
+##DEL 		incr i
+##DEL 	}
+##DEL }
 
 # returns the MOB id associated with a map element or empty string
 proc CanvasElementIdToMobId {w tag} {
@@ -6370,7 +6834,7 @@ proc CanvasElementIdToMobId {w tag} {
 proc CanvasMobCoordinates {w mob_id} {
 	set zone_coords [$w coords "MC#$mob_id"];	# [x1 y1 x2 y2] around threat zone
 	# R = (x2-x1)/2 + x1
-	DistributeVars [$w coords "MN#$mob_id"] x1 y1 x2 y2
+	lassign [$w coords "MN#$mob_id"] x1 y1 x2 y2
 	set Rx [expr ($x2 - $x1) / 2.0]
 	set Ry [expr ($y2 - $y1) / 2.0]
 	return [concat $zone_coords [list [expr $Rx + $x1] [expr $Ry + $y1] $Rx $Ry $x1 $y1 $x2 $y2]]
@@ -6380,14 +6844,13 @@ proc CanvasMobCoordinates {w mob_id} {
 # Selection of on-screen objects
 #
 proc AddToSelection {id} {
-	global MOB canvas
+	global MOB_SELECTED canvas
 	DEBUG 3 "Selecting $id"
-	if {[info exists MOB(GX:$id)]} {
-		set MOB(_SELECTED:$id) 1
-		DEBUG 3 "selected $MOB(_SELECTED:$id)"
+	if {[info exists MOBdata($id)]} {
+		set MOB_SELECTED($id) true
 		RenderSomeone $canvas $id
 	} else {
-		DEBUG 3 "No key GX:$id found"
+		DEBUG 3 "No mob key $id found"
 	}
 	SetSelectionContextMenu
 }
@@ -6401,47 +6864,46 @@ proc SetSelectionContextMenu {} {
 }
 
 proc ToggleSelection {id} {
-	global MOB canvas
+	global MOB_SELECTED canvas
 	DEBUG 3 "Selecting $id"
-	if {[info exists MOB(GX:$id)]} {
-		if {[info exists MOB(_SELECTED:$id)]} {
-			set MOB(_SELECTED:$id) [expr !$MOB(_SELECTED:$id)]
+	if {[info exists MOBdata($id)]} {
+		if {[info exists MOB_SELECTED($id)]} {
+			set MOB_SELECTED($id) [expr !$MOB_SELECTED($id)]
 		} else {
-			set MOB(_SELECTED:$id) 1
+			set MOB_SELECTED($id) true
 		}
-		DEBUG 3 "selected $MOB(_SELECTED:$id)"
 		RenderSomeone $canvas $id
 	} else {
-		DEBUG 3 "No key GX:$id found"
+		DEBUG 3 "No mob key $id found"
 	}
 	SetSelectionContextMenu
 }
 
 proc RemoveFromSelection {id} {
-	global MOB canvas
-	if {[info exists MOB(_SELECTED:$id)]} {
-		set MOB(_SELECTED:$id) 0
+	global MOB_SELECTED canvas
+	if {[info exists MOB_SELECTED($id)]} {
+		set MOB_SELECTED($id) false
 		RenderSomeone $canvas $id
 	}
 	SetSelectionContextMenu
 }
 
 proc ClearSelection {} {
-	global MOB canvas
-	foreach key [array names MOB _SELECTED:*] {
-		set id [string range $key 10 end]
-		set MOB(_SELECTED:$id) 0
+	global MOB_SELECTED canvas
+	foreach id [array names MOB_SELECTED] {
+		set MOB_SELECTED($id) false
 		RenderSomeone $canvas $id
 	}
 	SetSelectionContextMenu
+	array unset MOB_SELECTED
 }
 
 proc GetSelectionList {} {
-	global MOB
+	global MOB_SELECTED
 	set result {}
-	foreach key [array names MOB _SELECTED:*] {
-		if {$MOB($key)} {
-			lappend result [string range $key 10 end]
+	foreach id [array names MOB_SELECTED] {
+		if {$MOB_SELECTED($id)} {
+			lappend result $id
 		}
 	}
 	return $result
@@ -6454,35 +6916,33 @@ proc GetSelectionList {} {
 #
 
 proc RefreshMOBs {} {
-	global MOB canvas
+	global MOBdata canvas
 
-	DEBUG 3 "RefreshMOBs start ([array names MOB ID:*])"
-	foreach key [lsort -command cmp_mob_living [array names MOB ID:*]] {
-		set id $MOB($key)
-		DEBUG 3 "Rendering $id ($key)"
+	DEBUG 3 "RefreshMOBs start ([array names MOBdata])"
+	foreach id [lsort -command cmp_mob_living [array names MOBdata]] {
+		DEBUG 3 "Rendering $id"
 		RenderSomeone $canvas $id
 	}
 	DEBUG 3 "RefreshMOBs end"
 }
 
 proc ScreenXYToMOBID {w x y} {
-	global MOB
-	DistributeVars [ScreenXYToGridXY $x $y -exact] gx gy
+	global MOBdata
+	lassign [ScreenXYToGridXY $x $y -exact] gx gy
 
 	DEBUG 3 "Looking for object at $x,$y (grid $gx,$gy)..."
 	set mob_list {}
-	foreach key [array names MOB ID:*] {
-		set id $MOB($key)
-		set msz [expr max(1, [MonsterSizeValue $MOB(SIZE:$id)])]
-		set mx0 [expr int($MOB(GX:$id))]
+	foreach id [array names MOBdata] {
+		set msz [expr max(1, [MonsterSizeValue [dict get $MOBdata($id) Size]])]
+		set mx0 [expr int([dict get $MOBdata($id) Gx])]
 		set mx1 [expr $mx0 + $msz]
-		set my0 [expr int($MOB(GY:$id))]
+		set my0 [expr int([dict get $MOBdata($id) Gy])]
 		set my1 [expr $my0 + $msz]
 		if {$mx0 <= $gx && $gx < $mx1 && $my0 <= $gy && $gy < $my1} {
-			DEBUG 3 "...found $id ($MOB(NAME:$id))"
+			DEBUG 3 "...found $id"
 			lappend mob_list $id
 		}
-		DEBUG 3 "... $id ($MOB(NAME:$id)) is at ($gx,$gy)"
+		DEBUG 3 "... $id is at ($gx,$gy)"
 	}
 	DEBUG 3 "found $mob_list"
 	return $mob_list
@@ -6516,11 +6976,11 @@ proc ScreenXYToGridXY {x y args} {
 	#set yview [lindex [.ys get] 0]
 	#return [list [expr int(($x + ($xview*$cansw))/50)] \
 		#[expr int(($y + ($yview*$cansh))/50)]]
-	global canvas iscale MOB_MOVING MOB
+	global canvas iscale MOB_MOVING MOBdata
 
 	if {$args ne {-exact} && $MOB_MOVING ne {}} {
 		DEBUG 3 "ScreenXYToGridXY $x $y $args for MOB $MOB_MOVING"
-		set mob_size [MonsterSizeValue $MOB(SIZE:$MOB_MOVING)]
+		set mob_size [MonsterSizeValue [dict get $MOBdata($MOB_MOVING) Size]]
 		DEBUG 3 "--size $mob_size"
 		if {$mob_size < 1} {
 			DEBUG 3 "-- calc as [list [expr int([$canvas canvasx $x]/($iscale*$mob_size))*$mob_size] [expr int([$canvas canvasy $y]/($iscale*$mob_size))*$mob_size]]"
@@ -6545,8 +7005,8 @@ proc GridToCanvas {x} {
 set OBJ_MOVING {}
 set OBJ_MOVING_SELECTED {}
 proc MoveObjById {w id} {
-	global OBJ OBJ_MOVING OBJ_MOVING_SELECTED ClockDisplay
-	if [info exists OBJ(X:$id)] {
+	global OBJdata OBJ_MOVING OBJ_MOVING_SELECTED ClockDisplay
+	if [info exists OBJdata($id)] {
 		set OBJ_MOVING [list $id [$w coords obj$id]]
 		set OBJ_MOVING_SELECTED {}
 		set ClockDisplay $OBJ_MOVING
@@ -6554,13 +7014,13 @@ proc MoveObjById {w id} {
 }
 
 proc MoveObjDrag {w x y} {
-	global OBJ OBJ_MOVING
+	global OBJdata OBJ_MOVING
 	if {$OBJ_MOVING ne {}} {
-		DistributeVars $OBJ_MOVING id old_coords
+		lassign $OBJ_MOVING id old_coords
 		set cx [SnapCoord [$w canvasx $x]]
 		set cy [SnapCoord [$w canvasy $y]]
-		set dx [expr $cx - $OBJ(X:$id)]
-		set dy [expr $cy - $OBJ(Y:$id)]
+		set dx [expr $cx - [dict get $OBJdata($id) X]]
+		set dy [expr $cy - [dict get $OBJdata($id) Y]]
 		set new_coords {}
 		foreach {xx yy} $old_coords {
 			lappend new_coords [expr $xx + $dx] [expr $yy + $dy]
@@ -6571,15 +7031,18 @@ proc MoveObjDrag {w x y} {
 }
 
 proc MoveObjEndDrag {w} {
-	global OBJ OBJ_MOVING ClockDisplay MO_disp
+	global OBJdata OBJ_MOVING ClockDisplay MO_disp
 	set ClockDisplay $MO_disp
 	if {$OBJ_MOVING ne {}} {
-		DistributeVars $OBJ_MOVING id
+		lassign $OBJ_MOVING id
 		set obj_coords [$w coords obj$id]
-		set OBJ(X:$id) [lindex $obj_coords 0]
-		set OBJ(Y:$id) [lindex $obj_coords 1]
-		set OBJ(POINTS:$id) [lrange $obj_coords 2 end]
-		SendObjChanges $id {X Y POINTS}
+		dict set OBJdata($id) X [lindex $obj_coords 0]
+		dict set OBJdata($id) Y [lindex $obj_coords 1]
+		dict set OBJdata($id) Points {}
+		foreach {x y} [lrange $obj_coords 2 end] {
+			dict lappend OBJdata($id) Points [dict create X $x Y $y]
+		}
+		SendObjChanges $id {X Y Points}
 		set OBJ_MOVING {}
 	}
 }
@@ -6589,7 +7052,7 @@ menu .movemobmenu -tearoff 0
 set MOB_DISAMBIG {}
 set MOB_MOVING {}
 proc MOB_StartDrag {w x y} {
-	global MOB_MOVING MOB_DISAMBIG MOB DistanceLabelText MOB_StartGxGy MOB_TrackXY
+	global MOB_MOVING MOB_DISAMBIG MOBdata DistanceLabelText MOB_StartGxGy MOB_TrackXY
 	set MOB_MOVING [ScreenXYToMOBID $w $x $y]
 	if {[llength $MOB_MOVING] > 1} {
 		if {$MOB_DISAMBIG ne {}} {
@@ -6598,7 +7061,7 @@ proc MOB_StartDrag {w x y} {
 		} else {
 			.movemobmenu delete 0 end
 			foreach mob_id $MOB_MOVING {
-				.movemobmenu add command -command "set MOB_DISAMBIG $mob_id" -label "Move $MOB(NAME:$mob_id)"
+				.movemobmenu add command -command "set MOB_DISAMBIG $mob_id" -label "Move [dict get $MOBdata($mob_id) Name]"
 			}
 			set MOB_MOVING {}
 			set MOB_DISAMBIG {}
@@ -6617,7 +7080,7 @@ proc MOB_StartDrag {w x y} {
 		$w create line $cx $cy $cx $cy -fill red -width 5 -tags [list DL#marks DL#line]
 		$w create line $cx $cy $cx $cy -fill green -width 5 -tags [list DL#marks DL#track]
 		$w create window $cx $cy -window $w.distanceLabel -tags [list DL#marks DL#label]
-		set MOB_StartGxGy [list $MOB(GX:$MOB_MOVING) $MOB(GY:$MOB_MOVING)]
+		set MOB_StartGxGy [list [dict get $MOBdata($MOB_MOVING) Gx] [dict get $MOBdata($MOB_MOVING) Gy]]
 		set MOB_TrackXY [list $cx $cy $cx $cy]
 		bind $w <B1-Motion> "MOB_Drag $w %x %y"
 	} else {
@@ -6628,7 +7091,7 @@ proc MOB_StartDrag {w x y} {
 }
 
 proc MOB_SelectEvent {w x y} {
-	global MOB_DISAMBIG MOB
+	global MOB_DISAMBIG MOBdata MOB_SELECTED
 	set target_MOB [ScreenXYToMOBID $w $x $y]
 	if {[llength $target_MOB] > 1} {
 		if {$MOB_DISAMBIG ne {}} {
@@ -6639,10 +7102,10 @@ proc MOB_SelectEvent {w x y} {
 		}
 		.movemobmenu delete 0 end
 		foreach mob_id $target_MOB {
-			if {[info exists MOB(_SELECTED:$mob_id)] && $MOB(_SELECTED:$mob_id)} {
-				set label "Deselect $MOB(NAME:$mob_id)"
+			if {[info exists MOB_SELECTED($mob_id)] && $MOB_SELECTED($mob_id)} {
+				set label "Deselect [dict get $MOBdata($mob_id) Name]"
 			} else {
-				set label "Select $MOB(NAME:$mob_id)"
+				set label "Select [dict get $MOBdata($mob_id) Name]"
 			}
 			.movemobmenu add command -command "ToggleSelection $mob_id" -label $label
 		}
@@ -6686,11 +7149,11 @@ proc MOB_SelectEvent {w x y} {
 # (x,y).  The units are grid squares.
 #
 proc MOBPositionDelta {grid_xy mob_id} {
-	global MOB
+	global MOBdata
 
-	if {$MOB(GX:$mob_id) != [lindex $grid_xy 0]
-	||  $MOB(GY:$mob_id) != [lindex $grid_xy 1]} {
-		return [list [expr [lindex $grid_xy 0] - $MOB(GX:$mob_id)] [expr [lindex $grid_xy 1] - $MOB(GY:$mob_id)]]
+	if {[dict get $MOBdata($mob_id) Gx] != [lindex $grid_xy 0]
+	||  [dict get $MOBdata($mob_id) Gy] != [lindex $grid_xy 1]} {
+		return [list [expr [lindex $grid_xy 0] - [dict get $MOBdata($mob_id) Gx]] [expr [lindex $grid_xy 1] - [dict get $MOBdata($mob_id) Gy]]]
 	} else {
 		return {0 0}
 	}
@@ -6723,7 +7186,7 @@ proc DistanceAlongRoute {coordlist} {
 }
 
 proc MOB_Drag {w x y} {
-	global MOB MOB_MOVING DistanceLabelText MOB_StartGxGy MOB_TrackXY
+	global MOBdata MOB_MOVING DistanceLabelText MOB_StartGxGy MOB_TrackXY
 
 	if {$MOB_MOVING ne {}} {
 		set cx [$w canvasx $x]
@@ -6741,8 +7204,8 @@ proc MOB_Drag {w x y} {
 		set delta_xy [MOBPositionDelta $gridxy $MOB_MOVING]
 		set total_move [GridDistance [lindex $MOB_StartGxGy 0] [lindex $MOB_StartGxGy 1] [lindex $gridxy 0] [lindex $gridxy 1]]
 		set DistanceLabelText [format {[%02d] %03d ft / path %03d ft} $total_move [expr $total_move * 5] [expr [DistanceAlongRoute $MOB_TrackXY] * 5]]
-		if {$MOB(GX:$MOB_MOVING) != [lindex $gridxy 0]
-		||  $MOB(GY:$MOB_MOVING) != [lindex $gridxy 1]} {
+		if {[dict get $MOBdata($MOB_MOVING) Gx] != [lindex $gridxy 0]
+		||  [dict get $MOBdata($MOB_MOVING) Gy] != [lindex $gridxy 1]} {
 			MoveSomeone $w $MOB_MOVING [lindex $gridxy 0] [lindex $gridxy 1]
 			set MOB_TrackXY [concat $MOB_TrackXY $cx $cy]
 			set select_list [GetSelectionList]
@@ -6753,7 +7216,7 @@ proc MOB_Drag {w x y} {
 			if {[llength $select_list] > 0 && [lsearch -exact $select_list $MOB_MOVING] >= 0} {
 				foreach other_mob $select_list {
 					if {$other_mob != $MOB_MOVING} {
-						MoveSomeone $w $other_mob [expr $MOB(GX:$other_mob) + [lindex $delta_xy 0]] [expr $MOB(GY:$other_mob) + [lindex $delta_xy 1]]
+						MoveSomeone $w $other_mob [expr [dict get $MOBdata($other_mob) Gx] + [lindex $delta_xy 0]] [expr [dict get $MOBdata($other_mob) Gy] + [lindex $delta_xy 1]]
 					}
 				}
 			}
@@ -6768,9 +7231,9 @@ proc MOB_EndDrag {w} {
 	if {$MOB_MOVING ne {}} {
 		$w delete DL#marks
 		foreach mob_id [GetSelectionList] {
-			SendMobChanges $mob_id {GX GY}
+			SendMobChanges $mob_id {Gx Gy}
 		}
-		SendMobChanges $MOB_MOVING {GX GY}
+		SendMobChanges $MOB_MOVING {Gx Gy}
 		#if {[lsearch -exact [GetSelectionList] $MOB_MOVING] >= 0} {
 			#ClearSelection
 		#}
@@ -6798,51 +7261,63 @@ proc FindNearby {} {
 # Is the current value of the mob's attribute equal to <value>?
 #
 proc MobState {mob_id attr value} {
-	global MOB
+	global MOBdata
 
 	if {[llength $mob_id] != 1} { 
-		return 0 ; # not just one target, so no.
+		return false ; # not just one target, so no.
 	}
-	if {[info exists MOB($attr:$mob_id)]} {
-		if {$MOB($attr:$mob_id) == $value} {
-			return 1
+	if {[info exists MOBdata($mob_id)]} {
+		if {![dict exists $MOBdata($mob_id) $attr]} {
+			DEBUG 0 "MobState($mob_id,$attr,$value) no such attribute"
+			return false
+		}
+		if {[dict get $MOBdata($mob_id) $attr] == $value} {
+			return true
 		}
 	}
-	return 0
+	return false
 }
 
 #
 # Is the current value of the mob's attribute one of the values in the list <value>?
 #
 proc MobStateList {mob_id attr value} {
-	global MOB
+	global MOBdata
 
 	if {[llength $mob_id] != 1} { 
-		return 0 ; # not just one target, so no.
+		return false ; # not just one target, so no.
 	}
-	if {[info exists MOB($attr:$mob_id)]} {
-		if {[lsearch -exact $value $MOB($attr:$mob_id)] >= 0} {
-			return 1
+	if {[info exists MOBdata($mob_id)]} {
+		if {![dict exists $MOBdata($mob_id) $attr]} {
+			DEBUG 0 "MobStateList($mob_id,$attr,$value) no such attribute"
+			return false
+		}
+		if {[lsearch -exact $value [dict get $MOBdata($mob_id) $attr]] >= 0} {
+			return true
 		}
 	}
-	return 0
+	return false
 }
 
 #
 # Does the value of the mob's attribute (which is a list) contain <value> as an element?
 #
 proc MobStateFlag {mob_id attr value} {
-	global MOB
+	global MOBdata
 
 	if {[llength $mob_id] != 1} { 
-		return 0 ; # not just one target, so no.
+		return false ; # not just one target, so no.
 	}
-	if {[info exists MOB($attr:$mob_id)]} {
-		if {[lsearch -exact $MOB($attr:$mob_id) $value] >= 0} {
-			return 1
+	if {[info exists MOBdata($mob_id)]} {
+		if {![dict exists $MOBdata($mob_id) $attr]} {
+			DEBUG 0 "MobStateFlag($mob_id,$attr,$value) no such attribute"
+			return false
+		}
+		if {[lsearch -exact [dict get $MOBdata($mob_id) $attr] $value] >= 0} {
+			return true
 		}
 	}
-	return 0
+	return false
 }
 	
 
@@ -6862,7 +7337,7 @@ proc CreateMovementModeSubMenu {args} {
 	catch {$mid delete 0 end; destroy $mid}
 	menu $mid -tearoff 0
 	foreach {value label} {{} Land burrow Burrow climb Climb fly Fly swim Swim} {
-		if [MobState $mob_list MOVEMODE $value] {
+		if [MobState $mob_list MoveMode $value] {
 			$mid add command -command [list $cmd $mob_list $value] -label $label -foreground #ff0000
 		} else {
 			$mid add command -command [list $cmd $mob_list $value] -label $label
@@ -6872,10 +7347,10 @@ proc CreateMovementModeSubMenu {args} {
 }
 
 proc MovementModePerson {mob_id movemode} {
-	global MOB canvas
-	set MOB(MOVEMODE:$mob_id) $movemode
+	global MOBdata canvas
+	dict set MOBdata($mob_id) MoveMode [::gmaproto::to_enum MoveMode $movemode]
 	RenderSomeone $canvas $mob_id
-	SendMobChanges $mob_id {MOVEMODE}
+	SendMobChanges $mob_id {MoveMode}
 }
 
 proc MovementModeAll {mob_list movemode} {
@@ -6904,7 +7379,7 @@ proc CreateElevationSubMenu {args} {
 	catch {$mid delete 0 end; destroy $mid}
 	menu $mid
 	foreach {value label} {0 (Ground) +30 +30 +20 +20 +10 +10 +5 +5 -5 -5 -10 -10 -20 -20 -30 -30 -40 -40 -60 -60} {
-		if [MobState $mob_list ELEV $value] {
+		if [MobState $mob_list Elev $value] {
 			$mid add command -command [list $cmd $mob_list $value] -label $label -foreground #ff0000
 		} else {
 			$mid add command -command [list $cmd $mob_list $value] -label $label
@@ -6915,14 +7390,14 @@ proc CreateElevationSubMenu {args} {
 }
 
 proc ElevatePerson {mob_id elev} {
-	global MOB canvas
+	global MOBdata canvas
 	if {[regexp {^[+\-]} $elev] } {
-		catch {set MOB(ELEV:$mob_id) [expr $MOB(ELEV:$mob_id) + $elev]}
+		catch {dict set MOBdata($mob_id) Elev [expr [dict get $MOBdata($mob_id) Elev] + $elev]}
 	} else {
-		set MOB(ELEV:$mob_id) $elev
+		dict set MOBdata($mob_id) Elev $elev
 	}
 	RenderSomeone $canvas $mob_id
-	SendMobChanges $mob_id {ELEV}
+	SendMobChanges $mob_id {Elev}
 }
 
 proc ElevateAll {mob_list elev} {
@@ -6939,40 +7414,43 @@ proc ElevateAll {mob_list elev} {
 # -1 if removed, or 0 if nothing changed.
 #
 proc ToggleObjectAttribute {id key value} {
-	global MOB OBJ
 	if {[set idlist [ResolveObjectId_OA $id]] eq {}} {
 		return 0
 	}
-	DistributeVars $idlist a id
+	lassign $idlist a id datatype
+	global $a
+
+	if {![dict exists [set ${a}($id)] $key]} {
+		DEBUG 0 "Attempt to access field $key in object $id but type $datatype has no such field."
+		return 0
+	}
+
 	if {$value eq {__clear__}} {
-		DEBUG 4 "Clearing $id.$key completely (in $a)"
-		set ${a}($key:$id) {}
+		set defv [dict get [::gmaproto::new_dict $datatype] $key]
+		DEBUG 4 "Clearing $id.$key completely (in $a) to \"$defv\""
+		dict set ${a}($id) $key $defv
 		return -1
 	}
 	DEBUG 4 "Toggling value $value in object $id.$key (in $a)"
-	if {![info exists ${a}($key:$id)]} {
-		set ${a}($key:$id) [list $value]
-		DEBUG 4 "Trivially added; was no attribute before"
-		return 1
-	}
-	if {[set index [lsearch -exact [set ${a}($key:$id)] $value]] >= 0} {
-		set ${a}($key:$id) [lreplace [set ${a}($key:$id)] $index $index]
-		DEBUG 4 "Removed attribute; now [set ${a}($key:$id)]"
+	set old [dict get [set ${a}($id)] $key]
+	if {[set index [lsearch -exact $old $value]] >= 0} {
+		dict set ${a}($id) $key [set new [lreplace $old $index $index]]
+		DEBUG 4 "Removed attribute; now $new"
 		return -1
 	} else {
-		lappend ${a}($key:$id) $value
-		DEBUG 4 "Added attribute; now [set ${a}($key:$id)]"
+		dict lappend ${a}($id) $key $value
+		DEBUG 4 "Added attribute; now [dict get [set ${a}($id)] $key]"
 		return 1
 	}
 }
 	
 
 proc CondPerson {mob_id condition} {
-	global MOB canvas
+	global canvas
 
-	if {[ToggleObjectAttribute $mob_id STATUSLIST $condition] != 0} {
+	if {[ToggleObjectAttribute $mob_id StatusList $condition] != 0} {
 		RenderSomeone $canvas $mob_id
-		SendMobChanges $mob_id {STATUSLIST}
+		SendMobChanges $mob_id {StatusList}
 	}
 }
 
@@ -7001,7 +7479,7 @@ proc CreateConditionSubMenu {args} {
 	menu $mid
 	foreach condition [lsort [array names MarkerShape]] {
 		if {[info exists MarkerColor($condition)] && $MarkerColor($condition) ne {} && $MarkerShape($condition) ne {}} {
-			if {[MobStateFlag $mob_list STATUSLIST $condition]} {
+			if {[MobStateFlag $mob_list StatusList $condition]} {
 				$mid add command -command [list $cmd $mob_list $condition] -label $condition -foreground #ff0000
 			} else {
 				$mid add command -command [list $cmd $mob_list $condition] -label $condition
@@ -7034,7 +7512,7 @@ proc CreateTagSubMenu {args} {
 	$mid add command -command [list $cmd $mob_list {}] -label (Clear)
 	$mid add command -command [list $ncmd $mob_list] -label (New)
 	foreach tag $TagHistory {
-		if {[MobState $mob_list NOTE $tag]} {
+		if {[MobState $mob_list Note $tag]} {
 			$mid add command -command [list $cmd $mob_list $tag] -label $tag -foreground #ff0000
 		} else {
 			$mid add command -command [list $cmd $mob_list $tag] -label $tag
@@ -7045,8 +7523,8 @@ proc CreateTagSubMenu {args} {
 }
 
 proc TagPerson {mob_id tag} {
-	global MOB TagHistory canvas
-	set MOB(NOTE:$mob_id) $tag
+	global MOBdata TagHistory canvas
+	dict set MOBdata($mob_id) Note $tag
 	if {$tag != {}} {
 		if {[set i [lsearch -exact $TagHistory $tag]] < 0} {
 			if {[llength $TagHistory] <= 9} {
@@ -7059,7 +7537,7 @@ proc TagPerson {mob_id tag} {
 		}
 	}
 	RenderSomeone $canvas $mob_id
-	SendMobChanges $mob_id {NOTE}
+	SendMobChanges $mob_id {Note}
 }
 
 proc TagAll {mob_list tag} {
@@ -7069,6 +7547,7 @@ proc TagAll {mob_list tag} {
 }
 
 proc CreatePolySubMenu {args} {
+	global MOBdata
 	if {[lindex $args 0] == {-mass}} {
 		set mob_id __mass__
 		set mob_list [lindex $args 1]
@@ -7087,15 +7566,15 @@ proc CreatePolySubMenu {args} {
 	#
 	set max_skin 0
 	foreach mi $mob_list {
-		if {[info exists MOB(SKINSIZE:$mi)]} {
-			set max_skin [expr max($max_skin, [llength $MOB(SKINSIZE:$mi)])]
+		if {[info exists MOBdata($mi)]} {
+			set max_skin [expr max($max_skin, [llength [dict get $MOBdata($mi) SkinSize]])]
 		} else {
 			set max_skin [expr max($max_skin, 4)]
 		}
 	}
 
 	for {set i 0} {$i < $max_skin} {incr i} {
-		if {[MobState $mob_list SKIN $i]} {
+		if {[MobState $mob_list Skin $i]} {
 			$mid add command -command [list $cmd $mob_list $i] -label [expr $i==0 ? {{Base}} : "{# $i}"] -foreground #ff0000
 		} else {
 			$mid add command -command [list $cmd $mob_list $i] -label [expr $i==0 ? {{Base}} : "{# $i}"]
@@ -7133,7 +7612,7 @@ proc CreateSizeSubMenu {args} {
 		c {Colossal (long)}
 		C {Colossal (tall)}
 	} {
-		if {[MobStateList $mob_list SIZE $size_code]} {
+		if {[MobStateList $mob_list Size $size_code]} {
 			$mid add command -command [list $cmd $mob_list [lindex $size_code 0]] -label $size_name -foreground #ff0000
 		} else {
 			$mid add command -command [list $cmd $mob_list [lindex $size_code 0]] -label $size_name
@@ -7143,7 +7622,7 @@ proc CreateSizeSubMenu {args} {
 }
 
 proc DoContext {x y} {
-	global MOB_X MOB_Y canvas MOB
+	global MOB_X MOB_Y canvas MOBdata
 	set MOB_X $x
 	set MOB_Y $y
 
@@ -7173,26 +7652,27 @@ proc DoContext {x y} {
 		.contextMenu insert 11 command -command "" -label "Set Movement Mode" -state disabled
 	} elseif {[llength $mob_list] == 1} {
 		set mob_id [lindex $mob_list 0]
+		set mob_name [dict get $MOBdata($mob_id) Name]
 		.contextMenu delete 0
-		.contextMenu insert 0 command -command "RemovePerson $mob_id; ITsend \[list CLR $mob_id\]" -label "Remove $MOB(NAME:$mob_id)"
+		.contextMenu insert 0 command -command "RemovePerson $mob_id; ::gmaproto::clear $mob_id" -label "Remove [dict get $MOBdata($mob_id) Name]"
 		.contextMenu delete 3
-		.contextMenu insert 3 command -command "KillPerson $mob_id" -label "Toggle Death for $MOB(NAME:$mob_id)"
+		.contextMenu insert 3 command -command "KillPerson $mob_id" -label "Toggle Death for $mob_name"
 		.contextMenu delete 4
-		.contextMenu insert 4 command -command "ToggleReach $mob_id" -label "Cycle Reach for $MOB(NAME:$mob_id)"
+		.contextMenu insert 4 command -command "ToggleReach $mob_id" -label "Cycle Reach for $mob_name"
 		.contextMenu delete 5
-		.contextMenu insert 5 command -command "ToggleSpellArea $mob_id" -label "Toggle Spell Area for $MOB(NAME:$mob_id)"
+		.contextMenu insert 5 command -command "ToggleSpellArea $mob_id" -label "Toggle Spell Area for $mob_name"
 		.contextMenu delete 6
-		.contextMenu insert 6 cascade -menu [CreatePolySubMenu -shallow $mob_id] -label "Polymorph $MOB(NAME:$mob_id)"
+		.contextMenu insert 6 cascade -menu [CreatePolySubMenu -shallow $mob_id] -label "Polymorph $mob_name"
 		.contextMenu delete 7
-		.contextMenu insert 7 cascade -menu [CreateSizeSubMenu -shallow $mob_id] -label "Change Size of $MOB(NAME:$mob_id)"
+		.contextMenu insert 7 cascade -menu [CreateSizeSubMenu -shallow $mob_id] -label "Change Size of $mob_name"
 		.contextMenu delete 8
-		.contextMenu insert 8 cascade -menu [CreateConditionSubMenu -shallow $mob_id] -label "Toggle Condition for $MOB(NAME:$mob_id)"
+		.contextMenu insert 8 cascade -menu [CreateConditionSubMenu -shallow $mob_id] -label "Toggle Condition for $mob_name"
 		.contextMenu delete 9
-		.contextMenu insert 9 cascade -menu [CreateTagSubMenu -shallow $mob_id] -label "Tag $MOB(NAME:$mob_id)"
+		.contextMenu insert 9 cascade -menu [CreateTagSubMenu -shallow $mob_id] -label "Tag $mob_name"
 		.contextMenu delete 10
-		.contextMenu insert 10 cascade -menu [CreateElevationSubMenu -shallow $mob_id] -label "Set Elevation for $MOB(NAME:$mob_id)"
+		.contextMenu insert 10 cascade -menu [CreateElevationSubMenu -shallow $mob_id] -label "Set Elevation for $mob_name"
 		.contextMenu delete 11
-		.contextMenu insert 11 cascade -menu [CreateMovementModeSubMenu -shallow $mob_id] -label "Set Movement Mode for $MOB(NAME:$mob_id)"
+		.contextMenu insert 11 cascade -menu [CreateMovementModeSubMenu -shallow $mob_id] -label "Set Movement Mode for $mob_name"
 	} else {
 		.contextMenu.del delete 0 end
 		.contextMenu.kill delete 0 end
@@ -7205,16 +7685,17 @@ proc DoContext {x y} {
 		.contextMenu.elev delete 0 end
 		.contextMenu.mmode delete 0 end
 		foreach mob_id $mob_list {
-			.contextMenu.del add command -command "RemovePerson $mob_id; ITsend \[list CLR $mob_id\]" -label $MOB(NAME:$mob_id)
-			.contextMenu.kill add command -command "KillPerson $mob_id" -label $MOB(NAME:$mob_id)
-			.contextMenu.reach add command -command "ToggleReach $mob_id" -label $MOB(NAME:$mob_id)
-			.contextMenu.aoe add command -command "ToggleSpellArea $mob_id" -label $MOB(NAME:$mob_id)
-			.contextMenu.poly add cascade -menu [CreatePolySubMenu -deep $mob_id] -label $MOB(NAME:$mob_id)
-			.contextMenu.size add cascade -menu [CreateSizeSubMenu -deep $mob_id] -label $MOB(NAME:$mob_id)
-			.contextMenu.cond add cascade -menu [CreateConditionSubMenu -deep $mob_id] -label $MOB(NAME:$mob_id)
-			.contextMenu.tag add cascade -menu [CreateTagSubMenu -deep $mob_id] -label $MOB(NAME:$mob_id)
-			.contextMenu.elev add cascade -menu [CreateElevationSubMenu -deep $mob_id] -label $MOB(NAME:$mob_id)
-			.contextMenu.mmode add cascade -menu [CreateMovementModeSubMenu -deep $mob_id] -label $MOB(NAME:$mob_id)
+			set mob_name [dict get $MOBdata($mob_id) Name]
+			.contextMenu.del add command -command "RemovePerson $mob_id; ::gmaproto::clear $mob_id" -label $mob_name
+			.contextMenu.kill add command -command "KillPerson $mob_id" -label $mob_name
+			.contextMenu.reach add command -command "ToggleReach $mob_id" -label $mob_name
+			.contextMenu.aoe add command -command "ToggleSpellArea $mob_id" -label $mob_name
+			.contextMenu.poly add cascade -menu [CreatePolySubMenu -deep $mob_id] -label $mob_name
+			.contextMenu.size add cascade -menu [CreateSizeSubMenu -deep $mob_id] -label $mob_name
+			.contextMenu.cond add cascade -menu [CreateConditionSubMenu -deep $mob_id] -label $mob_name
+			.contextMenu.tag add cascade -menu [CreateTagSubMenu -deep $mob_id] -label $mob_name
+			.contextMenu.elev add cascade -menu [CreateElevationSubMenu -deep $mob_id] -label $mob_name
+			.contextMenu.mmode add cascade -menu [CreateMovementModeSubMenu -deep $mob_id] -label $mob_name
 		}
 		.contextMenu.del add command -command "RemoveAll $mob_list" -label "(all of the above)"
 		.contextMenu.kill add command -command "KillAll $mob_list" -label "(all of the above)"
@@ -7253,8 +7734,8 @@ proc DoContext {x y} {
 }
 
 proc MobNameComparison {a b} {
-	global MOB
-	return [string compare -nocase $MOB(NAME:$a) $MOB(NAME:$b)]
+	global MOBdata
+	return [string compare -nocase [dict get $MOBdata($a) Name] [dict get $MOBdata($b) Name]]
 }
 
 report_progress "Setting up UI: context menu"
@@ -7349,10 +7830,10 @@ proc AddTagMenuAll {mob_list} {
 # tile_id is {} if none set or  {name:zoom tilename zoom}
 proc SetTilePlaceHolder {obj_id width height tile_id} {
 	# Declare a placeholder for an image we don't have yet.
-	global OBJ TILE_ATTR
-	set TILE_ATTR(BBWIDTH:$tile_id) $width
-	set TILE_ATTR(BBHEIGHT:$tile_id) $height
-	set OBJ(_TILEID:$obj_id) $tile_id
+#	global OBJ TILE_ATTR
+#	set TILE_ATTR(BBWIDTH:$tile_id) $width
+#	set TILE_ATTR(BBHEIGHT:$tile_id) $height
+#	set OBJ(_TILEID:$obj_id) $tile_id
 	RefreshGrid 0
 }
 
@@ -7461,18 +7942,15 @@ proc AddMobFromMenu {baseX baseY color name area size type reach} {
 }
 
 proc RemovePerson id {
-	global canvas MOB
+	global canvas MOBdata MOBid
 
 	DEBUG 3 "RemovePerson $id"
 	$canvas delete M#$id
-	unset MOB(ID:$MOB(NAME:$id))
-	foreach key [array names MOB *:$id] {
-		unset MOB($key)
-	}
+	catch { unset MOBid([dict get $MOBdata($id) Name]) }
+	catch { unset MOBdata($id) }
 	catch { destroy $canvas.ms$id }
 	catch { destroy $canvas.z$id }
 	catch {	destroy $canvas.nt_$id }
-	#error "RemovePerson called!"
 }
 
 proc KillAll args {
@@ -7484,29 +7962,27 @@ proc KillAll args {
 proc RemoveAll args {
 	foreach mob $args {
 		RemovePerson $mob
-		ITsend [list CLR $mob]
+		::gmaproto::clear $mob
 	}
 }
 
 proc KillPerson id {
-	global canvas MOB
+	global canvas MOBdata
 
-	set MOB(KILLED:$id) [expr !$MOB(KILLED:$id)]
+	dict set MOBdata($id) Killed [expr ![dict get $MOBdata($id) Killed]]
 	RenderSomeone $canvas $id
-	SendMobChanges $id KILLED	
+	SendMobChanges $id Killed	
 }
 
 proc PolymorphPerson {id skin} {
-	global MOB canvas
-	set MOB(SKIN:$id) $skin
-	if {[info exists MOB(SKINSIZE:$id)]} {
-		if {[llength $MOB(SKINSIZE:$id)] > $skin} {
-			ChangeSize $id [lindex $MOB(SKINSIZE:$id) $skin]
-		}
+	global MOBdata canvas
+	dict set MOBdata($id) Skin $skin
+	if {[llength [dict get $MOBdata($id) SkinSize]] > $skin} {
+		ChangeSize $id [lindex [dict get $MOBdata($id) SkinSize] $skin]
 	}
 			
 	RenderSomeone $canvas $id
-	SendMobChanges $id SKIN
+	SendMobChanges $id Skin
 }
 
 proc PolymorphMass {mob_list skin} {
@@ -7516,11 +7992,11 @@ proc PolymorphMass {mob_list skin} {
 }
 
 proc ChangeSize {id code} {
-	global MOB canvas
-	set MOB(SIZE:$id) $code
-	set MOB(AREA:$id) $code
+	global MOBdata canvas
+	dict set MOBdata($id) Size $code
+	dict set MOBdata($id) Area $code
 	RenderSomeone $canvas $id
-	SendMobChanges $id {SIZE AREA}
+	SendMobChanges $id {Size Area}
 }
 
 proc ChangeSizeAll {mob_list code} {
@@ -7533,12 +8009,12 @@ proc ChangeSizeAll {mob_list code} {
 # otherwise, set it now
 #
 proc ToggleSpellArea id {
-	global MOB canvas
+	global MOBdata canvas
 
-	if {[info exists MOB(AOE:$id)] && [llength $MOB(AOE:$id)] > 0} {
-		set MOB(AOE:$id) {}
+	if {[dict get $MOBdata($id) AoE] ne {}} {
+		dict set MOBdata($id) AoE {}
 		RenderSomeone $canvas $id
-		SendMobChanges $id AOE
+		SendMobChanges $id AoE
 	} else {
 		canceltool
 		bind $canvas <1> "CompleteMOBAoE $id $canvas %x %y"
@@ -7551,40 +8027,36 @@ proc ToggleSpellArea id {
 proc CompleteMOBAoE {id w x y} {
 	canceltool
 	$w delete AoElocator#$id
-	SendMobChanges $id AOE
+	SendMobChanges $id AoE
 }
 
 proc DragMOBAoE {id w x y} {
-	global MOB iscale OBJ_COLOR
+	global MOBdata iscale OBJ_COLOR
 
 	set xx [SnapCoordAlways [$w canvasx $x]]
 	set yy [SnapCoordAlways [$w canvasy $y]]
 	set gx [CanvasToGrid $xx]
 	set gy [CanvasToGrid $yy]
-	set r  [GridDistance $MOB(GX:$id) $MOB(GY:$id) $gx $gy]
-	set MOB(AOE:$id) [list radius $r $OBJ_COLOR(fill)]
-	#DEBUG 1 "Setting MOB $id AoE ($MOB(GX:$id),$MOB(GY:$id))-($gx,$gy)=$r"
+	set r  [GridDistance [dict get $MOBdata($id) Gx] [dict get $MOBdata($id) Gy] $gx $gy]
+	dict set MOBdata($id) AoE [dict create Radius $r Color $OBJ_COLOR(fill)]
 	RenderSomeone $w $id
-	$w create line [expr $MOB(GX:$id) * $iscale] [expr $MOB(GY:$id) * $iscale] [expr $gx * $iscale] [expr $gy * $iscale] \
-		-fill black -width 3 -dash - -arrow last -tags [list M#$id AoElocator#$id] -arrowshape [list 15 18  8]
+	$w create line [expr [dict get $MOBdata($id) Gx] * $iscale] [expr [dict get $MOBdata($id) Gy] * $iscale] \
+		[expr $gx * $iscale] [expr $gy * $iscale] \
+		-fill black -width 3 -dash - -arrow last \
+		-tags [list M#$id AoElocator#$id] -arrowshape [list 15 18  8]
 }
 
 proc ToggleReach id {
-	global canvas MOB
-	if {[info exists MOB(REACH:$id)]} {
-		set MOB(REACH:$id) [expr ($MOB(REACH:$id) + 1) % 3]
-	} else {
-		set MOB(REACH:$id) 1
-	}
+	global canvas MOBdata
+	dict set MOBdata($id) Reach [expr ([dict get $MOBdata($id) Reach] + 1) % 3]
 	RenderSomeone $canvas $id
-	SendMobChanges $id REACH
+	SendMobChanges $id Reach
 }
 
 proc clearplayers {pattern} {
-	global MOB
-	foreach nkey [array names MOB NAME:*] {
-		set id [string range $nkey 5 end]
-		if [string match $pattern $MOB(TYPE:$id)] {
+	global MOBdata
+	foreach id [array names MOBdata] {
+		if [string match $pattern [::gmaproto::from_enum CreatureType [dict get $MOBdata($id) CreatureType]]] {
 			RemovePerson $id
 		}
 	}
@@ -7609,10 +8081,10 @@ proc clearplayers {pattern} {
 set KillObjID 0
 set KillObjIdx 0
 proc KillObjAdvance n {
-	global KillObjID KillObjIdx canvas OBJ_BLINK OBJ
+	global KillObjID KillObjIdx canvas OBJ_BLINK OBJdata
 	DEBUG 3 "BEGIN KillObjAdvance $n"
 
-	set display_list [lsort -integer -command cmp_obj_attr [array names OBJ Z:*]]
+	set display_list [lsort -integer -command cmp_obj_attr_z [array names OBJdata]]
 	DEBUG 3 "Display list is $display_list"
 	if {[llength $display_list] == 0} {
 		DEBUG 3 "Empty list; stopping"
@@ -7633,14 +8105,14 @@ proc KillObjAdvance n {
 			set KillObjIdx 0
 			DEBUG 3 "wrapped to $KillObjIdx; k=$k"
 		} 
-		set KillObjID [string range [lindex $display_list $KillObjIdx] 2 end]
-		if {[info exists OBJ(LOCKED:$KillObjID)] && $OBJ(LOCKED:$KillObjID) != 0} {
+		set KillObjID [lindex $display_list $KillObjIdx]
+		if {[dict get $OBJdata($KillObjID) Locked]} {
 			DEBUG 3 "Element #$KillObjIdx ($KillObjID) is locked; skipping"
 			continue
 		}
 
 		DEBUG 3 "Element #$KillObjIdx is $KillObjID"
-		if {[info exists OBJ(X:$KillObjID)]} {
+		if {[info exists OBJdata($KillObjID)]} {
 			DEBUG 3 "Setting $KillObjID to blink"
 			set OBJ_BLINK $KillObjID
 			blink $canvas $KillObjID 0
@@ -7717,7 +8189,7 @@ proc KillObj {which} {
 
 proc KillObjById {id args} {
 	if {$args ne {-nosend}} {
-		ITsend [list CLR $id]
+		::gmaproto::clear $id
 	}
 	RemoveObject $id
 }
@@ -7729,13 +8201,13 @@ proc KillObjUnderMouse {w x y} {
 	set cx [$w canvasx $x]
 	set cy [$w canvasy $y]
 	set candidates {}
-	global OBJ
+	global OBJdata OBJtype
 
 	foreach element [$w find overlapping [expr $cx-2] [expr $cy-2] [expr $cx+2] [expr $cy+2]] {
 		foreach elementTag [$w gettags $element] {
 			if {[string range $elementTag 0 2] eq {obj}} {
 				set target_id [string range $elementTag 3 end]
-				if {[info exists OBJ(LOCKED:$target_id)] && $OBJ(LOCKED:$target_id) != 0} {
+				if {[info exists OBJdata($target_id)] && [dict get $OBJdata($target_id) Locked]} {
 					DEBUG 3 "Object $target_id is locked, not allowing in selection"
 					continue
 				}
@@ -7749,63 +8221,57 @@ proc KillObjUnderMouse {w x y} {
 	if {[llength $candidates] == 1} {
 		KillObjById $candidates
 	} elseif {[llength $candidates] > 1} {
-		global OBJ
+		global OBJdata
 		.killmultiple delete 0 end
 		foreach id $candidates {
-			DistributeVars [obj_line_fill_width $id] line fill width
-			if [info exists OBJ(TEXT:$id)] {
-				set desc " \"$OBJ(TEXT:$id)\""
-			} elseif [info exists OBJ(IMAGE:$id)] {
-				set desc " \"$OBJ(IMAGE:$id)\""
+			lassign [obj_line_fill_width $id] line fill width
+			if [dict exists $OBJdata($id) Text] {
+				set desc " \"[dict get $OBJdata($id) Text]\""
+			} elseif [dict exists $OBJdata($id) Image] {
+				set desc " \"[dict get $OBJdata($id) Image]\""
 			} else {
 				set desc ""
 			}
-			.killmultiple add command -command "KillObjById $id" -label "Delete $OBJ(TYPE:$id) ($line/$fill)$desc @($OBJ(X:$id),$OBJ(Y:$id),$OBJ(Z:$id); w=$width; \[$OBJ(LAYER:$id)\]"
+			.killmultiple add command -command "KillObjById $id" -label "Delete $OBJtype($id) ($line/$fill)$desc @([dict get $OBJdata($id) X],[dict get $OBJdata($id) Y],[dict get $OBJdata($id) Z]; w=$width; \[[dict get $OBJdata($id) Layer]\]"
 		}
 		tk_popup .killmultiple [expr [winfo rootx $w] + $x] [expr [winfo rooty $w] + $y]
 	}
 }
 	
 proc obj_line_fill_width {id} {
-	global OBJ
-	if [info exists OBJ(LINE:$id)] {
-		set line $OBJ(LINE:$id)
-	} else {
-		set line "no line"
+	global OBJdata
+	if [info exists OBJdata($id)] {
+		::gmautil::dassign $OBJdata($id) Line l Fill f Width w
+		if {$l eq {}} {set l {no line}}
+		if {$f eq {}} {set f {no fill}}
+		if {$w eq {}} {set w {no width}}
+		return [list $l $f $w]
 	}
-	if [info exists OBJ(FILL:$id)] {
-		set fill $OBJ(FILL:$id)
-	} else {
-		set fill "no fill"
-	}
-	if [info exists OBJ(WIDTH:$id)] {
-		set width $OBJ(WIDTH:$id)
-	} else {
-		set width "no width"
-	}
-	return [list $line $fill $width]
+	return [list N/A N/A N/A]
 }
 
 set MO_disp {}
 set MO_last_obj {}
 proc NudgeObject {w dx dy} {
 	global MO_last_obj ClockDisplay
-	global OBJ
+	global OBJdata
 	DEBUG 3 "NudgeObject w=$w dx=$dx dy=$dy obj=$MO_last_obj"
 	if {$MO_last_obj eq {}} {
 		set ClockDisplay "No current object to move; move one with mouse first"
 		return
 	}
-	if [info exists OBJ(X:$MO_last_obj)] {
-		set OBJ(X:$MO_last_obj) [expr $OBJ(X:$MO_last_obj) + $dx]
-		set OBJ(Y:$MO_last_obj) [expr $OBJ(Y:$MO_last_obj) + $dy]
+	if [info exists OBJdata($MO_last_obj)] {
+		dict set OBJdata($MO_last_obj) X [expr [dict get $OBJdata($MO_last_obj) X] + $dx]
+		dict set OBJdata($MO_last_obj) Y [expr [dict get $OBJdata($MO_last_obj) Y] + $dy]
 		set new_coords {}
+		set new_cobj {}
 		foreach {xx yy} [$w coords obj$MO_last_obj] {
 			lappend new_coords [expr $xx + $dx] [expr $yy + $dy]
+			lappend new_cobj [dict create X [expr $xx + $dx] Y [expr $yy + $dy]]
 		}
 		$w coords obj$MO_last_obj $new_coords
-		set OBJ(POINTS:$MO_last_obj) [lrange $new_coords 2 end]
-		SendObjChanges $MO_last_obj {X Y POINTS}
+		dict set OBJdata($MO_last_obj) Points [lrange $new_cobj 2 end]
+		SendObjChanges $MO_last_obj {X Y Points}
 	} else {
 		set ClockDisplay "Object $MO_last_obj does not exist anymore"
 	}
@@ -7813,7 +8279,7 @@ proc NudgeObject {w dx dy} {
 
 proc NudgeObjectZ {w adj} {
 	global MO_last_obj ClockDisplay
-	global OBJ
+	global OBJdata
 	DEBUG 3 "NudgeObjectZ w=$w adj=$adj obj=$MO_last_obj"
 	if {$MO_last_obj eq {}} {
 		set ClockDisplay "No current object to move; move one with mouse first"
@@ -7822,22 +8288,23 @@ proc NudgeObjectZ {w adj} {
 	DEBUG 4 "NudgeObjectZ sampling object collection Z range"
 	set max_z nil
 	set min_z nil
-	foreach ok [array names OBJ Z:*] {
-		DEBUG 5 "-- $ok Z=$OBJ($ok)"
+	foreach ok [array names OBJdata] {
+		set z [dict get $OBJdata($ok) Z]
+		DEBUG 5 "-- $ok Z=$z"
 		if {$max_z eq {nil}} {
-			set min_z [set max_z $OBJ($ok)]
+			set min_z [set max_z $z]
 		} else {
-			if {$max_z == $OBJ($ok)} {
+			if {$max_z == $z} {
 				# We're not the only object at this coordinate so to be at max we'd have to be one past that
-				set max_z [expr $OBJ($ok) + 1]
-			} elseif {$max_z < $OBJ($ok)} {
-				set max_z $OBJ($ok)
+				set max_z [expr $z + 1]
+			} elseif {$max_z < $z} {
+				set max_z $z
 			}
-			if {$min_z == $OBJ($ok)} {
-				# We're not the only object at this coordinate so to be at max we'd have to be one past that
-				set min_z [expr $OBJ($ok) - 1]
-			} elseif {$min_z > $OBJ($ok)} {
-				set min_z $OBJ($ok)
+			if {$min_z == $z} {
+				# We're not the only object at this coordinate so to be at min we'd have to be one past that
+				set min_z [expr $z - 1]
+			} elseif {$min_z > $z} {
+				set min_z $z
 			}
 		}
 	}
@@ -7845,36 +8312,36 @@ proc NudgeObjectZ {w adj} {
 	if {$min_z eq {nil}} {set min_z 0}
 	if {$max_z eq {nil}} {set max_z 0}
 
-	if [info exists OBJ(Z:$MO_last_obj)] {
-		set z $OBJ(Z:$MO_last_obj)
+	if [info exists OBJdata($MO_last_obj)] {
+		set z [dict get $OBJdata($MO_last_obj) Z]
 		switch -exact -- $adj {
 			up { 
 				if {$z >= $max_z} {
 					set ClockDisplay "Object $MO_last_obj already top-most on display"
 					return
 				}
-				set OBJ(Z:$MO_last_obj) [expr $z + 1] 
+				dict set OBJdata($MO_last_obj) Z [expr $z + 1]
 			}
 			down {
 				if {$z <= $min_z} {
 					set ClockDisplay "Object $MO_last_obj already bottom-most on display"
 					return
 				}
-				set OBJ(Z:$MO_last_obj) [expr $z - 1] 
+				dict set OBJdata($MO_last_obj) Z [expr $z - 1]
 			}
 			front {
 				if {$z >= $max_z} {
 					set ClockDisplay "Object $MO_last_obj already top-most on display"
 					return
 				}
-				set OBJ(Z:$MO_last_obj) [expr $max_z + 1]
+				dict set OBJdata($MO_last_obj) Z [expr $max_z + 1]
 			}
 			back {
 				if {$z <= $min_z} {
 					set ClockDisplay "Object $MO_last_obj already bottom-most on display"
 					return
 				}
-				set OBJ(Z:$MO_last_obj) [expr $min_z - 1]
+				dict set OBJdata($MO_last_obj) Z [expr $min_z - 1]
 			}
 			default {
 				DEBUG 0 "NudgeObjectZ $w $adj makes no sense"
@@ -7883,7 +8350,7 @@ proc NudgeObjectZ {w adj} {
 		}
 
 		refreshScreen
-		set ClockDisplay "Object $MO_last_obj new Z=$OBJ(Z:$MO_last_obj)"
+		set ClockDisplay "Object $MO_last_obj new Z=[dict get $OBJdata($MO_last_obj) Z]"
 		SendObjChanges $MO_last_obj {Z}
 	} else {
 		set ClockDisplay "Object $MO_last_obj does not exist anymore"
@@ -7894,14 +8361,14 @@ proc MoveObjUnderMouse {w x y} {
 	set cx [$w canvasx $x]
 	set cy [$w canvasy $y]
 	set candidates {}
-	global ClockDisplay MO_disp MO_last_obj OBJ
+	global ClockDisplay MO_disp MO_last_obj OBJdata
 	set MO_disp $ClockDisplay
 
 	foreach element [$w find overlapping [expr $cx-2] [expr $cy-2] [expr $cx+2] [expr $cy+2]] {
 		foreach elementTag [$w gettags $element] {
 			if {[string range $elementTag 0 2] eq {obj}} {
 				set target_id [string range $elementTag 3 end]
-				if {[info exists OBJ(LOCKED:$target_id)] && $OBJ(LOCKED:$target_id) != 0} {
+				if {[info exists OBJdata($target_id)] && [dict get $OBJdata($target_id) Locked]} {
 					DEBUG 3 "Object $target_id is locked, not allowing in selection"
 					continue
 				}
@@ -7916,7 +8383,7 @@ proc MoveObjUnderMouse {w x y} {
 		set MO_last_obj $candidates
 		MoveObjById $w $candidates
 	} elseif {[llength $candidates] > 1} {
-		global OBJ
+		global OBJdata
 		global OBJ_MOVING_SELECTED
 
 		if {$OBJ_MOVING_SELECTED ne {}} {
@@ -7925,8 +8392,8 @@ proc MoveObjUnderMouse {w x y} {
 		} else {
 			.killmultiple delete 0 end
 			foreach id $candidates {
-				DistributeVars [obj_line_fill_width $id] line fill width
-				.killmultiple add command -command "set OBJ_MOVING_SELECTED $id" -label "Move $OBJ(TYPE:$id) ($line/$fill) @($OBJ(X:$id),$OBJ(Y:$id),$OBJ(Z:$id); w=$width; \[$OBJ(LAYER:$id)\]"
+				lassign [obj_line_fill_width $id] line fill width
+				.killmultiple add command -command "set OBJ_MOVING_SELECTED $id" -label "Move $OBJtype($id) ($line/$fill) @([dict get $OBJdata($id) X],[dict get $OBJdata($id) Y],[dict get $OBJdata($id) Z]); w=$width; \[[dict get $OBJdata($id) Layer]\]"
 			}
 			tk_popup .killmultiple [expr [winfo rootx $w] + $x] [expr [winfo rooty $w] + $y]
 		}
@@ -7940,7 +8407,7 @@ proc DrawScreen {scale show} {
 }
 
 proc blink {w t s} {
-	global OBJ_BLINK OBJ
+	global OBJ_BLINK OBJdata
 
 	if {$OBJ_BLINK ne {} && $OBJ_BLINK==$t} {
 		switch $s {
@@ -7955,31 +8422,29 @@ proc blink {w t s} {
 			after 100 "blink $w $t [expr ($s+1)%3]"
 		}
 	} else {
-		catch {$w itemconfigure obj$t -outline $OBJ(LINE:$t)}
-		catch {$w itemconfigure obj$t -fill $OBJ(FILL:$t)}
+		catch {$w itemconfigure obj$t -outline [dict get $OBJdata($t) Line]}
+		catch {$w itemconfigure obj$t -fill [dict get $OBJdata($t) Fill}
 	}
 }
 
 # hightlightMob canvasname mob_id_list_or_empty_for_none
 proc highlightMob {w id} {
-	global MOB MOB_BLINK NextMOBID
+	global MOBdata MOB_BLINK NextMOBID
 
 	set MOB_BLINK $id
 
 	set objectlist {}
-	foreach obj [array names MOB NAME:*] {
-		set obj_id [string range $obj 5 end]
-
-		if {!$MOB(KILLED:$obj_id)} {
+	foreach obj_id [array names MOBdata] {
+		if {![dict get $MOBdata($obj_id) Killed]} {
 			if {[llength $id] == 0 || [lsearch -exact $id $obj_id] < 0} {
 				# either we're setting everyone to normal, or
 				# this is not highlighted person anyway
-				set MOB(DIM:$obj_id) 1
-				$w itemconfigure MC#$obj_id -outline $MOB(COLOR:$obj_id)
+				dict set MOBdata($obj_id) Dim true
+				$w itemconfigure MC#$obj_id -outline [dict get $MOBdata($obj_id) Color]
 				$w delete MH#$obj_id
 			} else {
 				# this is the person
-				set MOB(DIM:$obj_id) 0
+				dict set MOBdata($obj_id) Dim false
 				$w itemconfigure MC#$obj_id -outline yellow
 			}
 		}
@@ -8044,7 +8509,7 @@ proc FlashGeneric {w id step pfx} {
 }
 
 proc blinkMob {w t s} {
-	global MOB_BLINK MOB
+	global MOB_BLINK MOBdata
 
 	if {$MOB_BLINK ne {} && $MOB_BLINK eq $t} {
 		switch $s {
@@ -8055,19 +8520,16 @@ proc blinkMob {w t s} {
 		catch {
 			foreach tt $t {
 				$w itemconfigure MC#$tt -outline $fillcolor
-#				$w itemconfigure MT#$tt -fill $fillcolor
 			}
 			after 100 "blinkMob $w [list $t] [expr ($s+1)%2]"
 		}
 	} else {
 		catch {
 			foreach tt $t {
-				if $MOB(DIM:$tt) {
-					$w itemconfigure MC#$tt -outline $MOB(COLOR:$tt)
-#					$w itemconfigure MT#$tt -fill black
+				if [dict get $MOBdata($tt) Dim] {
+					$w itemconfigure MC#$tt -outline [dict get $MOBdata($tt) Color]
 				} else {
 					$w itemconfigure MC#$tt -outline yellow
-#					$w itemconfigure MT#$tt -fill black
 				}
 			}
 		}
@@ -8311,566 +8773,636 @@ proc UpdateRunClock newtime {
 	}
 }
 
+proc BackgroundConnectToServer {tries} {
+	::gmaproto::background_redial $tries
+}
 
-set ITpending_auth true
-proc ITsend data {
-	global ITsock ITbuffer ITpending_auth
-	#
-	# Test that the data forms a proper TCL list with no embedded
-	# newlines and other crap that will cause havoc to the server
-	# and our peers.
-	#
-
-	if [catch {
-		set l [llength $data]
-	} err] {
-		DEBUG 0 "ITsend: I refuse to send the message \"$data\" to the server: $err"
-		return
-	}
-
-	if {$l < 1} {
-		DEBUG 0 "ITsend: I refuse to send the message \"$data\" to the server: it appears to have no meaningful content."
-		return
-	}
-
-	if {![string is print $data]} {
-		DEBUG 0 "ITsend: I refuse to send the message \"$data\" to the server: it contains invalid characters."
-		return
-	}
-
-	if {![string is list $data]} {
-		DEBUG 0 "ITsend: I refuse to send the message \"$data\" to the server: it is not a properly-formed list string."
-		return
-	}
-
-    if {$ITpending_auth && [lindex $data 0] != "POLO" && [lindex $data 0] != "AUTH"} {
-        DEBUG 1 "ITsend: queueing request \"$data\" until after authentication succeeds"
-        lappend ITbuffer "$data"
-        return
-    }
-
-	if {$ITsock ne {}} {
-		if [catch {
-            while {$ITbuffer ne {}} {
-                puts $ITsock [lindex $ITbuffer 0]
-                flush $ITsock
-                DEBUG 1 "sent delayed command <[lindex $ITbuffer 0]>"
-                set ITbuffer [lreplace $ITbuffer 0 0]
-                DEBUG 2 "buffer now $ITbuffer"
-            }
-			puts $ITsock "$data"
-			flush $ITsock
-			DEBUG 4 "sent $ITsock <- $data"
-		} error] {
-			DEBUG 0 "Lost connection to server ($error)."
-			DEBUG 0 "Attempting to reconnect..."
-			# save our message for later
-			catch {close $ITsock}
-			set ITsock {}
-			lappend ITbuffer "$data"
-            DEBUG 1 "Saved $data to outgoing buffer"
-            DEBUG 2 "ITsend buffer now $ITbuffer"
-			BackgroundConnectToServer 1
+#
+# Server interaction
+#
+proc DefinePlayerCharacter {d} {
+	global PC_IDs
+	::gmautil::dassign $d Name name ObjID id Color color Area area Size size
+	set creature_name [AcceptCreatureImageName $name]
+	if {[info exists PC_IDs($creature_name)]} {
+		if {$PC_IDs($creature_name) ne $id} {
+			DEBUG 0 "Attempting to add player '$creature_name' with ID $id to menu but ID $PC_IDs($creature_name) is already known for it! Ignoring new request."
+		} else {
+			DEBUG 1 "Received duplicate AC command for $name (ID $id)"
 		}
-	} elseif {$ITbuffer ne {}} {
-		# there's no socket but there USED to be, so queue up
-		# the message for when we get that connection back again
-		# (otherwise if there's never been a socket, we aren't even
-		# trying to talk to a server at all, so ignore this request)
-		lappend ITbuffer "$data"
-		DEBUG 1 "Saved more output ($data) waiting for connection to be reestablished."
-        DEBUG 2 "ITsend buffer now $ITbuffer"
+	} else {
+		set PC_IDs($creature_name) $id
+		.contextMenu add command -command "AddPlayer $creature_name $color $area $size $id" -label $creature_name 
 	}
 }
 
-proc BackgroundConnectToServer {tries} {
-	global ITbuffer ITpending_auth
+proc DefineStatusMarker {d} {
+	set condition [dict get $d Condition]
+	set shape [dict get $d Shape]
+	set color [dict get $d Color]
+	set description [dict get $d Description]
+	global MarkerColor MarkerShape MarkerDescription
 
-	if [catch {connectToServer} err] {
-		DEBUG 0 "Attempt to reconnect failed ($err); continuing to try... $tries"
-		after [expr min($tries*1000,10000)] BackgroundConnectToServer [expr $tries + 1]
+	if {$shape eq {} || $color eq {}} {
+		array unset MarkerColor $condition
+		array unset MarkerShape $condition
 	} else {
-		DEBUG 0 "Connection to server reestablished"
-        set ITpending_auth true
-		if {$ITbuffer ne {}} {
-			set saved $ITbuffer
-			set ITbuffer {}
-			foreach packet $saved {
-				DEBUG 1 "Sending queued packet <$packet> to server"
-				ITsend $packet
+		set MarkerColor($condition) $color
+		set MarkerShape($condition) $shape
+		if {$description eq {}} {
+			if {![info exists MarkerDescription($condition)]} {
+				set MarkerDescription($condition) $condition
 			}
+		} else {
+			set MarkerDescription($condition) $description
 		}
+	}
+}
+
+#
+# Hooks for specific incoming server messages
+#
+proc DoCommandMARCO {d} {
+	::gmaproto::polo
+}
+
+proc DoCommandCONN {d} {
+	global local_user PeerList
+	set PeerList {}
+
+	foreach peer [dict get $d PeerList] {
+		::gmautil::dassign $peer User peer_user
+
+		if {[dict get $peer IsMe] && $peer_user ne $local_user} {
+			set local_user $peer_user
+			DEBUG 1 "Correcting my local username to $local_user per server request"
+		}
+		if {[dict get $peer IsAuthenticated]} {
+			if {![dict get $peer IsWriteOnly]} {
+				if {$peer_user ne {} && $peer_user ne {None}} {
+					# we check for "None" because of the behavior of the Python server (sigh)
+					if {$peer_user ne $local_user} {
+						lappend PeerList $peer_user
+						DEBUG 3 "Peerlist=$PeerList"
+					} else {
+						DEBUG 2 "Excluding $peer (this is my username)"
+					}
+				} else {
+					DEBUG 2 "Excluding $peer (no username given)"
+				}
+			} else {
+				DEBUG 2 "Excluding $peer (client not listening)"
+			}
+		} else {
+			DEBUG 2 "Excluding $peer (not authenticated)"
+		}
+	}
+	UpdatePeerList
+}
+
+#
+# Hook for any errors encountered when trying to execute an incoming
+# server message (including the case where no DoCommand<cmd> procedure
+# is defined)
+#
+proc DoCommandError {cmd d err} {
+	DEBUG 0 "Unable to execute command $cmd from server: $err (with payload $d)"
+}
+
+proc UpgradeAvailable {d} {
+	global GMAMapperVersion BIN_DIR path_install_base
+	global UpdateURL path_tmp CURLproxy CURLpath
+
+	::gmautil::dassign $d Version new_version Token upgrade_file OS os Arch arch
+	set comp [::gmautil::version_compare $GMAMapperVersion $new_version]
+	if {$os eq {}} {
+		set for "for any operating system "
+	} else {
+		set for "for $os systems "
+	}
+	if {$arch eq {}} {
+		append for "running on any architecture"
+	} else {
+		append for "for $arch machines"
+	}
+	
+	if {$comp < 0} {
+		if {[::gmautil::is_git $BIN_DIR]} {
+			tk_messageBox -type ok -icon info \
+				-title "Mapper version $new_version is available"\
+				-message "There is a new mapper version, $new_version, available for use. Update your Git repository." \
+				-detail "You are currently running version $GMAMapperVersion.\nYour server says that the currently-recommended version $for (as incidated by your GM) is $new_version.\nHowever, since you are running this client from $BIN_DIR, which is inside a Git repository working tree, you should upgrade it by running \"git pull\" rather than using the built-in upgrade feature."
+		} else {
+			if {$UpdateURL eq {}} {
+				tk_messageBox -type ok -icon info \
+					-title "Mapper version $new_version is available"\
+					-message "There is a new mapper version, $new_version, available for use." \
+					-detail "You are currently running version $GMAMapperVersion.\nYour server says that the currently-recommended version $for (as incidated by your GM) is $new_version.\nIf you add an update-url value to your mapper configuration file or include an --update-url option when running mapper, this update may be installed automatically for you. Ask your GM for the correct value for that setting."
+			} else {
+				set answer [tk_messageBox -type yesno -icon question \
+					-title "Mapper version $new_version is available"\
+					-message "There is a new mapper version, $new_version, available for use. Do you wish to upgrade now?" \
+					-detail "You are currently running version $GMAMapperVersion.\nYour server says that the currently-recommended version $for (as incidated by your GM) is $new_version.\n\nIf you click YES, the new mapper will be downloaded from your GM's server, installed on your computer, and then launched. You will then be using the version $new_version client."]
+				if {$answer eq {yes}} {
+					# Figure out if $BIN_DIR has the format <install_base>/mapper/<version>/bin
+					set install_dirs [file split $BIN_DIR]
+					if {[lindex $install_dirs end] eq {bin}
+					&&  [lindex $install_dirs end-1] eq $GMAMapperVersion
+					&&  [lindex $install_dirs end-2] eq {mapper}} {
+						# yes. We propose using the same convention, then.
+						set target_dirs [lreplace $install_dirs end-1 end $new_version]
+					} else {
+						# no. What about <install_base>/mapper/bin?
+						if {[lindex $install_dirs end] eq {bin}
+						&&  [lindex $install_dirs end-1] eq {mapper}} {
+							# yes. propose adding the versioned structure.
+							set target_dirs [lreplace $install_dirs end end $new_version]
+						} else {
+							# (shrug) punt.
+							set target_dirs [file split $path_install_base]
+							lappend target_dirs $new_version
+						}
+					}
+
+					set answer [tk_messageBox -type yesnocancel -icon question \
+						-title "Installation Target" \
+						-message "This client is running from $BIN_DIR. Should I install the new one in [file join {*}$target_dirs]?"\
+						-detail "If you click YES, the new client will be installed in the recommended location to make it easier to maintain all the versions of the mapper you have on your system.\nIf you click NO, you will be prompted to choose the installation directory of your choice.\nIt you click CANCEL, we won't install the new version at this time at all."]
+					if {$answer eq {yes}} {
+						::gmautil::upgrade $target_dirs $path_tmp $UpdateURL $upgrade_file $GMAMapperVersion $new_version mapper bin/mapper.tcl ::display_message $CURLproxy $CURLpath
+					} elseif {$answer eq {no}} {
+						set chosen_dir [tk_chooseDirectory -initialdir [file join {*}$target_dirs] \
+							-mustexist true \
+							-title "Select Installation Base Directory"]
+						if {$chosen_dir eq {}} {
+							say "No directory selected; upgrade cancelled."
+						} else {
+							if {[tk_messageBox -type yesno -icon question \
+								-title "Confirm Installation Directory" \
+								-message "Are you sure you wish to install into $chosen_dir?"\
+								-detail "If you click YES, we will install the new mapper client into $chosen_dir."] eq {yes}} {
+								::gmautil::upgrade [file split $chosen_dir] $path_tmp $UpdateURL $upgrade_file $GMAMapperVersion $new_version mapper bin/mapper.tcl ::display_message $CURLproxy $CURLpath
+							} else {
+								say "Installation of version $new_version cancelled."
+							}
+						}
+					} else {
+						say "Installation of version $new_version cancelled."
+					}
+				}; # end of "yes, install update"
+			}; # end of "have UpdateURL"
+		}; # end of (not) in git area
+	} elseif {$comp > 0} {
+		DEBUG 0 "You appear to be running a newer mapper ($GMAMapperVersion) than the latest version offered by your server ($new_version $for). If this isn't expected, you may want to nudge your GM and/or system administrator to update the server's advertised version."
 	}
 }
 		
+		
+#DEL#proc RequireArgs {min max event} {
+#DEL#	if {[llength $event] < $min || [llength $event] > $max} {
+#DEL#		DEBUG 0 "Received command <$event> with [llength $event] values; $min-$max expected."
+#DEL#		return 0
+#DEL#	}
+#DEL#	return 1
+#DEL#}
 
-#proc ITsendObjStream {....} {
-#}
-
+#set ITreceive_queue {}
+#set ITpreamble 2
+#proc ITreceive socketID {
+#	global ITsock
 #
-# We had a maddening situation where a map update from a remote
-# source would throw an exception and wipe out random bits of 
-# the map.  I traced it down to a timing issue due to the ITreceive
-# procedure being called as a callback whenever data arrives on the
-# control socket.  When the SYNC operation is done by one map, it 
-# sends "CLR *" then a dump of all the objects which should be on
-# the other maps.  Problem: the map may not be finished executing
-# the CLR before another incoming ITreceive interrupts it to pile
-# more data into the map.  Then the CLR continues, *deleting* the
-# objects (some of them, anyway), which now confuse the mapper because
-# they should have been there and suddenly... aren't.
 #
-# Instead, we'll consider that ITreceive may be invoked before a
-# previous call is done, but we're not really multi-threaded--i.e.,
-# they won't be *concurrent* or create the need for a true mutex
-# or something.  So, we'll have a global queue of input events.  If
-# the queue is empty, we'll just run the event we have.  If not,
-# we'll store this one in the queue and return immediately.  At the
-# end of the execution, we'll call ITreceive recursively as needed to
-# burn up all the events queued earlier.
 #
-
-proc RequireArgs {min max event} {
-	if {[llength $event] < $min || [llength $event] > $max} {
-		DEBUG 0 "Received command <$event> with [llength $event] values; $min-$max expected."
-		return 0
-	}
-	return 1
-}
-
-set ITreceive_queue {}
-set ITpreamble 2
-proc ITreceive socketID {
-	global MOB_COMBATMODE canvas ITsock ITreceive_queue ITpreamble ITpending_auth
-	if {[gets $socketID event] == -1} {
-		if [eof $socketID] {
-			DEBUG 0 "Lost connection to map server"
-			close $socketID
-			set ITsock {}
-			lappend ITbuffer POLO
-			BackgroundConnectToServer 1
-			return
-		}
-		# insufficient data yet for a complete line
-		DEBUG 3 "ITreceive still waiting for complete line"
-		return
-	}
-
-	lappend ITreceive_queue $event
-	set queue_depth [llength $ITreceive_queue]
-	DEBUG 4 "recv $ITsock -> $event, queue now $queue_depth deep"
-
-	if {$queue_depth > 1} {
-		DEBUG 4 "ITreceive postponing $event until previous tasks have completed."
-		return
-	}
-
-	while {[llength $ITreceive_queue] > 0} {
-		global MasterClient
-		set event [lindex $ITreceive_queue 0]
-		DEBUG 4 "Executing top event from queue: $event"
-
-        if {$ITpreamble == 1} {
-            report_progress "Ready"
-            set ITpreamble 0
-        }
-
-		switch -exact -- [lindex $event 0] {
-			OK {
-				DEBUG 4 "Server greeting complete"
-				report_progress "Server greeting complete"
-				set ITpreamble 0
-				if {[llength $event] > 1} {
-					set server_protocol [lindex $event 1]
-					CheckProtocolCompatibility $server_protocol
-					if {$server_protocol >= 321 && [llength $event] > 2} {
-						# 321 and up require authentication
-						global ITpassword
-						set server_nonce [lindex $event 2]
-                        if {$ITpassword eq {?}} {
-                            if {! [::getstring::tk_getString .password_prompt ITpassword "Server Password" -title "Log In" -entryoptions {-show *}]} {
-                                set ITpassword {}
-                            }
-                        }
-						if {$ITpassword eq {}} {
-							say "This server requires authentication but no --password option or configuration file line was given."
-							exit 1
-						}
-						# authenticate now
-                        set ITpreamble 1
-						DEBUG 4 "Server requests authentication (challenge=$server_nonce)"
-                        report_progress "Authenticating..."
-						if {[catch {
-							set challenge [base64::decode $server_nonce]
-							binary scan $challenge S passes
-							set passes [expr $passes & 0xffff]
-                            set auth_prog [begin_progress * Authenticating... $passes]
-							DEBUG 4 "-- $passes passes"
-							set H [::sha2::SHA256Init]
-							::sha2::SHA256Update $H $challenge
-							::sha2::SHA256Update $H $ITpassword
-							set D [::sha2::SHA256Final $H]
-							for {set i 0} {$i < $passes} {incr i} {
-                                if {$i % 100 == 0} {
-                                    update_progress $auth_prog $i *
-                                    #report_progress_noconsole "Authenticating: [expr int($i * 100 / $passes)]%..."
-                                }
-								set H [::sha2::SHA256Init]
-								::sha2::SHA256Update $H $ITpassword
-								::sha2::SHA256Update $H $D
-								set D [::sha2::SHA256Final $H]
-							}
-							set response [base64::encode $D]
-							DEBUG 4 "-- sending response $response"
-#							if {[catch {
-#								set local_user $::tcl_platform(user)
-#							} uerr]} {
-#								set local_user "($uerr)"
+##	global MOB_COMBATMODE canvas ITsock ITreceive_queue ITpreamble ITpending_auth
+#	if {[gets $socketID event] == -1} {
+#		if [eof $socketID] {
+#			DEBUG 0 "Lost connection to map server"
+#			close $socketID
+#			set ITsock {}
+#			lappend ITbuffer POLO
+#			BackgroundConnectToServer 1
+#			return
+#		}
+#		# insufficient data yet for a complete line
+#		DEBUG 3 "ITreceive still waiting for complete line"
+#		return
+#	}
+#
+#	lappend ITreceive_queue $event
+#	set queue_depth [llength $ITreceive_queue]
+#	DEBUG 4 "recv $ITsock -> $event, queue now $queue_depth deep"
+#
+#	if {$queue_depth > 1} {
+#		DEBUG 4 "ITreceive postponing $event until previous tasks have completed."
+#		return
+#	}
+#
+#	while {[llength $ITreceive_queue] > 0} {
+#		global MasterClient
+#		set event [lindex $ITreceive_queue 0]
+#		DEBUG 4 "Executing top event from queue: $event"
+#
+#        if {$ITpreamble == 1} {
+#            report_progress "Ready"
+#            set ITpreamble 0
+#        }
+#
+#		switch -exact -- [lindex $event 0] {
+#			OK {
+#				DEBUG 4 "Server greeting complete"
+#				report_progress "Server greeting complete"
+#				set ITpreamble 0
+#				if {[llength $event] > 1} {
+#					set server_protocol [lindex $event 1]
+#					CheckProtocolCompatibility $server_protocol
+#					if {$server_protocol >= 321 && [llength $event] > 2} {
+#						# 321 and up require authentication
+#						global ITpassword
+#						set server_nonce [lindex $event 2]
+#                        if {$ITpassword eq {?}} {
+#                            if {! [::getstring::tk_getString .password_prompt ITpassword "Server Password" -title "Log In" -entryoptions {-show *}]} {
+#                                set ITpassword {}
+#                            }
+#                        }
+#						if {$ITpassword eq {}} {
+#							say "This server requires authentication but no --password option or configuration file line was given."
+#							exit 1
+#						}
+#						# authenticate now
+#                        set ITpreamble 1
+#						DEBUG 4 "Server requests authentication (challenge=$server_nonce)"
+#                        report_progress "Authenticating..."
+#						if {[catch {
+#							set challenge [base64::decode $server_nonce]
+#							binary scan $challenge S passes
+#							set passes [expr $passes & 0xffff]
+#                            set auth_prog [begin_progress * Authenticating... $passes]
+#							DEBUG 4 "-- $passes passes"
+#							set H [::sha2::SHA256Init]
+#							::sha2::SHA256Update $H $challenge
+#							::sha2::SHA256Update $H $ITpassword
+#							set D [::sha2::SHA256Final $H]
+#							for {set i 0} {$i < $passes} {incr i} {
+#                                if {$i % 100 == 0} {
+#                                    update_progress $auth_prog $i *
+#                                    #report_progress_noconsole "Authenticating: [expr int($i * 100 / $passes)]%..."
+#                                }
+#								set H [::sha2::SHA256Init]
+#								::sha2::SHA256Update $H $ITpassword
+#								::sha2::SHA256Update $H $D
+#								set D [::sha2::SHA256Final $H]
 #							}
-							global local_user GMAMapperVersion
-							ITsend [list AUTH $response $local_user "mapper $GMAMapperVersion"]
-                            end_progress $auth_prog
-							ITsend [list ALLOW [list DICE-COLOR-BOXES]]
-						} err]} {
-							say "Failed to understand server's challenge or compute our response ($err)"
-							exit 1
-						}
-						if {[catch {
-                            report_progress "Loading chat history..."
-							InitializeChatHistory
-						} err]} {
-							say "Error loading chat history: $err (Warning only)"
-						}
-					} else {
-						# no support/need for authentication
-						set ITpending_auth false
-						ITsend [list ALLOW [list DICE-COLOR-BOXES]]
-				        }
-				}
-			}
-			DENIED {
-				if {[llength $event] > 1} {
-					say "Server DENIED access: [lindex $event 1]"
-				} else {
-					say "Server DENIED access for unspecified reason."
-				}
-                report_progress "Server denied access"
-                exit 1  ; # we're not getting any farther if this happens
-			}
-            GRANTED {
-                report_progress "Server login successful"
-                set ITpending_auth false
-                after 5000 {report_progress ""}
-                ITsend //
-            }
-			I {
-				if {$MOB_COMBATMODE} {
-					if [RequireArgs 3 3 $event] {
-						UpdateRunClock [lindex $event 1]
-						ITupdate [AcceptCreatureImageName [lindex $event 2]]
-					}
-				}
-			}
-			L {
-				if [RequireArgs 2 2 $event] {
-					foreach file [lindex $event 1] {
-						loadfile 0 $file
-					}
-				}
-			}
-			M {
-				if [RequireArgs 2 2 $event] {
-					foreach file [lindex $event 1] {
-						loadfile 1 $file
-					}
-				}
-			}
-			M? { 
-				if [catch {fetch_map_file [lindex $event 1]} err] {
-					if {$err eq {NOSUCH}} {
-						DEBUG 0 "WARNING: Requested pre-load of file ID [lindex $event 1] but the server doesn't have it."
-					} else {
-						say "Error retrieving file ID [lindex $event 1] from server: $err"
-					}
-				}
-			}
-			M@ {
-				if [catch {set cache_filename [fetch_map_file [lindex $event 1]]} err] {
-					if {$err eq {NOSUCH}} {
-						DEBUG 0 "WARNING: Requested load of remote file ID [lindex $event 1] but the server doesn't have it."
-					} else {
-						say "Error retrieving file ID [lindex $event 1] from server: $err"
-					}
-				} else {
-					global SafMode
-					if $SafMode {
-						toggleSafMode
-					}
-					loadfile 1 $cache_filename -nosend
-				}
-			}
-			MARCO { ITsend POLO }
-			MARK { if [RequireArgs 3 3 $event] {start_ping_marker $canvas [lindex $event 1] [lindex $event 2] 0}}
-			POLO { DEBUG 4 "POLO received" }
-
-			AI  { if [RequireArgs 3 3 $event] {StartImageStream   [lindex $event 1] [lindex $event 2] }}
-			AI: { if [RequireArgs 2 2 $event] {ContinueImageStream [lindex $event 1]                  }}
-			AI. { if [RequireArgs 3 3 $event] {EndImageStream     [lindex $event 1] [lindex $event 2] }}
-			AI@ { 
-				if [RequireArgs 4 4 $event] {
-					fetch_image [lindex $event 1] [lindex $event 2] [lindex $event 3] 
-				}
-			}
-			AI? {
-				if [RequireArgs 3 3 $event] {
-					global TILE_ID
-					if [info exists TILE_ID([tile_id [lindex $event 1] [lindex $event 2]])] {
-						ITsend [list AI@ [lindex $event 1] [lindex $event 2] $TILE_ID([tile_id [lindex $event 1] [lindex $event 2]])]
-					}
-				}
-			}
-
-			CONN { StartConnStream }
-			CONN: { if [RequireArgs 10 10 $event] { ContinueConnStream [lrange $event 1 end] }}
-			CONN. { if [RequireArgs 3 3 $event] { EndConnStream [lindex $event 1] [lindex $event 2]}}
-
-			LS  { StartObjStream                                         }
-			LS: { if [RequireArgs 2 2 $event] {ContinueObjStream  [lindex $event 1]                   }}
-			LS. { if [RequireArgs 3 3 $event] {EndObjStream       [lindex $event 1] [lindex $event 2] }}
-			CLR { if [RequireArgs 2 2 $event] {ClearObjectById    [lindex $event 1]}}
-			CC  { if [RequireArgs 4 4 $event] {
-					ClearChatHistory   [lindex $event 1] [lindex $event 2] [lindex $event 3]
-					ChatHistoryAppend $event
-					LoadChatHistory
-				}
-			}
-			CLR@ { 
-				if [catch {set cache_filename [fetch_map_file [lindex $event 1]]} err] {
-					if {$err eq {NOSUCH}} {
-						DEBUG 0 "WARNING: Requested unload of file ID [lindex $event 1] but the server doesn't have it."
-					} else {
-						say "Error retrieving file ID [lindex $event 1] from server: $err"
-					}
-				} else {
-                    global SafMode
-                    if $SafMode {
-                        toggleSafMode
-                    }
-                    unloadfile $cache_filename -nosend
-                }
-			}
-			OA  { if [RequireArgs 3 3 $event] {SetObjectAttribute [lindex $event 1] [lindex $event 2] }}
-			OA+ {
-					if [RequireArgs 4 4 $event] { 
-						AddToObjectAttribute [lindex $event 1] [lindex $event 2] [lindex $event 3] 
-						RefreshGrid 0
-						RefreshMOBs
-					}
-				}
-			OA- {
-					if [RequireArgs 4 4 $event] { 
-						RemoveFromObjectAttribute [lindex $event 1] [lindex $event 2] [lindex $event 3] 
-						RefreshGrid 0
-						RefreshMOBs
-					}
-				}
-			DSM { 	
-					if [RequireArgs 4 5 $event] {
-						if {[llength $event] > 4} {
-							DefineStatusMarker [lindex $event 1] [lindex $event 2] [lindex $event 3] [lindex $event 4]
-						} else {
-							DefineStatusMarker [lindex $event 1] [lindex $event 2] [lindex $event 3] ""
-						}
-					}
-				}
-			TB  {
-					if [RequireArgs 2 2 $event] { 
-						if {!$MasterClient} {
-							toolBarState  [lindex $event 1]               
-						}
-					}
-				}
-			CO  { if [RequireArgs 2 2 $event] {setCombatMode [lindex $event 1] }}
-			AC  {
-					if [RequireArgs 6 6 $event] { 
-						# AC name id color area size
-						# 0    1  2    3     4    5
-						global PC_IDs
-						set creature_name [AcceptCreatureImageName [lindex $event 1]]
-						if {[info exists PC_IDs($creature_name)]} {
-							if {$PC_IDs($creature_name) ne [lindex $event 2]} {
-								DEBUG 0 "Attempting to add player '$creature_name' with ID [lindex $event 2] to menu but ID $PC_IDs($creature_name) is already known for it! Ignoring new request."
-							} else {
-								DEBUG 1 "Received duplicate AC command for [lindex $event 1] (ID [lindex $event 2])"
-							}
-						} else {
-							set PC_IDs($creature_name) [lindex $event 2]
-							.contextMenu add command -command "AddPlayer $creature_name [lindex $event 3] [lindex $event 4] [lindex $event 5] [lindex $event 2]" -label $creature_name 
-						}
-					}
-				}
-			PS {
-					if [RequireArgs 10 10 $event] { 
-						# PS id color name area size player|monster x y reach
-						#  0  1   2    3   4     5        6         7 8  9
-						DEBUG 4 "PlaceSomeone $canvas [lindex $event 7] [lindex $event 8] [lindex $event 2] [lindex $event 3] [lindex $event 4] [lindex $event 5] [lindex $event 6] [lindex $event 1] [lindex $event 9]"
-						set creature_name [AcceptCreatureImageName [lindex $event 3]]
-						PlaceSomeone $canvas [lindex $event 7] [lindex $event 8] [lindex $event 2] $creature_name \
-							[lindex $event 4] [lindex $event 5] [lindex $event 6] [lindex $event 1] [lindex $event 9]
-						FlashMob $canvas [lindex $event 1] 3
-					}
-				}
-			AV {
-				# AV x y
-				# 0  1 2
-				if [RequireArgs 3 3 $event] {AdjustView [lindex $event 1] [lindex $event 2]}
-			}
-			// {
-				if {$ITpreamble > 1} {
-					if {[llength $event] == 6
-					&&  [lindex $event 1] eq {MAPPER}
-					&&  [lindex $event 2] eq {UPDATE}
-					&&  [lindex $event 3] eq {//}} {
-						global GMAMapperVersion BIN_DIR path_install_base
-
-						set new_version [lindex $event 4]
-						set comp [::gmautil::version_compare $GMAMapperVersion $new_version]
-						if {$comp < 0} {
-							if {[::gmautil::is_git $BIN_DIR]} {
-								tk_messageBox -type ok -icon info \
-									-title "Mapper version $new_version is available" \
-									-message "There is a new mapper version, $new_version, available for use. Update your Git repository." \
-									-detail "You are currently running version $GMAMapperVersion.\nHowever, since you are running this client from $BIN_DIR, which is inside a Git repository working tree, you should upgrade it by running \"git pull\" rather than using the built-in upgrade feature."
-							} else { ;# not in git area
-								set upgrade_file [lindex $event 5]
-								global UpdateURL
-								if {$UpdateURL eq {}} {
-									tk_messageBox -type ok -icon info \
-										-title "Mapper version $new_version is available" \
-										-message "There is a new mapper version, $new_version, available for use."\
-										-detail "You are currently running version $GMAMapperVersion.\nIf you add an update-url value to your mapper configuration file or include an --update-url option when running mapper, this update may be installed automatically for you. Ask your GM for the correct value for that setting."
-								} else { ;# we have UpdateURL, let's proceed
-									set answer [tk_messageBox -type yesno -icon question \
-										-title "Mapper version $new_version is available" \
-										-detail "If you click YES, the new mapper will be downloaded from the server, installed, and then launched. You will then be using the new client." \
-										-message "You are running version $GMAMapperVersion of the mapper client, but version $new_version is now available. Do you wish to install the new version now?"]
-									if {$answer eq {yes}} {
-										global path_tmp
-										global CURLproxy
-										global CURLpath
-										#
-										# Figure out if $BIN_DIR has the format
-										#   <install_base>/mapper/<version>/bin
-										#
-										set install_dirs [file split $BIN_DIR]
-										if {[lindex $install_dirs end] eq {bin}
-										&&  [lindex $install_dirs end-1] eq $GMAMapperVersion
-										&&  [lindex $install_dirs end-2] eq {mapper}} {
-											#
-											# aha, it does. We propose using the same naming 
-											# convention, then.
-											#
-											set target_dirs [lreplace $install_dirs end-1 end $new_version]
-										} else {
-											#
-											# Nope. What about <install_base>/mapper/bin?
-											#
-											if {[lindex $install_dirs end] eq {bin}
-											&&  [lindex $install_dirs end-1] eq {mapper}} {
-												# 
-												# yes, so we'll propose adding the versioned structure there.
-												#
-												set target_dirs [lreplace $install_dirs end end $new_version]
-											} else {
-												#
-												# We have no idea. Punt.
-												#
-												set target_dirs [file split $path_install_base]
-												lappend target_dirs $new_version
-											}
-										}
-
-										set answer [tk_messageBox -type yesnocancel -icon question \
-											-title "Installation Target" \
-											-message "This client is running from $BIN_DIR. Should I install the new one in [file join {*}$target_dirs]?"\
-											-detail "If you click YES, the new client will be installed in the recommended location to make it easier to maintain all the versions of the mapper you have on your system.\nIf you click NO, you will be prompted to choose the installation directory of your choice.\nIt you click CANCEL, we won't install the new version at this time at all."]
-										if {$answer eq {yes}} {
-											::gmautil::upgrade $target_dirs $path_tmp $UpdateURL $upgrade_file $GMAMapperVersion $new_version mapper bin/mapper.tcl display_message $CURLproxy $CURLpath
-										} elseif {$answer eq {no}} {
-											set chosen_dir [tk_chooseDirectory -initialdir [file join {*}$target_dirs] \
-												-mustexist true \
-												-title "Select Installation Base Directory"]
-											if {$chosen_dir eq {}} {
-												say "No directory selected; upgrade cancelled."
-											} else {
-												if {[tk_messageBox -type yesno -icon question \
-													-title "Confirm Installation Directory" \
-													-message "Are you sure you wish to install into $chosen_dir?"\
-													-detail "If you click YES, we will install the new mapper client into $chosen_dir."] eq {yes}} {
-													::gmautil::upgrade [file split $chosen_dir] $path_tmp $UpdateURL $upgrade_file $GMAMapperVersion $new_version mapper bin/mapper.tcl display_message $CURLproxy $CURLpath
-												} else {
-													say "Installation of version $new_version cancelled."
-												}
-											}
-										} else {
-											say "Installation of version $new_version cancelled."
-										}
-									}; # end of "yes, install update"
-								}; # end of "have UpdateURL"
-							}; # end of (not) in git area
-						} elseif {$comp > 0} {
-							DEBUG 0 "You appear to be running a newer mapper ($GMAMapperVersion) than the latest version offered by your server ([lindex $event 4]). If this isn't expected, you may want to nudge your system administrator to update the server's advertised version."
-						}
-					}; # // MAPPER UPDATE // 
-				} elseif {[llength $event] == 5 && [lindex $event 1] eq "BEGIN"} {
-                    # // BEGIN <id> <max> <title>
-                    begin_progress [lindex $event 2] [lindex $event 4] [lindex $event 3]
-                } elseif {[llength $event] >= 4 && [lindex $event 1] eq "UPDATE"} {
-                    # // UPDATE <id> <val> [<newmax>]
-                    if {[llength $event] > 4} {
-                        set newmax [lindex $event 4]
-                    } else {
-                        set newmax *
-                    }
-                    update_progress [lindex $event 2] [lindex $event 3] $newmax
-                } elseif {[llength $event] == 3 && [lindex $event 1] eq "END"} {
-                    # // END <id>
-                    end_progress [lindex $event 2]
-                }
-				# otherwise ignore the comment
-			}
-			DD= { StartDD }
-			DD: {
-				if [RequireArgs 5 5 $event] {ContinueDD [lindex $event 1] [lindex $event 2] [lindex $event 3] [lindex $event 4]}
-			}
-			DD. {
-				if [RequireArgs 3 3 $event] {EndDD [lindex $event 1] [lindex $event 2]}
-			}
-			ROLL {
-				if [RequireArgs 7 7 $event] {
-					DisplayDieRoll [lindex $event 1] [lindex $event 2] [lindex $event 3] [lindex $event 4] [lindex $event 5]
-					ChatHistoryAppend $event
-				}
-			}
-			TO {
-				if [RequireArgs 5 5 $event] {
-					DisplayChatMessage [lindex $event 1] [lindex $event 2] [lindex $event 3]
-					ChatHistoryAppend $event
-				}
-			}
-			CS - D - DD - DR {
-				# We don't care about this command, ignore it
-			}
-
-			default {
-				DEBUG 1 "IT: INVALID \"$event\""
-			}
-		}
-
-		set ITreceive_queue [lreplace $ITreceive_queue 0 0]
-		DEBUG 4 "Removing event from queue.  Depth now [llength $ITreceive_queue]"
-	}
-}
+#							set response [base64::encode $D]
+#							DEBUG 4 "-- sending response $response"
+##							if {[catch {
+##								set local_user $::tcl_platform(user)
+##							} uerr]} {
+##								set local_user "($uerr)"
+##							}
+#							global local_user GMAMapperVersion
+#							ITsend [list AUTH $response $local_user "mapper $GMAMapperVersion"]
+#                            end_progress $auth_prog
+#							ITsend [list ALLOW [list DICE-COLOR-BOXES]]
+#						} err]} {
+#							say "Failed to understand server's challenge or compute our response ($err)"
+#							exit 1
+#						}
+#						if {[catch {
+#                            report_progress "Loading chat history..."
+#							InitializeChatHistory
+#						} err]} {
+#							say "Error loading chat history: $err (Warning only)"
+#						}
+#					} else {
+#						# no support/need for authentication
+#						set ITpending_auth false
+#						ITsend [list ALLOW [list DICE-COLOR-BOXES]]
+#				        }
+#				}
+#			}
+#			DENIED {
+#				if {[llength $event] > 1} {
+#					say "Server DENIED access: [lindex $event 1]"
+#				} else {
+#					say "Server DENIED access for unspecified reason."
+#				}
+#                report_progress "Server denied access"
+#                exit 1  ; # we're not getting any farther if this happens
+#			}
+#            GRANTED {
+#                report_progress "Server login successful"
+#                set ITpending_auth false
+#                after 5000 {report_progress ""}
+#                ITsend //
+#            }
+#			I {
+#				if {$MOB_COMBATMODE} {
+#					if [RequireArgs 3 3 $event] {
+#						UpdateRunClock [lindex $event 1]
+#						ITupdate [AcceptCreatureImageName [lindex $event 2]]
+#					}
+#				}
+#			}
+#			L {
+#				if [RequireArgs 2 2 $event] {
+#					foreach file [lindex $event 1] {
+#						loadfile 0 $file
+#					}
+#				}
+#			}
+#			M {
+#				if [RequireArgs 2 2 $event] {
+#					foreach file [lindex $event 1] {
+#						loadfile 1 $file
+#					}
+#				}
+#			}
+#			M? { 
+#				if [catch {fetch_map_file [lindex $event 1]} err] {
+#					if {$err eq {NOSUCH}} {
+#						DEBUG 0 "WARNING: Requested pre-load of file ID [lindex $event 1] but the server doesn't have it."
+#					} else {
+#						say "Error retrieving file ID [lindex $event 1] from server: $err"
+#					}
+#				}
+#			}
+#			M@ {
+#				if [catch {set cache_filename [fetch_map_file [lindex $event 1]]} err] {
+#					if {$err eq {NOSUCH}} {
+#						DEBUG 0 "WARNING: Requested load of remote file ID [lindex $event 1] but the server doesn't have it."
+#					} else {
+#						say "Error retrieving file ID [lindex $event 1] from server: $err"
+#					}
+#				} else {
+#					global SafMode
+#					if $SafMode {
+#						toggleSafMode
+#					}
+#					loadfile 1 $cache_filename -nosend
+#				}
+#			}
+#			MARCO { ITsend POLO }
+#			MARK { if [RequireArgs 3 3 $event] {start_ping_marker $canvas [lindex $event 1] [lindex $event 2] 0}}
+#			POLO { DEBUG 4 "POLO received" }
+#
+#			AI  { if [RequireArgs 3 3 $event] {StartImageStream   [lindex $event 1] [lindex $event 2] }}
+#			AI: { if [RequireArgs 2 2 $event] {ContinueImageStream [lindex $event 1]                  }}
+#			AI. { if [RequireArgs 3 3 $event] {EndImageStream     [lindex $event 1] [lindex $event 2] }}
+#			AI@ { 
+#				if [RequireArgs 4 4 $event] {
+#					fetch_image [lindex $event 1] [lindex $event 2] [lindex $event 3] 
+#				}
+#			}
+#			AI? {
+#				if [RequireArgs 3 3 $event] {
+#					global TILE_ID
+#					if [info exists TILE_ID([tile_id [lindex $event 1] [lindex $event 2]])] {
+#						ITsend [list AI@ [lindex $event 1] [lindex $event 2] $TILE_ID([tile_id [lindex $event 1] [lindex $event 2]])]
+#					}
+#				}
+#			}
+#
+#			CONN { StartConnStream }
+#			CONN: { if [RequireArgs 10 10 $event] { ContinueConnStream [lrange $event 1 end] }}
+#			CONN. { if [RequireArgs 3 3 $event] { EndConnStream [lindex $event 1] [lindex $event 2]}}
+#
+#			LS  { StartObjStream                                         }
+#			LS: { if [RequireArgs 2 2 $event] {ContinueObjStream  [lindex $event 1]                   }}
+#			LS. { if [RequireArgs 3 3 $event] {EndObjStream       [lindex $event 1] [lindex $event 2] }}
+#			CLR { if [RequireArgs 2 2 $event] {ClearObjectById    [lindex $event 1]}}
+#			CC  { if [RequireArgs 4 4 $event] {
+#					ClearChatHistory   [lindex $event 1] [lindex $event 2] [lindex $event 3]
+#					ChatHistoryAppend $event
+#					LoadChatHistory
+#				}
+#			}
+#			CLR@ { 
+#				if [catch {set cache_filename [fetch_map_file [lindex $event 1]]} err] {
+#					if {$err eq {NOSUCH}} {
+#						DEBUG 0 "WARNING: Requested unload of file ID [lindex $event 1] but the server doesn't have it."
+#					} else {
+#						say "Error retrieving file ID [lindex $event 1] from server: $err"
+#					}
+#				} else {
+#                    global SafMode
+#                    if $SafMode {
+#                        toggleSafMode
+#                    }
+#                    unloadfile $cache_filename -nosend
+#                }
+#			}
+#			OA  { if [RequireArgs 3 3 $event] {SetObjectAttribute [lindex $event 1] [lindex $event 2] }}
+#			OA+ {
+#					if [RequireArgs 4 4 $event] { 
+#						AddToObjectAttribute [lindex $event 1] [lindex $event 2] [lindex $event 3] 
+#						RefreshGrid 0
+#						RefreshMOBs
+#					}
+#				}
+#			OA- {
+#					if [RequireArgs 4 4 $event] { 
+#						RemoveFromObjectAttribute [lindex $event 1] [lindex $event 2] [lindex $event 3] 
+#						RefreshGrid 0
+#						RefreshMOBs
+#					}
+#				}
+#			DSM { 	
+#					if [RequireArgs 4 5 $event] {
+#						if {[llength $event] > 4} {
+#							DefineStatusMarker [lindex $event 1] [lindex $event 2] [lindex $event 3] [lindex $event 4]
+#						} else {
+#							DefineStatusMarker [lindex $event 1] [lindex $event 2] [lindex $event 3] ""
+#						}
+#					}
+#				}
+#			TB  {
+#					if [RequireArgs 2 2 $event] { 
+#						if {!$MasterClient} {
+#							toolBarState  [lindex $event 1]               
+#						}
+#					}
+#				}
+#			CO  { if [RequireArgs 2 2 $event] {setCombatMode [lindex $event 1] }}
+#			AC  {
+#					if [RequireArgs 6 6 $event] { 
+#						# AC name id color area size
+#						# 0    1  2    3     4    5
+#						global PC_IDs
+#						set creature_name [AcceptCreatureImageName [lindex $event 1]]
+#						if {[info exists PC_IDs($creature_name)]} {
+#							if {$PC_IDs($creature_name) ne [lindex $event 2]} {
+#								DEBUG 0 "Attempting to add player '$creature_name' with ID [lindex $event 2] to menu but ID $PC_IDs($creature_name) is already known for it! Ignoring new request."
+#							} else {
+#								DEBUG 1 "Received duplicate AC command for [lindex $event 1] (ID [lindex $event 2])"
+#							}
+#						} else {
+#							set PC_IDs($creature_name) [lindex $event 2]
+#							.contextMenu add command -command "AddPlayer $creature_name [lindex $event 3] [lindex $event 4] [lindex $event 5] [lindex $event 2]" -label $creature_name 
+#						}
+#					}
+#				}
+#			PS {
+#					if [RequireArgs 10 10 $event] { 
+#						# PS id color name area size player|monster x y reach
+#						#  0  1   2    3   4     5        6         7 8  9
+#						DEBUG 4 "PlaceSomeone $canvas [lindex $event 7] [lindex $event 8] [lindex $event 2] [lindex $event 3] [lindex $event 4] [lindex $event 5] [lindex $event 6] [lindex $event 1] [lindex $event 9]"
+#						set creature_name [AcceptCreatureImageName [lindex $event 3]]
+#						PlaceSomeone $canvas [lindex $event 7] [lindex $event 8] [lindex $event 2] $creature_name \
+#							[lindex $event 4] [lindex $event 5] [lindex $event 6] [lindex $event 1] [lindex $event 9]
+#						FlashMob $canvas [lindex $event 1] 3
+#					}
+#				}
+#			AV {
+#				# AV x y
+#				# 0  1 2
+#				if [RequireArgs 3 3 $event] {AdjustView [lindex $event 1] [lindex $event 2]}
+#			}
+#			// {
+#				if {$ITpreamble > 1} {
+#					if {[llength $event] == 6
+#					&&  [lindex $event 1] eq {MAPPER}
+#					&&  [lindex $event 2] eq {UPDATE}
+#					&&  [lindex $event 3] eq {//}} {
+#						global GMAMapperVersion BIN_DIR path_install_base
+#
+#						set new_version [lindex $event 4]
+#						set comp [::gmautil::version_compare $GMAMapperVersion $new_version]
+#						if {$comp < 0} {
+#							if {[::gmautil::is_git $BIN_DIR]} {
+#								tk_messageBox -type ok -icon info \
+#									-title "Mapper version $new_version is available" \
+#									-message "There is a new mapper version, $new_version, available for use. Update your Git repository." \
+#									-detail "You are currently running version $GMAMapperVersion.\nHowever, since you are running this client from $BIN_DIR, which is inside a Git repository working tree, you should upgrade it by running \"git pull\" rather than using the built-in upgrade feature."
+#							} else { ;# not in git area
+#								set upgrade_file [lindex $event 5]
+#								global UpdateURL
+#								if {$UpdateURL eq {}} {
+#									tk_messageBox -type ok -icon info \
+#										-title "Mapper version $new_version is available" \
+#										-message "There is a new mapper version, $new_version, available for use."\
+#										-detail "You are currently running version $GMAMapperVersion.\nIf you add an update-url value to your mapper configuration file or include an --update-url option when running mapper, this update may be installed automatically for you. Ask your GM for the correct value for that setting."
+#								} else { ;# we have UpdateURL, let's proceed
+#									set answer [tk_messageBox -type yesno -icon question \
+#										-title "Mapper version $new_version is available" \
+#										-detail "If you click YES, the new mapper will be downloaded from the server, installed, and then launched. You will then be using the new client." \
+#										-message "You are running version $GMAMapperVersion of the mapper client, but version $new_version is now available. Do you wish to install the new version now?"]
+#									if {$answer eq {yes}} {
+#										global path_tmp
+#										global CURLproxy
+#										global CURLpath
+#										#
+#										# Figure out if $BIN_DIR has the format
+#										#   <install_base>/mapper/<version>/bin
+#										#
+#										set install_dirs [file split $BIN_DIR]
+#										if {[lindex $install_dirs end] eq {bin}
+#										&&  [lindex $install_dirs end-1] eq $GMAMapperVersion
+#										&&  [lindex $install_dirs end-2] eq {mapper}} {
+#											#
+#											# aha, it does. We propose using the same naming 
+#											# convention, then.
+#											#
+#											set target_dirs [lreplace $install_dirs end-1 end $new_version]
+#										} else {
+#											#
+#											# Nope. What about <install_base>/mapper/bin?
+#											#
+#											if {[lindex $install_dirs end] eq {bin}
+#											&&  [lindex $install_dirs end-1] eq {mapper}} {
+#												# 
+#												# yes, so we'll propose adding the versioned structure there.
+#												#
+#												set target_dirs [lreplace $install_dirs end end $new_version]
+#											} else {
+#												#
+#												# We have no idea. Punt.
+#												#
+#												set target_dirs [file split $path_install_base]
+#												lappend target_dirs $new_version
+#											}
+#										}
+#
+#										set answer [tk_messageBox -type yesnocancel -icon question \
+#											-title "Installation Target" \
+#											-message "This client is running from $BIN_DIR. Should I install the new one in [file join {*}$target_dirs]?"\
+#											-detail "If you click YES, the new client will be installed in the recommended location to make it easier to maintain all the versions of the mapper you have on your system.\nIf you click NO, you will be prompted to choose the installation directory of your choice.\nIt you click CANCEL, we won't install the new version at this time at all."]
+#										if {$answer eq {yes}} {
+#											::gmautil::upgrade $target_dirs $path_tmp $UpdateURL $upgrade_file $GMAMapperVersion $new_version mapper bin/mapper.tcl display_message $CURLproxy $CURLpath
+#										} elseif {$answer eq {no}} {
+#											set chosen_dir [tk_chooseDirectory -initialdir [file join {*}$target_dirs] \
+#												-mustexist true \
+#												-title "Select Installation Base Directory"]
+#											if {$chosen_dir eq {}} {
+#												say "No directory selected; upgrade cancelled."
+#											} else {
+#												if {[tk_messageBox -type yesno -icon question \
+#													-title "Confirm Installation Directory" \
+#													-message "Are you sure you wish to install into $chosen_dir?"\
+#													-detail "If you click YES, we will install the new mapper client into $chosen_dir."] eq {yes}} {
+#													::gmautil::upgrade [file split $chosen_dir] $path_tmp $UpdateURL $upgrade_file $GMAMapperVersion $new_version mapper bin/mapper.tcl display_message $CURLproxy $CURLpath
+#												} else {
+#													say "Installation of version $new_version cancelled."
+#												}
+#											}
+#										} else {
+#											say "Installation of version $new_version cancelled."
+#										}
+#									}; # end of "yes, install update"
+#								}; # end of "have UpdateURL"
+#							}; # end of (not) in git area
+#						} elseif {$comp > 0} {
+#							DEBUG 0 "You appear to be running a newer mapper ($GMAMapperVersion) than the latest version offered by your server ([lindex $event 4]). If this isn't expected, you may want to nudge your system administrator to update the server's advertised version."
+#						}
+#					}; # // MAPPER UPDATE // 
+#				} elseif {[llength $event] == 5 && [lindex $event 1] eq "BEGIN"} {
+#                    # // BEGIN <id> <max> <title>
+#                    begin_progress [lindex $event 2] [lindex $event 4] [lindex $event 3]
+#                } elseif {[llength $event] >= 4 && [lindex $event 1] eq "UPDATE"} {
+#                    # // UPDATE <id> <val> [<newmax>]
+#                    if {[llength $event] > 4} {
+#                        set newmax [lindex $event 4]
+#                    } else {
+#                        set newmax *
+#                    }
+#                    update_progress [lindex $event 2] [lindex $event 3] $newmax
+#                } elseif {[llength $event] == 3 && [lindex $event 1] eq "END"} {
+#                    # // END <id>
+#                    end_progress [lindex $event 2]
+#                }
+#				# otherwise ignore the comment
+#			}
+#			DD= { StartDD }
+#			DD: {
+#				if [RequireArgs 5 5 $event] {ContinueDD [lindex $event 1] [lindex $event 2] [lindex $event 3] [lindex $event 4]}
+#			}
+#			DD. {
+#				if [RequireArgs 3 3 $event] {EndDD [lindex $event 1] [lindex $event 2]}
+#			}
+#			ROLL {
+#				if [RequireArgs 7 7 $event] {
+#					DisplayDieRoll [lindex $event 1] [lindex $event 2] [lindex $event 3] [lindex $event 4] [lindex $event 5]
+#					ChatHistoryAppend $event
+#				}
+#			}
+#			TO {
+#				if [RequireArgs 5 5 $event] {
+#					DisplayChatMessage [lindex $event 1] [lindex $event 2] [lindex $event 3]
+#					ChatHistoryAppend $event
+#				}
+#			}
+#			CS - D - DD - DR {
+#				# We don't care about this command, ignore it
+#			}
+#
+#			default {
+#				DEBUG 1 "IT: INVALID \"$event\""
+#			}
+#		}
+#
+#		set ITreceive_queue [lreplace $ITreceive_queue 0 0]
+#		DEBUG 4 "Removing event from queue.  Depth now [llength $ITreceive_queue]"
+#	}
+#}
 
 set DDchk {}
 set DDcnt 0
@@ -8980,7 +9512,7 @@ proc update_chat_to {} {
 	}
 }
 
-proc RefreshPeerList {} {ITsend /CONN}
+proc RefreshPeerList {} {::gmaproto::query_peers}
 		
 proc format_with_style {value format} {
 	global display_styles
@@ -9325,13 +9857,13 @@ proc _resize_die_roller {w width height type} {
 }
 
 proc DisplayChatMessage {from recipientlist message args} {
-	global dark_mode SuppressChat CHAT_TO CHAT_text ITsock check_select_color
+	global dark_mode SuppressChat CHAT_TO CHAT_text check_select_color
 	global icon_die16 icon_info20 icon_arrow_refresh check_menu_color
 	global icon_delete icon_add icon_open icon_save ChatTranscript
 	global last_known_size display_styles CHAT_blind global_bg_color
 
 	if $SuppressChat return
-	if {$ITsock == {}} {
+	if {![::gmaproto::is_ready]} {
 		tk_messageBox -type ok -icon error -title "No Connection to Server" \
 			-message "Your client must be connected to the map server to use this function."
 		return
@@ -9919,18 +10451,12 @@ proc UpdatePeerList {} {
 	}
 }
 
-proc SendDieRoll {recipients dice blind_p} { 
-	if {$blind_p} {
-		set recipients {%}
-	}
-	ITsend [list D $recipients $dice] 
-}
-
-proc UpdateDicePresets {deflist} {ITsend [list DD $deflist]}
-proc RequestDicePresets {} {ITsend [list DR]}
-proc SendChatMessage {recipients message} {
+proc SendDieRoll {recipients dice blind_p to_all_p} {::gmaproto::roll_dice $dice $recipients $to_all_p $blind_p}
+proc UpdateDicePresets {deflist} {::gmaproto::define_dice_presets $deflist false}
+proc RequestDicePresets {} {::gmaproto::query_dice_presets}
+proc SendChatMessage {recipients message blind_p to_all_p} {
 	foreach msg [split $message "\n"] {
-		ITsend [list TO - $recipients $msg]
+		::gmaproto::chat_message $msg {} $recipients $to_all_p $blind_p
 	}
 }
 
@@ -10052,25 +10578,25 @@ proc AdjustView {x y} {
 }
 
 proc SyncView {} {
-	ITsend [list AV [lindex [.c xview] 0] [lindex [.c yview] 0]]
+	::gmaproto::adjust_view [lindex [.c xview] 0] [lindex [.c yview] 0]
 }
 
 proc aboutMapper {} {
 	global GMAMapperVersion GMAMapperFileFormat GMAMapperProtocol GMAVersionNumber
 
 	tk_messageBox -type ok -icon info -title "About Mapper" \
-		-message "GMA Mapper Client, Version $GMAMapperVersion, for GMA $GMAVersionNumber.\n\nCopyright (c) Steve Willoughby, Aloha, Oregon, USA. All Rights Reserved. Distributed under the terms and conditions of the 3-Clause BSD License.\n\nThis client supports file format $GMAMapperFileFormat and server protocol $GMAMapperProtocol."
+		-message "GMA Mapper Client, Version $GMAMapperVersion, for GMA $GMAVersionNumber.\n\nCopyright \u00A9 Steve Willoughby, Aloha, Oregon, USA. All Rights Reserved. Distributed under the terms and conditions of the 3-Clause BSD License.\n\nThis client supports file format $GMAMapperFileFormat and server protocol $GMAMapperProtocol."
 }
 
 proc SyncAllClientsToMe {} {
-	global SafMode FileVersion OBJ MOB ClockDisplay
+	global SafMode GMAMapperFileFormat OBJdata OBJtype MOBdata ClockDisplay
 
 	set oldcd $ClockDisplay
 	if [tk_messageBox -type yesno -icon question -title "Push map data to other clients?" \
 			-message "This will push your map data to all other peers, replacing their map contents.  Are you sure?" \
 			-default no] {
 		if {$SafMode} {
-			# SafMode: 
+			# SafMode:
 			# (1) Save file to temporary location
 			# (2) Upload to server
 			# (3) Issue command for clients to download it
@@ -10085,162 +10611,166 @@ proc SyncAllClientsToMe {} {
 				set ClockDisplay $oldcd
 				return
 			}
-			set now [clock seconds]
-			puts $temp_file [list __MAPPER__:$FileVersion [list {dynamic push of map state to clients} [list $now [clock format $now]]]]
 
-			foreach obj [array names OBJ X:*] {
-				set obj_id [string range $obj 2 end]
-				foreach key [array names OBJ *:$obj_id] {
-					puts $temp_file [list $key $OBJ($key)]
+			if [catch {
+				::gmafile::save_arrays_to_file $temp_file [dict create \
+					Comment "Dynamic push of map data from one client to the others" \
+					Location "Full-map sync" \
+					] OBJdata OBJtype MOBdata
+				close $temp_file
+			} err] {
+				tk_messageBox -type ok -icon error -title "Error writing file"\
+					-message "Unable to save temporary file: $err" -parent .
+				set ClockDisplay $oldcd
+				catch {
+					close $temp_file
+					file delete $temp_name
 				}
+				return
 			}
 
-			foreach obj [array names MOB NAME:*] {
-				set obj_id [string range $obj 5 end]
-				foreach key [array names MOB *:$obj_id] {
-					if {$MOB(TYPE:$obj_id) eq "player"} {
-						puts $temp_file [list P $key $MOB($key)]
-					} else {
-						puts $temp_file [list M $key $MOB($key)]
-					}
-				}
-			}
-			close $temp_file
 			set ClockDisplay "Uploading..."
 			update
 			saf_loadfile $temp_name $oldcd -nocheck
-			ITsend [list CLR *]
-			ITsend [list M@ [cache_map_id $temp_name]]
+			::gmaproto::load_from [cache_map_id $temp_name] false false
 			file delete $temp_name
 			set ClockDisplay $oldcd
 		} else {
 			DEBUG 3 "SyncAllClientsToMe: sending global wipe"
-			ITsend [list CLR *]
+			::gmaproto::clear *
 			DEBUG 3 "SyncAllClientsToMe: sending all objects"
 
-			StartSendElementSet 1
-			foreach obj [array names OBJ X:*] {
-				set obj_id [string range $obj 2 end]
-				foreach key [array names OBJ *:$obj_id] {
-					ContinueSendElementSet [list $key $OBJ($key)]
+			if [catch {
+				foreach obj_id [array names OBJdata] {
+					send_element $obj_id
 				}
-			}
 
-			foreach obj [array names MOB NAME:*] {
-				set obj_id [string range $obj 5 end]
-				foreach key [array names MOB *:$obj_id] {
-					if {$MOB(TYPE:$obj_id) eq "player"} {
-						ContinueSendElementSet [list P $key $MOB($key)]
-					} else {
-						ContinueSendElementSet [list M $key $MOB($key)]
-					}
+				foreach mob_id [array names MOBdata] {
+					::gmaproto::place_someone_d $MOBdata($mob_id)
 				}
+			} err] {
+				tk_messageBox -type ok -icon error -title "Error sending data"\
+					-message "Unable to send data to clients : $err" -parent .\
+					-detail "Partial data may have been sent before the error occurred. In any case, you will need to try again to send the data."
+				set ClockDisplay $oldcd
 			}
-			FinishSendElementSet
 			SyncView
 		}
 	}
 }
 
 proc AddToObjectAttribute {id key vlist} {
-	global MOB OBJ
 	if {[set idlist [ResolveObjectId_OA $id]] eq {}} {
 		return
 	}
-	DistributeVars $idlist a id
-	DEBUG 4 "Adding values to object $id.$key (in $a) from $vlist"
-	if {![info exists ${a}($key:$id)]} {
-		set ${a}($key:$id) {}
-		DEBUG 4 "Creating new attribute"
-	} else {
-		DEBUG 4 "Starting value [set ${a}($key:$id)]"
+	lassign $idlist a id datatype
+	global $a
+
+	if {![dict exists [set ${a}($id)] $key]} {
+		DEBUG 0 "Attempt to access field $key in object $id but type $datatype has no such field."
+		return
 	}
+	DEBUG 4 "Adding values to object $id.$key (in $a) from $vlist"
 	foreach v $vlist {
-		if {[lsearch -exact [set ${a}($key:$id)] $v] < 0} {
-			lappend ${a}($key:$id) $v
+		if {[lsearch -exact [dict get [set ${a}($id)] $key] $v] < 0} {
+			dict lappend ${a}($id) $key $v
 		}
 	}
-	DEBUG 4 "New value is [set ${a}($key:$id)]"
+	DEBUG 4 "New value is [dict get [set ${a}($id)] $key]"
 }
 	
 proc RemoveFromObjectAttribute {id key vlist} {
-	global MOB OBJ
 	if {[set idlist [ResolveObjectId_OA $id]] eq {}} {
 		return
 	}
-	DistributeVars $idlist a id
-	DEBUG 4 "Removing values from object $id.$key from $vlist"
-	if {![info exists ${a}($key:$id)]} {
-		set ${a}($key:$id) {}
-		DEBUG 4 "Creating new attribute; trivially done here."
+	lassign $idlist a id datatype
+	global $a
+
+	if {![dict exists [set ${a}($id)] $key]} {
+		DEBUG 0 "Attempt to access field $key in object $id but type $datatype has no such field."
 		return
-	} else {
-		DEBUG 4 "Starting value [set ${a}($key:$id)]"
 	}
+
+	DEBUG 4 "Removing values from object $id.$key from $vlist"
 	foreach v $vlist {
-		if {[set index [lsearch -exact [set ${a}($key:$id)] $v]] >= 0} {
-			set ${a}($key:$id) [lreplace [set ${a}($key:$id)] $index $index]
+		if {[set index [lsearch -exact [dict get [set ${a}($id)] $key] $v]] >= 0} {
+			dict set ${a}($id) $key [lreplace [dict get [set ${a}($id)] $key] $index $index]
 		}
 	}
-	DEBUG 4 "New value is [set ${a}($key:$id)]"
+	DEBUG 4 "New value is [dict get [set ${a}($id)] $key]"
 }
 
+# @name|id -> {arrayname id commandtype} or {}
 proc ResolveObjectId_OA {id} {
-	global MOB OBJ
+	global MOBdata MOBid OBJdata OBJtype
 	if {[string range $id 0 0] eq {@}} {
 		# @name instead of id
 		set key [AcceptCreatureImageName [string range $id 1 end]]
-		if [info exists MOB(ID:$key)] {
-			return [list MOB $MOB(ID:$key)]
+		if [info exists MOBid($key)] {
+			return [list MOBdata $MOBid($key) PS]
 		}
 		DEBUG 1 "Attempt to change attribute of non-existent creature $key (IGNORED)"
 		return {}
-	} elseif [info exists OBJ(TYPE:$id)] {
-		set a OBJ
-	} elseif [info exists MOB(TYPE:$id)] {
-		set a MOB
-	} elseif [info exists MOB(ID:$id)] {
-		set a MOB
-		set id $MOB(ID:$id)
+	} elseif [info exists OBJtype($id)] {
+		set a OBJdata
+		if [catch {set t [::gmaproto::ObjTypeToGMAType $OBJtype($id)]} err] {
+			DEBUG 1 "object $id is of type $OBJtype($id) but we don't have a struct type for that. ($err)"
+			return {} 
+		}
+	} elseif [info exists MOBdata($id)] {
+		set a MOBdata
+		set t PS
+	} elseif [info exists MOBid($id)] {
+		set a MOBdata
+		set id $MOBid($id)
+		set t PS
 	} else {
 		DEBUG 1 "Received request to change object $id which does not exist!"
 		return {}
 	}
-	return [list $a $id]
+	return [list $a $id $t]
 }
 
 proc SetObjectAttribute {id kvlist} {
-	global MOB OBJ canvas MOB_IMAGE
+	global canvas MOB_IMAGE
 	if {[set idlist [ResolveObjectId_OA $id]] eq {}} {
 		return
 	}
-	DistributeVars $idlist a id
+	lassign $idlist a id datatype
+	global $a
+
 	DEBUG 4 "Changing attributes of object $id from $kvlist"
 	foreach {k v} $kvlist {
-		if {$a eq "MOB" && $k eq "NAME"} {
+		if {$datatype eq "PS" && $k eq "Name"} {
 			# changing creature name: also need to change the ID reverse mapping
-			if {$v ne $MOB(NAME:$id)} {
+			::gmautil::dassign $MOBdata($id) Name mob_name
+
+			if {$v ne $mob_name} {
 				# because it would be silly to panic here if we're "changing" to the same name we already have
-				if {[info exists MOB(ID:$v)]} {
-					DEBUG 0 "Refusing to change name of creature $id from $MOB(NAME:$id) to $v because that name is in use."
+				if {[info exists MOBid($v)]} {
+					DEBUG 0 "Refusing to change name of creature $id from $mob_name to $v because that name is in use."
 					continue
 				}
-				set old_name $MOB(NAME:$id)
+				set old_name $mob_name
 				if {[info exists MOB_IMAGE($old_name)]} {
 					set MOB_IMAGE($v) $MOB_IMAGE($old_name)
 					unset MOB_IMAGE($old_name)
 				} else {
 					set MOB_IMAGE($v) $old_name
 				}
-				unset MOB(ID:$old_name)
-				set MOB(ID:$v) $id
-				DEBUG 5 "-Changed ID reverse pointer MOB(ID:$old_name) to MOB(ID:$v)=$id"
+				unset MOBid($old_name)
+				set MOBid($v) $id
+				DEBUG 5 "-Changed ID reverse pointer MOBid($old_name) to MOBid($v)=$id"
 			}
 		}
-		set ${a}($k:$id) $v
-		DEBUG 5 "-${a}($k:$id) <- $v"
+		if {![dict exists [set ${a}($id)] $k]} {
+			DEBUG 0 "Attempt to set field $key in object $id but type $datatype has no such field."
+		} else {
+			dict set ${a}($id) $k $v
+			DEBUG 5 "-$a $id $k <- $v"
+		}
 	}
-	if {$a eq "MOB"} {
+	if {$datatype eq "PS"} {
 		RefreshMOBs
 		FlashMob $canvas $id 3
 	} else {
@@ -10249,7 +10779,7 @@ proc SetObjectAttribute {id kvlist} {
 }
 
 proc ClearObjectById {id} {
-	global OBJ MOB
+	global OBJdata OBJtype MOBdata
 	DEBUG 3 "ClearObjectById $id"
 
 	if {$id eq "*"} {
@@ -10261,193 +10791,193 @@ proc ClearObjectById {id} {
 		clearplayers player
 	} elseif {$id eq "E*"} {
 		cleargrid
-	} elseif [info exists OBJ(TYPE:$id)] {
+	} elseif [info exists OBJtype($id)] {
 		RemoveObject $id
-	} elseif [info exists MOB(TYPE:$id)] {
+	} elseif [info exists MOBdata($id)] {
 		RemovePerson $id
-	} elseif [info exists MOB(ID:$id)] {
-		RemovePerson $MOB(ID:$id)
+	} elseif [info exists MOBid($id)] {
+		RemovePerson $MOBid($id)
 	} else {
 		set name [AcceptCreatureImageName $id]
-		if [info exists MOB(ID:$name)] {
-			RemovePerson $MOB(ID:$name)
+		if [info exists MOBid($name)] {
+			RemovePerson $MOBid($name)
 		} else {
 			DEBUG 1 "Warning: Received request to delete object $id which does not exist."
 		}
 	}
 }
 
-set LSchk {}
-set LScnt 0
-set LSdata {}
-proc StartObjStream {} {
-	global LSchk LScnt LSdata
+##DEL set LSchk {}
+##DEL set LScnt 0
+##DEL set LSdata {}
+##DEL proc StartObjStream {} {
+##DEL 	global LSchk LScnt LSdata
+##DEL 
+##DEL 	if {$LScnt > 0} {
+##DEL 		# if we received an unterminated LS, abandon it now
+##DEL 		# we don't care if the LS wasn't followed by any data, though.
+##DEL 		DEBUG 0 "ERROR: Object stream started before previous one terminated!"
+##DEL 	}
+##DEL 	set LSchk [cs_init]
+##DEL 	set LSdata {}
+##DEL 	set LScnt 0
+##DEL 	DEBUG 2 "Starting object stream from server"
+##DEL }
+##DEL 
+##DEL proc ContinueObjStream {data} {
+##DEL 	global LSchk LScnt LSdata
+##DEL 	lappend LSdata $data
+##DEL 	incr LScnt
+##DEL 	cs_update $LSchk $data
+##DEL 	DEBUG 2 "Got LS #$LScnt: $data"
+##DEL }
+##DEL 
+##DEL proc EndObjStream {count checksum} {
+##DEL 	global LSchk LScnt LSdata FLASH_OBJ_LIST FLASH_MOB_LIST canvas
+##DEL 	set cs [cs_final $LSchk]
+##DEL 
+##DEL 	DEBUG 2 "End object stream, $LScnt records, check $cs"
+##DEL 	if {[llength $LSdata] != $LScnt} {
+##DEL 		DEBUG 0 "INTERNAL ERROR in data stream: Received $LScnt records, buffer has [llength $LSdata]!"
+##DEL 	} elseif {$LScnt != $count} {
+##DEL 		DEBUG 0 "ERROR in data stream: Received $LScnt records, expected $count!"
+##DEL 	} elseif {![cs_match $cs $checksum]} {
+##DEL 		DEBUG 0 "ERROR in data stream: Received data checksum mismatch!"
+##DEL 		DEBUG 0 "-- Server's checksum: $checksum"
+##DEL 		DEBUG 0 "-- Our calculation:   $cs"
+##DEL 	} else {
+##DEL 		# good to go...
+##DEL 		DEBUG 2 "Committing data stream for object"
+##DEL 		#
+##DEL 		# HACK!  yuck.
+##DEL 		#
+##DEL 		global okToLoadMonsters okToLoadPlayers
+##DEL 		set okToLoadMonsters yes
+##DEL 		set okToLoadPlayers yes
+##DEL 		#
+##DEL 		#
+##DEL 		set FLASH_OBJ_LIST {}
+##DEL 		set FLASH_MOB_LIST {}
+##DEL 		foreach line $LSdata {
+##DEL 			DEBUG 3 "--loading element $line"
+##DEL 			loadElement -flash $line
+##DEL 		}
+##DEL 		DEBUG 3 "--Existing MOBs now:"
+##DEL 		global MOB
+##DEL 		foreach mob_id [array name MOB ID:*] {
+##DEL 			set i $MOB($mob_id)
+##DEL 			DEBUG 3 "----$mob_id $i"
+##DEL 			DEBUG 3 "------GX:$i = $MOB(GX:$i)"
+##DEL 		}
+##DEL 		DEBUG 3 "--End."
+##DEL 		foreach mob_id $FLASH_MOB_LIST {
+##DEL 			FlashMob $canvas $mob_id 3
+##DEL 		}
+##DEL #		foreach obj_id $FLASH_OBJ_LIST {
+##DEL #			FlashElement $canvas $obj_id 3
+##DEL #		}
+##DEL 		set FLASH_OBJ_LIST {}
+##DEL 		set FLASH_MOB_LIST {}
+##DEL 	}
+##DEL #	garbageCollectGrid
+##DEL 	RefreshGrid 0
+##DEL 	RefreshMOBs
+##DEL 	modifiedflag - 1
+##DEL 	set LSchk {}
+##DEL 	set LScnt 0
+##DEL 	set LSdata {}
+##DEL }
 
-	if {$LScnt > 0} {
-		# if we received an unterminated LS, abandon it now
-		# we don't care if the LS wasn't followed by any data, though.
-		DEBUG 0 "ERROR: Object stream started before previous one terminated!"
-	}
-	set LSchk [cs_init]
-	set LSdata {}
-	set LScnt 0
-	DEBUG 2 "Starting object stream from server"
-}
+#set CONNchk {}
+#set CONNcnt 0
+#set CONNdata {}
+#proc StartConnStream {} {
+#	global CONNchk CONNcnt CONNdata
+#
+#	if {$CONNcnt > 0} {
+#		# if we received an unterminated CONN, abandon it now
+#		# we don't care if the CONN wasn't followed by any data, though.
+#		DEBUG 0 "ERROR: Connection data stream started before previous one terminated!"
+#	}
+#	set CONNchk [cs_init]
+#	set CONNdata {}
+#	set CONNcnt 0
+#	DEBUG 2 "Starting connection data stream from server"
+#}
+#
+#proc ContinueConnStream {data} {
+#	global CONNchk CONNcnt CONNdata
+#	lappend CONNdata $data
+#	incr CONNcnt
+#	cs_update $CONNchk $data
+#	DEBUG 2 "Got CONN #$CONNcnt: $data"
+#}
 
-proc ContinueObjStream {data} {
-	global LSchk LScnt LSdata
-	lappend LSdata $data
-	incr LScnt
-	cs_update $LSchk $data
-	DEBUG 2 "Got LS #$LScnt: $data"
-}
-
-proc EndObjStream {count checksum} {
-	global LSchk LScnt LSdata FLASH_OBJ_LIST FLASH_MOB_LIST canvas
-	set cs [cs_final $LSchk]
-
-	DEBUG 2 "End object stream, $LScnt records, check $cs"
-	if {[llength $LSdata] != $LScnt} {
-		DEBUG 0 "INTERNAL ERROR in data stream: Received $LScnt records, buffer has [llength $LSdata]!"
-	} elseif {$LScnt != $count} {
-		DEBUG 0 "ERROR in data stream: Received $LScnt records, expected $count!"
-	} elseif {![cs_match $cs $checksum]} {
-		DEBUG 0 "ERROR in data stream: Received data checksum mismatch!"
-		DEBUG 0 "-- Server's checksum: $checksum"
-		DEBUG 0 "-- Our calculation:   $cs"
-	} else {
-		# good to go...
-		DEBUG 2 "Committing data stream for object"
-		#
-		# HACK!  yuck.
-		#
-		global okToLoadMonsters okToLoadPlayers
-		set okToLoadMonsters yes
-		set okToLoadPlayers yes
-		#
-		#
-		set FLASH_OBJ_LIST {}
-		set FLASH_MOB_LIST {}
-		foreach line $LSdata {
-			DEBUG 3 "--loading element $line"
-			loadElement -flash $line
-		}
-		DEBUG 3 "--Existing MOBs now:"
-		global MOB
-		foreach mob_id [array name MOB ID:*] {
-			set i $MOB($mob_id)
-			DEBUG 3 "----$mob_id $i"
-			DEBUG 3 "------GX:$i = $MOB(GX:$i)"
-		}
-		DEBUG 3 "--End."
-		foreach mob_id $FLASH_MOB_LIST {
-			FlashMob $canvas $mob_id 3
-		}
-#		foreach obj_id $FLASH_OBJ_LIST {
-#			FlashElement $canvas $obj_id 3
+#proc EndConnStream {count checksum} {
+#	global CONNchk CONNcnt CONNdata PeerList local_user
+#	set cs [cs_final $CONNchk]
+#
+#	DEBUG 2 "End connection data stream, $CONNcnt records, check $cs"
+#	if {[llength $CONNdata] != $CONNcnt} {
+#		DEBUG 0 "INTERNAL ERROR in data stream: Received $CONNcnt records, buffer has [llength $CONNdata]!"
+#	} elseif {$CONNcnt != $count} {
+#		DEBUG 0 "ERROR in data stream: Received $CONNcnt records, expected $count!"
+#	} elseif {$checksum != 0 && ![cs_match $cs $checksum]} {
+#		DEBUG 0 "ERROR in data stream: Received data checksum mismatch!"
+#		DEBUG 0 "-- Server's checksum: $checksum"
+#		DEBUG 0 "-- Our calculation:   $cs"
+#	} else {
+#		if {$checksum == 0} {
+#			DEBUG 2 "Not checking checksum (none given to us)"
 #		}
-		set FLASH_OBJ_LIST {}
-		set FLASH_MOB_LIST {}
-	}
-	garbageCollectGrid
-	RefreshGrid 0
-	RefreshMOBs
-	modifiedflag - 1
-	set LSchk {}
-	set LScnt 0
-	set LSdata {}
-}
-
-set CONNchk {}
-set CONNcnt 0
-set CONNdata {}
-proc StartConnStream {} {
-	global CONNchk CONNcnt CONNdata
-
-	if {$CONNcnt > 0} {
-		# if we received an unterminated CONN, abandon it now
-		# we don't care if the CONN wasn't followed by any data, though.
-		DEBUG 0 "ERROR: Connection data stream started before previous one terminated!"
-	}
-	set CONNchk [cs_init]
-	set CONNdata {}
-	set CONNcnt 0
-	DEBUG 2 "Starting connection data stream from server"
-}
-
-proc ContinueConnStream {data} {
-	global CONNchk CONNcnt CONNdata
-	lappend CONNdata $data
-	incr CONNcnt
-	cs_update $CONNchk $data
-	DEBUG 2 "Got CONN #$CONNcnt: $data"
-}
-
-proc EndConnStream {count checksum} {
-	global CONNchk CONNcnt CONNdata PeerList local_user
-	set cs [cs_final $CONNchk]
-
-	DEBUG 2 "End connection data stream, $CONNcnt records, check $cs"
-	if {[llength $CONNdata] != $CONNcnt} {
-		DEBUG 0 "INTERNAL ERROR in data stream: Received $CONNcnt records, buffer has [llength $CONNdata]!"
-	} elseif {$CONNcnt != $count} {
-		DEBUG 0 "ERROR in data stream: Received $CONNcnt records, expected $count!"
-	} elseif {$checksum != 0 && ![cs_match $cs $checksum]} {
-		DEBUG 0 "ERROR in data stream: Received data checksum mismatch!"
-		DEBUG 0 "-- Server's checksum: $checksum"
-		DEBUG 0 "-- Our calculation:   $cs"
-	} else {
-		if {$checksum == 0} {
-			DEBUG 2 "Not checking checksum (none given to us)"
-		}
-		# good to go...
-		DEBUG 2 "Committing data stream for object"
-		set PeerList {}
+#		# good to go...
+#		DEBUG 2 "Committing data stream for object"
+#		set PeerList {}
 		#if [catch {set local_user $::tcl_platform(user)}] {set local_user __unknown__}
-		#
-		# 0 1        2    3    4      5    6   7   8
-		# i you|peer addr user client auth pri w/o polo
-		#
-		foreach line $CONNdata {
-			if {[llength $line] != 9} {
-				DEBUG 0 "Error in peer record $line"
-			} else {
-				if {[lindex $line 1] eq {you} && [lindex $line 3] ne $local_user} {
-					set local_user [lindex $line 3]
-					DEBUG 1 "Changing local user to $local_user"
-				}
-					
-				#if {[lindex $line 1] == {peer}} {                  }
-					if {[lindex $line 5]} {
-						if {![lindex $line 7]} {
-							if {[lindex $line 3] ne {} && [lindex $line 3] ne {None}} {
-#								if {[lindex $line 3] ne $local_user} {				}
-									lappend PeerList [lindex $line 3]
-									DEBUG 3 "PeerList=$PeerList"
-#{								} else {
-#									DEBUG 2 "Excluding $line (this is my username)"
-#								}
-							} else {
-								DEBUG 2 "Excluding $line (no username given)"
-							}
-						} else {
-							DEBUG 2 "Excluding $line (client not listening)"
-						}
-					} else {
-						DEBUG 2 "Excluding $line (not authenticated)"
-					}
-#{				} else {
-#					DEBUG 2 "Excluding $line (this is my own connection)"
+#		#
+#		# 0 1        2    3    4      5    6   7   8
+#		# i you|peer addr user client auth pri w/o polo
+#		#
+#		foreach line $CONNdata {
+#			if {[llength $line] != 9} {
+#				DEBUG 0 "Error in peer record $line"
+#			} else {
+#				if {[lindex $line 1] eq {you} && [lindex $line 3] ne $local_user} {
+#					set local_user [lindex $line 3]
+#					DEBUG 1 "Changing local user to $local_user"
 #				}
-			}
-		}
-	}
-	set CONNchk {}
-	set CONNcnt 0
-	set CONNdata {}
-
-	UpdatePeerList
-}
+#					
+#				#if {[lindex $line 1] == {peer}} {                  }
+#					if {[lindex $line 5]} {
+#						if {![lindex $line 7]} {
+#							if {[lindex $line 3] ne {} && [lindex $line 3] ne {None}} {
+##								if {[lindex $line 3] ne $local_user} {				}
+#									lappend PeerList [lindex $line 3]
+#									DEBUG 3 "PeerList=$PeerList"
+##{								} else {
+##									DEBUG 2 "Excluding $line (this is my username)"
+##								}
+#							} else {
+#								DEBUG 2 "Excluding $line (no username given)"
+#							}
+#						} else {
+#							DEBUG 2 "Excluding $line (client not listening)"
+#						}
+#					} else {
+#						DEBUG 2 "Excluding $line (not authenticated)"
+#					}
+##{				} else {
+##					DEBUG 2 "Excluding $line (this is my own connection)"
+##				}
+#			}
+#		}
+#	}
+#	set CONNchk {}
+#	set CONNcnt 0
+#	set CONNdata {}
+#
+#	UpdatePeerList
+#}
 
 set AIcnt 0
 set AIdata {}
@@ -10522,67 +11052,72 @@ proc EndImageStream {count checksum} {
 	update
 }
 
-proc ITupdate mobname {
-	global canvas MOB_BLINK NextMOBID MOB
-
-	set ITlist {}
-	switch -exact -- $mobname {
-		*Monsters* { 
-			foreach key [array names MOB NAME:*] {
-				set mob_id [string range $key 5 end]
-				if {$MOB(TYPE:$mob_id) eq "monster" && !$MOB(KILLED:$mob_id)} {
-					lappend ITlist $mob_id
-				}
-			}
-		}
-		{} {
-			set ITlist {}
-		}
-		default { 
-			if [info exists MOB(NAME:$mobname)] {
-				set mob_id $mobname;			# This IS the id number.
-			} elseif [info exists MOB(ID:$mobname)] {
-				set mob_id $MOB(ID:$mobname);	# Look up name to get the ID.
-			} elseif {[string range $mobname 0 0] eq {/}} {
-				# /<regex> on mob names
-				foreach key [array names MOB -regexp "^ID:[string range $mobname 1 end]"] {
-					lappend ITlist $MOB($key)
-				}
-			} else {
-				set mob_id {}
-			}
-
-			if {$mob_id ne {} && !$MOB(KILLED:$mob_id)} {
-				lappend ITlist $mob_id
-			}
-		}
-	}
-
-	set MOB_BLINK $ITlist
-	highlightMob $canvas $ITlist
-	foreach id $ITlist {
-		PopSomeoneToFront $canvas $id
-	}
-}
+##DEL proc ITupdate mobname {
+##DEL 	global canvas MOB_BLINK NextMOBID MOB
+##DEL 
+##DEL 	set ITlist {}
+##DEL 	switch -exact -- $mobname {
+##DEL 		*Monsters* { 
+##DEL 			foreach key [array names MOB NAME:*] {
+##DEL 				set mob_id [string range $key 5 end]
+##DEL 				if {$MOB(TYPE:$mob_id) eq "monster" && !$MOB(KILLED:$mob_id)} {
+##DEL 					lappend ITlist $mob_id
+##DEL 				}
+##DEL 			}
+##DEL 		}
+##DEL 		{} {
+##DEL 			set ITlist {}
+##DEL 		}
+##DEL 		default { 
+##DEL 			if [info exists MOB(NAME:$mobname)] {
+##DEL 				set mob_id $mobname;			# This IS the id number.
+##DEL 			} elseif [info exists MOB(ID:$mobname)] {
+##DEL 				set mob_id $MOB(ID:$mobname);	# Look up name to get the ID.
+##DEL 			} elseif {[string range $mobname 0 0] eq {/}} {
+##DEL 				# /<regex> on mob names
+##DEL 				foreach key [array names MOB -regexp "^ID:[string range $mobname 1 end]"] {
+##DEL 					lappend ITlist $MOB($key)
+##DEL 				}
+##DEL 			} else {
+##DEL 				set mob_id {}
+##DEL 			}
+##DEL 
+##DEL 			if {$mob_id ne {} && !$MOB(KILLED:$mob_id)} {
+##DEL 				lappend ITlist $mob_id
+##DEL 			}
+##DEL 		}
+##DEL 	}
+##DEL 
+##DEL 	set MOB_BLINK $ITlist
+##DEL 	highlightMob $canvas $ITlist
+##DEL 	foreach id $ITlist {
+##DEL 		PopSomeoneToFront $canvas $id
+##DEL 	}
+##DEL }
 
 proc SendMobChanges {id attrlist} {
-	global ITsock MOB
-	set alist {}
+	global MOBdata
+	set alist [dict create]
 	foreach attr $attrlist {
-		lappend alist $attr $MOB(${attr}:$id)
+		dict set alist $attr [dict get $MOBdata($id) $attr]
 	}
-	DEBUG 3 "Sending [list OA $id $attrlist]"
-	ITsend [list OA $id $alist]
+	::gmaproto::update_obj_attributes $id $alist
 }
 
 proc SendObjChanges {id attrlist} {
-	global ITsock OBJ
-	set alist {}
-	foreach attr $attrlist {
-		lappend alist $attr $OBJ(${attr}:$id)
+	global OBJdata
+	set d [dict create]
+	if {[info exists OBJdata($id)]} {
+		foreach attr $attrlist {
+			if {[dict exists $OBJdata($id) $attr]} {
+				dict set d $attr [dict get $OBJdata($id) $attr]
+			} else {
+				DEBUG 0 "Attempt to send attribute $attr in object $id, but that field does not exist."
+			}
+		}
+		DEBUG 3 "Sending update to object $id: $d"
+		::gmaproto::update_obj_attributes $id $d
 	}
-	DEBUG 3 "Sending [list OA $id $attrlist]"
-	ITsend [list OA $id $alist]
 }
 
 set SSEScheck {}
@@ -10832,44 +11367,12 @@ global socks_idlist
 
 
 proc connectToServer {} {
-	global ITsock ITport IThost proxy_auth 
+	global ITport IThost
 	global ITproxy ITproxyuser ITproxypass ITproxyport
-	#
-	# Contact the remote timekeeper server
-	#
-	if {$ITsock ne {}} {
-		if [catch {close $ITsock} err2] {
-			DEBUG 1 "close socket $ITsock: $err2"
-		}
-		set ITsock {}
-	}
-		
-	if {$ITproxy ne {}} {
-		if {$ITproxyuser ne {}} {
-			set proxy_auth 1
-		} else {
-			set proxy_auth 0
-			set ITproxyuser {}
-			set ITproxypass {}
-		}
+	global local_user ITpassword GMAMapperVersion
 
-		DEBUG 0 "Contacting proxy server $ITproxy..."
-		set ITsock [socket $ITproxy $ITproxyport]
-		set res [socks:init $ITsock $IThost $ITport $proxy_auth $ITproxyuser $ITproxypass]
-		DEBUG 1 puts "Connection completed."
-		if {$res ne {OK}} {
-			puts "Socks5 proxy $ITproxy: $res"
-			exit 1
-		}
-	} else {
-		set ITsock [socket $IThost $ITport]
-	}
-	fconfigure $ITsock -blocking 0 
-	fileevent $ITsock readable "ITreceive $ITsock"
-	#fileevent $ITsock writable "ITtransmit $ITsock"
+	::gmaproto::dial $IThost $ITport $local_user $ITpassword $ITproxy $ITproxyport $ITproxyuser $ITproxypass "mapper $GMAMapperVersion"
 }
-# TODO gets puts read flush close
-# TODO ITreceive ITtransmit
 
 proc WaitForConnectToServer {} {
 	connectToServer
@@ -10928,7 +11431,7 @@ proc toggleFontChooser {} {
 }
 
 proc SelectFont {canvas args} {
-	global CURRENT_FONT CURRENT_TEXT_WIDGET zoom OBJ
+	global CURRENT_FONT CURRENT_TEXT_WIDGET zoom OBJdata
 	DEBUG 3 "SelectFont canvas=$canvas args=$args"
 
 	if {[llength $args] > 0} {
@@ -10944,8 +11447,8 @@ proc SelectFont {canvas args} {
 	if {$CURRENT_TEXT_WIDGET ne {}} {
 		DEBUG 3 "Setting obj$CURRENT_TEXT_WIDGET"
 		$canvas itemconfigure obj$CURRENT_TEXT_WIDGET -font [ScaleFont [lindex $font 0] $zoom]
-		set OBJ(FONT:$CURRENT_TEXT_WIDGET) $font
-		DEBUG 3 "OBJ(FONT:$CURRENT_TEXT_WIDGET)=$OBJ(FONT:$CURRENT_TEXT_WIDGET)"
+		dict set OBJdata($CURRENT_TEXT_WIDGET) Font [TkFontToGMAFont $font]
+		DEBUG 3 "OBJ $CURRENT_TEXT_WIDGET font = [dict get $OBJdata($CURRENT_TEXT_WIDGET) Font]"
 	}
 }
 
@@ -11269,6 +11772,7 @@ proc start_ping_marker {w x y seq} {
 	after 100 start_ping_marker $w $x $y [expr $seq+1]
 }
 
+
 #
 # Preferences Editor
 #  edits the various config files in-place, so this will work
@@ -11456,7 +11960,7 @@ configureSafCapability
 report_progress "Drawing battle grid"
 DrawScreen $zoom $animatePlacement
 cleargrid
-if {$ITpreamble && $IThost ne {}} {
+if {![::gmaproto::is_ready] && $IThost ne {}} {
     report_progress "Mapper Client Ready (awaiting server login to complete)"
 } else {
     report_progress "Mapper Client Ready"

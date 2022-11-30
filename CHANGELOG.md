@@ -6,6 +6,19 @@
  * Supported GMA Mapper Protocol: 333        <!-- @@##@@ -->
  * Effective Date: 20-Nov-2022               <!-- @@##@@ -->
 
+# 4.0.0
+## Changes
+* Legion. The way objects are stored and referenced inside the mapper is fundamentally different now.
+* Save file format updated to version 20. This is a *completely* different format, which should be easier to parse and hand-edit than previously had been the case.
+   * Rather than an unordered collection of individual object attributes, each creature or map element is represented together as a record, which is JSON-formatted.
+   * The mapper still recognizes the previous file format (version 17) and will read version 17 files but will write new files in version 20 format.
+* Die-roll preset file format updated to version 2 format. This is a *completely* different format, similar to the new map file format.
+   * Rather than the file containing lines of TCL lists with data, the file now is a sequence of records which a JSON-encoded.
+   * The mapper still recognizes the previous file format (version 1) and will read version 1 files but will write new files in version 2 format.
+* All client/server interaction code has been re-written. It now supports server protocol 400, which is a total departure from the previous protocol formats.
+   * Instead of each server command being a TCL list of parameters, the parameters are now sent as JSON-encoded objects.
+   * A legacy compatibility mode is included, which allows the mapper to connect to an older server running protocol version 333. The mapper will translate incoming and outgoing data from its internal JSON-based format to the legacy protocol 333 when talking to an old server.
+
 # 3.44.0
 ## Enhancements
 * Enlarged arrowheads for line objects so they're more visible.

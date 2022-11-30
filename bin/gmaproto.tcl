@@ -55,9 +55,11 @@
 #
 # Implements GMA Mapper Protocol 400.
 # // ... \n		ignored
+# PROTOCOL <version>\n
 # <command> <json> \n
 #
 # Server negotiation:
+# server -> PROTOCOL v		(not required before protocol 400)
 # server -> initial greeting (AC, DSM, UPDATES, WORLD)
 # server -> OK
 #           AUTH <- client		IF authentication required
@@ -65,6 +67,28 @@
 # server -> more greeting (AC, DSM, UPDATES, WORLD)
 # server -> READY
 #
+# background_redial -> redial
+# dial -> redial (opens socket) -> login
+# receive (queues up input line) -> XXXparseXXX / background_redial
+# _protocol_send cmd args (encode) -> XXXsendXXX
+# parse_data_packet raw -> {cmd params} / {ERROR {error raw}} / {// raw} / {PROTOCOL v} / {UNDEFINED raw}
+# _legacy_login cmd params	login but for protocols <400
+# _login			login client, any protocol
+#
+# to_enum etype val	-> int
+# from_enum etype int	-> val
+# _encode_payload inputdict typedict -> json
+# _construct input types -> dict
+# new_id -> uuid
+# _read_poll (pop queued input line) -> parse_data_packet -> or returns {"" ""} if no data ready
+# _show
+#
+# external dependencies:
+# 	::DEBUG level message
+# 	::report_progress message
+# 	::say message
+# 	::DefinePlayerCharacter name id color area size
+# 	::DefineStatusMarker condition shape color description
 
 package provide gmaproto 0.1
 package require Tcl 8.5
@@ -75,8 +99,27 @@ package require uuid 1.0.1
 
 namespace eval ::gmaproto {
 	variable protocol 400
-	variable min_protocol 400
+	variable min_protocol 333
 	variable max_protocol 400
+	variable debug_f {}
+	variable legacy false
+	variable host {}
+	variable port {}
+	variable sock {}
+	variable send_buffer {}
+	variable recv_buffer {}
+	variable poll_buffer {}
+	variable proxy {}
+	variable proxy_user {}
+	variable proxy_password {}
+	variable proxy_port {}
+	variable pending_login true
+	variable in_redial false
+	variable username
+	variable password
+	variable client
+	variable current_stream {}
+	variable stream_dict {}
 
 	variable _message_map
 	array set _message_map {
@@ -185,6 +228,139 @@ namespace eval ::gmaproto {
 	]
 }
 
+proc ::gmaproto::is_connected {} {
+	return [expr {{$::gmaproto::sock}} eq {{}}]
+}
+
+proc ::gmaproto::is_ready {} {
+	return [expr [::gmaproto::is_connected] && !$::gmaproto::pending_login]
+}
+
+proc ::gmaproto::set_debug {f} {
+	set ::gmaproto::debug_f $f
+	::gmaproto::DEBUG "Debugging client/server protocol interactions"
+}
+
+proc ::gmaproto::DEBUG {msg} {
+	if {$::gmaproto::debug_f != {}} {
+		$::gmaproto::debug_f $msg
+	}
+}
+
+proc ::gmaproto::dial {host port user pass proxy proxyport proxyuser proxypass client} {
+	set ::gmaproto::host $host
+	set ::gmaproto::port $port
+	set ::gmaproto::proxy $proxy
+	set ::gmaproto::proxy_port $proxyport
+	set ::gmaproto::proxy_user $proxyuser
+	set ::gmaproto::proxy_password $proxypass
+	set ::gmaproto::username $user
+	set ::gmaproto::password $pass
+	set ::gmaproto::client $client
+	::gmaproto::DEBUG "dial to ${::gmaproto::host}:${::gmaproto::port}"
+	::gmaproto::redial
+}
+
+# we can all redial anytime we find we want to send something and we have no socket
+proc ::gmaproto::redial {} {
+	set ::gmaproto::recv_buffer {}
+
+	::gmaproto::DEBUG "attempting to connect to ${::gmaproto::host}:${::gmaproto::port}"
+	if {$::gmaproto::sock ne {}} {
+		if [catch {close $::gmaproto::sock} err2] {
+			::DEBUG 1 "close socket $::gmaproto::sock ($err2)"
+		}
+		set ::gmaproto::pending_login true
+		set ::gmaproto::sock {}
+	}
+
+	if {$::gmaproto::proxy ne {}} {
+		if {$::gmaproto::proxy_user ne {}} {
+			set proxy_auth 1
+		} else {
+			set proxy_auth 0
+			set ::gmaproto::proxy_user {}
+			set ::gmaproto::proxy_password {}
+		}
+
+		::gmaproto::DEBUG "Contacting proxy server $::gmaproto::proxy ..."
+		set ::gmaproto::sock [socket $::gmaproto::proxy $::gmaproto::proxy_port]
+		set res [socks:init $::gmaproto::sock $::gmaproto::host $::gmaproto::port $proxy_auth $::gmaproto::proxy_user $::gmaproto::proxy_password]
+		::gmaproto::DEBUG "Connection completed."
+		if {$res ne {OK}} {
+			::DEBUG 0 "FATAL Socks5 proxy $::gmaproto::proxy -- $res"
+			error "Socks 5 proxy error $res"
+		}
+	} else {
+		set ::gmaproto::sock [socket $::gmaproto::host $::gmaproto::port]
+	}
+	fconfigure $::gmaproto::sock -blocking 0
+	fileevent $::gmaproto::sock readable "::gmaproto::receive $::gmaproto::sock"
+
+	if [catch {::gmaproto::_login} err] {
+		say "Attempt to sign on to server failed: $err"
+	}
+}
+
+proc ::gmaproto::receive {s} {
+	if {[gets $s event] == -1} {
+		if [eof $s] {
+			::DEBUG 0 "Lost connection to map server"
+			close $s
+			set ::gmaproto::sock {}
+			set ::gmaproto::pending_login true
+			::gmaproto::background_redial 1
+			return
+		}
+		::gmaproto::DEBUG "still waiting for complete input line"
+		return
+	}
+
+	lappend ::gmaproto::recv_buffer $event
+	set queue_depth [llength $::gmaproto::recv_buffer]
+	::gmaproto::DEBUG "($queue_depth) <- $event"
+	if {!$::gmaproto::pending_login && $queue_depth == 1} {
+		if {[catch {
+			::gmaproto::_dispatch
+		} err]} {
+			::DEBUG 0 $err
+		}
+	}
+}
+
+proc ::gmaproto::_dispatch {} {
+	if {$::gmaproto::pending_login} {
+		return
+	}
+	while true {
+		lassign [::gmaproto::_read_poll] cmd params
+		if {$cmd eq {}} {
+			return
+		}
+		if {$cmd eq "//"} {
+			continue
+		}
+		if [catch {::DoCommand$cmd $params} err] {
+			catch {::DoCommandError $cmd $params $err}
+		}
+	}
+}
+
+
+proc ::gmaproto::background_redial {tries} {
+	if {$::gmaproto::in_redial} {
+		::DEBUG 0 "Already trying to reconnect, duplicate request ignored"
+		return
+	}
+	set ::gmaproto::in_redial true
+	if [catch {::gmaproto::redial} err] {
+		::DEBUG 0 "Attempt to reconnect failed ($err); continuing to try... $tries"
+		after [expr min($tries*1000,10000)] ::gmaproto::background_redial [expr $tries + 1]
+	} else {
+		::DEBUG 0 "Connection to server reestablished"
+		set ::gmaproto::in_redial false
+	}
+}
 proc ::gmaproto::to_enum {key value} {
 	if {![dict exists $::gmaproto::_enum_encodings $key]} {
 		error "no such enum type $key"
@@ -213,6 +389,17 @@ proc ::gmaproto::from_enum {key value} {
 # _protocol_send command ?name value ...?
 #
 proc ::gmaproto::_protocol_send {command args} {
+	::gmaproto::_raw_send [::gmaproto::_protocol_encode $command $args]
+}
+
+proc ::gmaproto::_protocol_encode_list {objtuple} {
+	if {[llength $objtuple] != 2} {
+		error "object tuple should have 2 elements: {$objtuple}"
+	}
+	return [::gmaproto::_protocol_encode {*}$objtuple]
+}
+
+proc ::gmaproto::_protocol_encode {command kvdict} {
 	#
 	# encode as JSON, eliminating zero fields and ones not mentioned in the protocol spec
 	#
@@ -226,11 +413,357 @@ proc ::gmaproto::_protocol_send {command args} {
 		::json::write aligned false
 		::json::write indented false
 		set message "$command "
-		append message [::gmaproto::_encode_payload $args $::gmaproto::_message_payload($command)]
+		append message [::gmaproto::_encode_payload $kvdict $::gmaproto::_message_payload($command)]
 	}
-	# TODO send $message
-	return "-> <$message>" 
+	return $message
 }
+
+# backport_message raw_message -> {old_format_raw_message ...}
+proc ::gmaproto::backport_message {new_message} {
+	set nparams {}
+	set newlist {}
+	::gmaproto::DEBUG "converting $new_message to old-style protocol message"
+	lassign [::gmaproto::parse_data_packet $new_message] cmd params
+	switch -exact -- $cmd {
+		// 	{ set nparams $params }	
+		ACCEPT 	{ set nparams [dict get $params Messages] }
+		AI {
+			set name [dict get $params Name]
+			foreach size [dict get $params Sizes] {
+				if {[set data [dict get $size ImageData]] ne {}} {
+					lappend newlist [list AI $name [dict get $size Zoom]
+					lappend newlist [list AI: $data]
+					lappend newlist [list AI. 1 {}]
+				} else {
+					if [dict get $size IsLocalFile] {
+						lappend newlist "// unable to translate local image file cmd"
+					} else {
+						lappend newlist [list AI@ $name [dict get $size Zoom] [dict get $size File]]
+					}
+				}
+			}
+		}
+		AI? {
+			set name [dict get $params Name]
+			foreach size [dict get $params Sizes] {
+				lappend newlist [list AI? $name [dict get $size Zoom]]
+			}
+		}
+		ALLOW	{ set nparams [dict get $params Features] }
+		AUTH	{ set nparams [list [binary encode base64 [dict get $params Response]] [dict get $params User] [dict get $params Client]] }
+		AV	{ set nparams [list [dict get $params XView] [dict get $params YView]] }
+		CC	{ 
+			if [dict get $params DoSilently] {
+				set nparams [list * [dict get $params Target]]
+			} else {
+				set nparams [list {} [dict get $params Target]]
+			}
+		}
+		CLR	{ set nparams [list [dict get $params ObjID]] }
+		CLR@	{ set nparams [list [dict get $params File]] }
+		CO	{ set nparams [list [::gmaproto::int_bool [dict get $params Enabled]]] }
+		D	{ 
+				if [dict get $params ToGM] {
+					set nparams [list % [dict get $params RollSpec]]
+				} elseif [dict get $params ToAll] {
+					set nparams [list * [dict get $params RollSpec]]
+				} else {
+					set nparams [list [dict get $params Recipients] [dict get $params RollSpec]]
+				}
+		}
+		DD - DD+ { set nparams [lmap v [dict get $params Presets] {list [dict get $v Name] [dict get $v Description] [dict get $v DieRollSpec]}] }
+		DD/	{ set nparams [list [dict get $params Filter]] }
+		DR	{ }
+		DSM	{ set nparams [list [dict get $params Condition] [dict get $params Shape] [dict get $params Color] [dict get $params Description]] }
+		L	{
+			set local [dict get $params IsLocalFile]
+			set cache [dict get $params CacheOnly]
+			set merge [dict get $params Merge]
+			set nparams [list [dict get $params File]]
+			if {$cache} {
+				set cmd M?
+			} elseif {$merge} {
+				if {$local} {
+					set cmd M
+				} else {
+					set cmd M@
+				}
+			}
+		}
+		LS-ARC {
+			lappend newlist "LS"
+			set id [dict get $params ID]
+			foreach attr {X Y Z Line Fill Width Layer Level Group Hidden Locked
+				      Start Extent} {
+				lappend newlist [list LS: [string uppercase $attr]:$id [dict get $params $attr]]
+			}
+			lappend newlist [list LS: DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]
+			set plist {}
+			foreach v [dict get $params Points] {
+				lappend plist [dict get $v X]
+				lappend plist [dict get $v Y]
+			}
+			lappend newlist [list LS: POINTS:$id $plist]
+
+			lappend newlist [list LS: ARCMODE:$id [::gmaproto::from_enum ArcMode [dict get $params ArcMode]]]
+			lappend newlist [list LS: TYPE:$id arc]
+			lappend newlist [list LS. 17 {}]
+		}
+		LS-CIRC {
+			lappend newlist "LS"
+			set id [dict get $params ID]
+			foreach attr {X Y Z Line Fill Width Layer Level Group Hidden Locked
+				      Start Extent} {
+				lappend newlist [list LS: [string uppercase $attr]:$id [dict get $params $attr]]
+			}
+			lappend newlist [list LS: DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]
+			set plist {}
+			foreach v [dict get $params Points] {
+				lappend plist [dict get $v X]
+				lappend plist [dict get $v Y]
+			}
+			lappend newlist [list LS: POINTS:$id $plist]
+
+			lappend newlist [list LS: ARCMODE:$id [::gmaproto::from_enum ArcMode [dict get $params ArcMode]]]
+			lappend newlist [list LS: TYPE:$id circ]
+			lappend newlist [list LS. 17 {}]
+		}
+		LS-LINE {
+			lappend newlist LS
+			set id [dict get $params ID]
+			foreach attr {X Y Z Line Fill Width Layer Level Group Hidden Locked} {
+				lappend newlist [list LS: [string uppercase $attr]:$id [dict get $params $attr]]
+			}
+			lappend newlist [list LS: DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]
+			set plist {}
+			foreach v [dict get $params Points] {
+				lappend plist [dict get $v X]
+				lappend plist [dict get $v Y]
+			}
+			lappend newlist [list LS: POINTS:$id $plist]
+
+			lappend newlist [list LS: ARROW:$id [::gmaproto::from_enum Arrow [dict get $params Arrow]]]
+			lappend newlist [list LS: TYPE:$id line]
+			lappend newlist [list LS. 15 {}]
+		}
+		LS-POLY {
+			lappend newlist LS
+			set id [dict get $params ID]
+			foreach attr {X Y Z Line Fill Width Layer Level Group Hidden Locked
+				      Spline} {
+				lappend newlist [list LS: [string uppercase $attr]:$id [dict get $params $attr]]
+			}
+			lappend newlist [list LS: DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]
+			set plist {}
+			foreach v [dict get $params Points] {
+				lappend plist [dict get $v X]
+				lappend plist [dict get $v Y]
+			}
+			lappend newlist [list LS: POINTS:$id $plist]
+
+			lappend newlist [list LS: JOIN:$id [::gmaproto::from_enum Join [dict get $params Join]]]
+			lappend newlist [list LS: TYPE:$id poly]
+			lappend newlist [list LS. 16 {}]
+		}
+		LS-RECT {
+			lappend newlist LS
+			set id [dict get $params ID]
+			foreach attr {X Y Z Line Fill Width Layer Level Group Hidden Locked} {
+				lappend newlist [list LS: [string uppercase $attr]:$id [dict get $params $attr]]
+			}
+			lappend newlist [list LS: DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]
+			set plist {}
+			foreach v [dict get $params Points] {
+				lappend plist [dict get $v X]
+				lappend plist [dict get $v Y]
+			}
+			lappend newlist [list LS: POINTS:$id $plist]
+
+			lappend newlist [list LS: TYPE:$id poly]
+			lappend newlist [list LS. 14 {}]
+		}
+		LS-SAOE {
+			lappend newlist LS
+			set id [dict get $params ID]
+			foreach attr {X Y Z Line Fill Width Layer Level Group Hidden Locked} {
+				lappend newlist [list LS: [string uppercase $attr]:$id [dict get $params $attr]]
+			}
+			lappend newlist [list LS: DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]
+			set plist {}
+			foreach v [dict get $params Points] {
+				lappend plist [dict get $v X]
+				lappend plist [dict get $v Y]
+			}
+			lappend newlist [list LS: POINTS:$id $plist]
+
+			lappend newlist [list LS: AOESHAPE:$id [::gmaproto::from_enum AoEShape [dict get $params AoEShape]]]
+			lappend newlist [list LS: TYPE:$id poly]
+			lappend newlist [list LS. 15 {}]
+		}
+		LS-TEXT {
+			lappend newlist LS
+			set id [dict get $params ID]
+			foreach attr {X Y Z Line Fill Width Layer Level Group Hidden Locked
+				     Text} {
+				lappend newlist [list LS: [string uppercase $attr]:$id [dict get $params $attr]]
+			}
+			lappend newlist [list LS: DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]
+			set plist {}
+			foreach v [dict get $params Points] {
+				lappend plist [dict get $v X]
+				lappend plist [dict get $v Y]
+			}
+			lappend newlist [list LS: POINTS:$id $plist]
+
+			lappend newlist [list LS: ANCHOR:$id [::gmaproto::from_enum Anchor [dict get $params Anchor]]]
+			set fontspec [list [dict get $params Font Family] [dict get $params Font Size]]
+			if {[dict get $params Font Weight] == 1} {
+				lappend fontspec bold
+			}
+			if {[dict get $params Font Slant] == 1} {
+				lappend fontspec italic
+			} else {
+				lappend fontspec roman
+			}
+			lappend newlist [list LS: FONT:$id $fontspec]
+			lappend newlist [list LS: TYPE:$id text]
+			lappend newlist [list LS. 17 {}]
+		}
+		LS-TILE {
+			lappend newlist LS
+			set id [dict get $params ID]
+			foreach attr {X Y Z Line Fill Width Layer Level Group Hidden Locked
+				     Image BBHeight BBWidth} {
+				lappend newlist [list LS: [string uppercase $attr]:$id [dict get $params $attr]]
+			}
+			lappend newlist [list LS: DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]
+			set plist {}
+			foreach v [dict get $params Points] {
+				lappend plist [dict get $v X]
+				lappend plist [dict get $v Y]
+			}
+			lappend newlist [list LS: POINTS:$id $plist]
+
+			lappend newlist [list LS: TYPE:$id tile]
+			lappend newlist [list LS. 17 {}]
+		}
+		MARK	{ set nparams [list [dict get $params X] [dict get $params Y]] }
+		POLO	{ }
+		NO	{ }
+		NO+	{ }
+		OA	{ 
+			set kvlist {}
+			dict for k v [dict get $params NewAttrs] {
+				lappend kvlist $k
+				lappend kvlist $v
+			}
+			set nparams [list [dict get $params ObjID] $kvlist]
+		}
+		OA+ - OA- { set nparams [list [dict get $params ObjID] [dict get $params AttrName] [dict get $params Values]] }
+		PS { 
+			if {[dict get $params CreatureType] == 2} {
+				set ptype player
+			} else {
+				set ptype monster
+			}
+			set nparams [list [dict get $params ID] \
+				       [dict get $params Color] \
+				       [dict get $params Name] \
+				       [dict get $params Area] \
+				       [dict get $params Size] \
+				       $ptype \
+				       [dict get $params Gx] \
+				       [dict get $params Gy] \
+				       [dict get $params Reach]]
+		}
+		SYNC	{ }
+		SYNC-CHAT { set cmd SYNC; set nparams [list CHAT [dict get $params Target]] }
+		TB	{ set nparams [list [::gmaproto::int_bool [dict get $params Enabled]]] }
+		TO	{
+			if [dict get $params ToGM] {
+				set nparams [list * % [dict get $params Text]]
+			} elseif [dict get $params ToAll] {
+				set nparams [list * * [dict get $params Text]]
+			} else {
+				set nparams [list * [dict get $params Recipients] [dict get $params Text]]
+			}
+		}
+		/CONN	{ }
+		default	{ 
+			set nparams "Unknown translation for $cmd $params"
+			set cmd //
+		}
+	}
+	if {[llength $newlist] > 0} {
+		::gmaproto::DEBUG "converted to:"
+		foreach c $newlist {
+			::gmaproto::DEBUG "-- $c"
+		}
+		return $newlist
+	}
+	::gmaproto::DEBUG "converted to: $cmd $nparams"
+	if {[llength $nparams] == 0} {
+		return [list $cmd]
+	}
+	return [list "$cmd $nparams"]
+}
+
+proc ::gmaproto::_raw_send {message} {
+	if {$::gmaproto::legacy} {
+		set messages [::gmaproto::backport_message $message]
+	} else {
+		set messages [list $message]
+	}
+	foreach m $messages {
+		lappend ::gmaproto::send_buffer $m
+		::gmaproto::DEBUG "([llength $::gmaproto::send_buffer]) -> $m"
+	}
+	if [catch {
+		::gmaproto::_transmit
+	} err] {
+		::DEBUG 0 $err
+	}
+}
+
+# try sending all queued-up messages now
+proc ::gmaproto::_transmit {} {
+	if {$::gmaproto::sock eq {}} {
+		if {[llength $::gmaproto::send_buffer] > 0} {
+			# we don't have an open socket but we used to, so
+			# first let's work on getting that established again.
+			set ::gmaproto::pending_login true
+			::gmaproto::background_redial 1
+		}
+		return
+	}
+
+	set saved {}
+	while {[llength $::gmaproto::send_buffer] > 0} {
+		set message [::gmautil::lpop ::gmaproto::send_buffer 0]
+		if {$::gmaproto::pending_login && $message != "POLO" && [string range $message 0 4] != "AUTH "} {
+			::gmaproto::DEBUG "Holding off on $message until login is complete"
+			lappend saved $message
+		} else {
+			if [catch {
+				puts $::gmaproto::sock $message
+				flush $::gmaproto::sock
+			} err] {
+				::DEBUG 0 "Lost connection to server ($err)"
+				catch {close $::gmaproto::sock}
+				set ::gmaproto::sock {}
+				set ::gmaproto::pending_login true
+				::gmaproto::background_redial 1
+				lappend saved $message; #save the message for later
+				break
+			}
+		}
+	}
+	if {[llength $saved] > 0} {
+		# preserved delayed messages for later
+		set ::gmaproto::send_buffer [linsert $::gmaproto::send_buffer 0 {*}$saved]
+	}
+}
+
 
 proc ::gmaproto::_encode_payload {input_dict type_dict} {
 	set a [dict create]
@@ -326,6 +859,9 @@ proc ::gmaproto::parse_data_packet {raw_line} {
 	if {[set delim [string first " " $raw_line]] > 0} {
 		set command [string range $raw_line 0 [expr $delim - 1]]
 		set payload [string trim [string range $raw_line [expr $delim + 1] end]]
+		if {$command eq {PROTOCOL}} {
+			return [list PROTOCOL $payload]
+		}
 		if {$payload ne {}} {
 			if {[catch {set json_payload [::json::json2dict $payload]} err]} {
 				return [list ERROR [list $err $raw_line]]
@@ -344,9 +880,12 @@ proc ::gmaproto::parse_data_packet {raw_line} {
 		return [list UNDEFINED $raw_line]
 	}
 
-	return [list ERROR {input not handled correctly} $raw_input]
+	return [list ERROR [list {input not handled correctly} $raw_input]]
 }
 
+proc ::gmaproto::new_dict {command args} {
+	return [::gmaproto::_construct [dict create {*}$args] $::gmaproto::_message_payload($command)]
+}
 #
 # _construct input_dict type_dict
 # returns a dict with the fields specified in type_dict defaulted to zero values
@@ -366,6 +905,20 @@ proc ::gmaproto::parse_data_packet {raw_line} {
 #   d     dictionary of name:value values
 #   l     list of strings
 #
+proc ::gmaproto::json_bool {b} {
+	if $b {
+		return "true"
+	} else {
+		return "false"
+	}
+}
+proc ::gmaproto::int_bool {b} {
+	if $b {
+		return 1
+	} else {
+		return 0
+	}
+}
 proc ::gmaproto::_construct {input types} {
 	foreach {field t} $types {
 		switch -exact -- [lindex $t 0] {
@@ -546,6 +1099,10 @@ proc ::gmaproto::query_peers {} {
 	::gmaproto::_protocol_send /CONN
 }
 
+proc ::gmaproto::place_someone_d {d} {
+	::gmaproto::_protocol_send PS {*}$d
+}
+
 proc ::gmaproto::place_someone {obj_id color name area size obj_type gx gy reach health skin skin_sizes elevation note status_list aoe move_mode killed dim} {
 	if {$obj_type eq "monster"} {
 		set ct 1
@@ -640,91 +1197,673 @@ proc ::gmaproto::new_id {} {
 	return [string tolower [string map {- {}} [::uuid::uuid generate]]]
 }
 
+# _initial_read_poll is like _read_poll but for the very first line
+# read from the server. It will try to determine if the server is
+# legacy or not, and correct for the case where it is.
+proc ::gmaproto::_initial_read_poll {} {
+	if {[llength $::gmaproto::poll_buffer] > 0} {
+		return [::gmautil::lpop ::gmaproto::poll_buffer 0]
+	}
+	if {[llength $::gmaproto::recv_buffer] == 0} {
+		return [list "" ""]
+	}
+	set message [lindex $::gmaproto::recv_buffer 0]
+	if {[string range $message 0 8] eq "PROTOCOL "} {
+		if {[llength $message] != 2} {
+			::say "Server PROTOCOL message is malformed; giving up"
+			error "Server PROTOCOL message is malformed; giving up"
+		}
+		set ::gmaproto::protocol [lindex $message 1]
+		::gmautil::lpop ::gmaproto::recv_buffer 0; # remove PROTOCOL from input stream
+		if {[lindex $message 1] >= 400} {
+			# this is NOT legacy; hand off to _read_poll from here...
+			return [::gmaproto::_read_poll]
+		}
+	}
+	
+	# this is a legacy server (protocol < 400); so we need to do a bunch
+	# of things to translate data to and from it.
+	set ::gmaproto::legacy true
+	set ::gmaproto::protocol 333;	# assume this by default for legacy mode
+	return [::gmaproto::_read_poll]
+}
+
+# _read_poll -> cmd params; cmd=="" if no data available yet
+proc ::gmaproto::_read_poll {} {
+	if {[llength $::gmaproto::poll_buffer] > 0} {
+		return [::gmautil::lpop ::gmaproto::poll_buffer 0]
+	}
+	if {[llength $::gmaproto::recv_buffer] == 0} {
+		return [list "" ""]
+	}
+	if {$::gmaproto::legacy} {
+		set res [list "" ""]
+		if [catch {
+			set message [::gmautil::lpop ::gmaproto::recv_buffer 0]
+			if {[llength $message] == 0} {
+				return $res
+			}
+			set cmd [lindex $message 0]
+			set params [lrange $message 1 end]
+			set json [::gmaproto::_repackage_legacy_packet $cmd $params]
+			if {[llength $json] == 0} {
+				::gmaproto::DEBUG "translated to nothing"
+				return [list "" ""]
+			}
+			foreach j $json {
+				::gmaproto::DEBUG "translated to $j"
+				lappend ::gmaproto::poll_buffer [::gmaproto::parse_data_packet $j]
+			}
+			set res [::gmautil::lpop ::gmaproto::poll_buffer 0]
+		} err] {
+			::gmaproto::DEBUG "ERROR parsing received string \"$message\": $err"
+		}
+		return $res
+	}
+	return [::gmaproto::parse_data_packet [::gmautil::lpop ::gmaproto::recv_buffer 0]]
+}
+
+#
+# _repackage_legacy_packet cmd params -> {jsonstring ...}
+#
+proc ::gmaproto::_repackage_legacy_packet {cmd params} {
+	switch -exact -- $cmd {
+		// {
+			if {[llength $params] == 3 && [lindex $params 0] eq "CALENDAR" && [lindex $params 1] eq "//"} {
+				return [list "WORLD {\"Calendar\":[json::write string [lindex $params 2]]}"]
+			}
+			if {[llength $params] == 5 && [lindex $params 0] eq "MAPPER" && [lindex $params 1] eq "UPDATE" && [lindex $params 2] eq "//"} {
+				return [list "UPDATES {\"Packages\":\[{\"Name\":\"mapper\",\"Instances\":\[{\"Version\":[json::write string [lindex $params 3]],\"Token\":[json::write string [lindex $params 4]]}\]}\]}"]
+			}
+			if {[llength $params] == 5 && [lindex $params 0] eq "CORE" && [lindex $params 1] eq "UPDATE" && [lindex $params 2] eq "//"} {
+				return [list "UPDATES {\"Packages\":\[{\"Name\":\"core\",\"Instances\":\[{\"Version\":[json::write string [lindex $params 3]],\"Token\":[json::write string [lindex $params 4]]}\]}\]}"]
+			}
+			if {[llength $params] == 4 && [lindex $params 0] eq "BEGIN"} {
+				if [catch {set maxvalue [expr int([lindex $params 2])]}] {
+					set maxvalue 0
+				}
+				return [list "PROGRESS {\"OperationID\":[json::write string [lindex $params 1]],\"MaxValue\":$maxvalue,\"Title\":[json::write string [lindex $params 3]]}"]
+			}
+			if {[llength $params] >= 3 && [lindex $params 0] eq "UPDATE"} {
+				if [catch {set value [expr int([lindex $params 2])]}] {
+					set value 0
+				}
+				if {[llength $params] != 4 || [catch {set maxvalue [expr int([lindex $params 2])]}]} {
+					set maxvalue 0
+				}
+				return [list "PROGRESS {\"OperationID\":[json::write string [lindex $params 1]],\"Value\":$value,\"MaxValue\":$maxvalue}"]
+			}
+			if {[llength $params] == 2 && [lindex $params 0] eq "END"} {
+				return [list "PROGRESS {\"OperationID\":[json::write string [lindex $params 1]],\"IsDone\":true}"]
+			}
+			return [list "// $params"]
+		}
+		AC {
+			# AC name id color area size
+			::gmautil::rdist 5 5 AC $params n i c a s
+			return [list "AC {\"Name\":[json::write string $n],\"ObjID\":[json::write string $i],\"Color\":[json::write string $c],\"Area\":[json::write string $a],\"Size\":[json::write string $s]}"]
+		}
+		AI {
+			# AI name size
+			::gmautil::rdist 2 2 AI $params n s
+			::gmaproto::_start_stream AI [dict create Name $n Size $s]
+		}
+		AI: {
+			# AI: data
+			::gmautil::rdist 1 1 AI: $params d
+			# TODO any packet which contains binary data has base64 encoding done automatically!!
+			# TODO checksum ignored for now; it should be based on the raw binary image data
+			# rather than what is actually sent with the command.
+			::gmaproto::_continue_stream AI [dict create Data $d] {} -append
+		}
+		AI. {
+			# AI. lines checksum
+			# TODO checksum ignored for now; it should be based on the raw binary image data
+			# rather than what is actually sent with the command.
+			::gmautil::rdist 1 2 AI. $params l cs
+			set sdata [::gmaproto::_end_stream AI $l {}] 
+
+			return [list "AI {\"Name\":[json::write string [dict get $sdata Name]],\"Sizes\":\[{\"ImageData\":[json::write string [dict get $sdata Data]],\"Zoom\":[dict get $sdata Size]}\]}"]
+		}
+		AI? {
+			# AI? name size
+			::gmautil::rdist 2 2 AI? $params n s
+			return [list "AI? {\"Name\":[json::write string $n],\"Sizes\":\[{\"Zoom\":$s}\]}"]
+		}
+		AI@ {
+			# AI@ name size id
+			::gmautil::rdist 3 3 AI@ $params n s i
+			return [list "AI {\"Name\":[json::write string $n],\"Sizes\":\[{\"File\":[json::write string $i],\"Zoom\":$s}\]}"]
+		}
+		AV {
+			# AV x y
+			::gmautil::rdist 2 2 AV $params x y
+			return [list "AV {\"XView\":$x,\"YView\":$y}"]
+		}
+		CC {
+			# CC *|user target messageID
+			::gmautil::rdist 3 3 CC $params u t i
+			if {$u == "*"} {
+				return [list "CC {\"DoSilently\":true,\"Target\":$t,\"MessageID\":[json::write string $i]}"]
+			} else {
+				return [list "CC {\"RequestedBy\":[json::write string $u],\"Target\":$t,\"MessageID\":[json::write string $i]}"]
+			}
+		}
+		CLR {
+			# CLR id|*|E*|M*|P*|[imagename=]name
+			::gmautil::rdist 1 1 CLR $params x
+			return [list "CLR {\"ObjID\":[json::write string $x]}"]
+		}
+		CLR@ {
+			# CLR@ id
+			::gmautil::rdist 1 1 CLR@ $params i
+			return [list "CLR@ {\"File\":[json::write string $i]}"]
+		}
+		CO {
+			# CO bool
+			::gmautil::rdist 1 1 CO $params b
+			if {$b} {
+				return [list "CO {\"Enabled\":true}"]
+			} else {
+				return [list "CO {}"]
+			}
+		}
+		CS {
+			# CS abs rel
+			::gmautil::rdist 2 2 CS $params a r
+			return [list "CS {\"Absolute\":$a,\"Relative\":$r}"]
+		}
+		DENIED {
+			# DENIED msg
+			::gmautil::rdist 0 1 DENIED $params m
+			return [list "DENIED {\"Reason\":[json::write string $m]}"]
+		}
+		DD= {
+			# DD=
+			::gmaproto::_start_stream DD {}
+		}
+		DD: {
+			# DD: pos name desc dice
+			::gmautil::rdist 4 4 DD: $params p n d ds
+			::gmaproto::_continue_stream DD [dict create Data [list $n $d $ds]] [list $p $n $d $ds] -lappend
+		}
+		DD. {
+			# DD. count checksum
+			::gmautil::rdist 1 2 DD. $params l cs
+			set sdata [::gmaproto::_end_stream DD $l $cs] 
+			set plist {}
+			foreach preset [dict get $sdata Data] {
+				lappend plist "{\"Name\":[json::write string [lindex $preset 0]],\"Description\":[json::write string [lindex $preset 1]],\"DieRollSpec\":[json::write string [lindex $preset 2]]}"
+			}
+
+			return [list "DD= {\"Presets\":\[[join $plist ,]\]}"]
+		}
+		DSM {
+			# DSM cond shape color [desc]
+			::gmautil::rdist 3 4 DSM $params cnd s c d
+			return [list "DSM {\"Condition\":[json::write string $cnd],\"Shape\":[json::write string $s],\"Color\":[json::write string $c],\"Description\":[json::write string $d]}"]
+		}
+		GRANTED {
+			# GRANTED name
+			::gmautil::rdist 1 1 GRANTED $params n
+			return [list "GRANTED {\"User\":[json::write string $n]}"]
+		}
+		I {
+			# I {r c s m h} id|name|*Monsters*|""|/regex
+			::gmautil::rdist 1 2 I $params t i
+			::gmautil::rdist 5 5 I-data $t r c s m h
+			return [list "I {\"ActorID\":[json::write string $i],\"Hours\":$h,\"Minutes\":$m,\"Seconds\":$s,\"Rounds\":$r,\"Count\":$c}"]
+		}
+		IL {
+			# IL {{name hold? ready? hp flat? slotno} ...}
+			::gmautil::rdist 1 1 IL $params il
+			set ilist {}
+			foreach slot $il {
+				::gmautil::rdist 6 6 IL-slot $slot n h r hp f sn
+				lappend ilist "{\"Slot\":$sn,\"CurrentHP\":$hp,\"Name\":[json::write string $n],\"IsHolding\":[::gmaproto::json_bool $h],\"HasReadiedAction\":[::gmaproto::json_bool $r],\"IsFlatFooted\":[::gmaproto::json_bool $f]}"
+			}
+			return [list "IL {\"InitiativeList\":\[[join $ilist ,]\]}"]
+		}
+		L {
+		# L file
+			::gmautil::rdist 1 1 L $params f
+			return [list "L {\"File\":[json::write string $f],\"IsLocalFile\":true}"]
+		}
+		LS {
+			::gmaproto::_start_stream LS {}
+		}
+		LS: {
+			# LS: data
+			::gmautil::rdist 1 1 LS: $params d
+			::gmaproto::_continue_stream LS [dict create Data $d] $params -lappend
+		}
+		LS. {
+			# LS. count checksum
+			::gmautil::rdist 1 2 LS. $params l cs
+			set sdata [::gmaproto::_end_stream LS $l $cs]
+			# translate sequence of the following lines into new-style objects
+			set objlist [lindex [::gmafile::load_legacy_map_data [dict get $sdata Data] [dict create Comment "from legacy LS data stream"]] 1]
+			return [lmap v [::gmafile::upgrade_elements $objlist] {::gmaproto::_protocol_encode_list $v}]
+		}
+		M {
+			# M {file ...}
+			::gmautil::rdist 1 1 M $params fs
+			set flist {}
+			foreach f $fs {
+				lappend flist "L {\"File\":[json::write string $f],\"IsLocalFile\":true,\"Merge\":true}"
+			}
+			return $flist
+		}
+		M? {
+			# M? id
+			::gmautil::rdist 1 1 M? $params i
+			return [list "L {\"File\":[json::write string $i],\"CacheOnly\":true}"]
+		}
+		M@ {
+			# M@ id
+			::gmautil::rdist 1 1 M@ $params i
+			return [list "L {\"File\":[json::write string $i],\"Merge\":true}"]
+		}
+		MARK {
+			# MARK x y
+			::gmautil::rdist 2 2 MARK $params x y
+			return [list "MARK {\"X\":$x,\"Y\":$y}"]
+		}
+		MARCO {
+			# MARCO
+			return [list "MARCO {}"]
+		}
+		OA {
+			# OA id {k1 v1 ... kN vN}
+			::gmautil::rdist 2 2 OA $params i kvs
+			set kvlist {}
+			dict for {k v} [dict create {*}$kvs] {
+				lappend kvlist "[json::write string $k]:[json::write string $v]"
+			}
+			return [list "OA {\"ObjID\":[json::write string $i],\"NewAttrs\":{[join $kvlist ,]}}"]
+		}
+		OA+ {
+			# OA+ id k {v1 ... vN}
+			::gmautil::rdist 3 3 OA+ $params i k vs
+			return [list "OA+ {\"ObjID\":[json::write string $i],\"AttrName\":[json::write string $k],\"Values\":\[[join [lmap v $vs {json::write string $v}] ,]\]}"]
+		}
+		OA- {
+			# OA- id k {v1 ... vN}
+			::gmautil::rdist 3 3 OA- $params i k vs
+			return [list "OA- {\"ObjID\":[json::write string $i],\"AttrName\":[json::write string $k],\"Values\":\[[join [lmap v $vs {json::write string $v}] ,]\]}"]
+		}
+		OK {
+			# OK v [challenge]
+			::gmautil::rdist 1 2 OK $params v c
+			return [list "OK {\"Protocol\":$v,\"Challenge\":[json::write string $c]}"]
+		}
+		PRIV {
+			# PRIV mesg
+			::gmautil::rdist 0 1 PRIV $params m
+			return [list "PRIV {\"Reason\":[json::write string $m]}"]
+		}
+		PS {
+			# PS id color name area size player|monster x y reach?
+			::gmautil::rdist 9 9 PS $params i c n a s t x y r
+			if {$t eq "monster"} {
+				set t 1
+			} elseif {$t eq "player"} {
+				set t 2
+			} else {
+				set t 0
+			}
+			return [list "PS {\"ID\":[json::write string $i],\"Name\":[json::write string $n],\"Gx\":$x,\"Gy\":$y,\"Color\":[json::write string $c],\"Size\":[json::write string $s],\"Area\":[json::write string $a],\"Reach\":$r,\"CreatureType\":$t}"]
+		}
+		ROLL {
+			# ROLL from reciplist title result structuredlist messageID
+			::gmautil::rdist 6 6 ROLL $params f r t res sr i
+			set rlist [lmap d $sr {join [list "{\"Type\":[json::write string [lindex $d 0]]" "\"Value\":[json::write string [lindex $d 1]]}"] ,}]
+			set result "\"Result\":{\"Result\":$res,\"Details\":\[[join $rlist ,]\]}"
+			if {[lsearch -exact $r "%"] >= 0} {
+				return [list "ROLL {\"Sender\":[json::write string $f],\"ToGM\":true,\"MessageID\":[json::write string $i],\"Title\":[json::write string $t],$result}"]
+			} elseif {[lsearch -exact $r "*"] >= 0} {
+				return [list "ROLL {\"Sender\":[json::write string $f],\"ToAll\":true,\"MessageID\":[json::write string $i],\"Title\":[json::write string $t],$result}"]
+			} else {
+				return [list "ROLL {\"Sender\":[json::write string $f],\"Recipients\":\[[join [lmap v $r {json::write string $v}] ,]\],\"MessageID\":[json::write string $i],\"Title\":[json::write string $t],$result}"]
+			}
+		}
+		TB {
+			# TB bool
+			::gmautil::rdist 1 1 TB $params b
+			if $b {
+				return [list "TB {\"Enabled\":true}"]
+			} else {
+				return [list "TB {}"]
+			}
+		}
+		TO {
+			# TO from reciplist|@(me)|*(all)|%(gm) message messageID
+			::gmautil::rdist 4 4 TO $params f r m i
+			if {[lsearch -exact $r "%"] >= 0} {
+				return [list "TO {\"Sender\":[json::write string $f],\"ToGM\":true,\"MessageID\":[json::write string $i],\"Text\":[json::write string $m]}"]
+			} elseif {[lsearch -exact $r "*"] >= 0} {
+				return [list "TO {\"Sender\":[json::write string $f],\"ToAll\":true,\"MessageID\":[json::write string $i],\"Text\":[json::write string $m]}"]
+			} else {
+				return [list "TO {\"Sender\":[json::write string $f],\"Recipients\":\[[join [lmap v $r {json::write string $v}] ,]\],\"MessageID\":[json::write string $i],\"Text\":[json::write string $m]}"]
+			}
+		}
+		CONN {
+			# CONN
+			::gmaproto::_start_stream CONN {}
+		}
+		CONN: {
+			# CONN: i you|peer addr user client auth? pri? w/o? polo
+			::gmautil::rdist 9 9 CONN: $params i who a u c au pr wo po
+			::gmaproto::_continue_stream CONN [dict create Data $params] $params -lappend
+		}
+		CONN. {
+			# CONN. count checksum
+			puts "conn."
+			::gmautil::rdist 1 2 CONN. $params l cs
+			puts "conn. $l $cs from $params"
+			set sdata [::gmaproto::_end_stream CONN $l $cs] 
+			set clist {}
+			foreach c [dict get $sdata Data] {
+				puts $c
+				lassign $c i who a u c au pr wo po
+				puts $i
+				lappend clist "{\"Addr\":[json::write string $a],\"User\":[json::write string $u],\"Client\":[json::write string $c],\"LastPolo\":$po,\"IsAuthenticated\":[::gmaproto::json_bool $au],\"IsMe\":[::gmaproto::json_bool [expr {$who} eq {{you}}]],\"IsMain\":[::gmaproto::json_bool $pr],\"IsWriteOnly\":[::gmaproto::json_bool $wo]}"
+			}
+
+			return [list "CONN {\"PeerList\":\[[join $clist ,]\]}"]
+		}
+		default {
+			::gmaproto::DEBUG "Unrecognized incoming command $cmd"
+			return [list "// UNKNOWN $cmd $params"]
+		}
+	}
+	return [list "" ""]
+}
+
 proc ::gmaproto::_login {} {
 	set sync_done false
-	set preamble {}
-	array set characters {}
+	set initial_command false
+	set ::gmaproto::legacy false
+	set update_ready {}
 
+	::gmaproto::DEBUG "begin _login"
 	while {!$sync_done} {
-		lassign [::gmaproto::_read_poll] cmd params
+		update; #allow other tasks like ::gmaproto::receive to happen
+		if {!$initial_command} {
+			lassign [::gmaproto::_initial_read_poll] cmd params
+			if {$cmd ne {}} {
+				if {$::gmaproto::legacy} {
+					::gmaproto::DEBUG "PROTOCOL missing or declared as old; proceeding with legacy protocol support"
+				} else {
+					::gmaproto::DEBUG "Proceeding with JSON-encoded protocol $::gmaproto::protocol"
+				}
+				set initial_command true
+			}
+		} else {
+			lassign [::gmaproto::_read_poll] cmd params
+		}
+
 		if {$cmd eq {}} {
 			continue
 		}
 
+		if [catch {
+		#
+		# Negotiate interaction with server up to successful login.
+		#
 		switch -exact -- $cmd {
 			//    { 
-				lappend preamble $params 
+				::DEBUG 1 "server: $params"
 			}
-
-			READY { 
-				::gmaproto::_diag "Server sign-on completed." 
-				set sync_done false
-			}
-
 			AC {
-				# TODO store character
+				::DefinePlayerCharacter $params
 			}
-
-			DSM {
-				# TODO store marker
-			}
-
-			UPDATES {
-				foreach p [dict get $params Packages] {
-					set pkg_name [dict get $p Name]
-					foreach inst [dict get $p Instances] {
-						# TODO store into list of updates
-					}
-				}
-			}
-
-			WORLD {
-				# TODO set that
-			}
-
-			GRANTED {
-				# TODO store username
-				::gmaproto::_diag "Access granted for [dict get $params User]"
-			}
-
 			DENIED {
-				set why [dict get $params Reason]
-				if {$why eq {}} {
-					::gmaproto::_diag "Access denied to server."
-					error "access denied to server"
-				}
-				::gmaproto::_diag "Access denied to server: $why"
-				error "access denied to server: $why"
+				::report_progress "Server denied access"
+				::say "Server DENIED access: [dict get $params Reason]"
+				error "Server DENIED access: [dict get $params Reason]"
 			}
-
+			DSM {
+				::DefineStatusMarker $params
+			}
+			GRANTED {
+				set ::gmaproto::username [dict get $params User]
+				::gmaproto::DEBUG "Access granted for [dict get $params User]"
+				if {$::gmaproto::legacy} {
+					# in legacy mode, we don't have READY, so this is our indication
+					# that we're done.
+					::gmaproto::DEBUG "Server legacy sign-on completed." 
+					set sync_done true
+				}
+			}
+			MARCO {
+				::gmaproto::DEBUG "Ignored MARCO during login"
+			}
 			OK {
-				set supported_protocol [dict get $params Protocol]
-				if {$supported_protocol == 0} {
+				::gmaproto::DEBUG "Server greeting complete"
+				::report_progress "Server greeting complete"
+				set ::gmaproto::protocol [dict get $params Protocol]
+				if {$::gmaproto::protocol == 0} {
 					error "This does not appear to be a server which speaks any protocol we understand."
 				}
 				set challenge [dict get $params Challenge]
-				if {$supported_protocol < ::gmaproto::min_protocol} {
-					error "The server speaks a protocol too old for me to understand ($supported_protocol)"
+				if {$::gmaproto::protocol < $::gmaproto::min_protocol} {
+					error "The server speaks a protocol too old for me to understand ($::gmaproto::protocol)"
 				}
-				if {$supported_protocol > ::gmaproto::max_protocol} {
-					error "The server speaks a protocol too new for me to understand ($supported_protocol)"
+				if {$::gmaproto::protocol > $::gmaproto::max_protocol} {
+					error "The server speaks a protocol too new for me to understand ($::gmaproto::protocol)"
 				}
 				if {$challenge ne {}} {
-					::gmaproto::_diag "Authenticating to server"
-					# TODO authenticate
-					::gmaproto::_protocol_send AUTH Response XXX User XXX Client XXX
-					::gmaproto::_diag "Authenticating to server (awaiting response)"
+					::gmaproto::DEBUG "Authenticating to server"
+					if {$::gmaproto::password eq {?}} {
+						if {! [::getstring::tk_getString .password_prompt ::gmaproto::password "Server Password" -title "Log In" -entryoptions {-show *}]} {
+							set ::gmaproto::password {}
+						}
+					}
+					if {$::gmaproto::password eq {}} {
+						::say "This server requires authentication but no --password option or configuration file line was given."
+						error "Authentication required"
+					}
+					::gmaproto::DEBUG "Server requests authentication (challenge=[binary encode hex $challenge])"
+					::report_progress "Authenticating..."
+					set response [::gmaproto::auth_response $challenge]
+					::gmaproto::_protocol_send AUTH Response $response User $::gmaproto::username Client $::gmaproto::client
+					::report_progress "Authenticating... (awaiting server response)"
+					::gmaproto::DEBUG "Waiting for server's response"
 				} else {
-					::gmaproto::_diag "Server did not request authentication"
+					::gmaproto::DEBUG "Server did not request authentication"
+					if {$::gmaproto::legacy} {
+						# In legacy mode, this is our only indication that we're done
+						::gmaproto::DEBUG "Server legacy sign-on completed." 
+						set sync_done true
+					}
 				}
 			}
-
-			default {
-				::gmaproto::_diag "Unexpected server message $cmd received while waiting for authentication to complete"
+			READY { 
+				::gmaproto::DEBUG "Server sign-on completed." 
+				set sync_done true
 			}
+			UPDATES {
+				foreach p [dict get $params Packages] {
+					if {[dict get $p Name] ne {mapper}} {
+						continue
+					}
+					foreach inst [dict get $p Instances] {
+						set os [dict get $inst OS]
+						set arch [dict get $inst Arch]
+
+						if {($os eq {} || $os eq [::gmautil::my_os]) && ($arch eq {} || $arch eq [::gmautil::my_arch])} {
+							if {$update_ready ne {} && 
+								(($os ne {} && [dict get $update_ready OS] eq {}) ||
+								 ($arch ne {} && [dict get $update_ready Arch] eq {}))} {
+								::gmaproto::DEBUG "Updated mapper version [dict get $inst Version] available (OS=[dict get $inst OS], Arch=[dict get $inst Arch], Token=[dict get $inst Token])"
+								::gmaproto::DEBUG "This version is more specific than the one I found before, switching to it instead."
+								set update_ready $inst
+							} else {
+								::gmaproto::DEBUG "Updated mapper version [dict get $inst Version] available (OS=[dict get $inst OS], Arch=[dict get $inst Arch], Token=[dict get $inst Token])"
+								set update_ready $inst
+							}
+						}
+					}
+				}
+			}
+			WORLD {
+				set calendar [dict get $params Calendar]
+			}
+			default {
+				::gmaproto::DEBUG "Unexpected server message $cmd received while waiting for authentication to complete"
+			}
+		}
+		} err] {
+			::say "Error processing login negotiation step: $err"
 		}
 	}
 
-	# TODO send initial commands
-	
+	set ::gmaproto::pending_login false
+	::report_progress "Server login successful."
+	after 5000 { ::report_progress "" }
+	::gmaproto::allow DICE-COLOR-BOXES
+	::gmaproto::_transmit
+	::gmaproto::_dispatch
+
+
+	if {$update_ready ne {}} {
+		if {[catch {::UpgradeAvailable $update_ready} err]} {
+			::say "Failed to check for upgrade: $err"
+		}
+	}
+}
+
+proc ::gmaproto::auth_response {challenge} {
+	if {[catch {
+#		set challenge [base64::decode $server_nonce]
+		binary scan $challenge S passes
+		set passes [expr $passes & 0xffff]
+		::gmaproto::DEBUG "-- $passes passes"
+		set H [::sha2::SHA256Init]
+		::sha2::SHA256Update $H $challenge
+		::sha2::SHA256Update $H $::gmaproto::password
+		set D [::sha2::SHA256Final $H]
+		for {set i 0} {$i < $passes} {incr i} {
+			set H [::sha2::SHA256Init]
+			::sha2::SHA256Update $H $::gmaproto::password
+			::sha2::SHA256Update $H $D
+			set D [::sha2::SHA256Final $H]
+		}
+#		set response [base64::encode $D]
+		set response $D
+		if {$::gmaproto::username eq {}} {
+			if {[catch {
+				set ::gmaproto::username $::tcl_platform(user)
+			} uerr]} {
+				set ::gmaproto::username "($uerr)"
+			}
+		}
+	} err]} {
+		::say "Failed to understand server's challenge or compute response ($err)"
+		error "Failed to understand server's challenge or compute response ($err)"
+	}
+	return $response
+}
+
+# current_stream
+# stream_dict
+#
+# Legacy data stream handling
+# _start_stream cmd dict		begin tracking for named cmd with dict of saved data
+# _continue_stream cmd dict cd ?-append|-lappend?
+#     					add to accumulated data; -append: append to dict keys; -lappend: dict keys are lists
+#     					checksum advanced using cd
+# _end_stream cmd -> dict		end tracking, return dict of collected data
+#
+proc ::gmaproto::_start_stream {cmd d} {
+	if {$::gmaproto::current_stream ne {}} {
+		::DEBUG 0 "Previous $::gmaproto::current_stream not ended before next $cmd stream started"
+	}
+	set ::gmaproto::current_stream $cmd
+	set ::gmaproto::stream_dict $d
+	::gmaproto::DEBUG "Started $cmd stream"
+	dict set ::gmaproto::stream_dict __cs [::sha2::SHA256Init]
+	dict set ::gmaproto::stream_dict __i 0
+}
+proc ::gmaproto::_continue_stream {cmd d cd args} {
+	if {$::gmaproto::current_stream ne $cmd} {
+		if {$::gmaproto::current_stream eq {}} {
+			::DEBUG 0 "Stream for $cmd not started; cannot continue"
+		} else {
+			::DEBUG 0 "Stream data for $cmd received while collecting $::gmaproto::current_stream"
+		}
+		return
+	}
+	dict incr ::gmaproto::stream_dict __i
+	sha2::SHA256Update [dict get $::gmaproto::stream_dict __cs] $cd
+	if {[lsearch -exact $args -append] >= 0} {
+		# dict keys are strings to append data onto
+		dict for {k v} $d {
+			dict append ::gmaproto::stream_dict $k $v
+		}
+	} elseif {[lsearch -exact $args -lappend] >= 0} {
+		# dict keys are lists to add data onto
+		dict for {k v} $d {
+			dict lappend ::gmaproto::stream_dict $k $v
+		}
+	} else {
+		# merge keys into our dictionary
+		set ::gmaproto::stream_dict [dict replace $::gmaproto::stream_dict $d]
+	}
+}
+proc ::gmaproto::_end_stream {cmd expected_len expected_cs} {
+	if {$::gmaproto::current_stream ne $cmd} {
+		if {$::gmaproto::current_stream eq {}} {
+			::DEBUG 0 "Stream for $cmd not started; cannot end"
+		} else {
+			::DEBUG 0 "Stream end for $cmd received while collecting $::gmaproto::current_stream"
+		}
+		set ::gmaproto::current_stream {}
+		error "$cmd stream aborted"
+	}
+	set ::gmaproto::current_stream {}
+	set digest [::sha2::SHA256Final [dict get $::gmaproto::stream_dict __cs]]
+	if {[dict get $::gmaproto::stream_dict __i] != $expected_len} {
+		::DEBUG 0 "Stream rejected for $cmd; expected $expected_len but got [dict get $::gmaproto::stream_dict __i]"
+		error "$cmd stream rejected (size)"
+	}
+	if {$expected_cs != {} && [::base64::encode $digest] != $expected_cs} {
+		::DEBUG 0 "Stream rejected for $cmd; checksum error"
+		error "$cmd stream rejected (checksum)"
+	}
+	return $::gmaproto::stream_dict
+}
+
+::gmaproto::ObjTypeToGMAType {ot args} {
+	set ls {}
+	if {[lsearch -exact $args {-protocol}] >= 0} {
+		set ls {LS-}
+	}
+	switch $ot {
+		arc	{ return "${ls}ARC" }
+		circ	{ return "${ls}CIRC" }
+		line	{ return "${ls}LINE" }
+		poly	{ return "${ls}POLY" }
+		rect	{ return "${ls}RECT" }
+		aoe - 
+		saoe 	{ return "${ls}SAOE" }
+		text	{ return "${ls}TEXT" }
+		tile	{ return "${ls}TILE" }
+	}
+	error "No such defined GMA type for $ot"
+}
+
+::gmaproto::GMATypeToObjType {gt} {
+	swtich $gt {
+		LS-ARC  - ARC  { return arc  }
+		LS-CIRC - CIRC { return circ }
+		LS-LINE - LINE { return line }
+		LS-POLY - POLY { return poly }
+		LS-RECT - RECT { return rect }
+		LS-SAOE - SAOE { return aoe  }
+		LS-TEXT - TEXT { return text }
+		LS-TILE - TILE { return tile }
+	}
+	error "No such defined object type for $gt"
 }
