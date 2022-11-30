@@ -1,5 +1,3 @@
-# vi:set ai sm nu ts=4 sw=4 fileencoding=utf-8 expandtab:
-#
 ########################################################################################
 #  _______  _______  _______                ___       _______     _______              #
 # (  ____ \(       )(  ___  )              /   )     (  ____ \   (  __   )             #
@@ -181,6 +179,22 @@ proc ::gmautil::version_compare {v1 v2} {
 		}
 	}
 	return 0
+}
+
+if {[::gmautil::version_compare $::tcl_version 8.7] >= 0} {
+    proc ::gmautil::lpop {var args} {
+        return [::lpop $var {*}$args]
+    }
+} else {
+    proc ::gmautil::lpop {var index} {
+        # pop indexth element from list
+        # unlike the built-in one from tcl 8.7, we don't currently
+        # consider sublists.
+        upvar 1 $var l
+        set removed [lindex $l $index]
+        set l [lreplace $l $index $index]
+        return $removed
+    }
 }
 
 #
@@ -439,3 +453,48 @@ proc ::gmautil::_countdown {sec cb pfx} {
 	}
 	after 1000 [list ::gmautil::_countdown [expr $sec - 1] $cb $pfx]
 }
+
+proc ::gmautil::rdist {minargs maxargs cmd arglist args} {
+    if {[llength $arglist] < $minargs} {
+        error "$cmd has only [llength $arglist] parameters but $minargs are required ($arglist)"
+    }
+    if {[llength $arglist] > $maxargs} {
+        error "$cmd has [llength $arglist] parameters but only up to $maxargs are allowed ($arglist)"
+    }
+    for {set i 0} {$i < [llength $args]} {incr i} {
+        upvar 1 [lindex $args $i] v
+        if {$i < [llength $arglist]} {
+            set v [lindex $arglist $i]
+        } else {
+            set v {}
+        }
+    }
+}
+
+# we standardize these values as:
+#   linux, freebsd, darwin, windows
+#   amd64
+proc ::gmautil::my_os {} {
+    switch $tcl_platform(os) {
+        Darwin  { return darwin }
+        Linux   { return linux }1G
+        FreeBSD { return freebsd }
+    }
+}
+
+proc ::gmautil::my_arch {} {
+    switch $tcl_platform(machine) {
+        x86_64  { return amd64 }
+    }
+    return $tcl_platform(machine)
+}
+
+# export the keys of a dictionary to local variables 
+# if a key has space-separated words, it is treated as a list of sub-keys.
+proc ::gmautil::dassign {dictval args} {
+    foreach {k var} $args {
+        upvar 1 $var v
+        set v [dict get $dictval {*}$k]
+    }
+}
+
