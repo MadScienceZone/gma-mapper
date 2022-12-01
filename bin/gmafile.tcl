@@ -57,16 +57,21 @@
 #
 #
 
+package provide gmafile 1.0
 package require gmaproto 0.1
 package require Tcl 8.5
 
 namespace eval ::gmafile {
 	variable version 20
+	variable dice_version 2
+	variable min_dice_version 1
+	variable max_dice_version 2
 	variable min_version 16
 	variable max_version 20
 
 	array set _data_payload {
 		__META__ {Timestamp i DateTime s Comment s Location s}
+		__DMETA__ {Timestamp i DateTime s Comment s}
 		ARC      {ArcMode i Start f Extent f ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		CIRC     {ArcMode i Start f Extent f ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		CREATURE {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l Elev i Color s Note s Size s Area s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i}
@@ -78,6 +83,7 @@ namespace eval ::gmafile {
 		SAOE     {AoEShape i ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		TEXT     {Text s Font {o {Family s Size f Weight i Slant i Anchor i}} ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		TILE     {Image s BBHeight f BBWidth f ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
+		PRESET   {Name s Description s DieRollSpec s}
 	}
 }
 
@@ -176,7 +182,6 @@ proc ::gmafile::load_from_file {f} {
 
 	::gmafile::_diag "Loading map file..."
 
-	dict set meta Version $vid
 	set json_data {}
 	set rescan true
 	while {[gets $f v] >= 0} {
@@ -228,6 +233,7 @@ proc ::gmafile::load_from_file {f} {
 			}
 		}
 	}
+	dict set meta FileVersion $vid
 	error "invalid map file: unexpected end of file"
 }
 
@@ -241,7 +247,7 @@ proc ::gmafile::load_from_file {f} {
 proc ::gmafile::load_legacy_map_file {f vid oldmeta} {
 	set meta_timestamp  {}
 	set LastFileComment {}
-	set meta [dict create Version $vid]
+	set meta [dict create FileVersion $vid]
 
 	if {$vid >= 12} {
 		if {[llength $oldmeta] < 2} {
@@ -249,10 +255,10 @@ proc ::gmafile::load_legacy_map_file {f vid oldmeta} {
 		}
 		if {[llength [lindex $oldmeta 1]] < 2} {
 			dict set meta Timestamp [lindex $oldmeta 1]
-			dict set meta Datetime  [lindex $oldmeta 1]
+			dict set meta DateTime  [lindex $oldmeta 1]
 		} else {
 			dict set meta Timestamp [lindex [lindex $oldmeta 1] 0]
-			dict set meta Datetime  [lindex [lindex $oldmeta 1] 1]
+			dict set meta DateTime  [lindex [lindex $oldmeta 1] 1]
 		}
 		dict set meta Comment [lindex $oldmeta 0]
 		dict set meta Location [lindex $oldmeta 0]
@@ -569,4 +575,130 @@ proc ::gmafile::default_arr {aname id args} {
 			set arr($a:$id) $value
 		}
 	}
+}
+proc ::gmafile::save_dice_presets_to_file {f objlist} {
+	puts $f "__DICE__:$::gmafile::dice_version"
+	lassign $objlist meta presets
+	if {![dict exists $meta Timestamp]} {
+		set now [clock seconds]
+		dict set meta Timestamp $now 
+		dict set meta DateTime [clock format $now -format "%d-%b-%Y %H:%M:%S"]
+	} elseif {![dict exists $meta DateTime]} {
+		dict set meta DateTime [clock format [dict get $meta Timestamp] -format "%d-%b-%Y %H:%M:%S"]
+	}
+	::json::write aligned true
+	::json::write indented true
+	puts $f "\u00ab__META__\u00bb [::gmaproto::_encode_payload $meta $::gmafile::_data_payload(__DMETA__)]"
+	foreach r $presets {
+		puts $f "\u00abPRESET\u00bb [::gmaproto::_encode_payload $r $::gmafile::_data_payload(PRESET)]"
+	}
+	puts $f "\u00ab__EOF__\u00bb"
+}
+
+# returns {<meta> <list of preset dicts>}
+proc ::gmafile::load_dice_presets_from_file {f} {
+	set vid 0
+	set objlist {}
+	set meta {}
+	
+	# initial line MUST now be __DICE__:<version>
+	# if there is anything after that on the first line we can safely ignore it
+	if {[gets $f v] >= 0} {
+		if {[regexp {^__DICE__:([0-9]+)\s*(.*)$} $v vv vid oldmeta]} {
+			if {$vid > $::gmafile::max_dice_version} {
+				error "die roll preset file is version $vid which is newer than this version of the mapper can read"
+			}
+			if {$vid < $::gmafile::min_dice_version} {
+				error "die roll preset file is version $vid which is older than this mapper's minimum supported version ($::gmafile::min_dice_version)"
+			}
+			if {$vid < 2} {
+				return [::gmafile::load_legacy_preset_file $f $vid [lindex $oldmeta 0]]
+			}
+		} else {
+			error "file does not begin with the required __DICE__ header line"
+		}
+	} else {
+		error "unable to read from die roll preset file"
+	}
+
+	::gmafile::_diag "Loading die-roll preset file..."
+
+	set json_data {}
+	set rescan true
+	while {[gets $f v] >= 0} {
+		while $rescan {
+			set rescan false
+
+			if {$v eq {}} {
+				continue
+			}
+
+			if {$v eq "\u00ab__EOF__\u00bb"} {
+				dict set meta FileVersion $vid
+				return [list $meta $objlist]
+			}
+
+			#
+			# start of __type__ json
+			#
+			if {![regexp "^\u00ab(.*?)\u00bb (.+)\$" $v vv record_type json_data]} {
+				error "invalid map file format: unexpected data"
+			}
+			#
+			# look for start of next record
+			#
+			while {[set status [gets $f v]] >= 0} {
+				if {[string range $v 0 0] eq "\u00ab"} {
+					#
+					# we've read the whole packet now; process it
+					#
+					if {$record_type eq {__META__}} {
+						set meta [::gmaproto::_construct [::json::json2dict $json_data] $::gmafile::_data_payload(__DMETA__)]
+					} elseif {$record_type eq {PRESET}} {
+						lappend objlist [::gmaproto::_construct [::json::json2dict $json_data] $::gmafile::_data_payload(PRESET)]
+					} else {
+						error "die roll preset file contains unrecognized record type $record_type"
+					}
+					set json_data {}
+					set record_type {}
+					set rescan true
+					break
+				} else {
+					append json_data $v
+				}
+			}
+			if {$status < 0} {
+				break
+			}
+		}
+	}
+	error "invalid die roll preset file: unexpected end of file"
+}
+
+proc ::gmafile::load_legacy_preset_file {f vid oldmeta} {
+	set meta [dict create FileVersion $vid]
+	set plist {}
+
+	if {[llength $oldmeta] > 0} {
+		dict set meta Timestamp [lindex $oldmeta 0]
+		if {[llength $oldmeta] > 1} {
+			dict set meta DateTime [lindex $oldmeta 1]
+		}
+	}
+
+	while {[gets $f v] >= 0} {
+		if {$v eq {}} {
+			continue
+		}
+		if {[llength $v] == 3} {
+			lappend plist [dict create \
+				Name [lindex $v 0] \
+				Description [lindex $v 1] \
+				DieRollSpec [lindex $v 2] \
+			]
+		} else {
+			error "Invalid line in legacy die-roll preset file: $v"
+		}
+	}
+	return [list $meta $plist]
 }

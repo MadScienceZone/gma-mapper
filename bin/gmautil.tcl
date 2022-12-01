@@ -54,8 +54,8 @@
 #
 # General utility functions
 
-package provide gmautil 1.0
-package require Tcl 8.5
+package provide gmautil 1.1
+package require Tcl 8.6
 package require sha256
 
 namespace eval ::gmautil {
@@ -477,9 +477,10 @@ proc ::gmautil::rdist {minargs maxargs cmd arglist args} {
 proc ::gmautil::my_os {} {
     switch $tcl_platform(os) {
         Darwin  { return darwin }
-        Linux   { return linux }1G
+        Linux   { return linux }
         FreeBSD { return freebsd }
     }
+    return $tcl_platform(os)
 }
 
 proc ::gmautil::my_arch {} {

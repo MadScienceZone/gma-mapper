@@ -4422,9 +4422,7 @@ proc ShowDiceSyntax {} {
 		{p {}}
 		{p {Saving preset rolls to the server allows them to be available any time your client connects to it. Each preset is given a unique name. If another preset is added with the same name, it will replace the previous one.}}
 		{p {If a vertical bar (|) appears in the preset name, everything up to and including the bar is not displayed in the tool, but the sort order of the preset display is based on the entire name. This allows you to sort the entries in any arbitrary order without cluttering the display if you wish. This is most convenient if you save your presets to a file, edit them, and load them back again.}}
-		{p {The save file for presets is a simple text file. Each line describes a single preset, with 3 space-delimited fields on the line: preset name, description of the preset, and the die roll string. If any spaces are contained in a field, surround that field in curly braces. (Specifically, each line must be a legal 3-element Tcl list string).}}
-		{p {Example: } b {Preset1 {This is an example preset.} 1d20+12}}
-		{p {Another: } b {{Attack Roll} {a basic attack} {d20+{12/7} + 1 awesome bonus}}}
+		{p {The save file for presets is a structured, record-based text file documented in dice(5).}}
 	} {
 		foreach {f t} $line {
 			$w.text insert end $t $f
@@ -9404,86 +9402,86 @@ proc UpgradeAvailable {d} {
 #	}
 #}
 
-set DDchk {}
-set DDcnt 0
-set DDdup 0
-
-proc StartDD {} {
-	global DDchk DDcnt DDdata DDdup
-
-	catch {unset DDdata}
-	if {$DDcnt > 0} {
-		DEBUG 0 "ERROR: Preset data stream started before previous one terminated!"
-	}
-	set DDchk [cs_init]
-	set DDcnt 0
-	set DDdup 0
-	DEBUG 2 "Starting preset data stream from server"
-}
-
-proc ContinueDD {idx name desc roll} {
-	global DDchk DDcnt DDdata DDdup
-	if {$idx != $DDcnt} {
-		DEBUG 0 "ERROR: Preset data stream element out of order (got $idx, expected $DDcnt)"
-	}
-	incr DDcnt
-	cs_update $DDchk [list $idx $name $desc $roll]
-	if {[info exists DDdata($name)]} {
-		incr DDdup
-		DEBUG 1 "Got duplicate die-roll preset $name (ignored)"
-	} else {
-		set DDdata($name) [list $desc $roll]
-	}
-	DEBUG 2 "Got DD #DDcnt: name=$name, desc=$desc, roll=$roll"
-}
-
-proc EndDD {count checksum} {
-	global DDchk DDcnt DDdata dice_preset_data SuppressChat DDdup
-	global icon_delete icon_die16 dark_mode
-	set cs [cs_final $DDchk]
-
-	set checksum 0	; # TODO fix checksum error in unicode data stream
-
-	DEBUG 2 "End preset data stream, $DDcnt records, check $cs"
-	if {[array size DDdata] != $count - $DDdup} {
-		DEBUG 0 "INTERNAL ERROR in data stream: Received $DDcnt records ($DDdup duplicate), buffer has [array size DDdata]!"
-	} elseif {$DDcnt != $count} {
-		DEBUG 0 "ERROR in data stream: Received $DDcnt records ($DDdup duplicate), expected $count!"
-	} elseif {$checksum != 0 && ![cs_match $cs $checksum]} {
-		DEBUG 0 "ERROR in data stream: Received data checksum mismatch!"
-		DEBUG 0 "-- Server's checksum: $checksum"
-		DEBUG 0 "-- Our calculation:   $cs"
-	} else {
-		if {$checksum == 0} {
-			DEBUG 2 "Not checking checksum (none given to us)"
-		}
-		# good to go...
-		DEBUG 2 "Committing preset data stream"
-		DEBUG 3 "presets before change: [array get dice_preset_data]"
-		if {! $SuppressChat} {
-			if [catch {
-				DisplayChatMessage {} {} {};	# force window open if it wasn't already
-				set wp [sframe content .chatwindow.p.preset.sf]
-				for {set i 0} {$i < [array size dice_preset_data]} {incr i} {
-					DEBUG 1 "destroy $wp.preset$i"
-					destroy $wp.preset$i
-				}
-				array unset dice_preset_data
-				array set dice_preset_data [array get DDdata]
-				_render_die_roller $wp 0 0 preset -noclear
-			} err] {
-				DEBUG 0 "Error updating die preset info: $err"
-			}
-		}
-		if {$DDdup > 0} {
-			DEBUG 0 "WARNING: Received $DDdup duplicate die-roll presets"
-		}
-	}
-	set DDchk {}
-	set DDcnt 0
-	set DDdup 0
-	catch {unset DDdata}
-}
+#DEL#set DDchk {}
+#DEL#set DDcnt 0
+#DEL#set DDdup 0
+#DEL#
+#DEL#proc StartDD {} {
+#DEL#	global DDchk DDcnt DDdata DDdup
+#DEL#
+#DEL#	catch {unset DDdata}
+#DEL#	if {$DDcnt > 0} {
+#DEL#		DEBUG 0 "ERROR: Preset data stream started before previous one terminated!"
+#DEL#	}
+#DEL#	set DDchk [cs_init]
+#DEL#	set DDcnt 0
+#DEL#	set DDdup 0
+#DEL#	DEBUG 2 "Starting preset data stream from server"
+#DEL#}
+#DEL#
+#DEL#proc ContinueDD {idx name desc roll} {
+#DEL#	global DDchk DDcnt DDdata DDdup
+#DEL#	if {$idx != $DDcnt} {
+#DEL#		DEBUG 0 "ERROR: Preset data stream element out of order (got $idx, expected $DDcnt)"
+#DEL#	}
+#DEL#	incr DDcnt
+#DEL#	cs_update $DDchk [list $idx $name $desc $roll]
+#DEL#	if {[info exists DDdata($name)]} {
+#DEL#		incr DDdup
+#DEL#		DEBUG 1 "Got duplicate die-roll preset $name (ignored)"
+#DEL#	} else {
+#DEL#		set DDdata($name) [list $desc $roll]
+#DEL#	}
+#DEL#	DEBUG 2 "Got DD #DDcnt: name=$name, desc=$desc, roll=$roll"
+#DEL#}
+#DEL#
+#DEL#proc EndDD {count checksum} {
+#DEL#	global DDchk DDcnt DDdata dice_preset_data SuppressChat DDdup
+#DEL#	global icon_delete icon_die16 dark_mode
+#DEL#	set cs [cs_final $DDchk]
+#DEL#
+#DEL#	set checksum 0	; # TODO fix checksum error in unicode data stream
+#DEL#
+#DEL#	DEBUG 2 "End preset data stream, $DDcnt records, check $cs"
+#DEL#	if {[array size DDdata] != $count - $DDdup} {
+#DEL#		DEBUG 0 "INTERNAL ERROR in data stream: Received $DDcnt records ($DDdup duplicate), buffer has [array size DDdata]!"
+#DEL#	} elseif {$DDcnt != $count} {
+#DEL#		DEBUG 0 "ERROR in data stream: Received $DDcnt records ($DDdup duplicate), expected $count!"
+#DEL#	} elseif {$checksum != 0 && ![cs_match $cs $checksum]} {
+#DEL#		DEBUG 0 "ERROR in data stream: Received data checksum mismatch!"
+#DEL#		DEBUG 0 "-- Server's checksum: $checksum"
+#DEL#		DEBUG 0 "-- Our calculation:   $cs"
+#DEL#	} else {
+#DEL#		if {$checksum == 0} {
+#DEL#			DEBUG 2 "Not checking checksum (none given to us)"
+#DEL#		}
+#DEL#		# good to go...
+#DEL#		DEBUG 2 "Committing preset data stream"
+#DEL#		DEBUG 3 "presets before change: [array get dice_preset_data]"
+#DEL#		if {! $SuppressChat} {
+#DEL#			if [catch {
+#DEL#				DisplayChatMessage {} {} {};	# force window open if it wasn't already
+#DEL#				set wp [sframe content .chatwindow.p.preset.sf]
+#DEL#				for {set i 0} {$i < [array size dice_preset_data]} {incr i} {
+#DEL#					DEBUG 1 "destroy $wp.preset$i"
+#DEL#					destroy $wp.preset$i
+#DEL#				}
+#DEL#				array unset dice_preset_data
+#DEL#				array set dice_preset_data [array get DDdata]
+#DEL#				_render_die_roller $wp 0 0 preset -noclear
+#DEL#			} err] {
+#DEL#				DEBUG 0 "Error updating die preset info: $err"
+#DEL#			}
+#DEL#		}
+#DEL#		if {$DDdup > 0} {
+#DEL#			DEBUG 0 "WARNING: Received $DDdup duplicate die-roll presets"
+#DEL#		}
+#DEL#	}
+#DEL#	set DDchk {}
+#DEL#	set DDcnt 0
+#DEL#	set DDdup 0
+#DEL#	catch {unset DDdata}
+#DEL#}
 	
 proc chat_to_all {} {
 	global CHAT_TO
@@ -9661,7 +9659,7 @@ proc inhibit_resize_task {flag type} {
 #        <w>.add|[+] Add new...           [load] [save] |	<-- we don't touch this part here
 #                .add .label              .load  .save
 #
-# global dice_preset_data(name) provides {description definition} for each preset
+# global dice_preset_data(name) provides dierollpreset dict for each preset
 # global recent_die_rolls       provides {{description extra} {description extra} ...} as list of recent roll descriptions
 #
 # options in args:
@@ -9785,8 +9783,10 @@ proc _render_die_roller {w width height type args} {
 			}
 			set i 0
 			foreach preset_name [lsort -dictionary [array names dice_preset_data]] {
-				set desc [lindex $dice_preset_data($preset_name) 0]
-				set def [lindex $dice_preset_data($preset_name) 1]
+				set d $dice_preset_data($preset_name)
+				set desc [dict get $d Description]
+				set def [dict get $d DieRollSpec]
+
 				if {[set namediv [string first | $preset_name]] >= 0} {
 					set pname [string range $preset_name $namediv+1 end]
 				} else {
@@ -10287,12 +10287,17 @@ proc SaveDieRollPresets {w} {
 		}
 	}
 
-	set now [clock seconds]
-	puts $f [list "__DICE__:1" $now [clock format $now]]
-	foreach name [array names dice_preset_data] {
-		puts $f [list $name [lindex $dice_preset_data($name) 0] [lindex $dice_preset_data($name) 1]]
+	if [catch {
+		set plist {}
+		foreach {_ d} [array get dice_preset_data] {
+			lappend plist $d
+		}
+		::gmafile::save_dice_presets_to_file $f $plist
+		close $f
+	} err] {
+		say "Error saving dice presets: $err"
+		catch {close $f}
 	}
-	close $f
 }
 
 proc LoadDieRollPresets {w} {
@@ -10302,13 +10307,15 @@ proc LoadDieRollPresets {w} {
 	array unset new_preset_list
 	if {$old_n > 0} {
 		set answer [tk_messageBox -type yesnocancel -parent $w -icon question -title "Merge with existing presets?" \
-			-message "You already have $old_n preset[expr $old_n==1 ? {{}} : {{s}}] defined. Do you want the new ones to be MERGED with those? (If you answer YES, any presets from the file will overwrite existing ones with the same name. If you answer NO, all current presets will be deleted and only the ones from the file will exist." -default yes]
+			-message "You already have $old_n preset[expr $old_n==1 ? {{}} : {{s}}] defined. Do you want the new ones to be MERGED with those?"\
+			-detail "If you answer YES, any presets from the file will overwrite existing ones with the same name, and any new ones will be added to your existing set. If you answer NO, all current presets will be deleted and only the ones from the file will exist." -default yes]
 		if {$answer eq {yes}} {
 			array set new_preset_list [array get dice_preset_data]
 		} elseif {$answer ne {no}} {
 			return
 		}
 	}
+
 	if {[set file [tk_getOpenFile -defaultextension .dice -filetypes {
 		{{GMA Die Roll Preset Files} {.dice}}
 		{{All Files}        *}
@@ -10322,46 +10329,23 @@ proc LoadDieRollPresets {w} {
 	}
 
 	if [catch {
-		if {[gets $f v] >= 0} {
-			if {[regexp {^__DICE__:([0-9]+)$} [lindex $v 0] vv vid]} {
-				if {$vid != 1} {
-					tk_messageBox -type ok -icon error -title "Invalid Preset File" \
-						-message "Unsupported die roll preset file version ($vid). We're expecting version 1." -parent $w
-					error "invalid preset"
-				}
-			} else {
-				tk_messageBox -type ok -icon error -title "Invalid Preset File" \
-					-message "File does not begin with metadata line." -parent $w
-				error "invalid preset"
-			}
-		} else {
-			tk_messageBox -type ok -icon error -title "Invalid Preset File" \
-				-message "File does not seem to have any data." -parent $w
-			error "invalid preset"
-		}
-		while {[gets $f v] >= 0} {
-			set ll 0
-			if {[catch {set ll [llength $v]}] || $ll != 3} {
-				tk_messageBox -type ok -icon error -title "Invalid Preset File" \
-					-message "Malformed file data line: $v" -parent $w
-				error "invalid preset"
-			}
-			set new_preset_list([lindex $v 0]) [lrange $v 1 2]
+		lassign [::gmafile::load_dice_presets_from_file $f] meta plist
+		close $f
+		DEBUG 1 "Loaded dice presets from version [dict get $meta FileVersion] file created [dict get $meta DateTime]; [dict get $meta Comment]"
+
+		foreach p $plist {
+			set new_preset_list([dict get $p Name]) $p
 		}
 	} err] {
 		tk_messageBox -type ok -icon error -title "Error Loading Preset File" \
 			-message "Error loading file: $err" -parent $w
-		close $f
+		catch {close $f}
 		return
 	}
 
-	close $f
-
 	set deflist {}
-	foreach preset_name [array names new_preset_list] {
-		set dd [lindex $new_preset_list($preset_name) 0]
-		set dr [lindex $new_preset_list($preset_name) 1]
-		lappend deflist [list $preset_name $dd $dr]
+	foreach {_ p} [array get new_preset_list] {
+		lappend deflist $p
 	}
 	UpdateDicePresets $deflist
 	RequestDicePresets
@@ -10393,12 +10377,10 @@ proc CommitNewPreset {} {
 		}
 	}
 
-	set dice_preset_data($name) [list $desc $def]
+	set dice_preset_data($name) [dict Name $name Description $desc DieRollSpec $def]
 	set deflist {}
-	foreach preset_name [array names dice_preset_data] {
-		set dd [lindex $dice_preset_data($preset_name) 0]
-		set dr [lindex $dice_preset_data($preset_name) 1]
-		lappend deflist [list $preset_name $dd $dr]
+	foreach {_ p} [array get dice_preset_data] {
+		lappend deflist $p
 	}
 	UpdateDicePresets $deflist
 	RequestDicePresets
@@ -10528,7 +10510,7 @@ proc RollPreset {w idx name} {
 
 	if {[info exists dice_preset_data($name)]} {
 		set extra [string trim [$w.extra get]]
-		_do_roll [lindex $dice_preset_data($name) 1] $extra
+		_do_roll [dict get $dice_preset_data($name) DieRollSpec] $extra
 	}
 }
 
@@ -10537,10 +10519,8 @@ proc DeleteDieRollPreset {name} {
 	array set new_set [array get dice_preset_data]
 	catch {unset new_set($name)}
 	set deflist {}
-	foreach preset_name [array names new_set] {
-		set dd [lindex $new_set($preset_name) 0]
-		set dr [lindex $new_set($preset_name) 1]
-		lappend deflist [list $preset_name $dd $dr]
+	foreach {_ p} [array get new_set] {
+		lappend deflist $p
 	}
 	UpdateDicePresets $deflist
 	RequestDicePresets
@@ -10979,78 +10959,78 @@ proc ClearObjectById {id} {
 #	UpdatePeerList
 #}
 
-set AIcnt 0
-set AIdata {}
-set AIname {}
-set AIzoom 1.0
-set AIcd {}
-set AIn 0
-proc StartImageStream {name zoom} {
-	global AIcnt AIdata AIname AIzoom AIcd ClockDisplay AIn
-
-	if {$AIcnt > 0} {
-		# if we received an unterminated AI, abandon it now
-		# we don't care if the AI wasn't followed by any data, though.
-		DEBUG 0 "ERROR: Image stream started before previous one terminated!"
-	}
-	set AIdata {}
-	set AIcnt 0
-	set AIname $name
-	set AIzoom $zoom
-	DEBUG 2 "Starting image stream from server for $AIname at zoom factor $AIzoom"
-	set AIcd $ClockDisplay
-	set ClockDisplay "Loading Image [incr AIn]..."
-	update
-}
-
-proc ContinueImageStream {data} {
-	global AIcnt AIdata AIname ClockDisplay
-	append AIdata $data
-	incr AIcnt
-	#DEBUG 2 "Got AI line #$AIcnt for $AIname: $data"
-}
-
-proc EndImageStream {count checksum} {
-	global AIcnt AIdata AIname AIzoom AIcd ClockDisplay
-
-
-	DEBUG 2 "End image stream for $AIname, $AIcnt records"
-	if {$AIcnt != $count} {
-		DEBUG 0 "ERROR in image data stream for $AIname: Received $AIcnt records, expected $count!"
-	} elseif {[catch {set img_data [base64::decode $AIdata]} err]} {
-		DEBUG 0 "ERROR decoding image data for $AIname: $err"
-	} else {
-		set chk [cs_init]
-		cs_update $chk $img_data
-		set chk_64 [cs_final $chk]
-
-		if {![cs_match $chk_64 $checksum]} {
-			DEBUG 0 "ERROR in data stream: Received image $AIname checksum mismatch!"
-			DEBUG 0 "-- Server's checksum: $checksum"
-			DEBUG 0 "-- Our calculation:   $chk_64"
-		} else {
-			global TILE_SET
-			if [info exists TILE_SET($AIname:$AIzoom)] {
-				DEBUG 1 "Replacing existing image $TILE_SET($AIname:$AIzoom) for ${AIname} x$AIzoom"
-				image delete $TILE_SET($AIname:$AIzoom)
-				unset TILE_SET($AIname:$AIzoom)
-			}
-			set TILE_SET($AIname:$AIzoom) [image create photo -format gif -data $img_data]
-			DEBUG 3 "Defined bitmap for $AIname at $AIzoom: $TILE_SET($AIname:$AIzoom)"
-		}
-	}
-			
-	#garbageCollectGrid
-	#RefreshGrid 0
-	#RefreshMOBs
-	#modifiedflag - 1
-	set AIcnt 0
-	set AIdata {}
-	set AIname {}
-	set AIzoom 1.0
-	set ClockDisplay $AIcd
-	update
-}
+#DEL#set AIcnt 0
+#DEL#set AIdata {}
+#DEL#set AIname {}
+#DEL#set AIzoom 1.0
+#DEL#set AIcd {}
+#DEL#set AIn 0
+#DEL#proc StartImageStream {name zoom} {
+#DEL#	global AIcnt AIdata AIname AIzoom AIcd ClockDisplay AIn
+#DEL#
+#DEL#	if {$AIcnt > 0} {
+#DEL#		# if we received an unterminated AI, abandon it now
+#DEL#		# we don't care if the AI wasn't followed by any data, though.
+#DEL#		DEBUG 0 "ERROR: Image stream started before previous one terminated!"
+#DEL#	}
+#DEL#	set AIdata {}
+#DEL#	set AIcnt 0
+#DEL#	set AIname $name
+#DEL#	set AIzoom $zoom
+#DEL#	DEBUG 2 "Starting image stream from server for $AIname at zoom factor $AIzoom"
+#DEL#	set AIcd $ClockDisplay
+#DEL#	set ClockDisplay "Loading Image [incr AIn]..."
+#DEL#	update
+#DEL#}
+#DEL#
+#DEL#proc ContinueImageStream {data} {
+#DEL#	global AIcnt AIdata AIname ClockDisplay
+#DEL#	append AIdata $data
+#DEL#	incr AIcnt
+#DEL#	#DEBUG 2 "Got AI line #$AIcnt for $AIname: $data"
+#DEL#}
+#DEL#
+#DEL#proc EndImageStream {count checksum} {
+#DEL#	global AIcnt AIdata AIname AIzoom AIcd ClockDisplay
+#DEL#
+#DEL#
+#DEL#	DEBUG 2 "End image stream for $AIname, $AIcnt records"
+#DEL#	if {$AIcnt != $count} {
+#DEL#		DEBUG 0 "ERROR in image data stream for $AIname: Received $AIcnt records, expected $count!"
+#DEL#	} elseif {[catch {set img_data [base64::decode $AIdata]} err]} {
+#DEL#		DEBUG 0 "ERROR decoding image data for $AIname: $err"
+#DEL#	} else {
+#DEL#		set chk [cs_init]
+#DEL#		cs_update $chk $img_data
+#DEL#		set chk_64 [cs_final $chk]
+#DEL#
+#DEL#		if {![cs_match $chk_64 $checksum]} {
+#DEL#			DEBUG 0 "ERROR in data stream: Received image $AIname checksum mismatch!"
+#DEL#			DEBUG 0 "-- Server's checksum: $checksum"
+#DEL#			DEBUG 0 "-- Our calculation:   $chk_64"
+#DEL#		} else {
+#DEL#			global TILE_SET
+#DEL#			if [info exists TILE_SET($AIname:$AIzoom)] {
+#DEL#				DEBUG 1 "Replacing existing image $TILE_SET($AIname:$AIzoom) for ${AIname} x$AIzoom"
+#DEL#				image delete $TILE_SET($AIname:$AIzoom)
+#DEL#				unset TILE_SET($AIname:$AIzoom)
+#DEL#			}
+#DEL#			set TILE_SET($AIname:$AIzoom) [image create photo -format gif -data $img_data]
+#DEL#			DEBUG 3 "Defined bitmap for $AIname at $AIzoom: $TILE_SET($AIname:$AIzoom)"
+#DEL#		}
+#DEL#	}
+#DEL#			
+#DEL#	#garbageCollectGrid
+#DEL#	#RefreshGrid 0
+#DEL#	#RefreshMOBs
+#DEL#	#modifiedflag - 1
+#DEL#	set AIcnt 0
+#DEL#	set AIdata {}
+#DEL#	set AIname {}
+#DEL#	set AIzoom 1.0
+#DEL#	set ClockDisplay $AIcd
+#DEL#	update
+#DEL#}
 
 ##DEL proc ITupdate mobname {
 ##DEL 	global canvas MOB_BLINK NextMOBID MOB
@@ -11120,49 +11100,49 @@ proc SendObjChanges {id attrlist} {
 	}
 }
 
-set SSEScheck {}
-set SSEScount 0
-
-proc StartSendElementSet {mergeflag} {
-	global SSEScheck SSEScount SafMode
-
-	if {!$SafMode} {
-		DEBUG 2 "Starting to send map elements (mergeflag=$mergeflag)"
-		if {$SSEScheck ne {}} {
-			DEBUG 1 "Warning: Another set of elements was underway (abandoned now)!"
-			cs_final $SSEScheck
-		}
-		if {!$mergeflag} {
-			ITsend [list CLR E*]
-		}
-		set SSEScheck [cs_init]
-		set SSEScount 0
-		ITsend LS
-	}
-}
-
-proc ContinueSendElementSet {data} {
-	global SSEScheck SSEScount SafMode
-
-	if {!$SafMode} {
-		DEBUG 3 "ContinueSendElementSet: #$SSEScount data=$data"
-		incr SSEScount
-		cs_update $SSEScheck $data
-		ITsend [list LS: $data]
-	}
-}
-
-proc FinishSendElementSet {} {
-	global SSEScheck SSEScount SafMode
-
-	if {!$SafMode} {
-		set cs [cs_final $SSEScheck]
-		DEBUG 2 "Finished sending elements (count=$SSEScount, checksum=$cs)"
-		ITsend [list LS. $SSEScount $cs]
-	}
-	set SSEScount 0
-	set SSEScheck {}
-}
+#DEL#set SSEScheck {}
+#DEL#set SSEScount 0
+#DEL#
+#DEL#proc StartSendElementSet {mergeflag} {
+#DEL#	global SSEScheck SSEScount SafMode
+#DEL#
+#DEL#	if {!$SafMode} {
+#DEL#		DEBUG 2 "Starting to send map elements (mergeflag=$mergeflag)"
+#DEL#		if {$SSEScheck ne {}} {
+#DEL#			DEBUG 1 "Warning: Another set of elements was underway (abandoned now)!"
+#DEL#			cs_final $SSEScheck
+#DEL#		}
+#DEL#		if {!$mergeflag} {
+#DEL#			ITsend [list CLR E*]
+#DEL#		}
+#DEL#		set SSEScheck [cs_init]
+#DEL#		set SSEScount 0
+#DEL#		ITsend LS
+#DEL#	}
+#DEL#}
+#DEL#
+#DEL#proc ContinueSendElementSet {data} {
+#DEL#	global SSEScheck SSEScount SafMode
+#DEL#
+#DEL#	if {!$SafMode} {
+#DEL#		DEBUG 3 "ContinueSendElementSet: #$SSEScount data=$data"
+#DEL#		incr SSEScount
+#DEL#		cs_update $SSEScheck $data
+#DEL#		ITsend [list LS: $data]
+#DEL#	}
+#DEL#}
+#DEL#
+#DEL#proc FinishSendElementSet {} {
+#DEL#	global SSEScheck SSEScount SafMode
+#DEL#
+#DEL#	if {!$SafMode} {
+#DEL#		set cs [cs_final $SSEScheck]
+#DEL#		DEBUG 2 "Finished sending elements (count=$SSEScount, checksum=$cs)"
+#DEL#		ITsend [list LS. $SSEScount $cs]
+#DEL#	}
+#DEL#	set SSEScount 0
+#DEL#	set SSEScheck {}
+#DEL#}
 
 #
 # Placing people on the map:
