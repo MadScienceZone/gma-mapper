@@ -1,4 +1,5 @@
 #!/usr/bin/env wish
+#
 # TODO
 # 		::gmaproto::set_debug f
 # 		::gmaproto::dial host port user pass proxy pport puser ppass client
@@ -237,7 +238,7 @@ proc begin_progress { id title max args } {
         }
         grid .toolbar2.progbar -row 0 -column 2 -sticky e
         set ClockProgress 0
-        if {$max eq "*"} {
+        if {$max eq "*" || $max == 0} {
             .toolbar2.progbar configure -mode indeterminate
             .toolbar2.progbar start
         } else {
@@ -269,7 +270,7 @@ proc update_progress { id value newmax args } {
 			::gmaproto::update_progress $id {} $value $newmax false
         }
         if [info exists progress_data($id:title)] {
-            if {$newmax ne {} && $newmax ne "*"} {
+            if {$newmax eq "*" || $newmax == 0} {
                 if {$progress_data($id:max) eq "*"} {
                     .toolbar2.progbar stop
                     .toolbar2.progbar configure -mode determinate
@@ -1480,7 +1481,7 @@ grid \
 	 [button .toolbar.aoebound -image $icon_wandbound -command aoeboundtool] \
 	 [button .toolbar.ruler -image $icon_ruler -command rulertool] \
 	 [button .toolbar.griden -image $icon_snap_1 -command toggleGridEnable] \
-	 [button .toolbar.chat -image $icon_die20 -command {DisplayChatMessage {} {} {}}] \
+	 [button .toolbar.chat -image $icon_die20 -command {DisplayChatMessage {}] \
 	 [label  .toolbar.sp4  -text "   "] \
 	 [button .toolbar.zi   -image $icon_zoom_in -command {zoomInBy 2}] \
 	 [button .toolbar.zo   -image $icon_zoom_out -command {zoomInBy 0.5}] \
@@ -1557,7 +1558,7 @@ menu $mm.play
 $mm.play add command -command {togglecombat} -label "Toggle Combat Mode"
 $mm.play add command -command {aoetool} -label "Indicate Area of Effect"
 $mm.play add command -command {rulertool} -label "Measure Distance Along Line(s)"
-$mm.play add command -command {DisplayChatMessage {} {} {}} -label "Show Chat/Die-roll Window"
+$mm.play add command -command {DisplayChatMessage {}} -label "Show Chat/Die-roll Window"
 $mm.play add separator
 $mm.play add command -command {ClearSelection} -label "Deselect All"
 menu $mm.help
@@ -8756,15 +8757,15 @@ proc fetch_image {name zoom id} {
 #
 
 
-proc UpdateRunClock newtime {
+proc UpdateRunClock d {
 	global MOB_COMBATMODE ClockDisplay
 	if {$MOB_COMBATMODE} {
 		set ClockDisplay [format "Round #%d  (%02d:%02d:%02d.%d)"\
-			[expr [lindex $newtime 0] + 1]\
-			[lindex $newtime 4]\
-			[lindex $newtime 3]\
-			[lindex $newtime 2]\
-			[expr [lindex $newtime 1] % 10]\
+			[expr [dict get $d Rounds] + 1]\
+			[dict get $d Hours] \
+			[dict get $d Minutes] \
+			[dict get $d Seconds] \
+			[expr [dict get $d Count] % 10]\
 		]
 	} else {
 		set ClockDisplay {}
@@ -8781,6 +8782,22 @@ proc BackgroundConnectToServer {tries} {
 #
 # Hooks for specific incoming server messages
 #
+
+# simple commands
+proc DoCommandAV    {d} { AdjustView [dict get $d XView] [dict get $d YView] }
+proc DoCommandCLR   {d} { ClearObjectById [dict get $d ObjID] }
+proc DoCommandCO    {d} { setCombatMode [dict get $d Enabled] }
+proc DoCommandMARCO {d} { ::gmaproto::polo }
+proc DoCommandMARK  {d} { global canvas; start_ping_marker $canvas [dict get $d X] [dict get $d Y] 0 }
+proc DoCommandOA    {d} { SetObjectAttribute [dict get $d ObjID] [dict get $d NewAttrs] }
+proc DoCommandOA+   {d} { AddToObjectAttribute [dict get $d ObjID] [dict get $d AttrName] [dict get $d Values]; RefreshGrid 0; RefreshMOBs }
+proc DoCommandOA-   {d} { RemoveFromObjectAttribute [dict get $d ObjID] [dict get $d AttrName] [dict get $d Values]; RefreshGrid 0; RefreshMOBs }
+proc DoCommandTB    {d} { global MasterClient; if {!$MasterClient} {toolBarState [dict get $d Enabled]} }
+
+# ignored commands
+proc DoCommandCS {d} {}
+proc DoCommandIL {d} {}
+
 proc DoCommandAC {d} {
 	# Add character to the menu
 	global PC_IDs
@@ -8852,10 +8869,6 @@ proc DoCommandAI? {d} {
 	}
 }
 
-proc DoCommandAV {d} {
-	AdjustView [dict get $d XView] [dict get $d YView]
-}
-
 proc DoCommandCC {d} {
 	# clear chat history
 	if [dict get $d DoSilently] {
@@ -8864,34 +8877,30 @@ proc DoCommandCC {d} {
 		set by [dict get $d RequestedBy]
 	}
 
-	ClearChatHistory $by [dict get $d Target] [dict get $d MessageID]
-	ChatHistoryAppend [list CC _ _ [dict get $d MessageID]]
+	ClearChatHistory $d
+	ChatHistoryAppend [list CC $d [dict get $d MessageID]]
 	LoadChatHistory
 }
 
-proc DoCommandDSM {d} {
-	# define status marker
-	::gmautil::dsasign $d Condition condition Shape shape Color color Description description
-	global MarkerColor MarkerShape MarkerDescription
-
-	if {$shape eq {} || $color eq {}} {
-		array unset MarkerColor $condition
-		array unset MarkerShape $condition
+proc DoCommandCLR@ {d} {
+	if [dict get $d IsLocalFile] {
+		set cache_filename [dict get $d File]
 	} else {
-		set MarkerColor($condition) $color
-		set MarkerShape($condition) $shape
-		if {$description eq {}} {
-			if {![info exists MarkerDescription($condition)]} {
-				set MarkerDescription($condition) $condition
+		if [catch {set cache_filename [fetch_map_file [dict get $d File]]} err] {
+			if {$err eq {NOSUCH}} {
+				DEBUG 0 "WARNING: Requested unload of File ID [dict get $d File] but the server doesn't have it."
+			} else {
+				error "Error retrieving file ID [dict get $d File] from server: $err"
 			}
-		} else {
-			set MarkerDescription($condition) $description
+			return
 		}
 	}
-}
 
-proc DoCommandMARCO {d} {
-	::gmaproto::polo
+	global SafMode
+	if $SafMode {
+		toggleSafMode
+	}
+	unloadfile $cache_filename -nosend
 }
 
 proc DoCommandCONN {d} {
@@ -8926,6 +8935,187 @@ proc DoCommandCONN {d} {
 		}
 	}
 	UpdatePeerList
+}
+
+proc DoCommandDD= {d} {
+	# define die-roll preset list
+	global SuppressChat dice_preset_data
+
+	if {! $SuppressChat} {
+		if [catch {
+			DisplayChatMessage {}; # force window open
+			set wp [sframe content .chatwindow.p.preset.sf]
+			for {set i 0} {$i < [array size dice_preset_data]} {incr i} {
+				DEBUG 1 "destroy $wp.preset$i"
+				destroy $wp.preset$i
+			}
+			array unset dice_preset_data
+			foreach preset [dict get $d Presets] {
+				set dice_preset_data([dict get $d Name]) $d
+			}
+			_render_die_roller $wp 0 0 preset -noclear
+		} err] {
+			DEBUG 0 "Error updating die preset info: $err"
+		}
+	}
+}
+
+proc DoCommandDSM {d} {
+	# define status marker
+	::gmautil::dsasign $d Condition condition Shape shape Color color Description description
+	global MarkerColor MarkerShape MarkerDescription
+
+	if {$shape eq {} || $color eq {}} {
+		array unset MarkerColor $condition
+		array unset MarkerShape $condition
+	} else {
+		set MarkerColor($condition) $color
+		set MarkerShape($condition) $shape
+		if {$description eq {}} {
+			if {![info exists MarkerDescription($condition)]} {
+				set MarkerDescription($condition) $condition
+			}
+		} else {
+			set MarkerDescription($condition) $description
+		}
+	}
+}
+
+proc DoCommandI {d} {
+	# update initiative clock
+	global MOB_COMBATMODE canvas MOB_BLINK NextMOBID MOBdata MOBid
+
+	if {$MOB_COMBATMODE} {
+		UpdateRunClock $d
+
+		set ITlist {}
+		if {[set actor [dict get $d ActorID]] eq {*Monsters*}} {
+			foreach {mob_id mob} [array get MOBdata] {
+				if {[dict get $mob CreatureType] == 1 && ![dict get $mob Killed]} {
+					lappend ITlist $mob_id
+				}
+			}
+		} else {
+			if [info exists MOBdata($actor)] {
+				set mob_id $actor;		# actor is the mob ID
+			} elseif [info exists MOBid($actor)] {
+				set mob_id $MOBid($actor);	# actor is the mob name
+			} elseif {[string range $actor 0 0] eq {/}} {
+				set mob_id {};			# actor is a regex of names
+				foreach key [array names MOBid -regexp [string range $actor 1 end]] {
+					if {![dict get $MOBdata($MOBid($key)) Killed]} {
+						lappend ITlist $MOBid($key)
+					}
+				}
+			} else {
+				set mob_id {};			# non-existent actor ID
+			}
+
+			if {$mob_id ne {} && ![dict get $MOBdata($mob_id) Killed]} {
+				lappend ITlist $mob_id
+			}
+		}
+	}
+
+ 	set MOB_BLINK $ITlist
+ 	highlightMob $canvas $ITlist
+ 	foreach id $ITlist {
+ 		PopSomeoneToFront $canvas $id
+ 	}
+}
+
+proc DoCommandL {d} {
+	# load map file
+	if [dict get $d CacheOnly] {
+		# just make sure we have a copy on hand (M?)
+		if [dict get $d IsLocalFile] {
+			DEBUG 0 "Server asked us to cache [dict get $d File], but it's a local file (request ignored)"
+			return
+		}
+		if [catch {fetch_map_file [dict get $d File]} err] {
+			if {$err eq {NOSUCH}} {
+				DEBUG 0 "WARNING: Requested pre-load of server file ID [dict get $d File] but the server doesn't have it."
+			} else {
+				error "Error retrieving server file ID [dict get $id File]: $err"
+			}
+		}
+		return
+	}
+	if {![dict get $d IsLocalFile]} {
+		# use local file (L)
+		set file_to_load [dict get $d File]
+	} else {
+		# fetch server file (unless we already have it cached) (M@)
+		if [catch {set file_to_load [fetch_map_file [dict get $d File]]} err] {
+			if {$err eq {NOSUCH}} {
+				DEBUG 0 "WARNING: Requested load of server file ID [dict get $d File] but the server doesn't have it."
+			} else {
+				error "Error retrieving server file ID [dict get $id File]: $err"
+			}
+		}
+	}
+	
+	global SafMode
+	if {$SafMode} {
+		toggleSafMode
+	}
+
+	if [dict get $d Merge] {
+		loadfile $file_to_load -force -merge -nosend;	# M@ M
+	} else {
+		loadfile $file_to_load -force -nosend;		# L
+	}
+}
+
+proc DoCommandLS-ARC  {d} {DoLS arc $d}
+proc DoCommandLS-CIRC {d} {DoLS circ $d}
+proc DoCommandLS-LINE {d} {DoLS line $d}
+proc DoCommandLS-POLY {d} {DoLS poly $d}
+proc DoCommandLS-RECT {d} {DoLS rect $d}
+proc DoCommandLS-SAOE {d} {DoLS aoe $d}
+proc DoCommandLS-TEXT {d} {DoLS text $d}
+proc DoCommandLS-TILE {d} {DoLS tile $d}
+proc DoLS {t d} {
+	# load map elements (generic handler for all element types)
+	set OBJdata([dict get $d ID]) $d
+	set OBJtype([dict get $d ID]) $t
+	RefreshGrid false
+	RefreshMOBs
+	update
+}
+
+proc DoCommandPROGRESS {d} {
+	global progress_data
+
+	set id [dict get $d OperationID]
+	if [dict get $d IsDone] {
+		end_progress $id
+		return
+	}
+	if {![info exists progress_data($id:title)]} {
+		begin_progress $id [dict get $d Title] [dict get $d MaxValue]
+	}
+	if {[dict get $d Value] > 0} {
+		update_progress $id [dict get $d Value] [dict get $d MaxValue]
+	}
+}
+
+proc DoCommandPS {d} {
+	global canvas
+	PlaceSomeone $canvas $d
+	RefreshGrid false
+	RefreshMOBs
+	update
+}
+
+proc DoCommandROLL {d} {
+	DisplayDieRoll $d
+	ChatHistoryAppend [list ROLL $d [dict get $d MessageID]]
+}
+
+proc DoCommandTO {d} {
+	DisplayChatMessage $d
+	ChatHistoryAppend [list TO $d [dict get $d MessageID]]
 }
 
 #
@@ -9597,32 +9787,40 @@ proc format_with_style {value format} {
 }
 
 set drd_id 0
-proc DisplayDieRoll {from recipientlist title result details} {
+#proc DisplayDieRoll {from recipientlist title result details} 
+proc DisplayDieRoll {d} {
 	global icon_die16 icon_die16c SuppressChat drd_id
 
 	if {$SuppressChat} {
 		return
 	}
 
+	::gmautil::dassign $d \
+		Sender           from \
+		Recipients       recipientlist \
+		Title            title \
+		{Result Result}  result \
+		{Result Details} details
+
 	set w .chatwindow.p.chat
 
 	if {![winfo exists $w]} {
-		DisplayChatMessage {} {} {}
+		DisplayChatMessage {}
 	}
 	set icon $icon_die16
-	foreach tuple $details {
-		if {[lindex $tuple 0] eq "critlabel"} {
+	foreach dd $details {
+		if {[dict get $dd Type] eq "critlabel"} {
 			set icon $icon_die16c
 			break
 		}
 	}
 
-	TranscribeDieRoll $from $recipientlist $title $result $details
+	TranscribeDieRoll $from $recipientlist $title $result $details [dict get $d ToAll] [dict get $d ToGM]
 	$w.1.text configure -state normal
 	$w.1.text image create end -align baseline -image $icon -padx 2
 	$w.1.text insert end [format_with_style $result fullresult] fullresult
 	$w.1.text insert end " "
-	ChatAttribution $w.1.text $from $recipientlist
+	ChatAttribution $w.1.text $from $recipientlist [dict get $d ToAll] [dict get $d ToGM]
 	if {$title != {}} {
 		global display_styles
 		if [catch {
@@ -9658,9 +9856,9 @@ proc DisplayDieRoll {from recipientlist title result details} {
 	}
 #				critspec  {$w.1.text insert end "  [lindex $tuple 1]" [lindex $tuple 0]}
 	if [catch {
-		foreach tuple $details {
-			$w.1.text insert end [format_with_style [lindex $tuple 1] [lindex $tuple 0]] [lindex $tuple 0]
-			DEBUG 3 "DisplayDieRoll: $tuple"
+		foreach dd $details {
+			$w.1.text insert end [format_with_style [dict get $dd Value] [dict get $dd Type]] [dict get $dd Type]
+			DEBUG 3 "DisplayDieRoll: $dd"
 		}
 	} err] {
 		DEBUG 0 $err
@@ -9926,11 +10124,13 @@ proc _resize_die_roller {w width height type} {
 	set resize_task($type) {}
 }
 
-proc DisplayChatMessage {from recipientlist message args} {
+# DisplayChatMessage d ?-noopen? ?-system?
+proc DisplayChatMessage {d args} {
 	global dark_mode SuppressChat CHAT_TO CHAT_text check_select_color
 	global icon_die16 icon_info20 icon_arrow_refresh check_menu_color
 	global icon_delete icon_add icon_open icon_save ChatTranscript
 	global last_known_size display_styles CHAT_blind global_bg_color
+	::gmautil::dassign $d Sender from Recipients recipientlist Text message
 
 	if $SuppressChat return
 	if {![::gmaproto::is_ready]} {
@@ -10064,20 +10264,20 @@ proc DisplayChatMessage {from recipientlist message args} {
 		LoadChatHistory
 	}
 
-	if {$message == {} && $recipientlist == {} && $from == {}} {
+	if {$d eq {}} {
 		return
 	}
 
 	set system [expr [lsearch -exact $args "-system"] >= 0] 
-	_render_chat_message $wc.1.text $system $message $recipientlist $from
+	_render_chat_message $wc.1.text $system $message $recipientlist $from [dict get $d ToAll] [dict get $d ToGM]
 	if {$system} {
-		TranscribeChat (system) $recipientlist $message
+		TranscribeChat (system) $recipientlist $message [dict get $d ToAll] [dict get $d ToGM]
 	} else {
-		TranscribeChat $from $recipientlist $message
+		TranscribeChat $from $recipientlist $message [dict get $d ToAll] [dict get $d ToGM]
 	}
 }
 
-proc _render_chat_message {w system message recipientlist from} {
+proc _render_chat_message {w system message recipientlist from toall togm} {
 	global SuppressChat
 
 	if {!$SuppressChat && [winfo exists $w]} {
@@ -10085,7 +10285,7 @@ proc _render_chat_message {w system message recipientlist from} {
 		if {$system} {
 			$w insert end "$message\n" system
 		} else {
-			ChatAttribution $w $from $recipientlist
+			ChatAttribution $w $from $recipientlist $toall $togm
 			$w insert end "$message\n" normal
 		}
 		$w see end
@@ -10111,21 +10311,122 @@ proc ChatMessageID {message} {
 }
 
 # check if the string at least appears to be a valid message
-proc IsMessageValid {message} {
-    if {![string is list $message] || [catch {set n [llength $message]}]} {
-        return false
-    }
-    switch -- [lindex $message 0] {
-        ROLL    {if {$n != 7} {return false} else {return true}}
-        TO      {if {$n != 5} {return false} else {return true}}
-        CC      {if {$n != 4} {return false} else {return true}}
-        -system {if {$n != 4} {return false} else {return true}}
-    }
-    return false
+#DEL#proc IsMessageValid {message} {
+#DEL#    if {![string is list $message] || [catch {set n [llength $message]}]} {
+#DEL#        return false
+#DEL#    }
+#DEL#    switch -- [lindex $message 0] {
+#DEL#        ROLL    {if {$n != 7} {return false} else {return true}}
+#DEL#        TO      {if {$n != 5} {return false} else {return true}}
+#DEL#        CC      {if {$n != 4} {return false} else {return true}}
+#DEL#        -system {if {$n != 4} {return false} else {return true}}
+#DEL#    }
+#DEL#    return false
+#DEL#}
+
+# translate old-style entries into new ones
+# return valid entry or empty string
+proc ValidateChatHistoryEntry {e} {
+	if {![string is list $e] || [catch {set n [llength $e]}]} {
+		return {}
+	}
+
+	# old: 	-system * <message> -1
+	# new:	-system <message> -1
+	if {[lindex $e 0] eq {-system}} {
+		if {$n == 4 && [lindex $e 3] == -1 && [lindex $e 1] eq "*"} {
+			return [list -system [lindex $e 2] -1]
+		}
+		if {$n == 3 && [lindex $e 2] == -1} {
+			return $e
+		}
+		return {}
+	}
+
+	switch -exact -- [lindex $e 0] {
+		ROLL {
+			# old: ROLL from recip title result rlist mid
+			# new: ROLL d mid
+			if {$n == 7} {
+				return [list ROLL [ParseRecipientList ROLL [lindex $e 2]\
+					Sender [lindex $e 1]\
+					Title  [lindex $e 3]\
+					{Result Result} [lindex $e 4]\
+					{Result Details} $dlist\
+					MessageID [lindex $e 6]\
+				] [lindex $e 6]]
+			}
+			if {$n == 3} {
+				return $e
+			}
+			return {}
+		}
+		TO {
+			# old: TO from recip msg mid
+			# new: TO d mid
+			if {$n == 5} {
+				return [list TO [ParseRecipientList TO [lindex $e 2]\
+					Sender [lindex $e 1]\
+					Text [lindex $e 3]\
+					MessageID [lindex $e 4]\
+				] [lindex $e 4]]
+			}
+			if {$n == 3} {
+				return $e
+			}
+			return {}
+		}
+		CC {
+			# old: CC from target mid
+			# new: CC d mid
+			if {$n == 4} {
+				set dd [::gmaproto::new_dict CC \
+					RequestedBy [lindex $e 1]\
+					Target [lindex $e 2]\
+					MessageID [lindex $e 3]\
+				]
+				if {[lindex $e 1] eq "*"} {
+					dict set dd RequestedBy {}
+					dict set dd DoSilently true
+				}
+			
+				return [list CC $dd [lindex $e 3]]
+			}
+			if {$n == 3} {
+				return $e
+			}
+			return {}
+		}
+	}
+	return {}
 }
 	
-proc ClearChatHistory {by target messageID} {
+proc ParseRecipientList {r type args} {
+	set d [::gmaproto::new_dict $type {*}$args]
+	foreach recip $r {
+		if {$recip eq "*"} {
+			dict set d ToAll true
+		} elseif {$recip eq "%"} {
+			dict set d ToGM true
+		} else {
+			dict lappend d Recipients $recip
+		}
+	}
+	if [dict get $d ToGM] {
+		dict set d ToAll false
+		dict set d Recipients {}
+	}
+	if [dict get $d ToAll] {
+		dict set d Recipients {}
+	}
+	return $d
+}
+
+
+proc ClearChatHistory {d} {
 	global ChatHistory
+	::gmautil::dassign $d RequestedBy by Target target 
+
 	if {$target eq {} || $target == 0} {
 		set ChatHistory {}
 	} elseif {$target < 0} {
@@ -10134,9 +10435,9 @@ proc ClearChatHistory {by target messageID} {
 		set old $ChatHistory
 		set ChatHistory {}
 		foreach msg $old {
-			set mID [ChatMessageID $msg]
+			set mID [lindex $msg 2]
 			if {$mID eq {} || $mID >= $target} {	
-				if {[IsMessageValid $msg]} {
+				if {[set msg [ValidateChatHistoryEntry $msg]] ne {}} {
 				    lappend ChatHistory $msg
 				} else {
 				    DEBUG 1 "ClearChatHistory: Invalid message $msg"
@@ -10144,7 +10445,7 @@ proc ClearChatHistory {by target messageID} {
 			}
 		}
 	}
-	if {$by eq {}} {
+	if {[dict get $d DoSilently]} {
 		_log_transcription "\[---chat history cleared---\]"
 	} elseif {$by eq "*"} {
 		_log_transcription "\[---chat history cleared/re-synced---\]"
@@ -10156,17 +10457,21 @@ proc ClearChatHistory {by target messageID} {
 #
 # Load up the chat window with what's in our in-memory chat history list.
 #
+#	_render_chat_message $wc.1.text $system $message $recipientlist $from [dict get $d ToAll] [dict get $d ToGM]
 proc LoadChatHistory {} {
 	global ChatHistory
 	set w .chatwindow.p.chat.1.text
 
 	foreach msg $ChatHistory {
-		switch -- [lindex $msg 0] {
-			ROLL { DisplayDieRoll {*}[lrange $msg 1 5] }
-			TO   { _render_chat_message $w [expr "{[lindex $msg 1]}" eq {{-system}}] [lindex $msg 3] [lindex $msg 2] [lindex $msg 1] }
-			CC	 {
-				set by [lindex $msg 1]
-				if {$by eq {}} {
+		lassign $msg msg_type d msg_id
+
+		switch -exact -- $msg_type {
+			-system { _render_chat_message $w true $d {} {} false false }
+			TO      { _render_chat_message $w false [dict get $d Text] [dict get $d Recipients] [dict get $d Sender] [dict get $d ToAll] [dict get $d ToGM] }
+			ROLL    { DisplayDieRoll $d }
+			CC	{
+				set by [dict get $d RequestedBy]
+				if {[dict get $d DoSilently]} {
 					_render_chat_message $w 1 "Chat history cleared." {} {}
 				} elseif {$by eq "*"} {
 					_render_chat_message $w 1 "Chat history cleared/re-synced." {} {}
@@ -10208,10 +10513,10 @@ proc LoadChatHistory {} {
 
 
 set chat_transcript_file {}
-proc TranscribeChat {from recipientlist message} {
+proc TranscribeChat {from recipientlist message toall togm} {
 	global ChatTranscript
 	if {$ChatTranscript ne {}} {
-		if {[set private [Chat_text_attribution $from $recipientlist]] eq {}} {
+		if {[set private [Chat_text_attribution $from $recipientlist $toall $togm]] eq {}} {
 			_log_transcription "$from: $message"
 		} else {
 			_log_transcription "$from ($private): $message"
@@ -10235,11 +10540,11 @@ proc _log_transcription {message} {
 	}
 }
 
-proc TranscribeDieRoll {from recipientlist title result details} {
+proc TranscribeDieRoll {from recipientlist title result details toall togm} {
 	global ChatTranscript
 
 	if {$ChatTranscript ne {}} {
-		if {[set private [Chat_text_attribution $from $recipientlist]] eq {}} {
+		if {[set private [Chat_text_attribution $from $recipientlist $toall $togm]] eq {}} {
 			set message "\[ROLL $result\] $from: "
 		} else {
 			set message "\[ROLL $result\] $from ($private): "
@@ -10248,7 +10553,7 @@ proc TranscribeDieRoll {from recipientlist title result details} {
 			append message "$title: "
 		}
 		if [catch {
-			foreach tuple $details {
+			foreach dd $details {
 				# operator 	"op"
 				# label    	" text"
 				# [max]roll "{n,n,n,n,n,...,n}"
@@ -10270,14 +10575,14 @@ proc TranscribeDieRoll {from recipientlist title result details} {
 				# critspec	"c..."
 				# critlabel	"Confirm:"
 				# subtotal      "(n)"
-				switch -exact [lindex $tuple 0] {
-					discarded	{append message "(DISCARDED: [lindex $tuple 1])"}
-					maxroll		{append message "(MAXIMIZED: [lindex $tuple 1])"}
-					diebonus	{append message "(per-die bonus [lindex $tuple 1])"}
-					fullmax     {append message "MAXIMIZED ROLL: [lindex $tuple 1]"}
-					subtotal    {append message "([lindex $tuple 1])"}
-					roll        {append message "{[lindex $tuple 1]}"}
-					default 	{append message [lindex $tuple 1]}
+				switch -exact [dict get $dd Type] {
+					discarded	{append message "(DISCARDED: [dict get $dd Value])"}
+					maxroll		{append message "(MAXIMIZED: [dict get $dd Value])"}
+					diebonus	{append message "(per-die bonus [dict get $dd Value])"}
+					fullmax     {append message "MAXIMIZED ROLL: [dict get $dd Value]"}
+					subtotal    {append message "([dict get $dd Value])"}
+					roll        {append message "{[dict get $dd Value]}"}
+					default 	{append message [dict get $dd Value]}
 				}
 			}
 		} err] {
@@ -10288,27 +10593,19 @@ proc TranscribeDieRoll {from recipientlist title result details} {
 	}
 }
 
-proc Chat_text_attribution {from recipientlist} {
+proc Chat_text_attribution {from recipientlist toall togm} {
 	global local_user
 
+	if {$togm} {return {blind to GM}}
+	if {$toall} {return {}}
 	if {[llength $recipientlist] == 1} {
-		if {$recipientlist == {%}} {
-			return {blind to GM}
-		} elseif {$recipientlist == "*"} {
-			return {}
-		} elseif {$from eq $local_user} {
+		if {$from eq $local_user} {
 			return "private to $recipientlist"
 		} else {
 			return "private"
 		}
 	} else {
-		if {[lsearch -exact $recipientlist %] >= 0} {
-			return {blind to GM}
-		} elseif {[lsearch -exact $recipientlist *] >= 0} {
-			return {}
-		} else {
-			return "to [join $recipientlist {, }]"
-		}
+		return "to [join $recipientlist {, }]"
 	}
 }
 
@@ -10457,9 +10754,9 @@ proc CommitNewPreset {} {
 	destroy $w
 }
 
-proc ChatAttribution {w from recipientlist} {
+proc ChatAttribution {w from recipientlist toall togm} {
 	global local_user
-	if {[set private [Chat_text_attribution $from $recipientlist]] eq {}} {
+	if {[set private [Chat_text_attribution $from $recipientlist $toall $togm]] eq {}} {
 		$w insert end [format_with_style "${from}: " from] from
 	} else {
 		$w insert end [format_with_style $from from] from
@@ -10490,15 +10787,15 @@ proc UpdatePeerList {} {
 	foreach peer_name [array names LastKnownPeers] {
 		if {[lsearch -exact $PeerList $peer_name] < 0} {
 			unset LastKnownPeers($peer_name)
-			DisplayChatMessage {} * "$peer_name disconnected." -noopen -system
-			ChatHistoryAppend [list -system * "$peer_name disconnected." -1]
+			DisplayChatMessage [::gmaproto::new_dict TO Text "$peer_name disconnected."] -noopen -system
+			ChatHistoryAppend [list -system "$peer_name disconnected." -1]
 		}
 	}
 	foreach peer_name $PeerList {
 		if {! [info exists LastKnownPeers($peer_name)]} {
 			set LastKnownPeers($peer_name) 1
-			DisplayChatMessage {} * "$peer_name joined." -noopen -system
-			ChatHistoryAppend [list -system * "$peer_name joined." -1]
+			DisplayChatMessage [::gmaproto::new_dict TO Text "$peer_name joined."] -noopen -system
+			ChatHistoryAppend [list -system "$peer_name joined." -1]
 		}
 	}
 }
@@ -11700,16 +11997,16 @@ proc InitializeChatHistory {} {
 				set ChatHistoryFileHandle {}
 			} else {
 				while {[gets $ChatHistoryFileHandle msg] >= 0} {
-                    if {[IsMessageValid $msg]} {
-                        switch -- [lindex $msg 0] {
-                            TO		{ set ChatHistoryLastMessageID [expr max($ChatHistoryLastMessageID, [lindex $msg 4])] }
-                            ROLL	{ set ChatHistoryLastMessageID [expr max($ChatHistoryLastMessageID, [lindex $msg 6])] }
-                            CC		{ set ChatHistory {} }
-                        }
-                        lappend ChatHistory $msg
-                    } else {
-                        DEBUG 1 "InitializeChatHistory: rejecting invalid message $msg from $ChatHistoryFile"
-                    }
+					if {[set msg [ValidateChatHistoryEntry $msg]] ne {}} {
+						if {[lindex $msg 0] eq {CC}} {
+							set ChatHistory {}
+						} else {
+							set ChatHistoryLastMessageID [expr max($ChatHistoryLastMessageID, [lindex $msg 2]]
+						}
+						lappend ChatHistory $msg
+					} else {
+						DEBUG 1 "InitializeChatHistory: rejecting invalid messsage $msg from $ChatHistoryFile"
+					}
 				}
 				close $ChatHistoryFileHandle
 				set ChatHistoryFileHandle {}
@@ -11740,14 +12037,14 @@ proc InitializeChatHistory {} {
 		if {$ChatHistoryLastMessageID <= 0} {
 			if {$ChatHistoryLimit > 0} {
 				DEBUG 1 "We don't have any loaded history; asking server for up to $ChatHistoryLimit messages."
-				ITsend [list SYNC CHAT -$ChatHistoryLimit]
+				::gmaproto::sync_chat -$ChatHistoryLimit
 			} else {
 				DEBUG 1 "We don't have any loaded history; asking server all messages."
-				ITsend [list SYNC CHAT]
+				::gmaproto::sync_chat 0
 			}
 		} else {
 			DEBUG 1 "Asking server for any new messages since $ChatHistoryLastMessageID."
-			ITsend [list SYNC CHAT $ChatHistoryLastMessageID]
+			::gmaproto::sync_chat $ChatHistoryLastMessageID
 		}
 	}
 }
@@ -11760,24 +12057,24 @@ set _last_known_message_id 0
 
 proc ChatHistoryAppend {event} {
 	global ChatHistory ChatHistoryFileHandle _last_known_message_id
-    if {[IsMessageValid $event]} {
-        set mid [ChatMessageID $event]
-        if {$mid eq {} || $mid < 0} {
-            set mid ${_last_known_message_id}
-        }
-        if {$mid >= ${_last_known_message_id}} {
-            lappend ChatHistory $event
-            set _last_known_message_id $mid
-            if {$ChatHistoryFileHandle ne {}} {
-                puts $ChatHistoryFileHandle $event
-                flush $ChatHistoryFileHandle
-            }
-        } else {
-            DEBUG 1 "Rejected chat message $event; message ID $mid < ${_last_known_message_id}"
-        }
-    } else {
-        DEBUG 1 "Rejected invalid chat message '$event'"
-    }
+
+	if {[set m [ValidateChatHistoryEntry $event]] ne {}} {
+		set mid [lindex $m 2]
+		if {$mid eq {} || $mid < 0} {
+			set mid ${_last_known_message_id}
+		}
+		if {$mid >= ${_last_known_messsage_id}} {
+			lappend ChatHistory $m
+			if {$ChatHistoryFileHandle ne {}} {
+				puts $ChatHistoryFileHandle $m
+				flush $ChatHistoryFileHandle
+			}
+		} else {
+		    DEBUG 1 "Rejected chat message $m; message ID $mid < ${_last_known_message_id}"
+		}
+	} else {
+		DEBUG 1 "Rejected invalid chat message '$event'"
+	}
 }
 
 proc PingMarker {w x y} {
