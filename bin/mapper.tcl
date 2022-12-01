@@ -8778,7 +8778,11 @@ proc BackgroundConnectToServer {tries} {
 #
 # Server interaction
 #
-proc DefinePlayerCharacter {d} {
+#
+# Hooks for specific incoming server messages
+#
+proc DoCommandAC {d} {
+	# Add character to the menu
 	global PC_IDs
 	::gmautil::dassign $d Name name ObjID id Color color Area area Size size
 	set creature_name [AcceptCreatureImageName $name]
@@ -8794,11 +8798,80 @@ proc DefinePlayerCharacter {d} {
 	}
 }
 
-proc DefineStatusMarker {d} {
-	set condition [dict get $d Condition]
-	set shape [dict get $d Shape]
-	set color [dict get $d Color]
-	set description [dict get $d Description]
+proc DoCommandAI {d} {
+	# add image
+	set name [dict get $d Name]
+	foreach instance [dict get $d Sizes] {
+		::gmautil::dassign $instance File server_id ImageData raw_data IsLocalFile localp Zoom zoom
+		if {$raw_data eq {} && $localp} {
+			DEBUG 2 "Loading local image file $server_id for $name @$zoom"
+			if [catch {
+				set f [open $server_id r]
+				fconfigure $f -encoding binary -translation binary
+				set raw_data [read $f]
+				close $f
+			} err] {
+				error "Unable to load image file $server_id: $err"
+			}
+		}
+		if {$raw_data ne {}} {
+			DEBUG 2 "Received binary image data for $name @$zoom"
+
+			global TILE_SET
+			set t_id [tile_id $name $zoom]
+			if [info exists TILE_SET($t_id)] {
+				DEBUG 1 "Replacing existing image $TILE_SET($t_id) for ${name} x$zoom"
+				image delete $TILE_SET($t_id)
+				unset TILE_SET($t_id)
+			}
+			set TILE_SET($t_id) [image create photo -format gif -data $raw_data]
+			DEBUG 3 "Defined bitmap for $name at $zoom: $TILE_SET($t_id)"
+		} else {
+			DEBUG 2 "Caching copy of server image $server_id for $name @$zoom"
+			fetch_image $name $zoom $server_id
+		}
+	}
+	update
+}
+
+proc DoCommandAI? {d} {
+	# query: Do we know where to find an image?
+	global TILE_ID
+
+	set name [dict get $d Name]
+	foreach instance [dict get $d Sizes] {
+		set zoom [dict get $instance Zoom]
+		if [info exists TILE_ID([tile_id $name $zoom])] {
+			# yes, we do! let everyone else know
+			::gmaproto::add_image $name [list [dict create \
+				File        $TILE_ID([tile_id $name $zoom]) \
+				IsLocalFile false \
+				Zoom        $zoom \
+			]]
+		}
+	}
+}
+
+proc DoCommandAV {d} {
+	AdjustView [dict get $d XView] [dict get $d YView]
+}
+
+proc DoCommandCC {d} {
+	# clear chat history
+	if [dict get $d DoSilently] {
+		set by {}
+	} else {
+		set by [dict get $d RequestedBy]
+	}
+
+	ClearChatHistory $by [dict get $d Target] [dict get $d MessageID]
+	ChatHistoryAppend [list CC _ _ [dict get $d MessageID]]
+	LoadChatHistory
+}
+
+proc DoCommandDSM {d} {
+	# define status marker
+	::gmautil::dsasign $d Condition condition Shape shape Color color Description description
 	global MarkerColor MarkerShape MarkerDescription
 
 	if {$shape eq {} || $color eq {}} {
@@ -8817,9 +8890,6 @@ proc DefineStatusMarker {d} {
 	}
 }
 
-#
-# Hooks for specific incoming server messages
-#
 proc DoCommandMARCO {d} {
 	::gmaproto::polo
 }
@@ -10056,7 +10126,7 @@ proc IsMessageValid {message} {
 	
 proc ClearChatHistory {by target messageID} {
 	global ChatHistory
-	if {$target eq {}} {
+	if {$target eq {} || $target == 0} {
 		set ChatHistory {}
 	} elseif {$target < 0} {
 		set ChatHistory [lrange $ChatHistory end-[expr abs($target)] end]
@@ -10066,11 +10136,11 @@ proc ClearChatHistory {by target messageID} {
 		foreach msg $old {
 			set mID [ChatMessageID $msg]
 			if {$mID eq {} || $mID >= $target} {	
-                if {[IsMessageValid $msg]} {
-                    lappend ChatHistory $msg
-                } else {
-                    DEBUG 1 "ClearChatHistory: Invalid message $msg"
-                }
+				if {[IsMessageValid $msg]} {
+				    lappend ChatHistory $msg
+				} else {
+				    DEBUG 1 "ClearChatHistory: Invalid message $msg"
+				}
 			}
 		}
 	}

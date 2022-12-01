@@ -733,6 +733,36 @@ If
 .I main
 is true, the client is also signalling that it wishes to be the primary client in the conversation.
 '\" <</>>
+.SH "EXTERNAL HOOKS"
+.LP
+This package will invoke the following procedures in the main application to carry out
+its operations, typically in response to having received a server command for the client
+to do something.
+.TP 10
+.BI "::DEBUG " level " " message
+This is called to report a diagnostic condition or provide some level of verbose detail
+about the operation of the communications package, except for the debugging of the actual
+protocol interactions, which is handled by the callback registered via
+.BR ::gmaproto::set_debug .
+.TP
+.BI "::report_progress " message
+Reports user-friendly progress information.
+.TP
+.BI "::say " message
+Displays an urgent message, probably in a modal dialog or alert box.
+.TP
+.BI ::DoCommand cmd " " params
+Handles the receipt of the server command
+.I cmd
+by the client.
+The
+.I params
+parameter is a dictionary of values as sent by the server.
+.TP
+.BI "::DoCommandError " cmd " " params " " err
+Handles any error encountered when trying to execute a
+.BI ::DoCommand cmd
+call.
 .SH DIAGNOSTICS
 .LP
 An exception is thrown if a serious error is encountered.
