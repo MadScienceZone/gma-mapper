@@ -1,0 +1,753 @@
+'\" t
+'\" <<bold-is-fixed>>
+'\" <<ital-is-var>>
+.TH GMAPROTO 3 "GMA Toolkit 4.5.0" 20-Nov-2022 "API Functions" \" @@mp@@
+.SH NAME
+gmaproto \- GMA client/server communication functions
+.SH SYNOPSIS
+'\" <<usage>>
+.na
+(If package installed globally)
+.br
+.B package
+.B require
+.B gmaproto
+.LP
+(Otherwise)
+.br
+.B source
+.B gmaproto.tcl
+.LP
+.B ::gmaproto::add_image
+.I name
+.I sizes
+.LP
+.B ::gmaproto::add_obj_attributes
+.I id
+.I attr
+.I values
+.LP
+.B ::gmaproto::adjust_view
+.I x
+.I y
+.LP
+.B ::gmaproto::allow
+.I features
+.LP
+.B ::gmaproto::auth_response
+.I challenge
+\[->]
+.I response
+.LP
+.B ::gmaproto::background_redial
+.I tries
+.LP
+.B ::gmaproto::chat_message
+.I message
+.I sender
+.I recipients
+.I to_all
+.I to_gm
+.LP
+.B ::gmaproto::clear
+.I id
+.LP
+.B ::gmaproto::clear_chat
+.I silent
+.I target
+.LP
+.B ::gmaproto::clear_from
+.I server_id
+.LP
+.B ::gmaproto::combat_mode
+.I bool
+.LP
+.B ::gmaproto::comment
+.I text
+.LP
+.B ::gmaproto::DEBUG
+.I msg
+.LP
+.B ::gmaproto::define_dice_presets
+.I plist
+.I append
+.LP
+.B ::gmaproto::dial
+.I host
+.I port
+.I user
+.I pass
+.I proxy
+.I pport
+.I puser
+.I ppass
+.I client
+.LP
+.B ::gmaproto::filter_dice_presets
+.I regex
+.LP
+.B ::gmaproto::from_enum
+.I key
+.I int
+\[->]
+.I value
+.LP
+.B ::gmaproto::GMATypeToObjType
+.I gtype
+\[->]
+.I otype
+.LP
+.B ::gmaproto::int_bool
+.I bool
+\[->]
+.I int
+.LP
+.B ::gmaproto::is_connected
+\[->]
+.I bool
+.LP
+.B ::gmaproto::is_ready
+\[->]
+.I bool
+.LP
+.B ::gmaproto::json_bool
+.I bool
+\[->]
+.I str
+.LP
+.B ::gmaproto::ls
+.I type
+.I d
+.LP
+.B ::gmaproto::load_from
+.I server_id
+.I cache_only
+.I merge
+.LP
+.B ::gmaproto::mark
+.I x
+.I y
+.LP
+.B ::gmaproto::new_dict
+.I command
+.RI ? key
+.IR value ?
+.RI ? key
+.IR value ...?
+\[->]
+.I d
+.LP
+.B ::gmaproto::new_id
+\[->]
+.I uuid 
+.LP
+.B ::gmaproto::ObjTypeToGMAType
+.I otype
+.RB ? \-protocol ?
+\[->]
+.I gtype
+.LP
+.B ::gmaproto::place_someone
+.I id
+.I color
+.I name
+.I area
+.I size
+.I type
+.I gx
+.I gy
+.I reach
+.I health
+.I skin
+.I skin_sizes
+.I elev
+.I note
+.I status_list
+.I aoe
+.I move_mode
+.I killed
+.I dim
+.LP
+.B ::gmaproto::place_someone_d
+.I d
+.LP
+.B ::gmaproto::polo
+.LP
+.B ::gmaproto::query_dice_presets
+.LP
+.B ::gmaproto::query_image
+.I name
+.I size
+.LP
+.B ::gmaproto::remove_obj_attributes
+.I id
+.I attr
+.I values
+.LP
+.B ::gmaproto::redial
+.LP
+.B ::gmaproto::roll_dice
+.I spec
+.I recipients
+.I to_all
+.I blind_to_gm
+.LP
+.B ::gmaproto::set_debug
+.B cmd
+.LP
+.B ::gmaproto::subscribe
+.I msglist
+.LP
+.B ::gmaproto::sync
+.LP
+.B ::gmaproto::sync_chat
+.I target
+.LP
+.B ::gmaproto::to_enum
+.I key
+.I value
+\[->]
+.I int
+.LP
+.B ::gmaproto::toolbar
+.I bool
+.LP
+.B ::gmaproto::update_clock
+.I abs
+.I rel
+.LP
+.B ::gmaproto::update_obj_attributes
+.I id
+.I kvdict
+.LP
+.B ::gmaproto::update_progress
+.I id
+.I title
+.I value
+.I max
+.I done
+\[->]
+.I id
+.LP
+.B ::gmaproto::update_status_marker
+.I condition
+.I shape
+.I color
+.I description
+.LP
+.B ::gmaproto::write_only
+.I main
+.ad
+'\" <</usage>>
+.SH DESCRIPTION
+.LP
+This module provides the functionality for communicating with the server, including
+low-level communications, legacy protocol translation, and dispatching incoming
+server commands to the mapper for execution.
+'\" <<list>>
+.TP 10
+.BI "::gmaproto::add_image " name " " sizes
+Send image information to the server for the image with the given
+.I name
+(the messsage ID as referenced in map files and in the client).
+The
+.I sizes
+parameter is a Tcl list of dictionaries describing each instance of each zoomed size
+of that image as documented in
+.BR mapper (6).
+This sends the 
+.B AI
+protocol command.
+.TP
+.BI "::gmaproto::add_obj_attributes " id " " attr " " values
+Tell the other clients to adjust the object with the given
+.I id
+by adding each string in the Tcl list
+.I values
+to their field named 
+.IR attr ,
+which must be a field that accepts a list of strings.
+This sends the
+.B OA+
+protocol command.
+.TP
+.BI "::gmaproto::adjust_view " x " " y
+Tell other clients to ajust their scrollbars so that the
+distance scrolled is 
+.I x
+to the right and
+.I y
+down, where 
+.I x
+and
+.I y
+are values between 0 and 1, which indicate the proportion of full range to move the
+scrollbars.
+This sends the
+.B AV
+protocol command.
+.TP
+.BI "::gmaproto::allow " features
+Tell the server that you will allow the use of the listed optional
+.I features
+(a Tcl list of feature name strings).
+This sends the
+.B ALLOW
+protocol command.
+.TP
+.BI "::gmaproto::auth_response " challenge
+.I "You should not normally need to invoke this procedure directly."
+Given a binary
+.I challenge
+value from the server, this calculates and returns the binary
+response needed to authenticate to the server, using the password
+previously given to
+.BR ::gmaproto::dial .
+If the username given is still empty, it also attempts to find the 
+local username and sets the configured username to that value.
+.TP
+.BI "::gmaproto::background_redial " tries
+.I "You should not normally need to invoke this procedure directly."
+Attempts to reconnect to the server. If this fails, it schedules itself
+to run again in a few seconds, with the
+.I tries
+value incremented.
+.TP
+.BI "::gmaproto::chat_message " message " " sender " " recipients " " to_all " " to_gm
+Sends a chat 
+.I message
+to other clients. Clients should not set the 
+.I sender
+value. If 
+.I to_gm
+is true, the message will be sent only to the GM; otherwise, if 
+.I to_all
+is true, the message is sent to all clients; otherwise it is sent to the
+list of usernames in
+.IR recipients .
+This sends the
+.B To
+protocol command.
+.TP
+.BI "::gmaproto::clear " id
+Tells other clients to remove the object identified by
+.I id
+as documented in 
+.BR mapper (6).
+This sends the
+.B CLR
+protocol command.
+.TP
+.BI "::gmaproto::clear_chat " silent " " target
+Tells others to clear chat messages specified by the 
+.I target
+value. If
+.I silent
+is true, ask them not to advertise that this was done.
+This sends the
+.B CC
+protocol command.
+.TP
+.BI "::gmaproto::clear_from " server_id
+Instruct other clients to remove all elements from the map file 
+.IR server_id .
+This sends the 
+.B CLR@
+protocol command.
+.TP
+.BI "::gmaproto::combat_mode " bool
+Tell others to set combat mode if
+.I bool
+is true, otherwise unset it.
+This sends the
+.B CO
+protocol command.
+.TP
+.BI "::gmaproto::comment " text
+Send
+.I text
+as a comment to the server, which is probably a pointless thing to do.
+This sends the
+.B //
+protocol command.
+.TP
+.BI "::gmaproto::DEBUG " msg
+Send
+.I msg
+to the callback function configured via
+.BR ::gmaproto::set_debug .
+.TP
+.BI "::gmaproto::define_dice_presets " plist " " append
+Send a new set of die-roll presets to the server for storage.
+The
+.I plist
+parameter is a Tcl list of dictionaries describing each preset as per
+.BR mapper (6).
+If
+.I append
+is true, the elements in
+.I plist
+are added to the ones already on the server; otherwise they replace the
+server's current set.
+This sends the
+.B DD
+or
+.B DD+
+protocol command.
+.TP
+.BI "::gmaproto::dial " host " " port " " user " " password " " proxy " " pport " " puser " " ppass " " client
+This is the initial command you should call to establish a connection to the server on 
+.I host
+at the TCP
+.I port
+specified.
+Once the connection is established, the client will authenticate as the given
+.I user
+and 
+.I password
+and will note that the connecting client is called
+.IR client .
+If a SOCKS proxy is needed,
+.IR proxy ,
+.IR pport ,
+.IR puser ,
+and
+.I ppass
+give the proxy host, port, and login credentials to use.
+.RS
+.LP
+If the connection is lost, this package will automatically try to reconnect using the same
+parameters.
+.LP
+As incoming commands are received from the server, they are dispatched back to the application
+by calling a procedure named
+.RS
+.LP
+.BI ::DoCommand cmd
+.I d
+.RE
+.LP
+where 
+.I cmd
+is the server's command name. The single parameter
+.I d
+is a dictionary holding the command's parameter set.
+For example, if the server sent an
+.B AV
+command, then
+.B ::DoCommandAV
+would be called in the application.
+.LP
+If that failed, either because the command does not exist in the application or
+because it threw an error, then an error-handling function is called:
+.RS
+.LP
+.B ::DoCommandError
+.I cmd
+.I d
+.I err
+.RE
+.LP
+where 
+.I cmd
+is the original command name,
+.I d
+is the parameter dictionary, and
+.I err
+is the error message received.
+.RE
+.TP
+.BI "::gmaproto::filter_dice_presets " regex
+Asks the server to remove all stored die-roll presets whose names match the
+regular expression
+.IR regex .
+This sends the
+.B DD/
+protocol command.
+.TP
+.BI "::gmaproto::from_enum " key " " int
+Converts the integer value
+.I int
+into the enum string corresponding to that value for the enumerated type
+.I key
+.RB ( Dash ,
+.BR Join ,
+.BR MoveMode ,
+etc.).
+.TP
+.BI "::gmaproto::GMATypeToObjType " gtype
+Converts the object type name as used by the server to the corresponding name used inside the mapper
+application, and returns it.
+.TP
+.BI "::gmaproto::int_bool " bool
+Returns 1 if 
+.I bool
+is true, otherwise returns 0.
+.TP
+.B ::gmaproto::is_connected
+Returns true if the client has an active network connection to the server.
+.TP
+.B ::gmaproto::is_ready
+Returns true if the client has an active network connection and has successfully completed the initial
+negotion and authentication with the server.
+.TP
+.BI "::gmaproto::json_bool " bool
+Returns the boolean value passed as the string
+.B true
+or
+.BR false ,
+suitable for JSON strings.
+.TP
+.BI "::gmaproto::ls " type " " d
+Sends a map object to peer clients.
+.I Type
+is the GMA protocol type name
+.RB ( ARC ,
+.BR LINE ,
+etc.)
+and
+.I d
+is an appropriate dictionary value for that type.
+This sends the
+.BR LS\-ARC ,
+.BR LS\-LINE ,
+etc.
+protocol commands.
+.TP
+.BI "::gmaproto::load_from " server_id " " cache_only " " merge
+Tells other clients to load elements from the given server map file called
+.IR server_id .
+If 
+.I merge
+is true, the contents of that file should be merged with the existing map
+contents instead of replacing them.
+If
+.I cache_only
+is true, tell the clients to cache a copy of the file without actually
+loading anything from it.
+This sends the
+.B L
+protocol command.
+.TP
+.BI "::gmaproto::mark " x " " y
+Tell other clients to visually mark the location with the given map coordinates.
+This sends the
+.B MARK
+protocol command.
+.TP
+.BI "::gmaproto::new_dict " command " " \fR?\fPkey " " value\fR?\fP " " \fR?\fPkey " " value\fR...?\fP
+Construct a new dictionary suitable to hold the parameters for the given
+.IR command ,
+with all fields defaulted. Additionally, any
+.I key
+and
+.I value
+pairs specified set the given fields in the new dictionary. The dictionary value is returned.
+.TP
+.B ::gmaproto::new_id
+Generate a new unique ID suitable for use as object identifiers, and returns it.
+.TP
+.BI "::gmaproto::ObjTypeToGMAType " otype " \fR?\fP\-protocol\fR?\fP"
+Computes and returns the server type name corresponding to the mapper internal type name
+.IR otype .
+If the
+.B \-protocol
+option is given, the protocol command name (with
+.B LS\-
+prefix) is returned instead of the base type name.
+.TP
+.BI "::gmaproto::place_someone " id " " color " " name " " area " " size " " type " " gx " " gy " " reach " " health " " skin " " skin_sizes " " elev " " note " " status_list " " aoe " " move_mode " " killed " " dim
+Tells the other clients to place a creature token on the map as described. If another creature is already present with the same name,
+it is replaced by the new one.
+This sends the
+.B PS
+protocol command.
+.TP
+.BI "::gmaproto::place_someone_d " d
+Like
+.B ::gmaproto::place_someone
+but takes a dictionary instead of discrete parameters.
+.TP
+.B ::gmaproto::polo
+Sends a \*(lqstill alive\*(rq response to the server, typically in response to receiving a
+.B MARCO
+command. 
+This sends the
+.B POLO
+server command.
+.TP
+.B ::gmaproto::query_dice_presets
+Asks the server to send all of the stored presets.
+This sends the 
+.B DR
+protocol command.
+.TP
+.BI "::gmaproto::query_image " name " " size
+Asks the server and other clients if any of them have heard of the given image
+.I name
+at the requested zoom
+.IR size .
+This sends the 
+.B AI?
+protocol command.
+.TP
+.B ::gmaproto::query_peers
+Requests that the server send the list of currently-connected clients.
+This sends the
+.B /CONN
+protocol command.
+.TP
+.B ::gmaproto::redial
+Try to reconnect using the parameters given with the initial
+.B ::gmaproto::dial
+command. 
+.I "You don't normally need to call this directly."
+.TP
+.BI "::gmaproto::roll_dice " spec " " recipients " " to_all " " blind_to_gm
+Ask the server to roll the dice indicated by
+.IR spec .
+If
+.I blind_to_gm
+is true, the results are visible only to the GM; otherwise, if
+.I to_all
+is true, the results are sent to everyone; otherwise only to
+the list of user names in
+.IR recipients .
+This sends the
+.B D
+protocol command.
+.TP
+.BI "::gmaproto::set_debug " cmd
+Protocol debugging statements will be sent by calling
+.I cmd
+with a string parameter.
+.TP
+.BI "::gmaproto::subscribe " msglist
+Tell the server that we're only interested in receiving the command names listed in
+.IR msglist .
+If 
+.I msglist
+is empty, then tell the server we accept all messages.
+This sends the 
+.B ACCEPT
+protocol command.
+.TP
+.B ::gmaproto::sync
+Request that the server send a set of commands which will bring the client up to date with
+the current game state.
+This sends the
+.B SYNC
+protocol command.
+.TP
+.BI "::gmaproto::sync_chat " target
+Request that the server send some or all (per the
+.IR target )
+value of the historical chat messages to the client.
+This sends the 
+.B "SYNC\-CHAT"
+protocol command.
+.TP
+.BI "::gmaproto::to_enum " key " " value
+Converts and returns the integer associated with the 
+.I value
+in the enumerated type
+.IR key .
+.TP
+.BI "::gmaproto::toolbar " bool
+Tells other clients to turn on their toolbars if
+.I bool
+is true; otherwise turn them off.
+This sends the
+.B TB
+protocol command.
+.TP
+.BI "::gmaproto::update_clock " absolute " " relative
+Updates the game clock to the given
+.I absolute
+and 
+.I relative
+time values.
+This sends the
+.B CS
+protocol command.
+.TP
+.BI "::gmaproto::update_obj_attributes " id " " kvdict
+Instructs the other clients to update the state of the object with the given
+.I id
+by setting each of the objects fields named as keys in 
+.I kvdict
+with their corresponding values.
+This sends the 
+.B OA
+protocol command.
+.TP
+.BI "::gmaproto::update_progress " id " " title " " value " " max " " done
+Instructs peers to display a progress meter with the given
+.I id
+(creating a new one if that is not an existing progress bar
+.IR id ).
+If 
+.I done
+is true, this is notice that the progress bar is no longer needed.
+.RS
+.LP
+If
+.I id
+is specified as 
+.BR * ,
+then a new ID will be generated.
+.LP
+If
+.I max
+is zero
+or
+.BR * ,
+then we are saying we don't know what the maximum value will be and the client
+should give a progress bar that shows activity but not specific progress toward a known
+goal.
+.LP
+This sends the
+.B PROGRESS
+potocol command.
+.LP
+The progress indicator's
+.I id
+is returned.
+.RE
+.TP
+.BI "::gmaproto::update_status_marker " condition " " shape " " color " " description
+Tells the server to define a new status marker for
+.I condition
+with the given
+.IR shape ,
+.IR color ,
+and
+.IR description .
+This sends the
+.B DSM
+protocol command.
+.TP
+.BI "::gmaproto::write_only " main
+Tells the server that this client no longer wishes to receive any messages from it.
+If
+.I main
+is true, the client is also signalling that it wishes to be the primary client in the conversation.
+'\" <</>>
+.SH DIAGNOSTICS
+.LP
+An exception is thrown if a serious error is encountered.
+.LP
+Messages are printed to standard output to indicate progress or provide debugging information.
+.LP
+The registered debugging hook is also used to print debugging and diagnostic messages.
+.SH "SEE ALSO"
+.SH AUTHOR
+.LP
+Steve Willoughby / steve@madscience.zone.
+.SH HISTORY
+.LP
+This document describes version 1.0 of the 
+.B gmaproto
+package, released in December 2022.
+.SH COPYRIGHT
+Part of the GMA software suite, copyright \(co 1992\-2022 by Steven L. Willoughby, Aloha, Oregon, USA. All Rights Reserved. Distributed under BSD-3-Clause License. \"@m(c)@

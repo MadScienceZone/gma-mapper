@@ -69,9 +69,9 @@
 #
 # background_redial -> redial
 # dial -> redial (opens socket) -> login
-# receive (queues up input line) -> XXXparseXXX / background_redial
+# _receive (queues up input line) -> XXXparseXXX / background_redial
 # _protocol_send cmd args (encode) -> XXXsendXXX
-# parse_data_packet raw -> {cmd params} / {ERROR {error raw}} / {// raw} / {PROTOCOL v} / {UNDEFINED raw}
+# _parse_data_packet raw -> {cmd params} / {ERROR {error raw}} / {// raw} / {PROTOCOL v} / {UNDEFINED raw}
 # _legacy_login cmd params	login but for protocols <400
 # _login			login client, any protocol
 #
@@ -80,7 +80,7 @@
 # _encode_payload inputdict typedict -> json
 # _construct input types -> dict
 # new_id -> uuid
-# _read_poll (pop queued input line) -> parse_data_packet -> or returns {"" ""} if no data ready
+# _read_poll (pop queued input line) -> _parse_data_packet -> or returns {"" ""} if no data ready
 # _show
 #
 # external dependencies:
@@ -90,7 +90,7 @@
 # 	::DefinePlayerCharacter name id color area size
 # 	::DefineStatusMarker condition shape color description
 
-package provide gmaproto 0.1
+package provide gmaproto 1.0
 package require Tcl 8.5
 package require json 1.3.4
 package require json::write 1.0.3
@@ -295,14 +295,14 @@ proc ::gmaproto::redial {} {
 		set ::gmaproto::sock [socket $::gmaproto::host $::gmaproto::port]
 	}
 	fconfigure $::gmaproto::sock -blocking 0
-	fileevent $::gmaproto::sock readable "::gmaproto::receive $::gmaproto::sock"
+	fileevent $::gmaproto::sock readable "::gmaproto::_receive $::gmaproto::sock"
 
 	if [catch {::gmaproto::_login} err] {
 		say "Attempt to sign on to server failed: $err"
 	}
 }
 
-proc ::gmaproto::receive {s} {
+proc ::gmaproto::_receive {s} {
 	if {[gets $s event] == -1} {
 		if [eof $s] {
 			::DEBUG 0 "Lost connection to map server"
@@ -418,12 +418,12 @@ proc ::gmaproto::_protocol_encode {command kvdict} {
 	return $message
 }
 
-# backport_message raw_message -> {old_format_raw_message ...}
-proc ::gmaproto::backport_message {new_message} {
+# _backport_message raw_message -> {old_format_raw_message ...}
+proc ::gmaproto::_backport_message {new_message} {
 	set nparams {}
 	set newlist {}
 	::gmaproto::DEBUG "converting $new_message to old-style protocol message"
-	lassign [::gmaproto::parse_data_packet $new_message] cmd params
+	lassign [::gmaproto::_parse_data_packet $new_message] cmd params
 	switch -exact -- $cmd {
 		// 	{ set nparams $params }	
 		ACCEPT 	{ set nparams [dict get $params Messages] }
@@ -710,7 +710,7 @@ proc ::gmaproto::backport_message {new_message} {
 
 proc ::gmaproto::_raw_send {message} {
 	if {$::gmaproto::legacy} {
-		set messages [::gmaproto::backport_message $message]
+		set messages [::gmaproto::_backport_message $message]
 	} else {
 		set messages [list $message]
 	}
@@ -851,7 +851,7 @@ proc ::gmaproto::_show {} {
 # 	If the command is not recognized, returns {UNDEFINED <raw_line>}
 # 	Comments are returned as {// <raw_line>}, which includes the // in the <raw_line>.
 #
-proc ::gmaproto::parse_data_packet {raw_line} {
+proc ::gmaproto::_parse_data_packet {raw_line} {
 	set raw_line [string trim $raw_line]
 	if {[string range $raw_line 0 1] eq "//"} {
 		return [list // $raw_line]
@@ -1056,18 +1056,12 @@ proc ::gmaproto::combat_mode {enabled} {
 proc ::gmaproto::comment {text} {
 	::gmaproto::_protocol_send_raw "// $text"
 }
+
 proc ::gmaproto::define_dice_presets {plist app} {
-	set p {}
-	foreach p in $plist {
-		if {[llength $p] != 3} {
-			error "dice presets must be 3-element tuples"
-		}
-		lappend p [dict create Name [lindex $p 0] Description [lindex $p 1] DieRollSpec [lindex $p 2]]
-	}
 	if {$app} {
-		::gmaproto::_protocol_send DD+ Presets $p
+		::gmaproto::_protocol_send DD+ Presets $plist
 	} else {
-		::gmaproto::_protocol_send DD Presets $p
+		::gmaproto::_protocol_send DD Presets $plist
 	}
 }
 
@@ -1152,8 +1146,8 @@ proc ::gmaproto::remove_obj_attributes {obj_id attr vs} {
 	::gmaproto::_protocol_send OA- ObjID $obj_id AttrName $attr Values $vs
 }
 
-proc ::gmaproto::update_status_marker {condition shape color} {
-	::gmaproto::_protocol_send DSM Condition $condition Shape $shape Color $color
+proc ::gmaproto::update_status_marker {condition shape color desc} {
+	::gmaproto::_protocol_send DSM Condition $condition Shape $shape Color $color Description $desc
 }
 
 proc ::gmaproto::write_only {is_main} {
@@ -1252,7 +1246,7 @@ proc ::gmaproto::_read_poll {} {
 			}
 			foreach j $json {
 				::gmaproto::DEBUG "translated to $j"
-				lappend ::gmaproto::poll_buffer [::gmaproto::parse_data_packet $j]
+				lappend ::gmaproto::poll_buffer [::gmaproto::_parse_data_packet $j]
 			}
 			set res [::gmautil::lpop ::gmaproto::poll_buffer 0]
 		} err] {
@@ -1260,7 +1254,7 @@ proc ::gmaproto::_read_poll {} {
 		}
 		return $res
 	}
-	return [::gmaproto::parse_data_packet [::gmautil::lpop ::gmaproto::recv_buffer 0]]
+	return [::gmaproto::_parse_data_packet [::gmautil::lpop ::gmaproto::recv_buffer 0]]
 }
 
 #
@@ -1588,7 +1582,7 @@ proc ::gmaproto::_login {} {
 
 	::gmaproto::DEBUG "begin _login"
 	while {!$sync_done} {
-		update; #allow other tasks like ::gmaproto::receive to happen
+		update; #allow other tasks like ::gmaproto::_receive to happen
 		if {!$initial_command} {
 			lassign [::gmaproto::_initial_read_poll] cmd params
 			if {$cmd ne {}} {
@@ -1736,7 +1730,6 @@ proc ::gmaproto::_login {} {
 
 proc ::gmaproto::auth_response {challenge} {
 	if {[catch {
-#		set challenge [base64::decode $server_nonce]
 		binary scan $challenge S passes
 		set passes [expr $passes & 0xffff]
 		::gmaproto::DEBUG "-- $passes passes"
@@ -1750,7 +1743,6 @@ proc ::gmaproto::auth_response {challenge} {
 			::sha2::SHA256Update $H $D
 			set D [::sha2::SHA256Final $H]
 		}
-#		set response [base64::encode $D]
 		set response $D
 		if {$::gmaproto::username eq {}} {
 			if {[catch {

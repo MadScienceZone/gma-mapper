@@ -1,8 +1,7 @@
-.\" vim:set syntax=nroff:
-.\" *** 333 ***
+.\" *** 332 ***
 '\" <<ital-is-var>>
 '\" <<bold-is-fixed>>
-.TH MAPPER 6 "GMA Toolkit 4.5.0" 20-Nov-2022 "Games" \" @@mp@@
+.TH MAPPER 6 "GMA Toolkit 4.3.12" 08-May-2022 "Games" \" @@mp@@
 .SH NAME
 mapper \- GMA battle grid map
 .SH SYNOPSIS
@@ -1425,8 +1424,9 @@ token in addition to switching to the \*(lqdead\*(rq image (if images
 are used).
 .TP
 .BI "Cycle Reach for " name
-Cycles's the creatures reach threat zone between normal, reach, and extended (both reach and
-adjacent foes threatened).
+Cycles through the extra threat zone for reach weapons. This goes from normal threat
+area to reach area and then to extended reach (both adjacent and reach zones together), then
+back to normal again.
 .TP
 .BI "Toggle Spell Area for " name
 Defines a spell effect which is described as a radius \*(lqcentered on you\*(rq (or some
@@ -1543,39 +1543,61 @@ creatures in range to be melee targets.
 When connected to a control service (see the
 .B \-h
 option above), the mapper and remote service exchange
-commands to indicate changes to the map display.  Each
-command is a newline-terminated line of plain ASCII text
-in the following formats.  If the mapper sends one of these
+commands to indicate changes to the map display.  
+To help keep communications simple and to help clients
+recover from malformed or missing data, each
+command is a newline-terminated line of text
+as described in detail below.  If the mapper sends one of these
 commands to the service, it is indicating that the local
 user made those changes and requests that other connected
 map clients update themselves accordingly.  If the mapper receives
 the command from the service, it should comply to make the
 corresponding change to itself.
 .LP
-The software SHOULD allow Unicode text encoded as UTF-8
-everywhere (of which 7-bit ASCII is a subset), but this 
-has not been extensively tested, thus the above note that
-the file is plain text ASCII.
+The software MUST allow Unicode text encoded as UTF-8
+everywhere (of which 7-bit ASCII is a subset).
 .LP
-Each command must be a properly-formed TCL list value (in simplest
-terms, a space-separated list of elements with curly braces surrounding
-elements with embedded spaces; braces must be balanced).  The first
-element of the list determines the request being made, and therefore
-the meaning of the other elements of the list.
+Each command (sent or received) consists of a command word
+followed by a JSON object holding the parameters appropriate to
+that command. (See the description of the 
+.B //
+command for an exception to this rule.)
+.LP
+The JSON object may be omitted (particularly if
+the command in question has no parameters). Any expected parameter fields
+which do not appear in the JSON object are automatically assumed to have
+an appropriate \*(lqzero\*(rq value (i.e., empty string, zero numeric
+value, empty list, boolean false, etc.). Any fields which are not expected are silently
+ignored.
+.LP
+JSON field names are matched case-sensitively. A client MAY match names
+regardless of case but MUST emit them as documented here.
+.LP
+Field values are strings unless otherwise noted.
+'\".LP
+'\"Each command must be a properly-formed TCL list value (in simplest
+'\"terms, a space-separated list of elements with curly braces surrounding
+'\"elements with embedded spaces; braces must be balanced).  The first
+'\"element of the list determines the request being made, and therefore
+'\"the meaning of the other elements of the list.
 .LP
 Unless otherwise noted, there is no response expected from
-these commands.
+these commands. Even where a response is expected, it will be
+asynchronously sent. In any case the client SHOULD NOT wait for a server
+response before considering its request to be completed. As a special
+case, a client MAY be implemented to wait synchronously for a server
+response during the authentication negotiation stage.
 .LP
-This describes protocol verion 333. These notes are intended to be 
+This describes protocol version 400. These notes are intended to be 
 detailed enough to implement a client from and should be considered
 the definitive reference to the protocol.
-.LP
-See also the documentation of the map file format in
-.BR mapper (5)
-which defines some of the data items referenced here.
-.LP
-Where boolean values are indicated, clients SHOULD use 0 for false and 1 for true,
-but MAY accept any non-zero value as true.
+'\".LP
+'\"See also the documentation of the map file format in
+'\".BR mapper (5)
+'\"which defines some of the data items referenced here.
+'\".LP
+'\"Where boolean values are indicated, clients SHOULD use 0 for false and 1 for true,
+'\"but MAY accept any non-zero value as true.
 .LP
 In the protocol command descriptions,
 .B BOLD
@@ -1584,104 +1606,110 @@ text indicates literal text to be sent as-is,
 indicate a parameter whose value should appear in place of the name shown, and
 [square brackets]
 surround optional items which may be omitted.
+.LP
+The normal course of actions at the start of the conversation is for the server to immediately send an initial
+greeting beginning with a
+.B PROTOCOL
+command followed by comments, 
+.BR AC , 
+.BR DSM , 
+.BR UPDATES ,
+and/or
+.BR WORLD 
+commands, then send an 
+.B OK
+command to indicate to the client its protocol version and to issue an
+authentication challenge (if configured to authenticate). It is RECOMMENDED
+that the initial greeting be limited only to comments, waiting until after authentication
+to send anything more specific about your game.
+.LP
+After the
+.B OK
+command, the client responds with an
+.B AUTH
+command if it is required to authenticate. The server will respond with
+.B GRANTED
+or
+.B DENIED
+and then MAY issue more of the initial greeting commands listed above.
+.LP
+Finally, the server will issue a
+.B READY
+command to the client and begin normal interaction with the client.
+.LP
+The server MUST NOT send the
+.BR AC ,
+.BR DENIED ,
+.BR GRANTED ,
+.BR OK ,
+.BR READY ,
+.BR UPDATES ,
+or
+.BR WORLD
+commands after the initial
+.B READY
+is sent.
+Clients MUST NOT send the
+.BR AUTH 
+command after receiving the server's
+.B READY
+signal.
 '\" <<list>>
-.TP 20
-.BR "// " [\fIargs\fP...]
+.TP 12
+.B //
 This is a server comment.  The entire command should be ignored by all clients. This is used
 to inject informative context and messages into the client/server conversation which may be
 of interest for debugging or interactive use.
 .RS
 .LP
-It is permitted for clients to use certain comment strings to carry useful information
-the systems administrator wishes to communicate to them. These are strictly speaking not
-part of the server protocol, but this allows for some local configuration management to
-take place, and these are easy to add to the server's initial greeting to the clients. 
-The following special comments are currently recognized:
-'\" <<list>>
-.TP 5
-.BI "// CALENDAR // " system
-Declares which calendaring system the various dates and times are based upon.
-In the future this may be promoted to a protocol command, but for the time being
-the mapper doesn't necessarily need to know this so it's an advisory comment
-for now.
-.TP 
-.BI "// MAPPER UPDATE // " version " " file
-The latest available
-.B mapper
-client is 
-.I version
-and is available for download from
-.IR file .
-Mapper clients which support automatic upgrades will offer to download this
-version and install it for the user. For this to work, the mapper client must
-see this comment before any non-comment commands from the server.
-The designated file is fetched from the server location indicated by the
-value of the
-.B \-\-update\-url
-option.
-.TP
-.BI "// CORE UPDATE // " version " \fR[\fP" file \fR]\fP
-The core GMA code's current release version is indicated as
-.IR version .
-If
-.I file
-is present, a new GMA release may be downloaded from that file in the same manner as
-for the mapper updates. Otherwise it is expected that the user obtains the code independently
-such as pulling from the git repository. Note that the git repository may contain more recent
-commits than this advertised release version. (This is intended to announce release points
-rather than individual commits.)
-.TP
-.BI "// BEGIN " id " " max " " title
-Start tracking progress for some event identified by
-.I id
-which will have a maximum value of 
-.IR max .
-(If
-.I max
-is the special value
-.RB \*(lq * \*(rq
-then there is no known maximum value yet.)
-The user-facing title for the event is given by
-.IR title .
-.TP
-.BI "// UPDATE " id " " value " \fR[\fP" newmax \fR]\fP
-Update the progress indicator for event
-.I id
-to have the new
-.I value
-toward the previously-declared maximum value.
-If
-.I newmax
-is specified and is not the empty string or
-.RB \*(lq * \*(rq,
-then the expected maximum value is updated as well.
-.TP
-.BI "// END " id
-Stop tracking progress for the specified event
-.IR id .
+.I "This is one of two exceptions to the rule that a command contains a JSON parameter"
+.I "object. In this case, the"
+entire
+.I "line should be ignored by the client and not interpreted further."
+This allows, for example, comments to be sent at the start of the server's
+signon message to provide a human-readable declaration as to the allowed
+usage of the server.
 .RE
-'\" <</>>
 .TP
-.BI "AC " name " " id " " color " " area " " size
+.BI "PROTOCOL " v
+This command, which, if used at all, MUST be the first command sent by the server
+to the client, gives an up-front indication to the client as to what protocol
+version is expected by the server. Older versions of the server waited until
+the
+.B OK
+command to notify the client, but as of protocol version 400 this is now too late
+for the client to correctly process the commands that may be sent before the
+.BR OK .
+This, along with the 
+.B //
+server comment command, are the only two commands which do
+.I not
+have a JSON data payload attached to them. The protocol version number is
+simply sent as an ASCII string of digits separated from the 
+.B PROTOCOL
+command word by a space.
+.TP
+.B AC
 Add a character to the pop-up menu for map clients. This makes it easy to place important character tokens
 on the map and ensures that such tokens are given consistent
 .I id
 values rather than generating a random one.
-Clients should NOT send this command to each other; it is intended for the server to send to the clients.
+Clients MUST NOT send this command to each other; it is intended for the server to send to the clients.
+The payload includes the following parameters:
 '\" <<desc>>
 .RS
 .TP 8
-.I name
+.B Name
 The name of the creature as displayed on the map. As with the 
 .B \-c
 option, this has the format
 .RI [ image\fB=\fP ] name
 which allows for creatures whose image names are different than their character name.
 .TP
-.I id
+.B ObjID
 The fixed ID for this creature. This will be used for internal references to this object on the map.
 .TP
-.I color
+.B Color
 The color to use when shading in the creature's threatened space when it has initiative to act.
 The
 .I color
@@ -1698,13 +1726,13 @@ could be specified as
 or 
 .RB \*(lq "steel blue" \*(rq).
 .TP
-.I area
+.B Area
 The size of the area threatened by the creature on the map. This can be the number of squares in diameter,
 but more commonly it should be a standard size code such as 
 .RB \*(lq M \*(rq
 for medium-size creatures.
 .TP
-.I size
+.B Size
 The size occupied by the creature on the map. This can be the number of squares in diameter,
 but more commonly it should be a standard size code such as 
 .RB \*(lq M \*(rq
@@ -1712,29 +1740,82 @@ for medium-size creatures.
 .RE
 '\" <</>>
 .TP
-.BI "ACCEPT " msg_set
+.B ACCEPT
 A client sends this message to the server to indicate that from this point
 forward (until another
 .B ACCEPT
-command), only the commands listed in
-.I msg_set
-should be sent to it by the server. This is a list of command names as they
+command), only the commands listed
+should be sent to it by the server. 
+The payload is a JSON object with this parameter:
+'\" <<desc>>
+.RS
+.TP 
+.BI Messages " (list)"
+A list of command names the client wishes to receive.
+This is a list of command names as they
 appear in this specification (e.g.,
-.BR "{AI CO TO}" ),
-or it may be the special value
+.BR "[\[dq]AI\[dq],\[dq]CO\[dq],\[dq]TO\[dq]]" ).
+If it contains the special value
 .RB \*(lq * \*(rq
-which means to accept all messages (the default).
+or is empty, this means to accept all messages. Note that the server may still
+decide to send messages such as comments or the 
+.B MARCO
+command (or others) at its discretion despite this request from the client.
+.RE
+'\" <</>>
 .TP
-.BI "AI " name " " size
-Add an image to the map. This begins a sequence of commands which together
-transmit image data to the client, followed by a number of
-.RB \*(lq AI: \*(rq
-commands and finally an 
-.RB \*(lq AI. \*(rq
-command at the end. Other commands MAY appear between any of these commands
-while the image is being transferred, but another
-.RB \*(lq AI \*(rq
-command is NOT allowed until the previous one is completed.
+.B AI
+Add an image to the map.
+(Supersedes the function of the
+.BR AI ,
+.BR AI: ,
+.BR AI. ,
+and
+.BR AI@
+commands as of protocol version 400.)
+The payload is a JSON object with the following fields:
+'\" <<desc>>
+.RS
+.TP
+.B Name
+The name of the image as known within the mapper.
+.TP
+.BI Sizes " (list of objects)"
+A list of sizes available for this object. This will be
+.I merged
+with any previously defined sizes for the same image name.
+Each element of this list is an object with the following fields:
+'\" <<desc>>
+.RS
+.TP
+.B File
+The filename or server ID by which the image can be retrieved.
+.TP
+.BI ImageData " (base64-encoded bytes)"
+If non-empty or not
+.BR null ,
+this provides the raw image data. This is DEPRECATED but still supported.
+Instead, images SHOULD be loaded to the game server and their ServerID used
+by clients.
+.TP
+.BI IsLocalFile " (bool)"
+If
+.BR true ,
+then
+.I file
+gives a local file pathname for the image; otherwise it gives the
+server-specific ID which the client will use to retrieve the file
+from the server.
+.TP
+.BI Zoom " (float)"
+The magnification level this bitmap represents for the given
+image. Typically images are provided for
+.I zoom
+levels of 0.25, 0.5, 1, 2, and 4.
+'\" <</>>
+.RE
+'\" <</>>
+.LP
 This does not
 '\" <</ital-is-var>>
 .I draw
@@ -1743,99 +1824,17 @@ the image on the map; it merely defines it so the client knows what to draw when
 the given
 .I name
 at the specified
-.I size
-is called for.
-.RS
-'\" <<desc>>
-.TP 8
-.I name
-The name of the image as it is referred to by other protocol commands and
-inside map files.
-.TP
-.I size
-The zoom factor desired. This is a real number where 1 (or 1.0) is the default zoom level for the map.
-If the map is zoomed out one step, images of 
-.I size
-0.5 will be needed; if zoomed in one step, 
-.I size
-will be 2 or 2.0. The map client does not internally have the ability to scale images, so it uses
-a separate image data file for each graphic element at each desired zoom level.
-'\" <</>>
+.I zoom
+factor is called for.
 .LP
-Use of a web server hosting images and the protocol command
-.RB \*(lq AI@ \*(rq
-are preferred to sending raw image data through the mapper data socket.
-.RE
-.TP
-.BI "AI: " data
-Add a line of image data to the image started by a previous
-.RB \*(lq AI \*(rq
-command. The 
-.I data 
-are base 64 encoded as a single unit. In other words, the binary image data (which must be in
-GIF format) is encoded as a single block of bytes into a single base-64 string. This string is broken into a
-number of pieces, which are sent in individual
-.RB \*(lq AI: \*(rq
-commands. After the last
-.RB \*(lq AI: \*(rq
-command is sent, finish by giving a
-.RB \*(lq AI. \*(rq
-command.
-.TP
-.BI "AI. " lines " " checksum
-Complete the image transfer begun by the most recent
-.RB \*(lq AI \*(rq
-command.
-.RS
-'\" <<desc>>
-.TP 10
-.I lines
-The number of 
-.RB \*(lq AI: \*(rq
-commands which should have been received during the transfer.
-.TP
-.I checksum
-The SHA-256 checksum, encoded in base-64, of the original binary GIF image data
-before it was encoded and transmitted. This field MAY be omitted if a client is not
-able to calculate the checksum or chooses not to do so.
-.LP
-Clients SHOULD reject image transfers which fail to match the expectations
-given in this command as to number of data lines received and checksum.
-'\" <</>>
-.RE
-.TP
-.BI "AI? " name " " size
-Request for the named image.
-Clients may send this if they need an image of the given
-.I name
-and 
-.I size
-(as described above for the
-.B AI
-command) but no such image is defined yet in the client. This
-queries the server or connected peers to see if any of them know
-of the needed image. The client should continue to process tasks without
-waiting for a response (which is never guaranteed). If another peer knows
-of the requested image, it should respond with an
-.RB \*(lq AI \*(rq
-command containing the full image data or (preferably) an
-.RB \*(lq AI@ \*(rq
-command indicating how to obtain the image from the game server.
-.TP
-.BI "AI@ " name " " size " " id
-Like
-.RB \*(lq AI \*(rq,
-but rather than receiving image data directly, this merely informs the client
-that the image with the indicated
-.I name
+Note on clients retrieving images by server ID when
+.I IsLocalFile
+is
+.B false
 and
-.I size
-(as described above) may be obtained from the game server under the file
-ID
-.IR id .
-.RS
-.LP
-As currently implemented, the 
+.I File
+contains a server-side ID:
+as currently implemented, the 
 .B mapper
 client checks to see if it has a cached version of the file. If so, and that
 file is newer than 2 days, it is used without further checks. If the cached file
@@ -1843,9 +1842,9 @@ is older, the server is queried to see if it has a newer version of the file; if
 that is retrieved and cached; otherwise, the existing cache is updated to note that
 it was the known latest version as of that moment. If no usable cache file is available,
 the file with the given
-.I id
+id
 is obtained from the server. For example, if the image
-.I id
+id
 were
 .RB \*(lq abcdefg \*(rq,
 the URL of the file to be retrieved would be
@@ -1871,36 +1870,74 @@ Due to implementation limitations of the framework used,
 always uses GIF format files.
 .RE
 .TP
-.BI "ALLOW " feature-list
-The client MAY send this command to the server after logging in. This
-tells the server that the client supports one or more optional features.
-The
-.I feature-list
-parameter is a TCL list, each element giving the name of a feature
-the client supports. If the list is empty, the server assumes
-no optional features are supported.
-Currently, only one feature is recognized here:
+.B AI?
+Request for the named image.
+Clients may send this if they need an image of the given
+.I name
+and 
+.I zoom
+(as described above for the
+.B AI
+command) but no such image is defined yet in the client. This
+queries the server or connected peers to see if any of them know
+of the needed image. The client should continue to process tasks without
+waiting for a response (which is never guaranteed). If another peer knows
+of the requested image, it should respond with an
+.RB \*(lq AI \*(rq
+command.
+The payload is a JSON object with the following fields:
+'\" <<desc>>
+.RS
+.TP
+.BI Name
+The image name as known to the mapper.
+.TP
+.BI Sizes " (list of objects)"
+The list of sizes for which the image data are requested.
+Each element of the list is an object with the following field:
+'\" <<desc>>
+.RS
+.TP
+.BI Zoom " (float)"
+The requested magnification factor for the image.
+.RE
+.\" <</>>
+.RE
+.\" <</>>
+.TP
+.B ALLOW
+The client MAY send this command to the server after logging in. This tells
+the server that the client supports one or more optional features. The
+JSON payload has the following field:
+.RS
+.TP
+.BI Features " (list of strings)"
+This is a list of feature names which the client wishes to enable.
+Every time an
+.B ALLOW
+command is given, it resets the entire set of features, rather than 
+adding to them.
+Currently, only one feature is recognized:
 .RS
 .TP
 .B DICE-COLOR-BOXES
-The client supports formatting controls in the die-roll title string
-sent to the server in the 
+The client supports formatting controls in the die-roll title string sent
+to the server in the
 .B D
 command and received from the server via the
 .B ROLL
-command. Specifically, the title may consist of multiple sub-titles 
-separated by U+2016 characters (||). Each of these may also have a
-suffix consisting of the U+2261 (\[==]) character followed by a color name
-or 
+command. Specifically, the title may consist of multiple sub-titles
+separated by U+2016 characters (||). Each of these may also have a suffix
+consisting of the U+2261 (\[==]) character followed by a color name or
 .BI # rrggbb
-color code, indicating the foreground color for that part of the title.
-A second such suffix may be added to indicate the background color.
-If this feature is not enabled, these formatting codes are stripped out
-by the server before sending die roll results to a client which isn't
-prepared to interpret them.
+color code, indicating the foreground color for that part of the title. A second
+such suffix may be added to indicate the background color. If this feature is
+not enabled, these formatting codes are stripped out by the server before sending
+die roll results to a client which isn't prepared to interpret them.
+.RE
 .RE
 .TP
-.BI "AUTH " response " \fR[\fP" user " " client \fR]\fP
+.B AUTH
 If the server included a challenge string (see the
 .B OK
 command below), then it requires a password before the client is allowed to
@@ -1908,27 +1945,36 @@ join the server. This is intended to prevent accidental connections by clients
 to the wrong servers, and to filter out nuisance connections from spammers or
 other random connections, so it is a fairly simple authentication mechanism
 using a password shared by all clients in a play group.
+The payload is a JSON object with the following parameters:
+'\" <<desc>>
 .RS
-.LP
+.TP
+.B Client
+This describes the client program. By convention, this value
+SHOULD include the version number (e.g., \*(lqmapper 4.0.1\*(rq).
+.TP
+.BI Response " (base64-encoded bytes)"
+The client's response to the server's challenge.
+.TP
+.B User
 If provided, the
 .I user
-parameter gives the local username, and
-.I client
-describes the client program connected to the server. These are intended to help
-diagnose issues with communications between clients while they are occurring.
-The
+parameter gives the local username of the player who is
+running the client. This name will be displayed for purposes
+such as chat-window conversations and dice rolling. If not
+provided, \*(lqanonymous\*(rq will be used, unless the authentication
+is successful for the GM role, in which case \*(lqGM\*(rq will be
+used regardless of any value sent by the client for the
 .I user
-name may be any arbitrary name except 
-.RB \*(lq GM \*(rq 
-(unless the client is really
-the GM), but for best results it should be a short, single word such as the player's
-name or the name of the character they're playing. If the client is authenticating
-using the GM's credentials, the
-.I user
-parameter will be ignored, and the name 
-.RB \*(lq GM \*(rq 
-will be used instead.
+field.
+'\" <</>>
+.LP
+Calculation of the 
+.I response
+field is as follows.
+.LP
 Given:
+'\" <<desc>>
 '\" <<TeX>>
 '\" \begin{align*}
 '\"  C & \text{ is the server's challenge as a binary string of bytes }\\
@@ -1964,11 +2010,13 @@ means to concatenate strings
 .I x
 and 
 .IR y ,
+'\" <</>>
 .LP
 To calculate the
 .I response
 string, the client must do the following:
-.TP
+'\" <<enum>>
+.TP 4
 (1)
 Obtain
 .I i
@@ -1986,6 +2034,7 @@ Repeat
 times: Calculate 
 .IR D '=H( P || D "); then let " D = D '
 '\" <</TeX>>
+'\" <</>>
 .LP
 The binary value of 
 '\" <</ital-is-var>>
@@ -2002,261 +2051,349 @@ command with either a
 .B DENIED
 or
 .B GRANTED
-message (q.v.). The client may wait for this response before proceeding
+message (q.v.). The client MAY wait for this response before proceeding
 with its other operations, so that it knows for sure how the authentication
 went.
 .RE
 .TP
-.BI "AV " x " " y
+.B AV
 Adjust view by setting the horizontal scrollbar to 
-.I x
+.I xview
 as a fraction of its full distance, where 0.0 is all the way to the left and
 1.0 is all the way to the right. The vertical scrollbar is similarly set based on
-.I y
+.I yview
 where 0.0 is all the way to the top and 1.0 is all the way to the bottom.
-.TP
-.BI "CC *\fR|\fP" user " " target " " message-ID
-Clear the chat history. If the parameter is
-.RB \*(lq * \*(rq,
-do so without further comment. Otherwise, the client may inform the
-user that the chat was cleared, and further if the parameter is not the
-empty string, it indicates the user name of the person who cleared it.
-.RS
-.LP
-If
-.I target
-is given and not the empty string, it may be a message ID in which case all messages
-with
-.I message-ID
-less than 
-.I target
-are removed from the history; it may also be a negative integer 
-'\" <</ital-is-var>>
-.IR \-n ,
-in which case all but the most recent
-.I n
-items are deleted.
-'\" <<ital-is-var>>
-.LP
-The
-.I message-ID
-parameter is a sequence ID for this command in a manner identical to the
-.B TO
-command.
-.RE
-.TP
-.BI "CLR " id
-Remove object with internal ID
-.I id
-from the map.
-The
-.I id
-may also be one of the following special values:
+The payload is a JSON object with the following fields:
 '\" <<desc>>
 .RS
-.TP 20
-.B *
-Remove all objects from the map.
 .TP
-.B E*
-Remove all map elements (non-creatures).
+.BI XView " (float)
+The fraction of full distance the
+.IR x -axis
+scrollbar should be moved to.
 .TP
-.B M*
-Remove all monster tokens.
-.TP
-.B P*
-Remove all player tokens.
-.TP
-.RI [ imagename \fB=\fP] name
-Remove the creature with the given
-.IR name .
+.BI YView " (float)
+As
+.IR xview ,
+but for the 
+.I y
+axis.
 .RE
 '\" <</>>
 .TP
-.BI "CLR@ " id
-Retrieve the map file with the given
-.I id
-from the server (as the
-.RB \*(lq M@ \*(rq
-command does) but rather than merging its contents with the map,
-the client is to delete the objects described in the file from the local map
-as if 
-.RB \*(lq CLR \*(rq
-were called for each of them.
+.B CC
+Clear the chat history. The payload is a JSON object with the following fields:
+'\" <<desc>>
+.RS
 .TP
-.BI "CO " state
-Set combat mode on or off based on the boolean value
-.IR state .
-This value SHOULD be 0 for off and 1 for on, but clients MAY interpret any non-zero value to turn
-the combat mode on.
+.BI RequestedBy
+The name of the user who initiated this operation, if known. 
+Clients SHOULD NOT set this field; it is set by the server when sending this
+message to clients.
 .TP
-.BI "CS " abs " " rel
+.BI DoSilently " (bool)"
+If true, the client MAY clear its chat history without notifying the user;
+otherwise it SHOULD indicate the action to the user.
+.TP
+.BI Target " (int)"
+If 0 or missing, clear all messages in the history. Otherwise, if positive, clear all
+messages with 
+.I messageID
+greater than the
+.I target
+value. If negative, clear all but the most recent
+.RI \- target
+messages (e.g., a
+.I target
+of \-50 clears all but the most recent 50 messages).
+.TP
+.BI MessageID " (int)"
+This message counts the same as a chat message and is included in the history
+itself. Thus, the server sets this field to a unique identifier for this
+message. Clients SHOULD NOT set this field.
+.RE
+'\" <</>>
+.TP
+.B CLR
+Remove object with a given internal ID from the map. The payload is a JSON
+object with the following field:
+'\" <<desc>>
+.RS
+.TP
+.BI ObjID
+This may be the object ID for the specific object to remove, or
+\*(lq*\(rq to mean all objects should be removed;
+\*(lqE*\(rq to mean all map elements should be removed;
+\*(lqM*\(rq to mean all monster tokens should be removed;
+\*(lqP*\(rq to mean all player tokens should be removed;
+or it may be a creature name (in the form
+.RI \*(lq[ imagename =] name \*(rq)
+which removes a creature token whose display name matches the
+.I objID
+value.
+.RE
+'\" <</>>
+
+.TP
+.B CLR@
+This command tells the client to \*(lqunload\*(rq the contents of a map
+file. In other words, all the elements listed in that file are removed from
+the map canvas rather than being added to it. The payload is a JSON object
+with the following fields:
+'\" <<desc>>
+.RS
+.TP
+.B File
+The pathname or server ID which specifies the map file in question.
+.TP
+.BI IsLocalFile " (bool)"
+If true, 
+.I file
+refers to a local file the client can read directly. Otherwise it is
+a server ID which can be used to fetch the file from its cache or from
+the server.
+.RE
+'\" <</>>
+.TP
+.B CO
+Sets the combat mode state in the client.  The payload is a JSON object
+with the following attribute:
+'\" <<desc>>
+.RS
+.TP
+.BI Enabled " (bool)"
+If true, the client should be in combat (initiative) mode, otherwise it should not.
+.RE
+'\" <</>>
+.TP
+.B CONN
+Update the list of connected peer clients to those described in the JSON
+payload, which contains the following field.
+Clients MUST NOT send this command. This supersedes the
+.BR CONN ,
+.BR CONN: ,
+and 
+.BR CONN.
+commands from protocol versions prior to 400.
+'\" <<desc>>
+.RS
+.TP
+.BI PeerList " (list of objects)"
+A list of objects, each describing a single connected client, with the following
+fields:
+'\" <<desc>>
+.RS
+.TP
+.BI Addr
+The IP address and port the peer connected from.
+.TP
+.BI User
+The username as provided during authentication.
+.TP
+.BI Client
+The name of the client program in use.
+.TP
+.BI LastPolo " (float)"
+The number of seconds since the server last heard a 
+.B POLO
+command from the peer.
+.TP
+.BI IsAuthenticated " (bool)"
+If true, the client successfully negotiated the server's authentication process.
+.TP
+.BI IsMe " (bool)"
+If true, this object describes the client which received this command.
+.TP
+.BI IsMain " (bool)"
+If true, the client is running as the \*(lqmain\*(rq or \*(lqprimary\*(rq
+client.
+.TP
+.BI IsWriteOnly " (bool)"
+If true, the client has requested not to receive most commands from the server.
+'\" <<//>>
+.RE
+'\" <<//>>
+.RE
+.TP
+.B CS
 Update the client's clock.
-.RS
+The JSON payload includes the following fields:
 '\" <<desc>>
-.TP 8
-.I abs
-The absolute time as a real number of seconds from the GMA clock's epoch.
+.RS
 .TP
-.I rel
-The real number of seconds which have elapsed from some GM-designated point of
-reference
-(usually from the start of
-going into initiative).
+.BI Absolute " (float)"
+The absolute time on the GMA world clock (in seconds since the epoch).
+.TP
+.BI Relative " (float)"
+The elapsed time on the GMA world clock (in seconds since the GM set a
+reference point, e.g., the start of combat).
+.TP
+.BI Running " (bool)"
+If true, the local client should continue advancing the clock in real-time locally after updating the time to the new absolute time.
+Otherwise, cancel real-time updates if they were running, leaving the clock at the given absolute time. The local real-time updating
+events should only be performed when not in combat mode.
 '\" <</>>
 .RE
 .TP
-.BI "D " recipient-list " " dice
-Roll the dice described by the
-.I dice
-parameter, sending the results to all of the authenticated users
-in
-.IR recipient-list .
-This list may include the usernames of other logged-in users.
-The list may also include any of the special symbols:
-'\" <<desc>>
-.RS
-.TP 4
-.B @
-Send back to the user issuing this command.
-.TP
-.B *
-Send to all clients.
-The presence of this in the
-.I recipient-list
-overrides everything else in the list.
-.TP
-.B %
-Send privately to the GM, and
-.I only
-to the GM (i.e., do not send a copy back to the
-user making the die roll, as would normally be done).
-The presence of this in the
-.I recipient-list
-overrides everything else in the list.
-.RE
-'\" <</>>
-.TP
-.BI "DD " definition-list
-Define a personal set of die roll presets. Each entry in
-.I definition-list
-describes a preset and contains three elements:
-.RS
-'\" <<desc>>
-.TP 12
-.I name
-The name of the preset.
-.TP
-.I description
-A long description of what the preset is for.
-.TP
-.I dice
-A list of die roll specifications as appropriate for the
 .B D
-command.
+Roll dice using the server's built-in die rolling facility.
+The JSON payload contains the following fields:
+'\" <<desc>>
+.RS
+.TP
+.BI Recipients " (list of strings)"
+The names of the people who should receive the results
+of the die roll. For global or GM results, this should be 
+.BR null .
+.TP
+.BI ToAll " (bool)"
+If true, this is a global die-roll, and the result should be
+sent to all clients.
+.TP
+.BI ToGM " (bool)"
+If true, this die-roll will be sent \*(lqblind\*(rq to the GM only.
+Not even the requester will see the result of the roll, only the GM will.
+.TP
+.BI RollSpec
+The die-roll specification, like \*(lqd20+12\*(rq or \*(lq6d6 fire\*(rq.
 '\" <</>>
-.LP
-All existing presets for the authenticated user are replaced with
-the set given to this command.
-This will trigger a
-.B DD=
-message to be sent to all peers other than the requesting connection
-which are logged in with the same username.
 .RE
 .TP
-.BI "DD+ " definition-list
-Just as
-.BR DD ,
-but rather than replacing the existing list, the elements of
-.I definition-list
-are added to the existing list. 
-This will trigger a
+.B DD
+Store Die-Roll Presets.
+Clients send this command to the server to request it to store a set of
+die-roll presets for it to retrieve for use in subsequent sessions.
+The JSON payload is identical to the one sent by the server in the
 .B DD=
-message to be sent to all peers other than the requesting connection
-which are logged in with the same username.
+command, with the addition of the following optional field:
+.RS
 .TP
-.BI "DD/ " regex
-Deletes all elements from the die-roll preset for the requesting
-user whose names match the regular expression
-.IR regex .
-This will trigger a
+.B For
+The name of the user whose presets are being affected. This is optional;
+if omitted, the presets of the user making this request are affected. Only
+the GM may change other users' presets.
+.LP
+The server SHOULD respond by issuing a
 .B DD=
-message to be sent to all peers other than the requesting connection
-which are logged in with the same username.
+command to all peer clients logged in with the same username as the
+affected user. 
+.RE
+.TP
+.B DD+
+Add to Die-Roll Presets.
+Clients send this command to the server to add an additional set of die-roll
+presets to the collection it was already holding for that user. The JSON
+payload is identical to the one sent for the 
+.B DD
+command.
+The server SHOULD respond by issuing a
+.B DD=
+command to all peer clients logged in with the same username as the
+requesting client. 
+.TP
+.B DD/
+Filter die-roll presets. This removes a set of die-roll presets
+from the server's storage for the user.
+The server SHOULD respond by issuing a
+.B DD=
+command to all peer clients logged in with the same username as the
+affected user. 
+The JSON payload includes the following field:
+'\" <<desc>>
+.RS
+.TP
+.B Filter
+The value is a regular expression. The server will delete all die-roll
+presets whose
+.I name
+attribute matches this regular expression.
+.TP
+.B For
+The name of the user whose presets are being filtered. This is optional;
+if omitted, the presets of the user making this request are affected. Only
+the GM may filter other users' presets.
+'\" <</>>
+.RE
 .TP
 .B DD=
-Begins a dump of defined dice rolls in response to a
-.B DR
-command. It is followed by a number of 
-.B DD:
-commands, and ultimately by a
-.B DD.
-command at the end of the list.
-The
+This command defines the list of die-roll presets the client should know.
+This replaces any previous set of presets the client was using.
+Clients MUST NOT send this command. This supersedes the commands
 .BR DD= ,
 .BR DD: ,
-and
-.B DD.
-commands are not sent by clients, only by the server.
-.TP
-.BI "DD: " i " " name " " desc " " dice
-Gives a preset dice roll definition. The fields are:
-.RS
+and 
+.BR DD.\&
+in protocol versions prior to 400.
+The JSON payload includes the following fields:
 '\" <<desc>>
-.TP 10
-.I i
-The position in the list, starting with 0.
+.RS
 .TP
+.BI Presets " (list of objects)"
+Each element in this list describes a single preset. It has the following
+fields:
+'\" <<desc>>
+.RS
+.TP
+.BI Name
+The name by which this preset is identified to the user. This MUST
+be unique for that user.  The client SHOULD sort the preset list by 
+the 
 .I name
-The name for this preset.
+field before displaying. If a vertical bar (\*(lq|\*(rq) appears in the
+.IR name ,
+all text up to and including the bar SHOULD be suppressed from display.
 .TP
-.I desc
-The description for this preset.
+.BI Description
+A text description of the purpose of the preset.
 .TP
-.I dice
-The list of dice rolls to make.
+.BI DieRollSpec
+The die-roll specification to send to the server when rolling this preset.
+'\" <</>>
 .RE
 '\" <</>>
+.RE
 .TP
-.BI "DD. " count " " checksum
-Ends the list started with
-.B DD=
-in the same manner as the
-.B LS.
-command (see below).
+.B DENIED
+Access to the server is denied. The server will send this to a client; clients
+MAY NOT send it.
+The JSON payload sent with this command includes the field:
+'\" <<desc>>
+.RS
 .TP
-.BI "DENIED " message
-Access to the server is denied. The server will send this to a client; no client
-should send it.
+.B Reason
+Text description of why the access was refused.
+'\" <</>>
+.RE
 .TP
-.BI "DR"
-Retrieve the authenticated user's die roll presets. This should
+.B DR
+Retrieve the authenticated user's die roll presets. This SHOULD
 result in the server sending the
 .B DD=
 command back to the requesting client. 
 .TP
-.BI "DSM " condition " " shape " " color " " \fR[\fPdescription\fR]\fP
-Define a new status marker for creatures with the named
-.IR condition .
+.B DSM
+Defines (or re-defines) a condition status marker which the client SHOULD
+use to mark creature tokens when the creature has the associated condition in
+effect. The JSON payload includes the following fields:
+'\" <<desc>>
+.RS
+.TP
+.B Condition
+The name of the condition being described.
 If there was already a marker defined for that condition, it is replaced with the new
-definition. If either
+definition. If either 
 .I shape
 or
 .I color
-is the empty string (noted as 
-.RB \*(lq {} \*(rq
-in this data format), then the condition is effectively removed from the list of conditions
+is the empty string or
+.BR null ,
+then the condition is effectively removed from the list of conditions
 known to the mapper. Creature conditions are in effect if their name appears in the list value
 for that creature's 
 .B STATUSLIST
-attribute as documented in
-.BR mapper (5).
-'\" <<desc>>
-.RS
-.TP 12
-.I condition
-This is an aribtrarily-named string that describes the creature's condition that will be noted
-with a special mark on their token. The mapper comes with the following conditions pre-defined:
+attribute.\" as documented in
+'\".BR mapper (5).
+The mapper comes with the following conditions pre-defined:
 .BR "ability drained" ,
 .BR bleed ,
 .BR blinded ,
@@ -2292,12 +2429,8 @@ with a special mark on their token. The mapper comes with the following conditio
 .BR stunned ,
 and
 .BR unconscious .
-Remember that values with embedded spaces need to be surrounded by braces
-(e.g., 
-.RB \*(lq {ability
-.BR drained} \*(rq).
 .TP
-.I shape
+.B Shape
 The shape of the marker to be placed if the creature has this condition.
 The mapper will attempt to arrange multiple markers with the same shape such
 that they are all visible at the same time. This value may be one of the 
@@ -2407,7 +2540,7 @@ A large circle drawn around the entire token.
 .RE
 '\" <</TeX>>
 .TP
-.I color
+.B Color
 The color to draw the marker in any of the forms documented
 above, or the special value
 .RB \*(lq * \*(rq,
@@ -2419,224 +2552,510 @@ If
 .I color
 begins with 
 .RB \*(lq \-\- \*(rq
+(e.g., \*(lq\-\-red\*(rq),
 then the marker is drawn with dashed lines instead of solid ones.
 If it begins with
 .RB \*(lq .. \*(rq
+(e.g., \*(lq..blue\*(rq),
 then the effect is the same, but the dashes are shorter.
 .RE
 .TP
-.I description
-If present, this field describes the effect of the condition on a creature.
+.B Description
+A description of the effects on the character of having that condition
+applied. This is intended to be shown to players (for example,
+if they hover their mouse over an affected creature token).
 '\" <</>>
 .RE
 .TP
-.BI "GRANTED " name
-Access to the server is granted. The server will send this to a client; no client should send it.
+.B GRANTED
+Access to the server is granted. The server will send this to a client; no client should send it. The JSON payload contains the field:
+'\" <<desc>>
+.RS
 .TP
-.BI "I " time " " id
+.B User
+The user name for this client. This is the name provided by the client,
+\*(lqanonymous\*(rq if the client didn't give one, or \*(lqGM\*(rq if the
+client authenticated as the GM.
+'\" <</>>
+.RE
+.TP
+.B I
 Update the time clock for initiative-based actions.  If the mapper
 is in combat mode, the clock display is updated accordingly.
-The
-.I time
-parameter is a list of five values, in this order:
-.RS
+The JSON object payload includes the following fields:
 '\" <<desc>>
-.TP 4
-.I r
-Number of rounds elapsed since start of combat.
+.RS
 .TP
-.I c
-The initiative count within the round. This is a number from 0\-59, which
-indicates which of 60 possible
-initiative slots is currently active. Since this means we are effectively
-dividing the round into 60 equal parts, each \*(lqcount\*(rq represents 0.1 seconds
-of game time.
+.B ActorID
+The object identifier of the creature whose turn it is. This may
+be the unique object ID code, the creature name as documented in the
+.B AC
+command, the special string
+.RB \*(lq*Monsters*\*(rq
+which indicates that all creatures with monster-type tokens have
+initiative, or may be of the form
+.BI \fR\*(lq\fP/ regex\fR\*(rq,\fP
+which matches all creatures whose names match the regular expression
+.IR regex .
 .TP
-.I s
-Number of seconds elapsed.
+.BI Hours " (int)"
+The number of hours elapsed since the start of combat.
 .TP
-.I m
-Number of minutes elapsed.
+.BI Minutes " (int)"
+The number of minutes elapsed since the start of combat.
 .TP
-.I h
-Number of hours elapsed.
+.BI Seconds " (int)"
+The number of seconds elapsed since the start of combat.
+.TP
+.BI Rounds " (int)"
+The number of rounds elapsed since the start of combat.
+.TP
+.BI Count " (int)"
+The number of initiative slots elapsed since the start of the round.
 '\" <</>>
-.LP
-The 
-.I id
-parameter gives
-the name of the creature whose turn it is.  This may be
-the name of a player or monster (exactly matching one of the values
-given by the
-.B \-c
-option(s), or creatures added via 
-.RB \*(lq AC \*(rq
-commands),
-the unique ID for a creature,
-the special string
-.RB \*(lq *Monsters* \*(rq
-(to indicate that all tokens of type \*(lqmonster\*(rq get to act now),
-or the empty string (written as
-.RB \*(lq {} \*(rq
-due to the rules for Tcl list string representation) which means no one has initiative at this point in time.
-.LP
-Alternatively, if
-.I id
-begins with a slash
-.RB (\*(lq / \*(rq),
-then all creatures whose names match the regular expression
-.I id
-(not including the leading slash)
-are selected.
-.LP
-If the mapper client is not in combat mode, this command 
-'\"will remove the clock
-'\"(if still displayed) and reset all combatants to their neutral appearance.
-has no effect.
 .RE
 .TP
-.BI "IL " slot-list
-Update the initiative list. The 
-.I slot-list
-parameter given is a list of an arbitrary number of sub-lists. Each
-sub-list consists of the following six values which describe a combatant:
-.RS
+.B IL
+Update the initiative list.
+The JSON payload includes the following field:
 '\" <<desc>>
-.TP 8
-.I name
-The creature's name as it appears on the map. This must be unique with respect to the other
-creatures listed. It may have the forms acceptable to the
-.RB \*(lq AC \*(rq
-command.
+.RS
 .TP
-.I hold
-Boolean value; if true, this person is holding their action.
+.BI InitiativeList " (list of objects)"
+The current initiative list is given as a list of initiative slots, each of which
+is an object with the following fields:
+'\" <<desc>>
+.RS
 .TP
-.I ready
-Boolean value; if true, this person is not only holding their action (and thus the
-.I hold
-field should also be true) but have a readied action waiting to trigger.
+.BI Slot " (int)"
+The slot number. As currently implemented this is a number in the range [0,59] which
+gives the \*(lqcount\*(rq (1/10th second) in the round where this creature may act.
 .TP
-.I hp
-Their current hit point total.
+.BI CurrentHP " (int)"
+The creature's current hit point total.
 .TP
-.I flat
-Boolean value; if true, this person is flat-footed. 
+.BI Name
+The creature's name as displayed on the map.
 .TP
-.I slot
-The slot number in the initiative list for this combatant. (An integer from 
-0\-59 as described above.)
+.BI IsHolding " (bool)"
+If true, the creature is holding their action.
+.TP
+.BI HasReadiedAction " (bool)"
+If true, the creature is holding a readied action.
+.TP
+.BI IsFlatFooted " (bool)"
+If true, the creature is flat-footed.
+'\" <</>>
 .RE
 '\" <</>>
+.RE
 .TP
-.BI "L " filename-list
-Load one or more map files into the mapper. The current contents of the client's
-map canvas are to be deleted, then the named
+.B L
+Loads map elements into the map client, either replacing or adding to the
+current contents of the map. Supersedes the function of commands
+.BR L ,
+.BR M ,
+.BR M? ,
+and
+.B M@
+in protocol versions prior to 400.
+The payload is a JSON object with the following fields:
+'\" <<desc>>
+.RS
+.TP
+.B File
+The local pathname or server ID identifying the map file to be loaded.
+.TP
+.BI IsLocalFile " (bool)"
+If true, 
 .I file
-loaded from disk. Its contents are as documented in 
-.BR mapper (5).
-The objects described in the file are added to the local map. For completeness
-(and consistency with the
-.RB \*(lq M \*(rq
-command), multiple files may be named, but since the map contents are cleared
-before each one, only a single file should be specified with this command.
-The files must be accessible from the local mapper process (and relative pathnames
-are relative to its current working directory).
-The braces are merely illustrative in this case. The argument to this command is a
-TCL list of filenames.
+refers to a local filename; otherwise it is a server ID.
 .TP
-.B LS
-Begin loading an object from the data stream rather than from
-a map file. This is analogous to the
-.RB \*(lq AI \*(rq
-\&...
-.RB \*(lq AI: \*(rq
-\&...
-.RB \*(lq AI. \*(rq
-sequence of commands described above.
+.BI CacheOnly " (bool)"
+If true, the server is only advising the client that it would be good to have
+a cached copy of
+.I file
+on hand for later. The client MUST NOT actually load the file's contents to the
+displayed map at this time.
 .TP
-.BI "LS: " data
-The map data
-are loaded from the sequence of 
-.RB \*(lq LS: \*(rq
-commands as if read from a local map file, one line of data
-(i.e., one object attribute record) per command.
-.TP
-.BI "LS. " count " " checksum
-Following the last data packet, this line terminates the stream
-transfer.  See 
-.RB \*(lq AI. \*(rq
-for a description of how this command ends the data sequence.
-The 
-.I checksum
-value is calculated as the SHA-256 hash of the
-.I data
-values of each command.
-.TP
-.BI "M " file-name-list
-Merge one or more map files into the mapper.  This is just like the load
-.RB (\*(lq L \*(rq)
-command, except the contents of the file are 
-'\" <</ital-is-var>>
-.I "added to"
-'\" <<ital-is-var>>
-the existing mapper contents rather than replacing them.
-Since the argument to this command is a Tcl list, braces enclose it if there
-is more than one filename. Examples:
-'\" <<TeX>>
-'\" \begin{verbatim}
-'\" M room12.map
-'\" M {room1.map room2.map room3.map}
-'\" M {room4.map {south corridor.map}}
-'\" \end{verbatim}
-.RS
-.RS
-.na
-.nf
-.B "M room12.map"
-.B "M {room1.map room2.map room3.map}"
-.B "M {room4.map {south corridor.map}}"
-.fi
-.ad
-'\" <</TeX>>
+.BI Merge " (bool)"
+If true, the map elements in
+.I file
+are merged with the map's current contents. Otherwise the map's current
+elements are replaced by the new ones in
+.IR file .
 .RE
+'\" <</>>
+.TP
+.BI LS- type
+This set of commands
+load a single map element into the map.
+As opposed to the
+.B L
+command which directs the client to read a file to get one or more objects,
+this just sends an object directly to it. This may be used, for example, when
+one client draws an element interactively and wants the other clients to display
+it as well.
+.RS
+.LP
+These supersede the function of the commands
+.BR LS ,
+.BR LS: ,
+and
+.BR LS.
+in protocol versions prior to 400.
+.LP
+All of the following
+.BI LS- type
+commands include as many of the following parameters as are applicable
+to them, in addition to type-specific parameters:
+'\" <<desc>>
+.TP
+.B ID
+The unique object identifier. This is a string containing upper- or lower-case
+letters, digits, underscores and octothorpes. By convention, we create these
+as hexadecimal UUID values, but they may be any arbitrary string, including
+human-readable IDs such as \*(lqPC1\*(rq, etc.
+.TP
+.BI X " (float)"
+The
+.I x
+coordinate of the \*(lqreference point\*(rq of the element, in standard map pixel units.
+.TP
+.BI Y " (float)"
+The
+.I y
+coordinate of the \*(lqreference point\*(rq of the element, in standard map pixel units.
+.TP
+.BI Points " (list of coordinate objects)"
+If an object needs more than a single coordinate pair to specify their
+location, (e.g., the diagonally opposite corner of a rectangle)
+the subsequent points are listed in this parameter. Each
+element in the list is an object with the fields:
+'\" <<desc>>
+.RS
+.TP
+.BI X " (float)"
+The
+.I x
+coordinate in standard map pixel units.
+.TP
+.BI Y " (float)"
+The
+.I y
+coordinate in standard map pixel units.
+.RE
+'\" <</>>
+.TP
+.BI Z " (int)"
+The
+.I z
+\*(lqcoordinate\*(rq of the element is its vertical stacking order
+on the displayed map canvas. Higher numbers are drawn after lower numbers.
+If two objects have the same
+.I z
+value and physically overlap, the result is not defined.
+.TP
+.BI Line
+The color used to draw the shape's outline, as a standard color
+name or RGB string such as \*(lq#336699\*(rq.
+.TP
+.BI Fill
+As with the
+.I line
+field, specifies a color to fill the interior of the element. If omitted or
+empty, the object will not be filled. Note that line objects are
+.I filled
+with the 
+.I fill
+color. They don't have an outline so don't use the
+.I line
+value.
+.TP
+.BI Width " (int)"
+The width in pixel units of the element's outline.
+.TP
+.BI Layer
+The map layer this element belongs to. 
+Currently not implemented.
+.TP
+.BI Level
+The dungeon level where this element appears. 
+Currently not implemented.
+.TP
+.BI Group
+The object group to which this element belongs.
+Currently not implemented.
+.TP
+.BI Dash " (int)"
+The outline of the element is to be drawn with the specified dash pattern:
+'\" <<desc>>
+.RS
+.TP 3
+0
+Solid (the default)
+.TP
+1
+Long dashes
+.TP
+2
+Medium dashes
+.TP
+3
+Short dashes
+.TP
+4
+Long-Short pattern
+.TP
+5
+Long-Long-Short pattern
+'\" <</>>
 .RE
 .TP
-.BI "M? " id
-Ensure that we have a locally-cached copy of a map file with the given
-.IR id .
-This performs an operation similar to that of
-.RB \*(lq AI@ \*(rq
-(looking for a file with a
-.RB \*(lq .map \*(rq
-suffix on the server)
-in that it checks to see that a cached copy exists. If it does but isn't
-recent enough, it will check the server to see if a newer version exists
-there. If no cached version is found or the server has a newer one, the file
-is downloaded to the cache. It does not actually load the map file, however.
-See
-.RB \*(lq M@ \*(rq.
-The 
-.I id
-has the same form as that allowed for
-.RB \*(lq AI@ \*(rq.
+.BI Hidden " (bool)"
+If true, this element MUST NOT be displayed on-screen.
 .TP
-.BI "M@ " id
-Identical to
-.RB \*(lq M? \*(rq
-but will then merge the contents of the map file with the current map data in the
-same fashion as the
-.RB \*(lq M \*(rq
-command does.
+.BI Locked " (bool)"
+If true, this element MUST NOT be edited further by clients.
+'\" <</>>
+.LP
+Each of the following commands defines a different kind of map element:
+'\" <<desc>>
+.TP 10
+.B LS-ARC
+Draws an arc on the canvas. 
+The arc is drawn around the circumference
+of the ellipse inscribed in the rectangle defined by the reference point and the
+first point in the
+.I points
+attribute (as opposite corners of a rectangle).
+The payload is a JSON object with these parameters in addition to
+those common to all map elements:
+'\" <<desc>>
+.RS
 .TP
-.BI "MARK " x " " y
-Make a brief animated marker at the specified coordinates to draw attention
-to that space.
+.BI ArcMode " (int)"
+Specifies how to draw the arc on-screen. 
+'\" <<desc>>
+.RS
+.TP 3
+0
+Pie slice (default); connects the arc endpoints to the center of the circle.
+.TP
+1
+Arc; does not connect the endpoints to anything else.
+.TP
+2
+Chord; connects the endpoints to each other via a straight line segment.
+'\" <<//>>
+.RE
+.TP
+.BI Start " (float)"
+The number of degrees around the circle to begin drawing the arc.
+.TP
+.BI Extent " (float)"
+The number of degrees around the circle to end drawing the arc.
+'\" <</>>
+.RE
+.TP
+.B LS-CIRC
+Draws an ellipse on the map canvas.
+The payload is a JSON object as described for all map elements above.
+The ellipse is defined as described for the 
+.B LS-ARC
+command, but the entire circumference is drawn.
+.TP
+.B LS-LINE
+Draws a straight line segment from the reference point to the
+each point in the
+.I points
+attribute (if more than one point is in
+.I points
+the result will be multiple connected line segments).
+The JSON payload has the following attribute in addition to the common
+ones described above:
+'\" <<desc>>
+.RS
+.TP
+.BI Arrow " (int)"
+The style of arrows to draw on the ends of the line:
+'\" <<desc>>
+.RS
+.TP 3
+0
+No arrows
+.TP
+1
+Arrow on the first point (the reference)
+.TP
+2
+Arrow on the last point
+.TP
+3
+Arrows on both first and last points
+'\" <</>>
+.RE
+'\" <</>>
+.RE
+.TP
+.B LS-POLY
+Draws a polygon on the map canvas. The vertices of the polygon
+start at the reference point and continue through every point in
+the 
+.I points
+attribute, and finally connecting back to the reference
+point again. The JSON payload contains
+the following fields in addition to the common ones described
+above:
+'\" <<desc>>
+.RS
+.TP
+.BI Spline " (float)"
+The factor to use when smoothing the sides of the polygon
+between its points. 0.0 means not to smooth at all, resulting
+in a shape with straight edges between the vertices. Otherwise,
+larger values provide more smoothing.
+.TP
+.BI Join " (int)"
+The join style for the edges of the polygon:
+'\" <<desc>>
+.RS
+.TP 3
+0 
+Beveled corners
+.TP
+1
+Mitered corners
+.TP
+2
+Rounded corners
+'\" <</>>
+.RE
+'\" <</>>
+.RE
+.TP
+.B LS-RECT
+Draws a rectangle defined by the reference point and the first point
+in the 
+.I points
+attribute (as opposite corners of the rectangle).
+.TP
+.B LS-SAOE
+Draws the zone of a spell's area of effect on the canvas. 
+The JSON payload contains the following field in addition to those 
+described above:
+'\" <<desc>>
+.RS
+.TP
+.BI AoEShape " (int)"
+The shape of the area of effect:
+'\" <<desc>>
+.RS
+.TP 3
+0
+Cone: a 90\(de pieslice defined as described for a pieslice arc element.
+.TP
+1
+Radius: an ellipse defined as described for a circle element.
+.TP
+2
+Ray: a rectangle defined as described for rectangle elements.
+'\" <</>>
+.RE
+'\" <</>>
+.RE
+.TP
+.B LS-TEXT
+Places some text on the canvas. The JSON payload includes the following
+fields in addition to those common to all elements:
+'\" <<desc>>
+.RS
+.TP
+.B Text
+The text to be displayed.
+.TP
+.BI Font " (object)"
+The typeface to use for the text. This is an object with the following
+fields:
+'\" <<desc>>
+.RS
+.TP
+.B Family
+The name of the font family as recognized by Tk.
+.TP
+.BI Size " (float)"
+The font size as recognized by Tk.
+.TP
+.BI Weight " (int)"
+The type wight to use. This may be 0 for normal or 1 for boldface.
+.TP
+.BI Slant " (int)"
+The type slant to use. This may be 0 for Roman (normal) or 1 for Italic (slanted).
+.TP
+.BI Anchor " (int)"
+Where the reference point is considered to be relative to the text:
+'\" <<desc>>
+.RS
+.TP 3
+0
+Center
+.TP
+1
+North
+.TP
+2
+South
+.TP
+3
+East
+.TP
+4
+West
+.TP
+5
+Northeast
+.TP
+6
+Northwest
+.TP
+7
+Southwest
+.TP
+8
+Southeast
+.RE
+'\" <</>>
+.RE
+'\" <</>>
+.RE
+'\" <</>>
+.TP
+.B LS-TILE
+Draws an image tile on the canvas. The JSON payload has the following
+fields in addition to those common to all map elements:
+'\" <<desc>>
+.RS
+.TP
+.B Image
+The image name as known to the mapper.
+.TP
+.BI BBHeight " (float)"
+The bounding-box height for the region bordering the image.
+.TP
+.BI BBWidth " (float)"
+The bounding-box width for the region bordering the image.
+'\" <</>>
+.RE
+'\" <</>>
+.RE
 .TP
 .B MARCO
 Status check. If received, reply with a 
 .B POLO
 command.
+Clients MUST NOT send this command.
+.RS
+.LP
 .B N.B.
 It is important that your client not ignore these occasional ping messages.
 For example, if your client is too slow receiving messages such that the
@@ -2646,69 +3065,77 @@ willing to do so if you have been at least responding to
 messages. If you haven't, the server will suspect your client has locked up
 or is not going to be able to catch up with the data being sent to it, and
 may decide to terminate the client's connection.
+.RE
 .TP
-.B NO
-Request that the server send no more data to the client.
+.B MARK
+Make a brief animated marker at the specified coordinates to draw attention
+to that space. The JSON payload contains the following fields:
+'\" <<desc>>
+.RS
 .TP
-.B NO+
-Same as 
-.BR NO ,
-but the client is also asserting primary control role to the other clients.
-(This is generally done by the GM console. The effect is that the server sends
-a 
-.RB \*(lq TB
-.BR 0 \*(rq
-command to tell all mapper clients to turn off their toolbars (unless, of course,
-they were invoked with the
-.B \-\-keep\-tools
-option) and the server will automatically tell all clients which connect after this
-point to start with their toolbars disabled as well.)
-Once all \*(lqprimary\*(rq clients (those who issued this command) have disconnected,
-the server will stop telling new clients to turn off their toolbars.
-'\" <</ital-is-var>>
-.I "This is deprecated. In the future, the concept of a primary client will not be"
-.I "supported by servers, and management of toolbars will be at the clients' discretion."
-'\" <<ital-is-var>>
-.TP
-'\".BI "OA " id " {{" key1 " " val1 "} {" key2 " " val2 "} \fR...\fP {" keyN " " valN }}
-'\".BI "OA " id " {" "key1 val1 key2 val2 \fR...\fP keyN valN" }
-.BI "OA " id " " kvlist
-Update a set of arbitrary attributes for the object with the given
-.IR id .
+.BI X " (float)"
 The
-.I id
-is either the unique identifier for the given object, or has the form
+.I x
+coordinate of the marker.
+.TP
+.BI Y " (float)"
+The 
+.I y
+coordinate of the marker.
+'\" <</>>
+.RE
+'\" **.TP
+'\" **.B NO
+'\" **Request that the server send no more data to the client.
+'\" **.TP
+'\" **.B NO+
+'\" **Same as 
+'\" **.BR NO ,
+'\" **but the client is also asserting primary control role to the other clients.
+'\" **(This is generally done by the GM console. The effect is that the server sends
+'\" **a 
+'\" **.RB \*(lq TB
+'\" **.BR 0 \*(rq
+'\" **command to tell all mapper clients to turn off their toolbars (unless, of course,
+'\" **they were invoked with the
+'\" **.B \-\-keep\-tools
+'\" **option) and the server will automatically tell all clients which connect after this
+'\" **point to start with their toolbars disabled as well.)
+'\" **Once all \*(lqprimary\*(rq clients (those who issued this command) have disconnected,
+'\" **the server will stop telling new clients to turn off their toolbars.
+'\" **'\" <</ital-is-var>>
+'\" **.I "This is deprecated. In the future, the concept of a primary client will not be"
+'\" **.I "supported by servers, and management of toolbars will be at the clients' discretion."
+'\" **'\" <<ital-is-var>>
+.TP
+.B OA
+Updates attributes of a specified map object. Any attributes not listed in the
+command MUST remain as-is. The JSON payload includes the following fields:
+'\" <<desc>>
+.RS
+.TP 
+.B ObjID
+The unique object identifier for the object to be modified.
+Alternatively, it may be in the form
 .BI @ name
 where
 .I name
-is the name of a creature in any of the forms accepted by the
-.RB \*(lq AC \*(rq
+is the creature's name in any of the forms allowed for the 
+.B AC
 command.
-.RS
+.TP
+.BI NewAttrs " (object)"
+The set of new attributes and their values, expressed as an object with
+field names matching the object attributes to be changed and their associated
+values being the new values for those attributes.
+'\" <</>>
 .LP
-The
-.I kvlist
-parameter is a list with an even number of elements. The first gives the
-name of an attribute. The next gives a new value for that attribute, and so on
-by pairs to specify a set of attributes to change.
-.LP
-For example, the command
-'\" <<center>>
-.RS
-.B "OA 12345 {X 13 Y 47}"
-.RE
-alters the
-.B X
-and 
-.B Y
-attributes of the object with ID
-.B 12345
-to the values 13 and 47, respectively. For a typical map element,
-this will move the object so its reference point is at coordinates (13, 47).
+Example: 
+.B "OA {\[dq]ObjID\[dq]:\[dq]a984a3\[dq],\[dq]NewAttrs\[dq]:{\[dq]X\[dq]:12,\[dq]Y\[dq]:44.5}}"
 .LP
 Note that there was an implicit assumption in the past that the
 .B NAME
-attribute would not change and it could be used as an immutable identifier
+attribute of a creature would not change and it could be used as an immutable identifier
 within a map client for a creature token. However, this is not the case and
 in fact GMA now includes explicit features to change this very attribute.
 Clients must be prepared to deal with the consequences of a change to any
@@ -2719,36 +3146,65 @@ The
 client itself does this correctly starting with version 3.39.
 .RE
 .TP
-.BI "OA+ " id " " key " " vlist
-Assuming that the object with the given
-.I id
-(which may be specified as described for the 
-.B OA
-command) has an attribute 
-.I key
-whose value is actually a list of values
-(e.g., the
-.B STATUSLIST
-attribute of creature objects), this command adds the values from
-.I vlist
-to that attribute's list. If any value was already in the
-attribute's list, it is not added again.
-.TP
-.BI "OA\- " id " " key " " vlist
-Just like 
 .B OA+
-but removes the specified values from the attribute's list rather than
-adding them. It is not an error if any of them did not already exist. 
-.TP
-.BI "OK " v " \fR[\fP" challenge \fR]\fP
-The server sends this to the client after the initial set of messages that are sent upon connection.
-It signals that those messages are over and the server is now ready to listen to the client.
-The
-.I v
-value is an integer which indicates the protocol version supported by the service.
-Map clients which do not support that protocol should warn their users to upgrade.
+Adds one or more values to a single attribute of an object known to the mapper.
+The payload is a JSON object with the following fields:
+'\" <<desc>>
 .RS
-.LP
+.TP
+.BI ObjID
+The unique object identifier, specified as for the
+.B OA
+command.
+.TP
+.BI AttrName
+The name of the attribute to be modified. This MUST be an attribute
+whose value is a list of strings. (E.g., the 
+.B STATUSLIST
+attribute of creature objects.)
+.TP
+.BI Values " (list of strings)"
+A list of string values to be added to those already in the named attribute.
+.RE
+'\" <</>>
+.TP
+.B OA\-
+Removes one or more values from a single attribute of an object known to the mapper.
+The payload is a JSON object with the following fields:
+'\" <<desc>>
+.RS
+.TP
+.BI ObjID
+The unique object identifier, specified as for the
+.B OA
+command.
+.TP
+.BI AttrName
+The name of the attribute to be modified. This MUST be an attribute
+whose value is a list of strings. (E.g., the 
+.B STATUSLIST
+attribute of creature objects.)
+.TP
+.BI Values " (list of strings)"
+A list of string values to be removed from those already in the named attribute.
+It is not an error if the value wasn't there to begin with.
+.RE
+'\" <</>>
+.TP
+.B OK
+'\" **.BI "OK " v " \fR[\fP" challenge \fR]\fP
+The server sends this to the client when it is ready for the client to start
+sending commands to it. The accompanying JSON payload includes the following
+fields:
+'\" <<desc>>
+.RS
+.TP
+.BI Protocol " (int)"
+The protocol version used by the server. Map clients which do not support
+that protocol SHOULD warn their users and SHOULD disconnect since they can't
+guarantee they can actually communicate with the server.
+.TP
+.BI Challenge " (base64-encoded bytes)"
 If present, the
 .I challenge
 value is a base-64-encoded authentication challenge. A client must successfully
@@ -2756,252 +3212,475 @@ respond with a valid
 .B AUTH
 command before any of its commands to the server will be accepted. The server will also
 refuse to send the client any map updates until it has successfully authenticated.
+'\" <</>>
 .RE
 .TP
-.BI "PRIV " message
+.B PRIV
 Notice from the server that a command sent by the client is denied due to
-insufficient privilege. Clients should not send this command.
+insufficient privilege. Clients MUST NOT send this command. The JSON
+payload includes the following field:
+'\" <<desc>>
+.RS
+.TP
+.B Command
+The command the client was attempting.
+.TP
+.B Reason
+The reason that command was denied.
+'\" <</>>
+.RE
 .TP
 .B POLO
-No-op. Ignore if received.
+No-op. Clients MUST ignore if received. Clients SHOULD send this in response
+to a
+.B MARCO
+command from the server.
 .TP
-.BI "PS " id " " color " " name " " area " " size " player|monster " x " " y " " reach
+.B PROGRESS
+The server sends this to the client to 
+indicate progress of a long-running operation such as downloading files.
+(Formerly this was sent as a comment prior to protocol version 400.)
+The payload is a JSON object with the following fields:
+'\" <<desc>>
+.RS
+.TP
+.B OperationID
+A unique identifier for the operation we're reporting progress for.
+.TP
+.B Title
+The description of the operation in progress. This is suitable for display to the user.
+.TP
+.BI Value " (int)"
+The current value of the progress meter. Units are arbitrary.
+.TP
+.BI MaxValue " (int)"
+The maximum value expected for the progress meter when it is finished.
+If this is 0, we don't yet know what the maximum will be, which SHOULD cause
+the client to use a progress meter style that indicates that it is not possible
+to estimate remaining time to completion. Also note that this value MAY change
+over the course of the progress report if the server becomes aware that it has
+a better maximum value available to it at that point.
+.TP
+.BI IsDone " (bool)"
+A boolean indication that the operation is completed. The client SHOULD remove the
+progress meter from display when the operation is completed.
+'\" <</>>
+.LP
+Clients MUST NOT send these; they are for the server to notify the client
+about progress.
+.RE
+.TP
+.BI PS
 Place a creature token on the map. This may be used to define a new creature object
 if no object with the given
-.I id
+.I ID
 already exists, or replaces an existing token with the (possibly different) parameters
-given.
+given. The JSON payload includes the following fields:
 .RS
 '\" <<desc>>
-.TP 8
-.I id
+.TP 
+.B ID
 The internal ID by which this creature is to be known. This must be unique. The client
 which creates the character token locally should create a unique ID, which is then broadcast
 via this command to the other clients, which use the same ID.
 .TP
-.I color
-The color used to shade the creature's threat zone when they have initiative to act.
-It has the same forms as accepted by the
-.RB \*(lq AC \*(rq
-command.
+.B Name
+The name as displayed on the map. Must be unique among all creatures
+currently displayed.
 .TP
-.I name
-The name of the creature as will be displayed on the token. 
-It has the same forms as accepted by the
-.RB \*(lq AC \*(rq
-command.
+.BI Health " (object)"
+If not
+.BR null ,
+this gives the current health status of the creature. It is an object with the
+following fields:
+'\" <<desc>>
+.RS
 .TP
-.I area
-The size of the threat zone around the creature.
-It has the same forms as accepted by the
-.RB \*(lq AC \*(rq
-command.
+.BI MaxHP " (int)"
+The creature's maximum number of hit points.
 .TP
+.BI LethalDamage " (int)"
+The amount of lethal damage sustained.
+.TP
+.BI NonLethalDamage " (int)"
+The amount of non-lethal damage sustained.
+.TP
+.BI Con " (int)"
+The grace amount of hit points the creature may sustain over their maximum
+before they are considered dead.
+.TP
+.BI IsFlatFooted " (bool)"
+If true, the creature is flat-footed.
+.TP
+.BI IsStable " (bool)"
+If true, the creature has been stabilized to prevent death while critically wounded.
+Creatures which are in non-critical states of health don't have this attribute set
+even though technically (in a sense) they are \*(lqstable\*(rq.
+.TP
+.BI Condition
+A custom condition status to display on the map, if you wish to override the map's
+calculation.
+.TP
+.BI HPBlur " (int)"
+If 0, the creature's health is displayed accurately. Otherwise, this gives
+the percentage by which to \*(lqblur\*(rq the hit points as seen by the 
+players. For example, if
+.I HPBlur
+is 10, then hit points are displayed only in 10% increments.
+'\" <</>>
+.RE
+.TP
+.BI Gx " (float)"
+The grid 
+.I x
+coordinate for the creature's reference point. Note that this is in
+grids, not pixel units.
+.TP
+.BI Gy " (float)"
+The grid 
+.I y
+coordinate for the creature's reference point. Note that this is in
+grids, not pixel units.
+.TP
+.BI Skin " (int)"
+If 0, show the default appearance on the creature's token. Otherwise, show
+one of the alternative images defined for that creature.
+.TP
+.BI SkinSize " (list of strings)"
+This gives a list of values to use for the
 .I size
-The size of the creature itself.
-It has the same forms as accepted by the
-.RB \*(lq AC \*(rq
-command.
+attribute corresponding to the
+.I skin
+number. For example, if there are 3 skins defined for a
+shape-changing creature, and the first two are medium-size
+but the third is large, then 
+.I skinsize
+would have the value
+.BR [\[dq]M\[dq],\[dq]M\[dq],\[dq]L\[dq]] .
 .TP
-.I type
-This is either the constant string
-.RB \*(lq player \*(rq
-or
-.RB \*(lq monster \*(rq,
-to indicate whether the creature is generally considered an ally or adversary (respectively)
-to the players. The only effect this has is that creatures of
-.RB \*(lq monster \*(rq
-type may be selected by the special token
-.RB \*(lq *Monsters* \*(rq
-when specifying whose turn it is in initiative, and are deleted by the
-.RB \*(lq "CLR M*" \*(rq
-command, while player type creatures are deleted by the
-.RB \*(lq "CLR P*" \*(rq
-command.
+.BI Elev " (int)"
+The creature's elevation in feet relative to the \*(lqfloor\*(rq level.
 .TP
-.I x
-The location on the
-.I x
-axis for the creature's reference point (upper-left corner). 
-.B Note 
-that this
-is in 
-'\" <</ital-is-var>>
-.IR "grid units" .
-'\" <<ital-is-var>>
-The leftmost square of the map is 0, the next square to the right is 1, and so forth.
-Creatures smaller than \*(lqsmall\*(rq size category may be placed with fractional
-values such as 0.5 for the right half of the left-most square on the map.
+.BI Color
+The color code used to draw the creature's threat zone.
 .TP
-.I y
-Like
-.IR x ,
-but along the 
-.I y
-axis.
+.BI Note
+A note to attach to the creature token to indicate special conditions or status.
 .TP
-.I reach
-Integer value; if 0, the creature's threat zone is normal. If 1, they have a reach weapon.
-If 2, both zones are threatened.
+.BI Size
+The tactical size category of the creature.
+.TP
+.BI Area
+The tactical size category for the creature's threat zone.
+.TP
+.BI StatusList " (list of strings)"
+A list of condition codes which apply to the character. These are defined by
+the
+.B DSM
+command (q.v.).
+.TP
+.BI AoE " (object)"
+If not
+.BR null ,
+a spell area of effect should be drawn around the creature.
+The value is an object with these fields:
+'\" <<desc>>
+.RS
+.TP
+.BI Radius " (float)"
+The distance in standard map pixel units away from the creature's center
+to the perimeter of the area of effect.
+.TP
+.BI Color
+The color with which to draw the spell area.
 .RE
 '\" <</>>
 .TP
-.BI "ROLL " from " " recipient-list " " title " " result " " structured-result-list " " message-ID
+.BI MoveMode " (int)"
+The mode of locomotion currently employed by the creature:
+'\" <<desc>>
+.RS
+.TP 3
+0
+Land (walking)
+.TP
+1
+Burrowing
+.TP
+2
+Climbing
+.TP
+3
+Flying
+.TP
+4
+Swimming
+'\" <</>>
+.RE
+.TP
+.BI Reach " (int)"
+Indicates if the creature is wielding a reach weapon and thus has an expanded
+threat zone. If 0, the threat zone is normal for the creature. If 1, it cannot
+attack adjacent foes but has a wider threat space. If 2, it has both threat
+zones active at the same time.
+.TP
+.BI Killed " (bool)"
+If true, the creature is dead.
+.TP
+.BI Dim " (bool)"
+If true, the creature does not have initiative now, and their token
+should be de-emphasized compared to the one with initiative.
+.TP
+.BI CreatureType " (int)"
+The specific type of creature. This may be 0 if the type is unknown, 1 for
+monsters, or 2 for players. Clients MUST NOT set this field to a value other
+than 1 or 2.
+'\" <</>>
+.RE
+.TP
+.B READY
+The server sends this to the client to indicate that all preliminary
+data has been sent, authentication (if applicable) has been successful,
+and the client may proceed to carry out normal operations now.
+.TP
+.B ROLL
 Reports the results of a die roll initiated by the
 .B D
-command. The values given are:
-.RS
+command. Clients MUST NOT send this command. The JSON payload includes the following fields:
 '\" <<desc>>
-.TP 23
-.I from
-The user who initiated the roll.
+.RS
 .TP
-.I recipient-list
-The list of users to receive this notice, in a form identical to the
-.B TO
-command.
+.BI Sender
+The name of the user who rolled the dice. 
 .TP
-.I title
-A descriptive title for the die roll. This may be the empty string.
+.BI Recipients " (list of strings)"
+The names of the people the message was explicitly addressed to. For
+global messages, this should be
+.BR null .
 .TP
-.I result
-The numeric result of the die roll.
+.BI MessageID " (int)"
+The unique number assigned by the server for this chat message. (Die roll
+results are essentially a kind of chat message.) 
 .TP
-.I structured-result-list
-A list of tuples describing the actual die rolls that resulted in the reported 
-.I result
-value. See
-.BR dice (3)
-for a description of what this list may look like.
+.BI ToAll " (bool)"
+If true, this is a global message sent to all clients.
+The contents of the
+.I recipients
+field are ignored; it should be omitted or set to
+.BR null .
 .TP
-.I message-ID
-A server sequence for the message as described for the
-.B TO
-command.
+.BI ToGM " (bool)"
+If true, this message will be sent only to the GM. 
+The contents of the
+.I recipients
+field are ignored; it should be omitted or set to
+.BR null .
+.TP
+.BI Title
+The title describing the purpose of the die-roll as set by the
+user, if any.
+The title string may include special formatting codes which will be used by
+clients supporting the
+.B DICE-COLOR-BOXES
+optional feature (see the
+.B ALLOW
+command for details). Clients which did not request this feature will not
+see the special formatting codes in the title string.
+.TP
+.BI Result " (object)"
+The result of the die roll. This is an object with the following fields:
+'\" <<desc>>
+.RS
+.TP
+.BI Result " (int)"
+The final numerical result of the die-roll.
+.TP
+.BI Details " (list of objects)"
+The details behind how that result was generated are given as a list of objects
+with the following fields:
+'\" <<desc>>
+.RS
+.TP
+.BI Type
+A text label describing what the value means in the context of the die-roll
+result.
+.TP
+.BI Value
+The value for this part of the result (as a string).
+'\" <</>>
 .RE
 '\" <</>>
-.TP
-.BI "SYNC \fR[\fPCHAT \fR[\fP" target \fR]]\fP
-This command is
-'\" <</ital-is-var>>
-.I not
-'\" <<ital-is-var>>
-recognized by any client (if a client receives one, it should simply ignore it) and is not
-relayed by the server to any other clients. Instead, this is a request by a client to the 
-server itself. The client should completely clear its internal state before making this
-request. In response, the server will send to the client its understanding of the current
-state of the game. This should catch up the client to match what the other map clients are seeing.
-.RS
-.LP
-If a parameter with the word
-.B CHAT
-is added, then the chat message history is synced to the client instead of the map contents.
-In this case the optional parameter
-.I target
-may be used to get only a subset of the chat history. If 
-.I target
-is a negative integer
-'\" <</ital-is-var>>
-.I \-n
-then only the most recent
-.I n
-'\" <<ital-is-var>>
-messages are sent; otherwise it is assumed to be the 
-.I message-ID
-the client last saw, so only messages with IDs higher than
-.I target
-are sent.
-.LP
-A server may be configured to perform a sync operation upon client connection (after, if 
-required, authentication) without the client explicitly sending a
-.RB \*(lq SYNC \*(rq
-command to it.
+.RE
 .RE
 .TP
-.BI "TB " state
-If
-.I state
-is a boolean true value, display the toolbar in the mapper client, otherwise hide it.
-A client may choose to disregard this command.
+.B SYNC
+This command MUST be ignored if received by a client. A client sends this to the
+server to request a replay of map commands which would be necessary to catch it
+up to the state the other maps are currently in.
+A server may be configured to perform a sync operation upon client connection (after, if 
+required, authentication) without the client explicitly sending a
+.B SYNC
+command to it.
 .TP
-.BI "TO " from " " recipient-list " " message " " message-ID
-Send chat message to a set of recipients. The values in the recipient
-list are as described above for the
-.B D
-command. The
-.I from
-parameter is ignored when received from a client and may be the empty string. It is replaced
-by the username of the sender when the server resends the command out to all clients.
-The
-.I message-ID
-value is ignored when sent by clients, but when the server relays this out to the
-peer clients, it will add a unique (and sequentially increasing) value to identify
-the message. Clients can use this to request updates via the
-.B "SYNC CHAT"
-command or to sort messages chronologically.
+.B SYNC-CHAT
+This command MUST be ignored if received by a client. 
+Supersedes the 
+.B SYNC
+command with
+.B CHAT
+argument in protocol versions prior to 400.
+A client sends this to the
+server to request a replay of chat messages (including die-roll result notices)
+according to the JSON payload, which may include this field:
+'\" <<desc>>
+.RS
+.TP
+.BI Target " (int)"
+If missing or 0, all chat messages in the server's history are sent to the client.
+Otherwise, if
+.I target
+is positive, all messages with 
+.IR messageID s
+greater than
+.IR target .
+If
+.I target
+is negative, its absolute value gives the number of recent messages to send
+to the client (e.g., if
+.I target
+is \-50, then the most recent 50 messages are re-sent to the client).
+'\" <</>>
+.RE
+.TP
+.B TB
+Controls the display of the toolbar in the mapper client.
+The JSON payload is an object with the following field:
+'\" <<desc>>
+.RS
+.TP
+.BI Enabled " (bool)"
+If true, the client SHOULD display its toolbar. If false, the client SHOULD NOT
+display it. The client may override this request based on the user's preferences.
+'\" <</>>
+.RE
+.TP
+.B TO
+Send chat message to a set of recipients. 
+The payload is a JSON object with the following fields:
+'\" <<desc>>
+.RS
+.TP
+.BI Sender
+The name of the user sending the message. Clients SHOULD NOT set this field; it
+is set by the server when sending these messages to peers.
+.TP
+.BI Recipients " (list of strings)"
+The names of the people the message was explicitly addressed to. For
+global messages, this should be
+.BR null .
+.TP
+.BI MessageID " (int)"
+The unique number assigned by the server for this chat message. Clients SHOULD NOT
+set this field.
+.TP
+.BI ToAll " (bool)"
+If true, this is a global message sent to all clients.
+The contents of the
+.I recipients
+field are ignored; it should be omitted or set to
+.BR null .
+.TP
+.BI ToGM " (bool)"
+If true, this message will be sent only to the GM. 
+The contents of the
+.I recipients
+field are ignored; it should be omitted or set to
+.BR null .
+.TP
+.B Text
+The text of the message to be sent.
+.RE
+'\" <</>>
 .TP
 .B /CONN
 For diagnostic purposes, this command causes the server to send a summary of the
 connections it is currently serving. These are sent back to the client
-using the
+via the
 .B CONN
-\&...
-.B CONN:
-\&...
-.B CONN.
-command series.
-It is not passed on to peer clients.
+command documented above.
 .TP
-.B CONN
-Begin a sequence of data records describing current connected clients. This is
-followed by a number of
-.B CONN:
-commands.
-.TP
-.BI "CONN: " i " you|peer " addr " " user " " client " " auth? " " primary? " " w/o? " " polo
-Gives one data record describing a connection to the server. The fields included are:
-.RS
+.B UPDATES
+This provides the latest available versions of various programs. A client MAY
+alert the user or initiate an automatic upgrade if it recognizes that it or one
+of its dependencies is out of date.
+Clients MUST NOT send this command.
+(Formerly this was sent as a comment prior to protocol version 400.)
+The payload contains the following field:
 '\" <<desc>>
-.TP 10
-.I i
-Position in the data list, starting with 0.
+.RS
 .TP
-.BR you | peer
-Indicates if this describes the requesting client or a peer connection.
+.BI Packages " (list of objects)"
+Each element in this list is a JSON object with the following fields:
+'\" <<desc>>
+.RS
 .TP
-.I addr
-The IP address of the connection.
+.B Name
+The name of the software package, such as \*(lqmapper\*(rq or \*(lqcore\*(rq.
 .TP
-.I user
-The username given by the client when logging in.
+.BI Instances " (list of objects)"
+A list of all available instances of the named package. Each is a JSON object
+with the following fields:
+'\" <<desc>>
+.RS
 .TP
-.I client
-The client tool using that connection.
+.B OS
+The name of the operating system platform for which this instance of the package
+is available (e.g., \*(lqfreebsd\*(rq, \*(lqlinux\*(rq, \*(lqdarwin\*(rq, \*(lqwindows\*(rq, etc.).
+If this is empty, then this instance is platform-independent.
 .TP
-.I auth?
-A boolean value, true if the connection authenticated successfully.
+.B Arch
+The name of the hardware architecture for which this instance of the package
+is compiled (e.g., \*(lqamd64\*(rq, etc.) If this is empty, then this instance
+is architecture-independent.
 .TP
-.I primary?
-A boolean value, true if the connection asserted primary mode.
+.B Version
+The semantic version number that users should be using. This is set by the GM
+(or designated server administrator\(emhenceforth we will simply use the term
+\*(lqGM\*(rq for this role) for their game. It may not necessarily be
+the latest version available generally.
 .TP
-.I w/o?
-A boolean value, true if the connection is in write-only mode (will send commands to the server
-but it not listening for any replies).
-.TP
-.I polo
-The number of seconds (which may be an integer or real number) since the last
-.B POLO
-command was received from this client. This may help debug stuck clients or
-dropped connections.
+.B Token
+The download token used for obtaining a copy of the package. This is entirely
+under the GM's control and refers to a file the GM placed on their game server
+for their players to access.  The
+.I token
+value is the non-static part of the download URL from their game server.
+.RE
+'\" <</>>
+.RE
+'\" <</>>
 .RE
 '\" <</>>
 .TP
-.BI "CONN. " count " " checksum
-Marks the end of the sequence of data records, just as the
-.B LS.
-command does (q.v.). The
-.I checksum
-value may be 0, in which case there is no calculated checksum provided.
+.B "WORLD"
+This command provides various campaign-world information useful for the client
+to know. Clients MUST NOT send this command. 
+The payload includes the following parameters:
+'\" <<desc>>
+.RS
+.TP
+.B Calendar
+The name of the calendar system in play, as known to the GMA game clock.
+(Formerly this was sent as a comment in the form
+.BI "// CALENDAR // " system
+prior to protocol version 400.)
+
+Declares which calendaring system the various dates and times are based upon.
+'\" <</>>
+.LP
+Example:
+.B "WORLD {\[dq]Calendar\[dq]:\[dq]golarion\[dq]}"
+.RE
 '\" <</>>
 '\" <<TeX>>
 '\" \label{manpage:mapper:6:protocol:end}
@@ -3072,9 +3751,11 @@ Steve Willoughby / steve@madscience.zone;
 John Mechalas (elevation and movement modes).
 .SH HISTORY
 .LP
-This document describes version 3.39 of 
+This document describes version 4.x of 
 .BR mapper .
-(A previous version of this manpage erroneously listed the mapper version as 4.)
+This introduces a breaking change from versions 3.x, mostly in terms of the communications
+protocol used between the mapper server and clients. 
+.LP
 A version of 
 .B mapper
 was also in version 3 of GMA, but was different in operation.
@@ -3090,13 +3771,15 @@ the server tracks game state, simply exiting and restarting the map client accom
 the same effect (possibly better). Now this button requests a "sync" operation with the
 server. 
 .LP
-This document also describes map protocol version 333,
-which added the
-.B ALLOW
-command.
+This document also describes map protocol version 400,
+which changed the server communication protocol to use JSON instead of TCL lists.
+It also introduced the
+.BR UPDATES
+and
+.B WORLD
+commands.
 .LP
-Version 332
-added the
+Version 332 added the
 .B GRANTED
 server response, guaranteeing that
 .B AUTH
@@ -3327,4 +4010,4 @@ was in any sort of controlling or leadership role. It only meant it would
 refuse to turn off its own toolbar if asked to do so. The new name is
 more descriptive of the actual function.
 .SH COPYRGHT
-Part of the GMA software suite, copyright \(co 1992\-2022 by Steven L. Willoughby, Aloha, Oregon, USA. All Rights Reserved. Distributed under BSD-3-Clause License. \"@m(c)@
+Part of the GMA software suite, copyright \(co 1992\-2021 by Steven L. Willoughby (Software Alchemy), Aloha, Oregon, USA. All Rights Reserved. Distributed under BSD-3-Clause License. \"@m(c)@
