@@ -87,8 +87,6 @@
 # 	::DEBUG level message
 # 	::report_progress message
 # 	::say message
-# 	::DefinePlayerCharacter name id color area size
-# 	::DefineStatusMarker condition shape color description
 
 package provide gmaproto 1.0
 package require Tcl 8.5
@@ -340,9 +338,13 @@ proc ::gmaproto::_dispatch {} {
 		if {$cmd eq "//"} {
 			continue
 		}
-		if [catch {::DoCommand$cmd $params} err] {
-			catch {::DoCommandError $cmd $params $err}
-		}
+		::gmaproto::_dispatch_to_app $cmd $params
+	}
+}
+
+proc ::gmaproto::_dispatch_to_app {cmd params} {
+	if [catch {::DoCommand$cmd $params} err] {
+		catch {::DoCommandError $cmd $params $err}
 	}
 }
 
@@ -1606,19 +1608,15 @@ proc ::gmaproto::_login {} {
 		# Negotiate interaction with server up to successful login.
 		#
 		switch -exact -- $cmd {
-			//    { 
-				::DEBUG 1 "server: $params"
-			}
-			AC {
-				::DefinePlayerCharacter $params
-			}
+			//	{ ::DEBUG 1 "server: $params" }
+			AC	{ ::gmaproto::_dispatch_to_app AC $params }
+			DSM	{ ::gmaproto::_dispatch_to_app DSM $params }
+			MARCO	{ ::gmaproto::DEBUG "Ignored MARCO during login" }
+			WORLD	{ set calendar [dict get $params Calendar] }
 			DENIED {
 				::report_progress "Server denied access"
 				::say "Server DENIED access: [dict get $params Reason]"
 				error "Server DENIED access: [dict get $params Reason]"
-			}
-			DSM {
-				::DefineStatusMarker $params
 			}
 			GRANTED {
 				set ::gmaproto::username [dict get $params User]
@@ -1629,9 +1627,6 @@ proc ::gmaproto::_login {} {
 					::gmaproto::DEBUG "Server legacy sign-on completed." 
 					set sync_done true
 				}
-			}
-			MARCO {
-				::gmaproto::DEBUG "Ignored MARCO during login"
 			}
 			OK {
 				::gmaproto::DEBUG "Server greeting complete"
@@ -1700,9 +1695,6 @@ proc ::gmaproto::_login {} {
 						}
 					}
 				}
-			}
-			WORLD {
-				set calendar [dict get $params Calendar]
 			}
 			default {
 				::gmaproto::DEBUG "Unexpected server message $cmd received while waiting for authentication to complete"
