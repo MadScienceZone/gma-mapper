@@ -58,7 +58,7 @@
 #
 
 package provide gmafile 1.0
-package require gmaproto 0.1
+package require gmaproto 1.0
 package require Tcl 8.5
 
 namespace eval ::gmafile {
@@ -270,7 +270,7 @@ proc ::gmafile::load_legacy_map_file {f vid oldmeta} {
 	while {[gets $f v] >= 0} {
 		lappend file_lines $v
 	}
-	return [::gmafile::load_legacy_map_data $v $meta]
+	return [::gmafile::load_legacy_map_data $file_lines $meta]
 }
 
 # load_legacy_map_data lines metadict -> metadict objlist
@@ -280,7 +280,7 @@ proc ::gmafile::load_legacy_map_file {f vid oldmeta} {
 #   RAW line
 #
 proc ::gmafile::load_legacy_map_data {vlist meta} {
-	::gmafile::_diag "Loading [dict get $meta Comment]..."
+	::gmafile::_diag "Loading [llength $vlist] from [dict get $meta Comment]..."
 	set imagedict {}
 	set file_data {}
 
@@ -304,7 +304,9 @@ proc ::gmafile::load_legacy_map_data {vlist meta} {
 		} else {
 			lappend file_data [list RAW $v]
 		}
+		::DEBUG 3 "in: $v"
 	}
+	::DEBUG 3 "read images: [dict size $imagedict] elements: [llength $file_data]"
 
 	foreach image_id [dict keys $imagedict] {
 		set image_data [dict create Name $image_id]
@@ -325,8 +327,9 @@ proc ::gmafile::load_legacy_map_data {vlist meta} {
 			}
 		}
 		lappend file_data [list IMG $image_data]
+		DEBUG 3 "added IMG $image_data"
 	}
-	return [list $meta $file_data]
+	return [list $meta [::gmafile::upgrade_elements $file_data]]
 }
 
 proc ::gmafile::_diag {message} {
@@ -376,7 +379,7 @@ proc ::gmafile::upgrade_elements {filedata} {
 			set aoe [dict create Radius $r Color $c]
 		}
 
-		lappend new_filedata [list PS [dict create \
+		lappend new_filedata [list CREATURE [dict create \
 			ID $mob_id \
 			Name $OldMobs(NAME:$mob_id) \
 			Health $health \
@@ -403,7 +406,7 @@ proc ::gmafile::upgrade_elements {filedata} {
 	foreach obj_id [array names OldObjs TYPE:*] {
 		set obj_id [string range $obj_id 5 end]
 		require_arr OldObjs $obj_id X Y Z
-		default_add OldObjs $obj_id -value 0 WIDTH HIDDEN LOCKED
+		default_arr OldObjs $obj_id -value 0 WIDTH HIDDEN LOCKED
 		default_arr OldObjs $obj_id POINTS LINE FILL LAYER LEVEL GROUP DASH
 		set obj_type $OldObjs(TYPE:$obj_id)
 
@@ -465,25 +468,25 @@ proc ::gmafile::upgrade_elements {filedata} {
 				dict set element ArcMode [::gmaproto::to_enum ArcMode $OldObjs(ARCMODE:$obj_id)]
 				dict set element Start $OldObjs(START:$obj_id)
 				dict set element Extent $OldObjs(EXTENT:$obj_id)
-				lappend new_filedata [list LS-ARC $element]
+				lappend new_filedata [list ARC $element]
 			}
 			circ {
 				dict set element ArcMode [::gmaproto::to_enum ArcMode $OldObjs(ARCMODE:$obj_id)]
 				dict set element Start $OldObjs(START:$obj_id)
 				dict set element Extent $OldObjs(EXTENT:$obj_id)
-				lappend new_filedata [list LS-CIRC $element]
+				lappend new_filedata [list CIRC $element]
 			}
 			line {
 				dict set element Arrow [::gmaproto::to_enum Arrow $OldObjs(ARROW:$obj_id)]
-				lappend new_filedata [list LS-LINE $element]
+				lappend new_filedata [list LINE $element]
 			}
 			poly {
 				dict set element Spline $OldObjs(SPLINE:$obj_id)
 				dict set element Join [::gmaproto::to_enum Join $OldObjs(JOIN:$obj_id)]
-				lappend new_filedata [list LS-POLY $element]
+				lappend new_filedata [list POLY $element]
 			}
 			rect {
-				lappend new_filedata [list LS-RECT $element]
+				lappend new_filedata [list RECT $element]
 			}
 			saoe {
 				set shape [::gmaproto::to_enum AoEShape $OldObjs(AOESHAPE:$obj_id)]
@@ -494,7 +497,7 @@ proc ::gmafile::upgrade_elements {filedata} {
 					dict set element Extent $OldObjs(EXTENT:$obj_id)
 				}
 						
-				lappend new_filedata [list LS-SAOE $element]
+				lappend new_filedata [list SAOE $element]
 			}
 			text {
 				# value is {family size normal underline bold overstrike roman italic}
@@ -520,16 +523,16 @@ proc ::gmafile::upgrade_elements {filedata} {
 					Family $family \
 					Size $size \
 					Weight $weight \
-					Slant $slant \
-					Anchor $anchor \
+					Slant $slant
 				]
-				lappend new_filedata [list LS-TEXT $element]
+				dict set element Anchor [::gmaproto::to_enum Anchor $anchor]
+				lappend new_filedata [list TEXT $element]
 			} 
 			tile {
 				dict set element Image $OldObjs(IMAGE:$obj_id)
 				dict set element BBHeight $OldObjs(BBHEIGHT:$obj_id)
 				dict set element BBWidth $OldObjs(BBWIDTH:$obj_id)
-				lappend new_filedata [list LS-TILE $element]
+				lappend new_filedata [list TILE $element]
 			}
 			default {
 				::gmafile::_diag "Ignoring object $obj_id since we can't figure out what it is."

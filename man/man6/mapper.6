@@ -3266,8 +3266,10 @@ A boolean indication that the operation is completed. The client SHOULD remove t
 progress meter from display when the operation is completed.
 '\" <</>>
 .LP
-Clients MUST NOT send these; they are for the server to notify the client
-about progress.
+Clients SHOULD NOT send these; they are for the server to notify the client
+about progress. If a client does send progress update messages to other
+peers, it should be clear that what is being tracked is a process that the
+other clients are interested in.
 .RE
 .TP
 .BI PS
@@ -3754,7 +3756,8 @@ John Mechalas (elevation and movement modes).
 This document describes version 4.x of 
 .BR mapper .
 This introduces a breaking change from versions 3.x, mostly in terms of the communications
-protocol used between the mapper server and clients. 
+protocol used between the mapper server and clients and the way map data are represented
+internally and in the disk files used by the mapper.
 .LP
 A version of 
 .B mapper
@@ -3774,7 +3777,10 @@ server.
 This document also describes map protocol version 400,
 which changed the server communication protocol to use JSON instead of TCL lists.
 It also introduced the
-.BR UPDATES
+.BR PROGRESS ,
+.BR PROTOCOL ,
+.BR READY ,
+.BR UPDATES ,
 and
 .B WORLD
 commands.
@@ -4009,5 +4015,5 @@ but this never really made sense, as it didn't really mean the mapper
 was in any sort of controlling or leadership role. It only meant it would
 refuse to turn off its own toolbar if asked to do so. The new name is
 more descriptive of the actual function.
-.SH COPYRGHT
+.SH COPYRIGHT
 Part of the GMA software suite, copyright \(co 1992\-2021 by Steven L. Willoughby (Software Alchemy), Aloha, Oregon, USA. All Rights Reserved. Distributed under BSD-3-Clause License. \"@m(c)@

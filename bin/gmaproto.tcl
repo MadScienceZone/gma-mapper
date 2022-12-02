@@ -159,7 +159,7 @@ namespace eval ::gmaproto {
 		AC      {Name s ObjID s Color s Area s Size s}
 		ACCEPT  {Messages l}
 		AI      {Name s Sizes {a {File s ImageData b IsLocalFile ? Zoom f}}}
-		AI?	    {Name s Sizes {a {Zoom f}}}
+		AI?	{Name s Sizes {a {Zoom f}}}
 		ALLOW   {Features l}
 		AUTH    {Client s Response b User s}
 		AV      {XView f YView f}
@@ -187,7 +187,7 @@ namespace eval ::gmaproto {
 		LS-POLY {Spline f Join i ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		LS-RECT {ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		LS-SAOE {AoEShape i ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
-		LS-TEXT {Text s Font {o {Family s Size f Weight i Slant i Anchor i}} ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
+		LS-TEXT {Text s Font {o {Family s Size f Weight i Slant i}} Anchor i ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		LS-TILE {Image s BBHeight f BBWidth f ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		MARCO   {}
 		MARK    {X f Y f}
@@ -208,6 +208,8 @@ namespace eval ::gmaproto {
 		UPDATES {Packages {a {Name s Instances {a {OS s Arch s Version s Token s}}}}}
 		WORLD   {Calendar s}
 		/CONN   {}
+		Health  {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}
+		Font	{Family s Size f Weight i Slant i}
 	}
 	variable all_messages {}
 	foreach {_ v} [array get _message_map] {lappend all_messages $v}
@@ -338,7 +340,13 @@ proc ::gmaproto::_dispatch {} {
 		if {$cmd eq "//"} {
 			continue
 		}
-		::gmaproto::_dispatch_to_app $cmd $params
+		if {$cmd eq "ERROR"} {
+			::DEBUG 0 "Unable to interpret server data \"[lindex $params 1]\": [lindex $params 0]"
+		} elseif {$cmd eq "UNDEFINED"} {
+			::DEBUG 0 "Unable to interpret server command \"$params\""
+		} else {
+			::gmaproto::_dispatch_to_app $cmd $params
+		}
 	}
 }
 
@@ -401,7 +409,8 @@ proc ::gmaproto::_protocol_encode_list {objtuple} {
 	return [::gmaproto::_protocol_encode {*}$objtuple]
 }
 
-proc ::gmaproto::_protocol_encode {command kvdict} {
+proc ::gmaproto::_protocol_encode {oldcommand kvdict} {
+	set command [::gmaproto::GMATypeToProtocolCommand $oldcommand]
 	#
 	# encode as JSON, eliminating zero fields and ones not mentioned in the protocol spec
 	#
@@ -420,6 +429,181 @@ proc ::gmaproto::_protocol_encode {command kvdict} {
 	return $message
 }
 
+# attrname internal_value -> jsonified_value
+proc ::gmaproto::_attribute_encode {k v} {
+	switch -exact -- $k {
+		AoEShape -
+		Anchor   -
+		ArcMode  -
+		Arrow    -
+		Dash     -
+		Join     -
+		MoveMode -
+		CreaturType { return [::gmaproto::to_enum $k $v] }
+
+		Dim      -
+		Hidden   -
+		Killed   -
+		Locked   { return [::gmaproto::json_bool $v] }
+
+		BBHeight -
+		BBwidth  -
+		Elev     -
+		Extent   -
+		Gx       -
+		Gy       -
+		Reach    -
+		Skin     -
+		Spline   -
+		Start    -
+		Width    -
+		X        -
+		Y        -
+		Z        { return $v }
+
+		AoE      { return [::json::write object Radius [lindex $v 1] Color [lindex $v 2]] }
+
+		SkinSize   { return [::json::write array {*}$v] }
+		StatusList { return [::json::write array {*}[lmap s $v {json::write string $s}]] }
+
+		Font   -
+		Health { return [::gmaproto::_protocol_encode $k $v] }
+
+		Points {
+			set plist {}
+			foreach point $v {
+				lappend plist "{\"X\":[dict get $v X],\"Y\":[dict get $v Y]}"
+			}
+			return [::json::write array {*}$plist]
+		}
+	}
+	return [::json::write string $v]
+}
+
+# _upgrade_attribute attrname oldvalue -> {newname jsonified_newvalue}
+proc ::gmaproto::_upgrade_attribute {k v} {
+	switch -exact -- $k {
+		AOESHAPE { return [list AoEShape     [::gmaproto::to_enum AoEShape $v]] }
+		ANCHOR   { return [list Anchor       [::gmaproto::to_enum Anchor $v]] }
+		ARCMODE  { return [list ArcMode      [::gmaproto::to_enum ArcMode $v]] }
+		ARROW    { return [list Arrow        [::gmaproto::to_enum Arrow $v]] }
+		DASH     { return [list Dash         [::gmaproto::to_enum Dash $v]] }
+		JOIN     { return [list Join         [::gmaproto::to_enum Join $v]] }
+		MOVEMODE { return [list MoveMode     [::gmaproto::to_enum MoveMode $v]] }
+		TYPE     { return [list CreatureType [::gmaproto::to_enum CreatureType $v]] }
+
+		DIM      { return [list Dim    [::gmaproto::json_bool $v]] }
+		HIDDEN   { return [list Hidden [::gmaproto::json_bool $v]] }
+		KILLED   { return [list Killed [::gmaproto::json_bool $v]] }
+		LOCKED   { return [list Locked [::gmaproto::json_bool $v]] }
+
+		BBHEIGHT { return [list BBHeight $v] }
+		BBWIDTH  { return [list BBWidth $v] }
+		ELEV     { return [list Elev $v] }
+		EXTENT   { return [list Extent $v] }
+		GX       { return [list Gx $v] }
+		GY       { return [list Gy $v] }
+		REACH    { return [list Reach $v] }
+		SKIN     { return [list Skin $v] }
+		SPLINE   { return [list Spline $v] }
+		START    { return [list Start $v] }
+		WIDTH    { return [list Width $v] }
+		X        { return [list X $v] }
+		Y        { return [list Y $v] }
+		Z        { return [list Z $v] }
+
+		AOE      { return [list AoE [::json::write object Radius [lindex $v 1] Color [lindex $v 2]]] }
+
+		SKINSIZE   { return [list SkinSize [::json::write array {*}$v]] }
+		STATUSLIST { return [list StatusList [::json::write array {*}[lmap s $v {json::write string $s}]]] }
+
+		HEALTH {
+			if {[llength $v] < 7} {
+				return [list Health null]
+			}
+			if {[llength $v] > 7} {
+				set blur [lindex $v 7]
+			} else {
+				set blur 0
+			}
+			return [list Health "{\"MaxHP\":[lindex $v 0],\"LethalDamage\":[lindex $v 1],\"NonLethalDamage\":[lindex $v 2],\"Con\":[lindex $v 3],\"IsFlatFooted\":[::gmaproto::json_bool [lindex $v 4]],\"IsStable\":[::gmaproto::json_bool [lindex $v 5]],\"Condition\":[::json::write string [lindex $v 6]],\"HPBlur\":$blur}"]
+		}
+		FONT {
+			set weight 0
+			set slant 0
+			if {[lsearch -exact $v bold] >= 0} {
+				set weight 1
+			}
+			if {[lsearch -exact $v italic] >= 0} {
+				set slant 1
+			}
+			return [list Font "{\"Family\":[json::write string [lindex $v 0]],\"Size\":[lindex $v 1],\"Weight\":$weight,\"Slant\":$slant}"]
+		}
+
+		POINTS {
+			set plist {}
+			foreach {x y} $v {
+				lappend plist "{\"X\":$x,\"Y\":$y}"
+			}
+			return [list Points [::json::write array {*}$plist]]
+		}
+	}
+	return [list [string totitle $k] [::json::write string $v]]
+}
+
+# _backport_attribute attrname newvalue -> oldvalue
+proc ::gmaproto::_backport_attribute {k v} {
+	switch -exact -- $k {
+		AoEShape     { return [list AOESHAPE [::gmaproto::from_enum AoEShape $v]] }
+		Anchor       { return [list ANCHOR   [::gmaproto::from_enum Anchor $v]] }
+		ArcMode      { return [list ARCMODE  [::gmaproto::from_enum ArcMode $v]] }
+		Arrow        { return [list ARROW    [::gmaproto::from_enum Arrow $v]] }
+		CreatureType { return [list TYPE     [::gmaproto::from_enum CreatureType $v]] }
+		Dash         { return [list DASH     [::gmaproto::from_enum Dash $v]] }
+		Join         { return [list JOIN     [::gmaproto::from_enum Join $v]] }
+		MoveMode     { return [list MOVEMODE [::gmaproto::from_enum MoveMode $v]] }
+
+		Dim      { return [list DIM     [::gmaproto::int_bool $v]] }
+		Hidden   { return [list HIDDEN  [::gmaproto::int_bool $v]] }
+		Killed   { return [list KILLED  [::gmaproto::int_bool $v]] }
+		Locked   { return [list LOCKED  [::gmaproto::int_bool $v]] }
+
+		AoE      { return [list AOE [list radius [dict get $v Radius] [dict get $v Color]]] }
+
+		Health {
+			return [list \
+				[dict get $v MaxHP]\
+				[dict get $v LethalDamage]\
+				[dict get $v NonLethalDamage]\
+				[dict get $v Con]\
+				[::gmaproto::int_bool [dict get $v IsFlatFooted]]\
+				[::gmaproto::int_bool [dict get $v IsStable]]\
+				[dict get $v Condition]\
+				[dict get $v HPBlur]\
+			]
+		}
+		Font {
+			set fontspec [list [dict get $v Family] [dict get $v Size]]
+			if {[dict get $v Weight] == 1} { lappend fontspec bold }
+			if {[dict get $v Slant] == 1} { 
+				lappend fontspec italic 
+			} else {
+				lappend fontsped roman
+			}
+			return [list FONT $fontspec]
+		}
+		Points {
+			set plist {}
+			foreach point $v {
+				lappend plist [dict get $point X] [dict get $point Y]
+			}
+			return [list POINTS $plist]
+		}
+
+	}
+	return [list [string toupper $k] $v]
+}
+
 # _backport_message raw_message -> {old_format_raw_message ...}
 proc ::gmaproto::_backport_message {new_message} {
 	set nparams {}
@@ -427,6 +611,7 @@ proc ::gmaproto::_backport_message {new_message} {
 	::gmaproto::DEBUG "converting $new_message to old-style protocol message"
 	lassign [::gmaproto::_parse_data_packet $new_message] cmd params
 	switch -exact -- $cmd {
+		NIL	{ set cmd "//"; set nparams {} }
 		// 	{ set nparams $params }	
 		ACCEPT 	{ set nparams [dict get $params Messages] }
 		AI {
@@ -497,18 +682,18 @@ proc ::gmaproto::_backport_message {new_message} {
 			set id [dict get $params ID]
 			foreach attr {X Y Z Line Fill Width Layer Level Group Hidden Locked
 				      Start Extent} {
-				lappend newlist [list LS: [string uppercase $attr]:$id [dict get $params $attr]]
+				lappend newlist [list LS: [list [string toupper $attr]:$id [dict get $params $attr]]]
 			}
-			lappend newlist [list LS: DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]
+			lappend newlist [list LS: [list DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]]
 			set plist {}
 			foreach v [dict get $params Points] {
 				lappend plist [dict get $v X]
 				lappend plist [dict get $v Y]
 			}
-			lappend newlist [list LS: POINTS:$id $plist]
+			lappend newlist [list LS: [list POINTS:$id $plist]]
 
-			lappend newlist [list LS: ARCMODE:$id [::gmaproto::from_enum ArcMode [dict get $params ArcMode]]]
-			lappend newlist [list LS: TYPE:$id arc]
+			lappend newlist [list LS: [list ARCMODE:$id [::gmaproto::from_enum ArcMode [dict get $params ArcMode]]]]
+			lappend newlist [list LS: [list TYPE:$id arc]]
 			lappend newlist [list LS. 17 {}]
 		}
 		LS-CIRC {
@@ -516,36 +701,36 @@ proc ::gmaproto::_backport_message {new_message} {
 			set id [dict get $params ID]
 			foreach attr {X Y Z Line Fill Width Layer Level Group Hidden Locked
 				      Start Extent} {
-				lappend newlist [list LS: [string uppercase $attr]:$id [dict get $params $attr]]
+				lappend newlist [list LS: [list [string toupper $attr]:$id [dict get $params $attr]]]
 			}
-			lappend newlist [list LS: DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]
+			lappend newlist [list LS: [list DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]]
 			set plist {}
 			foreach v [dict get $params Points] {
 				lappend plist [dict get $v X]
 				lappend plist [dict get $v Y]
 			}
-			lappend newlist [list LS: POINTS:$id $plist]
+			lappend newlist [list LS: [list POINTS:$id $plist]]
 
-			lappend newlist [list LS: ARCMODE:$id [::gmaproto::from_enum ArcMode [dict get $params ArcMode]]]
-			lappend newlist [list LS: TYPE:$id circ]
+			lappend newlist [list LS: [list ARCMODE:$id [::gmaproto::from_enum ArcMode [dict get $params ArcMode]]]]
+			lappend newlist [list LS: [list TYPE:$id circ]]
 			lappend newlist [list LS. 17 {}]
 		}
 		LS-LINE {
 			lappend newlist LS
 			set id [dict get $params ID]
 			foreach attr {X Y Z Line Fill Width Layer Level Group Hidden Locked} {
-				lappend newlist [list LS: [string uppercase $attr]:$id [dict get $params $attr]]
+				lappend newlist [list LS: [list [string toupper $attr]:$id [dict get $params $attr]]]
 			}
-			lappend newlist [list LS: DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]
+			lappend newlist [list LS: [list DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]]
 			set plist {}
 			foreach v [dict get $params Points] {
 				lappend plist [dict get $v X]
 				lappend plist [dict get $v Y]
 			}
-			lappend newlist [list LS: POINTS:$id $plist]
+			lappend newlist [list LS: [list POINTS:$id $plist]]
 
-			lappend newlist [list LS: ARROW:$id [::gmaproto::from_enum Arrow [dict get $params Arrow]]]
-			lappend newlist [list LS: TYPE:$id line]
+			lappend newlist [list LS: [list ARROW:$id [::gmaproto::from_enum Arrow [dict get $params Arrow]]]]
+			lappend newlist [list LS: [list TYPE:$id line]]
 			lappend newlist [list LS. 15 {}]
 		}
 		LS-POLY {
@@ -553,53 +738,53 @@ proc ::gmaproto::_backport_message {new_message} {
 			set id [dict get $params ID]
 			foreach attr {X Y Z Line Fill Width Layer Level Group Hidden Locked
 				      Spline} {
-				lappend newlist [list LS: [string uppercase $attr]:$id [dict get $params $attr]]
+				lappend newlist [list LS: [list [string toupper $attr]:$id [dict get $params $attr]]]
 			}
-			lappend newlist [list LS: DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]
+			lappend newlist [list LS: [list DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]]
 			set plist {}
 			foreach v [dict get $params Points] {
 				lappend plist [dict get $v X]
 				lappend plist [dict get $v Y]
 			}
-			lappend newlist [list LS: POINTS:$id $plist]
+			lappend newlist [list LS: [list POINTS:$id $plist]]
 
-			lappend newlist [list LS: JOIN:$id [::gmaproto::from_enum Join [dict get $params Join]]]
-			lappend newlist [list LS: TYPE:$id poly]
+			lappend newlist [list LS: [list JOIN:$id [::gmaproto::from_enum Join [dict get $params Join]]]]
+			lappend newlist [list LS: [list TYPE:$id poly]]
 			lappend newlist [list LS. 16 {}]
 		}
 		LS-RECT {
 			lappend newlist LS
 			set id [dict get $params ID]
 			foreach attr {X Y Z Line Fill Width Layer Level Group Hidden Locked} {
-				lappend newlist [list LS: [string uppercase $attr]:$id [dict get $params $attr]]
+				lappend newlist [list LS: [list [string toupper $attr]:$id [dict get $params $attr]]]
 			}
-			lappend newlist [list LS: DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]
+			lappend newlist [list LS: [list DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]]
 			set plist {}
 			foreach v [dict get $params Points] {
 				lappend plist [dict get $v X]
 				lappend plist [dict get $v Y]
 			}
-			lappend newlist [list LS: POINTS:$id $plist]
+			lappend newlist [list LS: [list POINTS:$id $plist]]
 
-			lappend newlist [list LS: TYPE:$id poly]
+			lappend newlist [list LS: [list TYPE:$id poly]]
 			lappend newlist [list LS. 14 {}]
 		}
 		LS-SAOE {
 			lappend newlist LS
 			set id [dict get $params ID]
 			foreach attr {X Y Z Line Fill Width Layer Level Group Hidden Locked} {
-				lappend newlist [list LS: [string uppercase $attr]:$id [dict get $params $attr]]
+				lappend newlist [list LS: [list [string toupper $attr]:$id [dict get $params $attr]]]
 			}
-			lappend newlist [list LS: DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]
+			lappend newlist [list LS: [list DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]]
 			set plist {}
 			foreach v [dict get $params Points] {
 				lappend plist [dict get $v X]
 				lappend plist [dict get $v Y]
 			}
-			lappend newlist [list LS: POINTS:$id $plist]
+			lappend newlist [list LS: [list POINTS:$id $plist]]
 
-			lappend newlist [list LS: AOESHAPE:$id [::gmaproto::from_enum AoEShape [dict get $params AoEShape]]]
-			lappend newlist [list LS: TYPE:$id poly]
+			lappend newlist [list LS: [list AOESHAPE:$id [::gmaproto::from_enum AoEShape [dict get $params AoEShape]]]]
+			lappend newlist [list LS: [list TYPE:$id poly]]
 			lappend newlist [list LS. 15 {}]
 		}
 		LS-TEXT {
@@ -607,17 +792,17 @@ proc ::gmaproto::_backport_message {new_message} {
 			set id [dict get $params ID]
 			foreach attr {X Y Z Line Fill Width Layer Level Group Hidden Locked
 				     Text} {
-				lappend newlist [list LS: [string uppercase $attr]:$id [dict get $params $attr]]
+				lappend newlist [list LS: [list [string toupper $attr]:$id [dict get $params $attr]]]
 			}
-			lappend newlist [list LS: DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]
+			lappend newlist [list LS: [list DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]]
 			set plist {}
 			foreach v [dict get $params Points] {
 				lappend plist [dict get $v X]
 				lappend plist [dict get $v Y]
 			}
-			lappend newlist [list LS: POINTS:$id $plist]
+			lappend newlist [list LS: [list POINTS:$id $plist]]
 
-			lappend newlist [list LS: ANCHOR:$id [::gmaproto::from_enum Anchor [dict get $params Anchor]]]
+			lappend newlist [list LS: [list ANCHOR:$id [::gmaproto::from_enum Anchor [dict get $params Anchor]]]]
 			set fontspec [list [dict get $params Font Family] [dict get $params Font Size]]
 			if {[dict get $params Font Weight] == 1} {
 				lappend fontspec bold
@@ -627,8 +812,8 @@ proc ::gmaproto::_backport_message {new_message} {
 			} else {
 				lappend fontspec roman
 			}
-			lappend newlist [list LS: FONT:$id $fontspec]
-			lappend newlist [list LS: TYPE:$id text]
+			lappend newlist [list LS: [list FONT:$id $fontspec]]
+			lappend newlist [list LS: [list TYPE:$id text]]
 			lappend newlist [list LS. 17 {}]
 		}
 		LS-TILE {
@@ -636,17 +821,17 @@ proc ::gmaproto::_backport_message {new_message} {
 			set id [dict get $params ID]
 			foreach attr {X Y Z Line Fill Width Layer Level Group Hidden Locked
 				     Image BBHeight BBWidth} {
-				lappend newlist [list LS: [string uppercase $attr]:$id [dict get $params $attr]]
+				lappend newlist [list LS: [list [string toupper $attr]:$id [dict get $params $attr]]]
 			}
-			lappend newlist [list LS: DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]
+			lappend newlist [list LS: [list DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]]
 			set plist {}
 			foreach v [dict get $params Points] {
 				lappend plist [dict get $v X]
 				lappend plist [dict get $v Y]
 			}
-			lappend newlist [list LS: POINTS:$id $plist]
+			lappend newlist [list LS: [list POINTS:$id $plist]]
 
-			lappend newlist [list LS: TYPE:$id tile]
+			lappend newlist [list LS: [list TYPE:$id tile]]
 			lappend newlist [list LS. 17 {}]
 		}
 		MARK	{ set nparams [list [dict get $params X] [dict get $params Y]] }
@@ -655,13 +840,12 @@ proc ::gmaproto::_backport_message {new_message} {
 		NO+	{ }
 		OA	{ 
 			set kvlist {}
-			dict for k v [dict get $params NewAttrs] {
-				lappend kvlist $k
-				lappend kvlist $v
+			dict for {k v} [dict get $params NewAttrs] {
+				lappend kvlist {*}[::gmaproto::_backport_attribute $k $v]
 			}
 			set nparams [list [dict get $params ObjID] $kvlist]
 		}
-		OA+ - OA- { set nparams [list [dict get $params ObjID] [dict get $params AttrName] [dict get $params Values]] }
+		OA+ - OA- { set nparams [list [dict get $params ObjID] {*}[::gmaproto::_backport_attribute [dict get $params AttrName] [dict get $params Values]]] }
 		PS { 
 			if {[dict get $params CreatureType] == 2} {
 				set ptype player
@@ -697,13 +881,13 @@ proc ::gmaproto::_backport_message {new_message} {
 		}
 	}
 	if {[llength $newlist] > 0} {
-		::gmaproto::DEBUG "converted to:"
-		foreach c $newlist {
-			::gmaproto::DEBUG "-- $c"
-		}
+		#::gmaproto::DEBUG "converted to:"
+		#foreach c $newlist {
+			#::gmaproto::DEBUG "-- $c"
+		#}
 		return $newlist
 	}
-	::gmaproto::DEBUG "converted to: $cmd $nparams"
+	#::gmaproto::DEBUG "converted to: $cmd $nparams"
 	if {[llength $nparams] == 0} {
 		return [list $cmd]
 	}
@@ -847,7 +1031,7 @@ proc ::gmaproto::_show {} {
 
 #
 # parse a raw text line received
-# Returns list with command name in element 0 or UNDEFINED or ERROR
+# Returns list with command name in element 0 or UNDEFINED or ERROR or NIL
 # The remaining elements hold data relevant to that command
 # 	In case of a parsing error the result is {ERROR <description> <raw_line>}
 # 	If the command is not recognized, returns {UNDEFINED <raw_line>}
@@ -855,6 +1039,9 @@ proc ::gmaproto::_show {} {
 #
 proc ::gmaproto::_parse_data_packet {raw_line} {
 	set raw_line [string trim $raw_line]
+	if {$raw_line eq {}} {
+		return [list NIL ""]
+	}
 	if {[string range $raw_line 0 1] eq "//"} {
 		return [list // $raw_line]
 	}
@@ -1088,7 +1275,7 @@ proc ::gmaproto::add_image {name sizes} {
 }
 
 proc ::gmaproto::query_image {name size} {
-	::gmaproto::_protocol_send AI? Name $name Zoom $size
+	::gmaproto::_protocol_send AI? Name $name Sizes [list [dict create Zoom $size]]
 }
 
 proc ::gmaproto::query_peers {} {
@@ -1137,15 +1324,19 @@ proc ::gmaproto::update_clock {a r} {
 }
 
 proc ::gmaproto::update_obj_attributes {obj_id kvdict} {
-	::gmaproto::_protocol_send OA ObjID $obj_id NewAttrs $kvdict
+	set a {}
+	foreach {k v} [dict get $kvdict] {
+		lappend a $k [::gmaproto::_attribute_encode $k $v]
+	}
+	::gmaproto::_raw_send "OA {\"ObjID\":[json::write string $obj_id],\"NewAttrs\":[json::write object {*}$a]}"
 }
 
 proc ::gmaproto::add_obj_attributes {obj_id attr vs} {
-	::gmaproto::_protocol_send OA+ ObjID $obj_id AttrName $attr Values $vs
+	::gmaproto::_raw_send "OA+ {\"ObjID\":[json::write string $obj_id],\"AttrName\":[json::write string $attr],\"Values\":[json::write array {*}$vs]}"
 }
 
 proc ::gmaproto::remove_obj_attributes {obj_id attr vs} {
-	::gmaproto::_protocol_send OA- ObjID $obj_id AttrName $attr Values $vs
+	::gmaproto::_raw_send "OA- {\"ObjID\":[json::write string $obj_id],\"AttrName\":[json::write string $attr],\"Values\":[json::write array {*}$vs]}"
 }
 
 proc ::gmaproto::update_status_marker {condition shape color desc} {
@@ -1248,7 +1439,9 @@ proc ::gmaproto::_read_poll {} {
 			}
 			foreach j $json {
 				::gmaproto::DEBUG "translated to $j"
-				lappend ::gmaproto::poll_buffer [::gmaproto::_parse_data_packet $j]
+				if {[lindex [set translated_j [::gmaproto::_parse_data_packet $j]] 0] ne {NIL}} {
+					lappend ::gmaproto::poll_buffer $translated_j
+				}
 			}
 			set res [::gmautil::lpop ::gmaproto::poll_buffer 0]
 		} err] {
@@ -1256,7 +1449,11 @@ proc ::gmaproto::_read_poll {} {
 		}
 		return $res
 	}
-	return [::gmaproto::_parse_data_packet [::gmautil::lpop ::gmaproto::recv_buffer 0]]
+	set res [::gmaproto::_parse_data_packet [::gmautil::lpop ::gmaproto::recv_buffer 0]]
+	if {[lindex $res 0] eq {NIL}} {
+		return [list "" ""]
+	}
+	return $res
 }
 
 #
@@ -1421,7 +1618,7 @@ proc ::gmaproto::_repackage_legacy_packet {cmd params} {
 			return [list "IL {\"InitiativeList\":\[[join $ilist ,]\]}"]
 		}
 		L {
-		# L file
+			# L file
 			::gmautil::rdist 1 1 L $params f
 			return [list "L {\"File\":[json::write string $f],\"IsLocalFile\":true}"]
 		}
@@ -1439,7 +1636,9 @@ proc ::gmaproto::_repackage_legacy_packet {cmd params} {
 			set sdata [::gmaproto::_end_stream LS $l $cs]
 			# translate sequence of the following lines into new-style objects
 			set objlist [lindex [::gmafile::load_legacy_map_data [dict get $sdata Data] [dict create Comment "from legacy LS data stream"]] 1]
-			return [lmap v [::gmafile::upgrade_elements $objlist] {::gmaproto::_protocol_encode_list $v}]
+			return [lmap v $objlist {::gmaproto::_protocol_encode_list $v}]
+#			return [lmap v $objlist {[list [::gmaproto::GMATypeToProtocolCommand [lindex $v 0]] [lindex $v 1]]}]
+#			return [lmap v [::gmafile::upgrade_elements $objlist] {::gmaproto::_protocol_encode_list $v}]
 		}
 		M {
 			# M {file ...}
@@ -1474,19 +1673,22 @@ proc ::gmaproto::_repackage_legacy_packet {cmd params} {
 			::gmautil::rdist 2 2 OA $params i kvs
 			set kvlist {}
 			dict for {k v} [dict create {*}$kvs] {
-				lappend kvlist "[json::write string $k]:[json::write string $v]"
+				lassign [::gmaproto::_upgrade_attribute $k $v] k v
+				lappend kvlist "[json::write string $k]:$v"
 			}
 			return [list "OA {\"ObjID\":[json::write string $i],\"NewAttrs\":{[join $kvlist ,]}}"]
 		}
 		OA+ {
 			# OA+ id k {v1 ... vN}
 			::gmautil::rdist 3 3 OA+ $params i k vs
-			return [list "OA+ {\"ObjID\":[json::write string $i],\"AttrName\":[json::write string $k],\"Values\":\[[join [lmap v $vs {json::write string $v}] ,]\]}"]
+			lassign [::gmaproto::_upgrade_attribute $k $vs] k vs
+			return [list "OA+ {\"ObjID\":[json::write string $i],\"AttrName\":[json::write string $k],\"Values\":\[[join $vs ,]\]}"]
 		}
 		OA- {
 			# OA- id k {v1 ... vN}
 			::gmautil::rdist 3 3 OA- $params i k vs
-			return [list "OA- {\"ObjID\":[json::write string $i],\"AttrName\":[json::write string $k],\"Values\":\[[join [lmap v $vs {json::write string $v}] ,]\]}"]
+			lassign [::gmaproto::_upgrade_attribute $k $vs] k vs
+			return [list "OA- {\"ObjID\":[json::write string $i],\"AttrName\":[json::write string $k],\"Values\":\[[join $vs ,]\]}"]
 		}
 		OK {
 			# OK v [challenge]
@@ -1819,7 +2021,7 @@ proc ::gmaproto::_end_stream {cmd expected_len expected_cs} {
 	return $::gmaproto::stream_dict
 }
 
-::gmaproto::ObjTypeToGMAType {ot args} {
+proc ::gmaproto::ObjTypeToGMAType {ot args} {
 	set ls {}
 	if {[lsearch -exact $args {-protocol}] >= 0} {
 		set ls {LS-}
@@ -1838,8 +2040,8 @@ proc ::gmaproto::_end_stream {cmd expected_len expected_cs} {
 	error "No such defined GMA type for $ot"
 }
 
-::gmaproto::GMATypeToObjType {gt} {
-	swtich $gt {
+proc ::gmaproto::GMATypeToObjType {gt} {
+	switch $gt {
 		LS-ARC  - ARC  { return arc  }
 		LS-CIRC - CIRC { return circ }
 		LS-LINE - LINE { return line }
@@ -1850,4 +2052,19 @@ proc ::gmaproto::_end_stream {cmd expected_len expected_cs} {
 		LS-TILE - TILE { return tile }
 	}
 	error "No such defined object type for $gt"
+}
+
+proc ::gmaproto::GMATypeToProtocolCommand {gt} {
+	switch $gt {
+		LS-ARC  - ARC  { return LS-ARC  }
+		LS-CIRC - CIRC { return LS-CIRC }
+		LS-LINE - LINE { return LS-LINE }
+		LS-POLY - POLY { return LS-POLY }
+		LS-RECT - RECT { return LS-RECT }
+		LS-SAOE - SAOE { return LS-SAOE }
+		LS-TEXT - TEXT { return LS-TEXT }
+		LS-TILE - TILE { return LS-TILE }
+		CREATURE - PS  { return PS      }
+	}
+	return $gt
 }
