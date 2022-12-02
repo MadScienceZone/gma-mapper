@@ -363,6 +363,7 @@ if [catch {set local_user $::tcl_platform(user)}] {set local_user __unknown__}
 set ChatTranscript 	{}
 
 proc say {msg} {
+	puts "-> $msg"
 	tk_messageBox -type ok -icon warning -title "Warning" -message $msg
 }
 
@@ -519,46 +520,60 @@ set GridEnable 1
 # Z coordinates.
 
 set DEBUG_file {}
-proc DEBUG0 {msg} {
-	puts ":: $msg"
-	catch {
-		DEBUG 0 $msg
-	}
+proc DEBUGp {msg} {
+	puts "::protocol:: $msg"
+	DEBUG protocol $msg -custom [list white [::tk::Darken white 40]]
 }
-proc DEBUG {level msg} {
+proc DEBUG {level msg args} {
 	global DEBUG_level DEBUG_file path_DEBUG_file dark_mode
 
-	if {$dark_mode} {
-		set fgcolor(0) red
-		set bgcolor(0) yellow
-		set fgcolor(1) yellow
-		set bgcolor(1) #232323
-		set fgcolor(2) black
-		set bgcolor(2) yellow
-		set fgcolor(3) white
-		set bgcolor(3) #232323
-		set dialogbg #232323
-	} else {
-		set fgcolor(0) red
-		set bgcolor(0) yellow
-		set fgcolor(1) red
-		set bgcolor(1) #cccccc
-		set fgcolor(2) black
-		set bgcolor(2) yellow
-		set fgcolor(3) blue
-		set bgcolor(3) #cccccc
-		set dialogbg #cccccc
+	if {[set i [lsearch -exact $args -custom]] >= 0} {
+		if {$i+1 < [llength $args]} {
+			lassign [lindex $args $i+1] fg bg
+			set DEBUGfgcolor($level) $fg 
+			set DEBUGbgcolor($level) $bg
+		} else {
+			error "DEBUG: wrong number of args to -custom: should be -custom {fg bg}"
+		}
 	}
 
-	if {$level <= $DEBUG_level} {
+	if {$level <= $DEBUG_level || [string is alpha $level]} {
 		if {![winfo exists .debugwindow]} {
+			if {$dark_mode} {
+				set DEBUGfgcolor(0) red
+				set DEBUGbgcolor(0) yellow
+				set DEBUGfgcolor(1) yellow
+				set DEBUGbgcolor(1) #232323
+				set DEBUGfgcolor(2) black
+				set DEBUGbgcolor(2) yellow
+				set DEBUGfgcolor(3) white
+				set DEBUGbgcolor(3) #232323
+				set dialogbg #232323
+			} else {
+				set DEBUGfgcolor(0) red
+				set DEBUGbgcolor(0) yellow
+				set DEBUGfgcolor(1) red
+				set DEBUGbgcolor(1) #cccccc
+				set DEBUGfgcolor(2) black
+				set DEBUGbgcolor(2) yellow
+				set DEBUGfgcolor(3) blue
+				set DEBUGbgcolor(3) #cccccc
+				set dialogbg #cccccc
+			}
 			toplevel .debugwindow -background $dialogbg
 			grid [text .debugwindow.text -yscrollcommand {.debugwindow.sb set}] \
 				[scrollbar .debugwindow.sb -orient vertical -command {.debugwindow.text yview}] -sticky news
 			foreach l {0 1 2 3} {
-				.debugwindow.text tag configure level$l -foreground $fgcolor($l) -background $bgcolor($l)
+				.debugwindow.text tag configure level$l -foreground $DEBUGfgcolor($l) -background $DEBUGbgcolor($l)
 			}
 		}
+
+		foreach k [array names DEBUGfgcolor] {
+			if [string is alpha $k] {
+				.debugwindow.text tag configure level$k -foreground $DEBUGfgcolor($k) -background $DEBUGbgcolor($k)
+			}
+		}
+
 		grid columnconfigure .debugwindow 0 -weight 1
 		grid rowconfigure .debugwindow 0 -weight 1
 		set visible [lindex [.debugwindow.text yview] 1]
@@ -1058,7 +1073,7 @@ for {set argi 0} {$argi < $argc} {incr argi} {
                 lappend OptAddCharacters $charToAdd
 			}
 		-D - --debug  { incr DEBUG_level }
-		--debug-protocol { ::gmaproto::set_debug ::DEBUG0}
+		--debug-protocol { ::gmaproto::set_debug ::DEBUGp}
 		-d - --dark {set dark_mode 1}
 		--help { usage }
 		-h - --host { 
@@ -1481,7 +1496,7 @@ grid \
 	 [button .toolbar.aoebound -image $icon_wandbound -command aoeboundtool] \
 	 [button .toolbar.ruler -image $icon_ruler -command rulertool] \
 	 [button .toolbar.griden -image $icon_snap_1 -command toggleGridEnable] \
-	 [button .toolbar.chat -image $icon_die20 -command {DisplayChatMessage {}] \
+	 [button .toolbar.chat -image $icon_die20 -command {DisplayChatMessage {}}] \
 	 [label  .toolbar.sp4  -text "   "] \
 	 [button .toolbar.zi   -image $icon_zoom_in -command {zoomInBy 2}] \
 	 [button .toolbar.zo   -image $icon_zoom_out -command {zoomInBy 0.5}] \
@@ -1565,9 +1580,9 @@ menu $mm.help
 $mm.help add command -command {aboutMapper} -label "About Mapper..."
 
 proc configureChatCapability {} {
-	global icon_blank
+	global icon_blank IThost
 
-	if {![::gmaproto::is_connected]} {
+	if {$IThost eq {}} {
 		.toolbar.chat configure -image $icon_blank -state disabled
 		tooltip::tooltip .toolbar.chat "Chat/die roll tool is not available unless connected to a server."
 	}
@@ -1772,9 +1787,9 @@ proc CreateHealthStatsToolTip {mob_id} {
 		lappend conditions {*}$statuslist
 	}
 
-	if {$flatp && [lsearch -exact $conditions flat-footed] < 0} {lappend conditions flat-footed}
-	if {$stablep && [lsearch -exact $conditions stable] < 0} {lappend conditions stable}
 	if {$has_health_info} {
+		if {$flatp && [lsearch -exact $conditions flat-footed] < 0} {lappend conditions flat-footed}
+		if {$stablep && [lsearch -exact $conditions stable] < 0} {lappend conditions stable}
 		set tiptext "[dict get $MOBdata($mob_id) Name]:"
 
 		global blur_all blur_pct
@@ -1835,7 +1850,7 @@ proc CreateHealthStatsToolTip {mob_id} {
 			append tiptext " dead."
 		}
 	} else {
-		set tiptext "$MOB(NAME:$mob_id): \[no health info\]"
+		set tiptext "[dict get $MOBdata($mob_id) Name]: \[no health info\]"
 	}
 
 	if {[set elevation [dict get $MOBdata($mob_id) Elev]] != 0} {
@@ -2398,7 +2413,7 @@ proc loadfile {file args} {
 						::gmaproto::load_from $map_id true false
 					}
 				}
-				CREATURE {
+				CREATURE - PS {
 					PlaceSomeone $canvas $d
 					if {$sendp} {
 						::gmaproto::place_someone_d $d
@@ -2406,7 +2421,7 @@ proc loadfile {file args} {
 				}
 				default {
 					if [catch {set etype [::gmaproto::GMATypeToObjType $element_type]} err] {
-						DEBUG 0 "Can't load element of unknown type $element_type."
+						DEBUG 0 "Can't load element of unknown type $element_type ($err)."
 						continue
 					}
 					set OBJdata([dict get $d ID]) $d
@@ -2926,7 +2941,7 @@ proc unloadfile {file args} {
     #
     # If we're being told remotely to do this, don't prompt the user
     # 
-    if {!$force} {
+    if {!$forcep} {
         if {[tk_messageBox -type yesno -default no -icon warning -title "Remove Elements?"\
             -message "Do you really want to DELETE all elements from file $file?"] ne "yes"} {
             return
@@ -4171,7 +4186,7 @@ proc RefreshGrid {show} {
 				}
 				text {
 					::gmautil::dassign $OBJdata($id) Text Text Font Font Anchor _Anchor
-					::gmautil::dassign $Font Family FontFamily Size FontSize WeightFontWei
+					#::gmautil::dassign $Font Family FontFamily Size FontSize WeightFontWei
 					set Anchor [::gmaproto::from_enum Anchor ${_Anchor}]
 
 					$canvas create text $X $Y -fill $Fill -anchor $Anchor -font [ScaleFont [GMAFontToTkFont $Font] $zoom] \
@@ -4293,7 +4308,7 @@ proc UpdateObjectDisplay {id} {
 			text {
 				$canvas coords obj$id "$X $Y"
 				::gmautil::dassign $OBJdata($id) Text Text Font Font Anchor _Anchor
-				::gmautil::dassign $Font Family FontFamily Size FontSize WeightFontWei
+				#::gmautil::dassign $Font Family FontFamily Size FontSize WeightFontWei
 				set Anchor [::gmaproto::from_enum Anchor ${_Anchor}]
 
 				$canvas itemconfigure obj$id -fill $Fill -anchor $Anchor -font [ScaleFont [GMAFontToTkFont $Font] $zoom] \
@@ -4517,9 +4532,9 @@ proc StartObj {w x y} {
 				X [expr [SnapCoord $x] / $zoom] Y [expr [SnapCoord $y] / $zoom] Z $z \
 				Fill $fill_color Line $OBJ_COLOR(line) Width $OBJ_WIDTH \
 				Dash $dash Layer $layer]
-			$canvas create arc  [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] -fill $OBJ(FILL:$OBJ_CURRENT) -outline $OBJ_COLOR(line) -width $OBJ_WIDTH -tags [list obj$OBJ_CURRENT allOBJ] -style $ARCMODE -start 0 -extent 359 -dash $DASHSTYLE
+			$canvas create arc  [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] -fill [dict get $OBJdata($OBJ_CURRENT) Fill] -outline $OBJ_COLOR(line) -width $OBJ_WIDTH -tags [list obj$OBJ_CURRENT allOBJ] -style $ARCMODE -start 0 -extent 359 -dash $DASHSTYLE
 			bind $canvas <1> "LastArcPoint $canvas %x %y"
-			set OBJ(ARCMODE:$OBJ_CURRENT) $ARCMODE
+			dict set OBJdata($OBJ_CURRENT) ArcMode [::gmaproto::to_enum ArcMode $ARCMODE]
 		}
 		circ { 
 			set OBJtype($OBJ_CURRENT) circ
@@ -5160,7 +5175,7 @@ proc AllPointsFromObj {o} {
 }
 
 proc ObjDrag {w x y} {
-	global OBJdta OBJ_CURRENT OBJ_SNAP canvas zoom OBJ_MODE
+	global OBJdata OBJ_CURRENT OBJ_SNAP canvas zoom OBJ_MODE
 	if {$OBJ_CURRENT != 0} {
 		set new_coords "[AllPointsFromObj $OBJdata($OBJ_CURRENT)] [SnapCoord [$canvas canvasx $x]] [SnapCoord [$canvas canvasy $y]]"
 		if {[catch {
@@ -5387,7 +5402,7 @@ proc PlaceSomeone {w d} {
 		DEBUG 1 "--PlaceSomeone $n using existing id $id (updating in-place)"
 		set MOBdata($id) [dict merge $MOBdata($id) $d]
 	}
-	MoveSomeone $w $id $x $y
+	MoveSomeone $w $id [dict get $d Gx] [dict get $d Gy]
 }
 
 proc MoveSomeone {w id x y} {
@@ -6546,7 +6561,7 @@ proc RenderSomeone {w id} {
 		set Thl [list "M#$id" "MHB#$id" "allMOB"]
 		set TxX [expr $Xh0 + 0.5*$Xhw]
 		set TxY [expr $Yh0 - 0.5*$HealthBarWidth]
-		set full_stats [expr $ShowHealthStats && {$MOB(TYPE:$id)} eq {{player}}]
+		set full_stats [expr $ShowHealthStats && [dict get $MOBdata($id) CreatureType] == 2]
 
 		set bw $HealthBarFrameWidth
 		set bc black
@@ -7779,9 +7794,10 @@ proc AddPlayer {name color args} {
 	if {[llength $args] > 1} { set size [lindex $args 1] } else { set size 1 }
 	if {[llength $args] > 2} { set id   [lindex $args 2] } else { set id [new_id] }
 	# XXX check for existing player
-	DEBUG 3 "PlaceSomeone $canvas [lindex $g 0] [lindex $g 1] $color $name $area $size $id 0"
-	PlaceSomeone $canvas [lindex $g 0] [lindex $g 1] $color $name $area $size player $id 0
-	ITsend [list PS $id $color $name $area $size player [lindex $g 0] [lindex $g 1] 0]
+	set d [::gmaproto::new_dict PS Gx [lindex $g 0] Gy [lindex $g 1] Color $color Name $name Area $area Size $size CreatureType 2 ID $id]
+	DEBUG 3 "PlaceSomeone $canvas $d"
+	PlaceSomeone $canvas $d
+	::gmaproto::place_someone_d $d
 }
 
 set MOB_Name {}
@@ -7920,8 +7936,9 @@ proc AddMobFromMenu {baseX baseY color name area size type reach} {
 			}
 			set apm_id [new_id]
 			DEBUG 3 "Multi-add $i of $multistart-$multiend: ${basename}#$i"
-			PlaceSomeone $canvas [expr $baseX+$XX] $baseY $color [AcceptCreatureImageName "${basename}#$i"] $area $size $type $apm_id $reach
-			ITsend [list PS $apm_id $color "${basename}#$i" $area $size $type [expr $baseX+$XX] $baseY $reach]
+			set d [::gmaproto::new_dict PS Gx [expr $baseX+$XX] Gy $baseY Color $color Name [AcceptCreatureImageName "${basename}#$i"] Area $area Size $size CreatureType [::gmaproto::to_enum CreatureType $type] ID $apm_id Reach $reach]
+			PlaceSomeone $canvas $d
+			::gmaproto::place_someone_d $d
 		}
 	} else {
 		# 
@@ -7935,8 +7952,9 @@ proc AddMobFromMenu {baseX baseY color name area size type reach} {
 		} else {
 			set apm_id [new_id]
 		}
-		PlaceSomeone $canvas $baseX $baseY $color $basename $area $size $type $apm_id $reach
-		ITsend [list PS $apm_id $color $name $area $size $type $baseX $baseY $reach]
+		set d [::gmaproto::new_dict PS Gx $baseX Gy $baseY Color $color Name $basename Area $area Size $size [::gmaproto::to_enum CreatureType $type] ID $apm_id Reach $reach]
+		PlaceSomeone $canvas $d
+		::gmaproto::place_someone_d $d
 	}
 }
 
@@ -8962,7 +8980,7 @@ proc DoCommandDD= {d} {
 
 proc DoCommandDSM {d} {
 	# define status marker
-	::gmautil::dsasign $d Condition condition Shape shape Color color Description description
+	::gmautil::dassign $d Condition condition Shape shape Color color Description description
 	global MarkerColor MarkerShape MarkerDescription
 
 	if {$shape eq {} || $color eq {}} {
@@ -8984,11 +9002,11 @@ proc DoCommandDSM {d} {
 proc DoCommandI {d} {
 	# update initiative clock
 	global MOB_COMBATMODE canvas MOB_BLINK NextMOBID MOBdata MOBid
+	set ITlist {}
 
 	if {$MOB_COMBATMODE} {
 		UpdateRunClock $d
 
-		set ITlist {}
 		if {[set actor [dict get $d ActorID]] eq {*Monsters*}} {
 			foreach {mob_id mob} [array get MOBdata] {
 				if {[dict get $mob CreatureType] == 1 && ![dict get $mob Killed]} {
@@ -9036,7 +9054,7 @@ proc DoCommandL {d} {
 			if {$err eq {NOSUCH}} {
 				DEBUG 0 "WARNING: Requested pre-load of server file ID [dict get $d File] but the server doesn't have it."
 			} else {
-				error "Error retrieving server file ID [dict get $id File]: $err"
+				error "Error retrieving server file ID [dict get $d File]: $err"
 			}
 		}
 		return
@@ -9050,7 +9068,7 @@ proc DoCommandL {d} {
 			if {$err eq {NOSUCH}} {
 				DEBUG 0 "WARNING: Requested load of server file ID [dict get $d File] but the server doesn't have it."
 			} else {
-				error "Error retrieving server file ID [dict get $id File]: $err"
+				error "Error retrieving server file ID [dict get $d File]: $err"
 			}
 		}
 	}
@@ -10129,11 +10147,11 @@ proc DisplayChatMessage {d args} {
 	global dark_mode SuppressChat CHAT_TO CHAT_text check_select_color
 	global icon_die16 icon_info20 icon_arrow_refresh check_menu_color
 	global icon_delete icon_add icon_open icon_save ChatTranscript
-	global last_known_size display_styles CHAT_blind global_bg_color
+	global last_known_size display_styles CHAT_blind global_bg_color IThost
 	::gmautil::dassign $d Sender from Recipients recipientlist Text message
 
 	if $SuppressChat return
-	if {![::gmaproto::is_ready]} {
+	if {$IThost eq {}} {
 		tk_messageBox -type ok -icon error -title "No Connection to Server" \
 			-message "Your client must be connected to the map server to use this function."
 		return
@@ -12063,7 +12081,7 @@ proc ChatHistoryAppend {event} {
 		if {$mid eq {} || $mid < 0} {
 			set mid ${_last_known_message_id}
 		}
-		if {$mid >= ${_last_known_messsage_id}} {
+		if {$mid >= ${_last_known_message_id}} {
 			lappend ChatHistory $m
 			if {$ChatHistoryFileHandle ne {}} {
 				puts $ChatHistoryFileHandle $m
@@ -12082,7 +12100,7 @@ proc PingMarker {w x y} {
 	set cx [expr [$w canvasx $x] / $zoom]
 	set cy [expr [$w canvasy $y] / $zoom]
 	start_ping_marker $w $cx $cy 0
-	ITsend [list MARK $cx $cy]
+	::gmaproto::mark $cx $cy
 }
 
 proc start_ping_marker {w x y seq} {
