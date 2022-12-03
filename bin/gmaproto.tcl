@@ -345,6 +345,9 @@ proc ::gmaproto::_dispatch {} {
 		} elseif {$cmd eq "UNDEFINED"} {
 			::DEBUG 0 "Unable to interpret server command \"$params\""
 		} else {
+			if {$::gmaproto::debug_f ne {}} {
+				$::gmaproto::debug_f "dispatching $cmd to app: $params"
+			}
 			::gmaproto::_dispatch_to_app $cmd $params
 		}
 	}
@@ -358,7 +361,7 @@ proc ::gmaproto::_dispatch_to_app {cmd params} {
 
 
 proc ::gmaproto::background_redial {tries} {
-	if {$::gmaproto::in_redial} {
+	if {$::gmaproto::in_redial && $tries <= 1} {
 		::DEBUG 0 "Already trying to reconnect, duplicate request ignored"
 		return
 	}
@@ -461,7 +464,7 @@ proc ::gmaproto::_attribute_encode {k v} {
 		Y        -
 		Z        { return $v }
 
-		AoE      { return [::json::write object Radius [lindex $v 1] Color [lindex $v 2]] }
+		AoE      { return "{\"Radius\":[dict get $v Radius],\"Color\":[json::write string [dict get $v Color]]}" }
 
 		SkinSize   { return [::json::write array {*}$v] }
 		StatusList { return [::json::write array {*}[lmap s $v {json::write string $s}]] }
@@ -472,7 +475,7 @@ proc ::gmaproto::_attribute_encode {k v} {
 		Points {
 			set plist {}
 			foreach point $v {
-				lappend plist "{\"X\":[dict get $v X],\"Y\":[dict get $v Y]}"
+				lappend plist "{\"X\":[dict get $point X],\"Y\":[dict get $point Y]}"
 			}
 			return [::json::write array {*}$plist]
 		}
@@ -512,7 +515,7 @@ proc ::gmaproto::_upgrade_attribute {k v} {
 		Y        { return [list Y $v] }
 		Z        { return [list Z $v] }
 
-		AOE      { return [list AoE [::json::write object Radius [lindex $v 1] Color [lindex $v 2]]] }
+		AOE      { return [list AoE "{\"Radius\":[lindex $v 1],\"Color\":[json::write string [lindex $v 2]]}"] }
 
 		SKINSIZE   { return [list SkinSize [::json::write array {*}$v]] }
 		STATUSLIST { return [list StatusList [::json::write array {*}[lmap s $v {json::write string $s}]]] }
@@ -674,6 +677,11 @@ proc ::gmaproto::_backport_message {new_message} {
 					set cmd M
 				} else {
 					set cmd M@
+				}
+			} else {
+				if {!$local} {
+					lappend newlist [list CLR *]
+					lappend newlist [list M@ $nparams]
 				}
 			}
 		}
@@ -1227,7 +1235,7 @@ proc ::gmaproto::_construct {input types} {
 proc ::gmaproto::adjust_view {x y} {
 	::gmaproto::_protocol_send AV XView $x YView $y
 }
-proc ::gmaproto::chat_messsage {message sender recipients to_all to_gm} {
+proc ::gmaproto::chat_message {message sender recipients to_all to_gm} {
 	::gmaproto::_protocol_send TO Recipients $recipients ToAll $to_all ToGM $to_gm Text $message
 }
 proc ::gmaproto::clear {obj_id} {
@@ -1404,7 +1412,7 @@ proc ::gmaproto::_initial_read_poll {} {
 		::gmautil::lpop ::gmaproto::recv_buffer 0; # remove PROTOCOL from input stream
 		if {[lindex $message 1] >= 400} {
 			# this is NOT legacy; hand off to _read_poll from here...
-			return [::gmaproto::_read_poll]
+			return [list // "Protocol version $::gmaproto::protocol"]
 		}
 	}
 	
