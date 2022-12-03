@@ -107,7 +107,7 @@ proc ::gmafile::save_arrays_to_file {f meta elements elementtypes creatures} {
 			continue
 		}
 		
-		if {$t($id) ne [dict get $d ID]} {
+		if {$id ne [dict get $d ID]} {
 			::gmafile::_diag "WARNING: Saving map element $id ($t($id)): it thinks its ID is [dict get $d ID]"
 			::DEBUG 0 "WARNING: Saving map element $id ($t($id)): it thinks its ID is [dict get $d ID]"
 		}

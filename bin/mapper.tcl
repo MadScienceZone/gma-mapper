@@ -4133,8 +4133,8 @@ proc RefreshGrid {show} {
 			#
 			catch {unset Points}
 			if {$zoom != 1} {
-				X = [expr $X * $zoom]
-				Y = [expr $Y * $zoom]
+				set X [expr $X * $zoom]
+				set Y [expr $Y * $zoom]
 				foreach x ${_Points} {
 					lappend Points [expr [dict get $x X] * $zoom]
 					lappend Points [expr [dict get $x Y] * $zoom]
@@ -4236,12 +4236,12 @@ proc RefreshGrid {show} {
 proc UpdateObjectDisplay {id} {
 	global canvas OBJdata OBJtype zoom animatePlacement
 
-	if {![info exists $OBJdata($id)]} {
+	if {![info exists OBJdata($id)]} {
 		DEBUG 0 "UpdateObjectDisplay: $id does not exist in OBJdata."
 		return
 	}
 
-	if {![info exists $OBJtype($id)]} {
+	if {![info exists OBJtype($id)]} {
 		DEBUG 0 "UpdateObjectDisplay: $id does not seem to have a type."
 		return
 	}
@@ -4254,8 +4254,8 @@ proc UpdateObjectDisplay {id} {
 	#
 	catch {unset Points}
 	if {$zoom != 1} {
-		X = [expr $X * $zoom]
-		Y = [expr $Y * $zoom]
+		set X [expr $X * $zoom]
+		set Y [expr $Y * $zoom]
 		foreach x ${_Points} {
 			lappend Points [expr [dict get $x X] * $zoom]
 			lappend Points [expr [dict get $x Y] * $zoom]
@@ -7952,7 +7952,7 @@ proc AddMobFromMenu {baseX baseY color name area size type reach} {
 		} else {
 			set apm_id [new_id]
 		}
-		set d [::gmaproto::new_dict PS Gx $baseX Gy $baseY Color $color Name $basename Area $area Size $size [::gmaproto::to_enum CreatureType $type] ID $apm_id Reach $reach]
+		set d [::gmaproto::new_dict PS Gx $baseX Gy $baseY Color $color Name $basename Area $area Size $size CreatureType [::gmaproto::to_enum CreatureType $type] ID $apm_id Reach $reach]
 		PlaceSomeone $canvas $d
 		::gmaproto::place_someone_d $d
 	}
@@ -9044,6 +9044,7 @@ proc DoCommandI {d} {
 
 proc DoCommandL {d} {
 	# load map file
+	DEBUG 0 "L: $d"
 	if [dict get $d CacheOnly] {
 		# just make sure we have a copy on hand (M?)
 		if [dict get $d IsLocalFile] {
@@ -9095,6 +9096,8 @@ proc DoCommandLS-TEXT {d} {DoLS text $d}
 proc DoCommandLS-TILE {d} {DoLS tile $d}
 proc DoLS {t d} {
 	# load map elements (generic handler for all element types)
+	global OBJdata OBJtype
+	DEBUG 0 "Drawing type=$t, data=$d"
 	set OBJdata([dict get $d ID]) $d
 	set OBJtype([dict get $d ID]) $t
 	RefreshGrid false
@@ -10148,7 +10151,12 @@ proc DisplayChatMessage {d args} {
 	global icon_die16 icon_info20 icon_arrow_refresh check_menu_color
 	global icon_delete icon_add icon_open icon_save ChatTranscript
 	global last_known_size display_styles CHAT_blind global_bg_color IThost
-	::gmautil::dassign $d Sender from Recipients recipientlist Text message
+
+	if {$d ne {}} {
+		::gmautil::dassign $d Sender from Recipients recipientlist Text message
+	} else {
+		lassign {} from recipientlist message
+	}
 
 	if $SuppressChat return
 	if {$IThost eq {}} {
@@ -10818,14 +10826,21 @@ proc UpdatePeerList {} {
 	}
 }
 
-proc SendDieRoll {recipients dice blind_p to_all_p} {::gmaproto::roll_dice $dice $recipients $to_all_p $blind_p}
+proc SendDieRoll {recipients dice blind_p} {
+	set d [ParseRecipientList $recipients TO ToGM $blind_p]
+	::gmaproto::roll_dice $dice [dict get $d Recipients] [dict get $d ToAll] [dict get $d ToGM]
+}
 proc UpdateDicePresets {deflist} {::gmaproto::define_dice_presets $deflist false}
 proc RequestDicePresets {} {::gmaproto::query_dice_presets}
-proc SendChatMessage {recipients message blind_p to_all_p} {
+
+proc SendChatMessage {recipients message} {
+	set d [ParseRecipientList $recipients TO]
 	foreach msg [split $message "\n"] {
-		::gmaproto::chat_message $msg {} $recipients $to_all_p $blind_p
+		::gmaproto::chat_message $msg {} [dict get $d Recipients] [dict get $d ToAll] [dict get $d ToGM]
 	}
 }
+
+
 
 set recent_die_rolls {}
 proc SendDieRollFromWindow {} {
@@ -10912,10 +10927,14 @@ proc DeleteDieRollPreset {name} {
 }
 
 proc SendChatFromWindow {} {
-	global CHAT_text
+	global CHAT_text CHAT_blind
 
 	if {$CHAT_text != {}} {
-		SendChatMessage [_recipients] $CHAT_text
+		if {$CHAT_blind} {
+			::gmaproto::chat_message $msg {} {} false true
+		} else {
+			SendChatMessage [_recipients] $CHAT_text
+		}
 		set CHAT_text {}
 	}
 }
