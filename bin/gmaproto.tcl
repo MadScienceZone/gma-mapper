@@ -229,7 +229,7 @@ namespace eval ::gmaproto {
 }
 
 proc ::gmaproto::is_connected {} {
-	return [expr {{$::gmaproto::sock}} eq {{}}]
+	return [expr {$::gmaproto::sock} ne {{}}]
 }
 
 proc ::gmaproto::is_ready {} {
@@ -661,7 +661,7 @@ proc ::gmaproto::_backport_message {new_message} {
 					set nparams [list [dict get $params Recipients] [dict get $params RollSpec]]
 				}
 		}
-		DD - DD+ { set nparams [lmap v [dict get $params Presets] {list [dict get $v Name] [dict get $v Description] [dict get $v DieRollSpec]}] }
+		DD - DD+ { set nparams [list [lmap v [dict get $params Presets] {list [dict get $v Name] [dict get $v Description] [dict get $v DieRollSpec]}]] }
 		DD/	{ set nparams [list [dict get $params Filter]] }
 		DR	{ }
 		DSM	{ set nparams [list [dict get $params Condition] [dict get $params Shape] [dict get $params Color] [dict get $params Description]] }
@@ -1591,7 +1591,7 @@ proc ::gmaproto::_repackage_legacy_packet {cmd params} {
 		DD. {
 			# DD. count checksum
 			::gmautil::rdist 1 2 DD. $params l cs
-			set sdata [::gmaproto::_end_stream DD $l $cs] 
+			set sdata [::gmaproto::_end_stream DD $l {}] 
 			set plist {}
 			foreach preset [dict get $sdata Data] {
 				lappend plist "{\"Name\":[json::write string [lindex $preset 0]],\"Description\":[json::write string [lindex $preset 1]],\"DieRollSpec\":[json::write string [lindex $preset 2]]}"
@@ -1921,12 +1921,26 @@ proc ::gmaproto::_login {} {
 	::gmaproto::allow DICE-COLOR-BOXES
 	::gmaproto::_transmit
 	::gmaproto::_dispatch
-
+	after 2000 { ::gmaproto::_background_poll }
 
 	if {$update_ready ne {}} {
 		if {[catch {::UpgradeAvailable $update_ready} err]} {
 			::say "Failed to check for upgrade: $err"
 		}
+	}
+}
+
+proc ::gmaproto::_background_poll {} {
+	if {[::gmaproto::is_connected]} {
+		if [catch {
+			::gmaproto::_transmit
+			::gmaproto::_dispatch
+		} err] {
+			::DEBUG 0 "Error in background communcation poll task: $err"
+		}
+		after 2000 {::gmaproto::_background_poll}
+	} else {
+		::DEBUG 0 "Shutting down background communication poll task."
 	}
 }
 

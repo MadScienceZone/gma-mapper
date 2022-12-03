@@ -2281,12 +2281,6 @@ proc loadfile {file args} {
 		return
 	}
 
-#	if {$sendp} {
-#		set okToLoadPlayers [set okToLoadMonsters "?"]
-#	} else {
-#		set okToLoadPlayers [set okToLoadMonsters "yes"]
-#	}
-
 	if {$file eq {}} {
 		if {[set file [tk_getOpenFile -defaultextension .map -filetypes {
 			{{GMA Mapper Files} {.map}}
@@ -8927,7 +8921,7 @@ proc DoCommandCLR@ {d} {
 	if $SafMode {
 		toggleSafMode
 	}
-	unloadfile $cache_filename -nosend
+	unloadfile $cache_filename -nosend -force
 }
 
 proc DoCommandCONN {d} {
@@ -8978,7 +8972,7 @@ proc DoCommandDD= {d} {
 			}
 			array unset dice_preset_data
 			foreach preset [dict get $d Presets] {
-				set dice_preset_data([dict get $d Name]) $d
+				set dice_preset_data([dict get $preset Name]) $preset
 			}
 			_render_die_roller $wp 0 0 preset -noclear
 		} err] {
@@ -9053,7 +9047,6 @@ proc DoCommandI {d} {
 
 proc DoCommandL {d} {
 	# load map file
-	DEBUG 0 "L: $d"
 	if [dict get $d CacheOnly] {
 		# just make sure we have a copy on hand (M?)
 		if [dict get $d IsLocalFile] {
@@ -9069,7 +9062,7 @@ proc DoCommandL {d} {
 		}
 		return
 	}
-	if {![dict get $d IsLocalFile]} {
+	if {[dict get $d IsLocalFile]} {
 		# use local file (L)
 		set file_to_load [dict get $d File]
 	} else {
@@ -10169,7 +10162,7 @@ proc DisplayChatMessage {d args} {
 	}
 
 	if $SuppressChat return
-	if {$IThost eq {}} {
+	if {![::gmaproto::is_connected]} {
 		tk_messageBox -type ok -icon error -title "No Connection to Server" \
 			-message "Your client must be connected to the map server to use this function."
 		return
@@ -10526,12 +10519,12 @@ proc LoadChatHistory {} {
 	set w .chatwindow.p.chat.1.text
 
 	foreach msg $ChatHistory {
-        if {[IsMessageValid $msg]} {
-            switch -- [lindex $msg 0] {
-                ROLL { DisplayDieRoll {*}[lrange $msg 1 5] }
-                TO   { _render_chat_message $w [expr "{[lindex $msg 1]}" eq {{-system}}] [lindex $msg 3] [lindex $msg 2] [lindex $msg 1] }
+	if {[set m [ValidateChatHistoryEntry $msg]] ne {}} {
+            switch -- [lindex $m 0] {
+                ROLL { DisplayDieRoll {*}[lrange $m 1 5] }
+                TO   { _render_chat_message $w [expr "{[lindex $m 1]}" eq {{-system}}] [lindex $m 3] [lindex $m 2] [lindex $m 1] }
                 CC	 {
-                    set by [lindex $msg 1]
+                    set by [lindex $m 1]
                     if {$by eq {}} {
                         _render_chat_message $w 1 "Chat history cleared." {} {}
                     } elseif {$by eq "*"} {
@@ -10695,7 +10688,7 @@ proc SaveDieRollPresets {w} {
 		foreach {_ d} [array get dice_preset_data] {
 			lappend plist $d
 		}
-		::gmafile::save_dice_presets_to_file $f $plist
+		::gmafile::save_dice_presets_to_file $f [list [dict create] $plist]
 		close $f
 	} err] {
 		say "Error saving dice presets: $err"
