@@ -2414,9 +2414,10 @@ proc loadfile {file args} {
 					}
 				}
 				CREATURE - PS {
+					dict set d Name [AcceptCreatureImageName [dict get $d Name]]
 					PlaceSomeone $canvas $d
 					if {$sendp} {
-						::gmaproto::place_someone_d $d
+						::gmaproto::place_someone_d [InsertCreatureImageName $d]
 					}
 				}
 				default {
@@ -7794,10 +7795,18 @@ proc AddPlayer {name color args} {
 	if {[llength $args] > 1} { set size [lindex $args 1] } else { set size 1 }
 	if {[llength $args] > 2} { set id   [lindex $args 2] } else { set id [new_id] }
 	# XXX check for existing player
-	set d [::gmaproto::new_dict PS Gx [lindex $g 0] Gy [lindex $g 1] Color $color Name $name Area $area Size $size CreatureType 2 ID $id]
+	set d [::gmaproto::new_dict PS Gx [lindex $g 0] Gy [lindex $g 1] Color $color Name [AcceptCreatureImageName $name] Area $area Size $size CreatureType 2 ID $id]
 	DEBUG 3 "PlaceSomeone $canvas $d"
 	PlaceSomeone $canvas $d
-	::gmaproto::place_someone_d $d
+	::gmaproto::place_someone_d [InsertCreatureImageName $d]
+}
+
+proc InsertCreatureImageName {d} {
+	global MOB_IMAGE
+	if [info exists MOB_IMAGE([dict get $d Name])] {
+		return [dict replace $d Name "$MOB_IMAGE([dict get $d Name])=[dict get $d Name]"]
+	}
+	return $d
 }
 
 set MOB_Name {}
@@ -7938,7 +7947,7 @@ proc AddMobFromMenu {baseX baseY color name area size type reach} {
 			DEBUG 3 "Multi-add $i of $multistart-$multiend: ${basename}#$i"
 			set d [::gmaproto::new_dict PS Gx [expr $baseX+$XX] Gy $baseY Color $color Name [AcceptCreatureImageName "${basename}#$i"] Area $area Size $size CreatureType [::gmaproto::to_enum CreatureType $type] ID $apm_id Reach $reach]
 			PlaceSomeone $canvas $d
-			::gmaproto::place_someone_d $d
+			::gmaproto::place_someone_d [InsertCreatureImageName $d]
 		}
 	} else {
 		# 
@@ -7954,7 +7963,7 @@ proc AddMobFromMenu {baseX baseY color name area size type reach} {
 		}
 		set d [::gmaproto::new_dict PS Gx $baseX Gy $baseY Color $color Name $basename Area $area Size $size CreatureType [::gmaproto::to_enum CreatureType $type] ID $apm_id Reach $reach]
 		PlaceSomeone $canvas $d
-		::gmaproto::place_someone_d $d
+		::gmaproto::place_someone_d [InsertCreatureImageName $d]
 	}
 }
 
@@ -9123,6 +9132,7 @@ proc DoCommandPROGRESS {d} {
 
 proc DoCommandPS {d} {
 	global canvas
+	dict set d Name [AcceptCreatureImageName [dict get $d Name]]
 	PlaceSomeone $canvas $d
 	RefreshGrid false
 	RefreshMOBs
@@ -10770,7 +10780,7 @@ proc CommitNewPreset {} {
 		}
 	}
 
-	set dice_preset_data($name) [dict Name $name Description $desc DieRollSpec $def]
+	set dice_preset_data($name) [dict create Name $name Description $desc DieRollSpec $def]
 	set deflist {}
 	foreach {_ p} [array get dice_preset_data] {
 		lappend deflist $p
@@ -10931,7 +10941,7 @@ proc SendChatFromWindow {} {
 
 	if {$CHAT_text != {}} {
 		if {$CHAT_blind} {
-			::gmaproto::chat_message $msg {} {} false true
+			::gmaproto::chat_message $CHAT_text {} {} false true
 		} else {
 			SendChatMessage [_recipients] $CHAT_text
 		}
@@ -11030,7 +11040,7 @@ proc SyncAllClientsToMe {} {
 				}
 
 				foreach mob_id [array names MOBdata] {
-					::gmaproto::place_someone_d $MOBdata($mob_id)
+					::gmaproto::place_someone_d [InsertCreatureImageName $MOBdata($mob_id)]
 				}
 			} err] {
 				tk_messageBox -type ok -icon error -title "Error sending data"\
