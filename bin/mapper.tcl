@@ -4460,6 +4460,9 @@ proc StartObj {w x y} {
 		set OBJ_CURRENT AOE_GLOBAL_BOUND
 		$w delete obj$OBJ_CURRENT
 		RemoveObject $OBJ_CURRENT
+	} elseif {$OBJ_MODE == "ruler"} {
+		set OBJ_CURRENT RULER_GLOBAL
+		$w delete obj$OBJ_CURRENT
 	} else {
 		set OBJ_CURRENT [new_id]
 	}
@@ -4571,6 +4574,10 @@ proc StartObj {w x y} {
 			bind $canvas <1> "LastPoint $canvas %x %y"
 		}
 		ruler {
+			set OBJtype($OBJ_CURRENT) line
+			set OBJdata($OBJ_CURRENT) [::gmaproto::new_dict LS-LINE ID $OBJ_CURRENT \
+				X [expr [SnapCoord $x] / $zoom] Y [expr [SnapCoord $y] / $zoom] Z $z \
+				Fill $fill_color Width 3]
 			$canvas create line [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] \
 				-fill $fill_color -width 3 -tags [list obj$OBJ_CURRENT allOBJ] -dash -
 			bind $canvas <1> "NextPoint $canvas %x %y"
@@ -7281,11 +7288,14 @@ proc DistanceFromGrid {x y z_ft} {
 
 	create_dialog .dfg
 	wm title .dfg "Distance from grid point [LetterLabel $Gx]$Gy"
-	grid [text .dfg.list -yscrollcommand {.dfg.sb set}] \
+	grid [text .dfg.list -yscrollcommand {.dfg.sb set} -bg black] \
 	     [scrollbar .dfg.sb -orient vertical -command {.dfg.list yview}] -sticky news
 	grid [button .dfg.ok -text OK -command "$canvas delete distanceTracer; destroy .dfg"]
 	grid columnconfigure .dfg 0 -weight 1
 	grid rowconfigure .dfg 0 -weight 1
+	.dfg.list tag configure key -foreground yellow
+	.dfg.list tag configure normal -foreground white
+	.dfg.list tag configure title -foreground cyan
 	set namelen [string length "TARGET"]
 
 	foreach target [array names MOBdata] {
@@ -7300,12 +7310,14 @@ proc DistanceFromGrid {x y z_ft} {
 		set namelen [expr max($namelen, [string length $name($target)])]
 	}
 
-	.dfg.list insert end [format "%-${namelen}.${namelen}s  CENTER-TO-CENTER  NEAREST-GRID-----\n" TARGET------------------------]
+	.dfg.list insert end [format "%-${namelen}.${namelen}s  CENTER-TO-CENTER  NEAREST-GRID-----\n" TARGET------------------------] title
 
 	foreach target [lsort -real -command "SortByValue centerdist" [array names centerdist]] {
-		.dfg.list insert end [format "%-${namelen}s  %3dsq %3dft (%s)  %3dsq %3dft %s\n" \
+		.dfg.list insert end [format "%-${namelen}s  %3dsq %3dft (%s)  %3dsq "\
 			$name($target) $centerdist($target) [expr $centerdist($target)*5] $dimension($target)\
-			[lindex $nearest($target) 0] [expr [lindex $nearest($target) 0]*5] [lindex $nearest($target) 3]]
+			[lindex $nearest($target) 0]] normal
+		.dfg.list insert end [format "%3dft" [expr [lindex $nearest($target) 0]*5]] key
+		.dfg.list insert end " [lindex $nearest($target) 3]\n" normal
 	}
 }
 
@@ -7333,6 +7345,9 @@ proc DistanceFromMob {MobID} {
 	grid [button .dfg.ok -text OK -command "$canvas delete distanceTracer; destroy .dfg"]
 	grid columnconfigure .dfg 0 -weight 1
 	grid rowconfigure .dfg 0 -weight 1
+	.dfg.list tag configure key -foreground yellow
+	.dfg.list tag configure normal -foreground white
+	.dfg.list tag configure title -foreground cyan
 	set namelen [string length "TARGET"]
 
 	foreach target [array names MOBdata] {
@@ -7394,12 +7409,14 @@ proc DistanceFromMob {MobID} {
 		}
 	}
 
-	.dfg.list insert end [format "%-${namelen}.${namelen}s  CENTER-TO-CENTER  NEAREST-GRID-----\n" TARGET------------------------]
+	.dfg.list insert end [format "%-${namelen}.${namelen}s  CENTER-TO-CENTER  NEAREST-GRID-----\n" TARGET------------------------] title
 
 	foreach target [lsort -real -command "SortByValue centerdist" [array names centerdist]] {
-		.dfg.list insert end [format "%-${namelen}s  %3dsq %3dft (%s)  %3dsq %3dft %s\n" \
+		.dfg.list insert end [format "%-${namelen}s  %3dsq %3dft (%s)  %3dsq " \
 			$name($target) $centerdist($target) [expr $centerdist($target)*5] $dimension($target)\
-			[lindex $nearest($target) 0] [expr [lindex $nearest($target) 0]*5] [lindex $nearest($target) 3]]
+			[lindex $nearest($target) 0]] normal
+		.dfg.list insert end [format "%3dft" [expr [lindex $nearest($target) 0]*5]] key
+		.dfg.list insert end " [lindex $nearest($target) 3]\n" normal
 	}
 }
 
