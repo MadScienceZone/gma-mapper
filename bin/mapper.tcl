@@ -7185,8 +7185,6 @@ proc GridDeltaDistance {deltaxy} {
 #
 proc GridXYToCenterPoint {Gx Gy} {
 	global iscale;			# pixels per grid square
-	puts "Grid $Gx $Gy, scale $iscale"
-	puts "return [expr $Gx*$iscale + ($iscale/2.0)] [expr $Gy*$iscale + ($iscale/2.0)]"
 	return [list [expr $Gx*$iscale + ($iscale/2.0)] [expr $Gy*$iscale + ($iscale/2.0)]]
 }
 
@@ -7302,10 +7300,10 @@ proc DistanceFromGrid {x y z_ft} {
 		set namelen [expr max($namelen, [string length $name($target)])]
 	}
 
-	.dfg.list insert end [format "%-${namelen}s CENTER-TO-CENTER NEAREST-GRID\n" TARGET]
+	.dfg.list insert end [format "%-${namelen}.${namelen}s  CENTER-TO-CENTER  NEAREST-GRID-----\n" TARGET------------------------]
 
 	foreach target [lsort -real -command "SortByValue centerdist" [array names centerdist]] {
-		.dfg.list insert end [format "%-${namelen}s %3dsq %3dft (%s) %3dsq %3dft %s\n" \
+		.dfg.list insert end [format "%-${namelen}s  %3dsq %3dft (%s)  %3dsq %3dft %s\n" \
 			$name($target) $centerdist($target) [expr $centerdist($target)*5] $dimension($target)\
 			[lindex $nearest($target) 0] [expr [lindex $nearest($target) 0]*5] [lindex $nearest($target) 3]]
 	}
@@ -7396,10 +7394,10 @@ proc DistanceFromMob {MobID} {
 		}
 	}
 
-	.dfg.list insert end [format "%-${namelen}s CENTER-TO-CENTER NEAREST-GRID\n" TARGET]
+	.dfg.list insert end [format "%-${namelen}.${namelen}s  CENTER-TO-CENTER  NEAREST-GRID-----\n" TARGET------------------------]
 
 	foreach target [lsort -real -command "SortByValue centerdist" [array names centerdist]] {
-		.dfg.list insert end [format "%-${namelen}s %3dsq %3dft (%s) %3dsq %3dft %s\n" \
+		.dfg.list insert end [format "%-${namelen}s  %3dsq %3dft (%s)  %3dsq %3dft %s\n" \
 			$name($target) $centerdist($target) [expr $centerdist($target)*5] $dimension($target)\
 			[lindex $nearest($target) 0] [expr [lindex $nearest($target) 0]*5] [lindex $nearest($target) 3]]
 	}
