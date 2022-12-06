@@ -71,10 +71,14 @@ You may need to set `GMA_TCLSH` to point to your `tclsh` interpreter if the `gma
 script can't find it on its own.
 
 ## Versioning
-Until the mapper is rewritten in Python and/or Go, it has its own 3._x_ version
-number. Once it is ported, that will bump its version to 4._x_. We have not yet
-decided whether to keep it in lock-step with the GMA version numbers or remain
-separate.
+The legacy version of the mapper client is version 3._x_ and is numbered separately
+from the core GMA project, which has its own repository.
+
+Version 4._x_ has significant refactoring of the internal code and represents
+internal map elements in a very different way. It also uses new JSON-based
+file formats which should make the files more easily portable to other applications
+and even hand-editable. It also supports the new JSON-based server protocol style
+(protocol 400+).
 
 ## Other Software
 Includes Paul Walton's scrollable frame code `sframe.tcl`, available at [http://wiki.tcl.tk/9223]().
