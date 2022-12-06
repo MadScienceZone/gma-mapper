@@ -1,109 +1,18 @@
 #!/usr/bin/env wish
-#
-# TODO
-# 		::gmaproto::set_debug f
-# 		::gmaproto::dial host port user pass proxy pport puser ppass client
-# (auto)	::gmaproto::redial
-# (auto)	::gmaproto::background_redial 1
-# (auto)	::gmaproto::receive sock
-# (auto,hook)	::gmaproto::_dispatch	(from receive: _read_poll and do something until it comes up empty)
-# 		::gmaproto::json_bool n -> true|false
-# 		::gmaproto::to_enum type strvalue -> int
-# 		::gmaproto::from_enum type int -> strvalue
-#
-# 		::gmaproto::_protocol_send command ?k1 v1 k2 v2 ...?
-# 		::gmaproto::_protocol_encode_list {cmd dict} -> {cmd json}
-# 		::gmaproto::_protocol_encode cmd dict -> {cmd json}
-# (auto)	::gmaproto::_encode_payload inputdict typedict -> json
-# (auto)	::gmaproto::_construct inputdict typedict -> dict (with cleanup and defaulting)
-# 		::gmaproto::_raw_send message
-# (auto)	::gmaproto::_transmit	(send pending stuff)
-# (auto)	::gmaproto::parse_data_packet raw -> {cmd|UNDEFINED|ERROR dict|protocol|comment}	(from _read_poll)
-# (auto)	::gmaproto::_initial_read_poll -> {cmd dict}
-# (auto)	::gmaproto::_read_poll -> {cmd dict}
-# (auto)	::gmaproto::_repackage_legacy_packet cmd oldstyleparams -> {cmd json}		
-# (auto)	::gmaproto::_login
-# (auto)	::gmaproto::auth_response challenge(b64) -> response(b64)
-# (auto)	::gmaproto::_start_stream cmd dict
-# (auto)	::gmaproto::_continue_stream cmd dict ckdata ?-append|-lappend?
-# (auto)	::gmaproto::_end_stream cmd len cs -> dict
-#		::gmaproto::new_id -> uuid
-#		::gmautil::is_git path -> bool
-# (auto)	::gmautil::verify data signature -> bool
-#		::gmautil::version_compare v1 v2 -> <0|0|>0
-#		::gmautil::lpop listvar index -> removed_element
-#		::gmautil::upgrade dest_dir_list tmp baseurl basefile oldv newv strip_prefix launch msg_cb curlproxy curlpath
-# (auto)	::gmautil::_intall_file dest_dir_list prefix cb pfx header data
-# (auto)	::gmautil::_countdown sec cb pfx
-# 		::gmautil::rdist minargs maxargs cmd arglist ?var ...?
-# 		::gmautil::my_os -> string
-# 		::gmautil::my_arch -> string
-# 		::gmafile::save_to_file f {meta {{type dict} ...}}
-# 		::gmafile::load_from_file f -> {meta {{type dict} ...}}
-# (auto)	::gmafile::load_legacy_map_file f vid oldmeta -> {meta {{type dict} ...}}
-# (auto)	::gmafile::load_legacy_map_data linelist meta -> {meta {{IMG|MAP|RAW list} ...}}
-# (auto)	::gmafile::upgrade_elements {{IMG|MAP|RAW list} ...} -> {{type dict} ...}
-#		::gmafile::require_arr aname id ?attr ...?
-#		::gmafile::default_arr aname id ?-value v? ?--? ?attr ...?
-#
-# 		
-#
-# ::gmaproto::protocol sending commands
-# 	adjust_view x y
-# 	chat_message msg sender recips to_all? to_gm?
-# 	clear objid
-# 	clear_chat silent? target
-# 	clear_from serverid
-# 	combat_mode enabled?
-# 	comment text
-# 	define_dice_presets plist app?
-# 	filter_dice_presets re
-# 	load_from serverid cache? merge?
-# 	mark x y
-# 	query_dice_presets
-# 	add_image name sizes
-# 	query_image name size
-# 	query_peers
-# 	place_someone objid co name area size type gx gy reach? health skin skin_sizes elev note statuslist aoe movemode killed? dim?
-# 	polo
-# 	roll_dice spec recips all? gm?
-# 	sync_chat target
-# 	toolbar enabled?
-# 	update_clock a r
-# 	update_obj_attributes objid kvdict
-# 	add_obj_attributes objid attr vs
-# 	remove_obj_attributes objid attr vs
-# 	update_status_marker cond shape color
-# 	write_only ismain?
-# 	subscribe msglist
-# 	allow featurelist
-# 	ls type dict
-# 	update_progress id title value max done		id=* to generate, max=*|0 for none
-#
-# Requires these functions be available here:
-#X	::DEBUG level message
-#X	::say message
-#X	::DefinePlayerCharacter dict
-#X	::report_progress msg
-#X	::DefineStatusMarker dict
-# 	::DoCommand<cmd> dict
-#X	::DoCommandError cmd dict error
-#
-# 	
 ########################################################################################
-#  _______  _______  _______             ______         ___       ___       _______    #
-# (  ____ \(       )(  ___  ) Game      / ___  \       /   )     /   )     (  __   )   #
-# | (    \/| () () || (   ) | Master's  \/   \  \     / /) |    / /) |     | (  )  |   #
-# | |      | || || || (___) | Assistant    ___) /    / (_) (_  / (_) (_    | | /   |   #
-# | | ____ | |(_)| ||  ___  |             (___ (    (____   _)(____   _)   | (/ /) |   #
-# | | \_  )| |   | || (   ) |                 ) \        ) (       ) (     |   / | |   #
-# | (___) || )   ( || )   ( | Mapper    /\___/  / _      | |       | |   _ |  (__) |   #
-# (_______)|/     \||/     \| Client    \______/ (_)     (_)       (_)  (_)(_______)   #
+#  _______  _______  _______                ___       _______     _______              #
+# (  ____ \(       )(  ___  ) Game         /   )     (  __   )   (  __   )             #
+# | (    \/| () () || (   ) | Master's    / /) |     | (  )  |   | (  )  |             #
+# | |      | || || || (___) | Assistant  / (_) (_    | | /   |   | | /   |             #
+# | | ____ | |(_)| ||  ___  |           (____   _)   | (/ /) |   | (/ /) |             #
+# | | \_  )| |   | || (   ) |                ) (     |   / | |   |   / | |             #
+# | (___) || )   ( || )   ( | Mapper         | |   _ |  (__) | _ |  (__) |             #
+# (_______)|/     \||/     \| Client         (_)  (_)(_______)(_)(_______)             #
 #                                                                                      #
 ########################################################################################
 #
 # GMA Mapper Client with background I/O processing.
-# @[00]@| GMA 4.5.0
+# @[00]@| GMA 4.6.0
 # @[01]@|
 # @[10]@| Copyright © 1992–2022 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
@@ -147,7 +56,7 @@
 set GMAMapperVersion {4.0.0}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
 set GMAMapperProtocol {400}         ;# @@##@@
-set GMAVersionNumber {4.4.3}            ;# @@##@@
+set GMAVersionNumber {4.6.0}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
