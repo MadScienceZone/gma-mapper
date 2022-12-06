@@ -1928,6 +1928,10 @@ proc ::gmaproto::_login {} {
 			::say "Failed to check for upgrade: $err"
 		}
 	}
+
+	if [catch ::DoCommandLoginSuccessful err] {
+		::gmaproto::DEBUG "Unable to notify application of successful login: $err"
+	}
 }
 
 proc ::gmaproto::_background_poll {} {

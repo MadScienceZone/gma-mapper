@@ -798,6 +798,151 @@ proc LoadDefaultStyles {} {
 	}
 }
 
+# IThost ITport 
+set ChatHistory {}
+set ChatHistoryFile {}
+set ChatHistoryFileHandle {}
+set ChatHistoryLastMessageID 0
+# We only use ChatHistoryLastMessageID while loading the saved data. From that point on
+# we get the messages in real time and don't ask the server to catch us up again, (or
+# if we do, we can look at our in-memory history for that instead of taking time to update
+# this for every message).
+
+proc InitializeChatHistory {} {
+	global ChatHistoryFile ChatHistory ChatHistoryFileHandle ChatHistoryLastMessageID
+	global path_cache IThost ITport ChatHistoryLimit local_user
+
+	if {$IThost ne {}} {
+		set ChatHistoryFile [file join $path_cache "${IThost}-${ITport}-${local_user}-chat.history"]
+		DEBUG 1 "Loading chat history from $ChatHistoryFile"
+		if {! [file exists $ChatHistoryFile]} {
+			DEBUG 1 "-Creating new file; did not find an existing one"
+		} else {
+			if [catch {set ChatHistoryFileHandle [open $ChatHistoryFile]} err] {
+				DEBUG 0 "Unable to read chat history file $ChatHistoryFile ($err). We will try asking the server for a new history download."
+				set ChatHistoryFileHandle {}
+			} else {
+				while {[gets $ChatHistoryFileHandle msg] >= 0} {
+					DEBUG 2 "read $msg from cache"
+					if {[lindex $msg 0] eq {CHAT}} {
+						# new-style entry:	{CHAT ROLL|TO|CC|-system json-dict}
+						DEBUG 3 "parsing new style message"
+						lassign [UnmarshalChatHistoryEntry $msg] ctype d
+						DEBUG 2 "new-style -> $ctype, $d"
+					} else {
+						# old-style entry:	{ROLL|TO|CC|-system a b c ...}
+						DEBUG 3 "parsing old style message"
+						if {[set o [ValidateChatHistoryEntry $msg]] eq {}} {
+							DEBUG 1 "$ChatHistoryFile: Rejecting invalid old-style entry $msg"
+							continue
+						}
+						lassign $o ctype d
+						DEBUG 2 "old-style -> $ctype, $d"
+					}
+
+					if {$ctype eq {-system}} {
+						set mid -1
+					} else {
+						set mid [dict get $d MessageID]
+					}
+
+					if {$ctype eq {CC}} {
+						set ChatHistory {}
+					} else {
+						set ChatHistoryLastMessageID [expr max($ChatHistoryLastMessageID, $mid)]
+					}
+					lappend ChatHistory [list $ctype $d $mid]
+				}
+				close $ChatHistoryFileHandle
+				set ChatHistoryFileHandle {}
+
+				if {$ChatHistoryLimit > 0 && [llength $ChatHistory] > $ChatHistoryLimit} {
+					DEBUG 1 "Chat history contains [llength $ChatHistory] items; trimming it back to $ChatHistoryLimit."
+					if [catch {set ChatHistoryFileHandle [open $ChatHistoryFile w]} err] {
+						DEBUG 0 "Unable to overwrite the chat history in $ChatHistoryFile ($err). No history will be kept now."
+						set ChatHistoryFileHandle {}
+					} else {
+						set ChatHistory [lrange $ChatHistory end-$ChatHistoryLimit end]
+						foreach msg $ChatHistory {
+							puts $ChatHistoryFileHandle [MarshalChatHistoryEntry $msg]
+						}
+						flush $ChatHistoryFileHandle
+					}
+				}
+			}
+		}
+
+		if {$ChatHistoryFileHandle eq {}} {
+			if [catch {set ChatHistoryFileHandle [open $ChatHistoryFile a]} err] {
+				DEBUG 0 "Unable to append to or create chat history file $ChatHistoryFile ($err). No history will be kept."
+				set ChatHistoryFileHandle {}
+			}
+		}
+		DEBUG 1 "Chat history now has [llength $ChatHistory] items."
+		if {$ChatHistoryLastMessageID <= 0} {
+			if {$ChatHistoryLimit > 0} {
+				DEBUG 1 "We don't have any loaded history; asking server for up to $ChatHistoryLimit messages."
+				::gmaproto::sync_chat -$ChatHistoryLimit
+			} else {
+				DEBUG 1 "We don't have any loaded history; asking server all messages."
+				::gmaproto::sync_chat 0
+			}
+		} else {
+			DEBUG 1 "Asking server for any new messages since $ChatHistoryLastMessageID."
+			::gmaproto::sync_chat $ChatHistoryLastMessageID
+		}
+	}
+}
+
+set _last_known_message_id 0
+
+#
+# {CC|TO|ROLL|-system d|msg id} -> CHAT type jsonified-d
+#
+proc MarshalChatHistoryEntry {m} {
+	if {[lindex $m 0] eq {-system}} {
+		return [list CHAT -system [::json::write string [lindex $m 1]]]
+	}
+	return [list CHAT [lindex $m 0] [::gmaproto::_encode_payload [lindex $m 1] $::gmaproto::_message_payload([lindex $m 0])]]
+}
+
+#
+# {CHAT type json} -> {CC|TO|ROLL|-system d|msg id}
+#
+proc UnmarshalChatHistoryEntry {m} {
+	if {[lindex $m 1] eq {-system}} {
+		return [list {-system} [::json::json2dict [lindex $m 2]] -1]
+	}
+	DEBUG 2 "unmarshal $m"
+	set d [::gmaproto::_construct [::json::json2dict [lindex $m 2]] $::gmaproto::_message_payload([lindex $m 1])]
+	DEBUG 3 "-> [lindex $m 1] $d" 
+	return [list [lindex $m 1] $d [dict get $d MessageID]]
+}
+
+# ChatHistoryAppend {CC|ROLL|TO d mid}
+# ChatHistoryAppend {-system msg -1}
+proc ChatHistoryAppend {event} {
+	global ChatHistory ChatHistoryFileHandle _last_known_message_id
+
+	if {[set m [ValidateChatHistoryEntry $event]] ne {}} {
+		set mid [lindex $m 2]
+		if {$mid eq {} || $mid < 0} {
+			set mid ${_last_known_message_id}
+		}
+		if {$mid >= ${_last_known_message_id}} {
+			lappend ChatHistory $m
+			if {$ChatHistoryFileHandle ne {}} {
+				puts $ChatHistoryFileHandle [MarshalChatHistoryEntry $m]
+				flush $ChatHistoryFileHandle
+			}
+		} else {
+		    DEBUG 1 "Rejected chat message $m; message ID $mid < ${_last_known_message_id}"
+		}
+	} else {
+		DEBUG 1 "Rejected invalid chat message '$event'"
+	}
+}
+
 proc LoadCustomStyle {filename} {
 	# Load up styles from specified file
 	# sections <h> -> list of all section names
@@ -5179,7 +5324,7 @@ proc AllPointsFromObj {o} {
 proc ObjDrag {w x y} {
 	global OBJdata OBJ_CURRENT OBJ_SNAP canvas zoom OBJ_MODE
 	if {$OBJ_CURRENT != 0} {
-		set new_coords "[AllPointsFromObj $OBJdata($OBJ_CURRENT)] [SnapCoord [$canvas canvasx $x]] [SnapCoord [$canvas canvasy $y]]"
+		set new_coords "[lmap v [AllPointsFromObj $OBJdata($OBJ_CURRENT)] {expr $v*$zoom}] [SnapCoord [$canvas canvasx $x]] [SnapCoord [$canvas canvasy $y]]"
 		if {[catch {
 			$w coords obj$OBJ_CURRENT $new_coords
 		} err]} {
@@ -6452,7 +6597,7 @@ proc RenderSomeone {w id} {
 			label $nametag_w -background [::tk::Darken [dict get $MOBdata($id) Color] 40] \
 				-foreground white -font [FontBySize [dict get $MOBdata($id) Size]] -text $mob_name 
 		}
-		$w create window [expr $x*$iscale] [expr $y*$iscale] -anchor w -window $nametag_w -tags "M#$id MF#$id MT#$id allMOB"
+		$w create window [expr $x*$iscale] [expr $y*$iscale] -anchor nw -window $nametag_w -tags "M#$id MF#$id MT#$id allMOB"
 	} else {
 		DEBUG 3 "No $image_pfx:$zoom found in TILE_SET"
 		$w create oval [expr $x*$iscale] [expr $y*$iscale] [expr ($x+$mob_size)*$iscale] [expr ($y+$mob_size)*$iscale] -fill $fillcolor -tags "mob MF#$id M#$id MN#$id allMOB"
@@ -9412,6 +9557,13 @@ proc DoCommandTO {d} {
 }
 
 #
+# Hook for any post-login activities we need to do
+#
+proc DoCommandLoginSuccessful {} {
+	InitializeChatHistory
+}
+
+#
 # Hook for any errors encountered when trying to execute an incoming
 # server message (including the case where no DoCommand<cmd> procedure
 # is defined)
@@ -10625,7 +10777,9 @@ proc ChatMessageID {message} {
 # translate old-style entries into new ones
 # return valid entry or empty string
 proc ValidateChatHistoryEntry {e} {
+	DEBUG 2 "Validating chat history entry $e"
 	if {![string is list $e] || [catch {set n [llength $e]}]} {
+		DEBUG 2 "--rejected, invalid format"
 		return {}
 	}
 
@@ -10633,11 +10787,14 @@ proc ValidateChatHistoryEntry {e} {
 	# new:	-system <message> -1
 	if {[lindex $e 0] eq {-system}} {
 		if {$n == 4 && [lindex $e 3] == -1 && [lindex $e 1] eq "*"} {
+			DEBUG 3 "--old -system record -> -system [lindex $e 2] -1"
 			return [list -system [lindex $e 2] -1]
 		}
 		if {$n == 3 && [lindex $e 2] == -1} {
+			DEBUG 3 "--new -system record -> $e"
 			return $e
 		}
+		DEBUG 3 "--rejected"
 		return {}
 	}
 
@@ -10646,38 +10803,49 @@ proc ValidateChatHistoryEntry {e} {
 			# old: ROLL from recip title result rlist mid
 			# new: ROLL d mid
 			if {$n == 7} {
-				return [list ROLL [ParseRecipientList ROLL [lindex $e 2]\
+				DEBUG 3 "--old ROLL record from [lindex $e 2]"
+				set d [ParseRecipientList [lindex $e 2] ROLL\
 					Sender [lindex $e 1]\
 					Title  [lindex $e 3]\
 					{Result Result} [lindex $e 4]\
-					{Result Details} $dlist\
 					MessageID [lindex $e 6]\
-				] [lindex $e 6]]
+				]
+				foreach result [lindex $e 5] {
+					dict lappend d Result Details [dict create Type [lindex $result 0] Value [lindex $result 1]]
+				}
+				DEBUG 3 "-- -> ROLL $d [dict get $d MessageID]"
+				return [list ROLL $d [dict get $d MessageID]]
 			}
 			if {$n == 3} {
+				DEBUG 3 "--new ROLL record -> $e"
 				return $e
 			}
+			DEBUG 3 "--rejected"
 			return {}
 		}
 		TO {
 			# old: TO from recip msg mid
 			# new: TO d mid
 			if {$n == 5} {
-				return [list TO [ParseRecipientList TO [lindex $e 2]\
+				DEBUG 3 "--old TO record from [lindex $e 2]"
+				return [list TO [ParseRecipientList [lindex $e 2] TO\
 					Sender [lindex $e 1]\
 					Text [lindex $e 3]\
 					MessageID [lindex $e 4]\
 				] [lindex $e 4]]
 			}
 			if {$n == 3} {
+				DEBUG 3 "--new TO record -> $e"
 				return $e
 			}
+			DEBUG 3 "--rejected"
 			return {}
 		}
 		CC {
 			# old: CC from target mid
 			# new: CC d mid
 			if {$n == 4} {
+				DEBUG 3 "--old CC record"
 				set dd [::gmaproto::new_dict CC \
 					RequestedBy [lindex $e 1]\
 					Target [lindex $e 2]\
@@ -10688,14 +10856,18 @@ proc ValidateChatHistoryEntry {e} {
 					dict set dd DoSilently true
 				}
 			
+				DEBUG 3 "-- -> CC $dd [lindex $e 3]"
 				return [list CC $dd [lindex $e 3]]
 			}
 			if {$n == 3} {
+				DEBUG 3 "--new CC record -> $e"
 				return $e
 			}
+			DEBUG 3 "--rejected"
 			return {}
 		}
 	}
+	DEBUG 3 "--rejected (unknown type)"
 	return {}
 }
 	
@@ -10755,51 +10927,33 @@ proc ClearChatHistory {d} {
 #
 # Load up the chat window with what's in our in-memory chat history list.
 #
-#	_render_chat_message $wc.1.text $system $message $recipientlist $from [dict get $d ToAll] [dict get $d ToGM]
-proc LoadChatHistory {} {
-	global ChatHistory
-	set w .chatwindow.p.chat.1.text
-
-	foreach msg $ChatHistory {
-		lassign $msg msg_type d msg_id
-
-		switch -exact -- $msg_type {
-			-system { _render_chat_message $w true $d {} {} false false }
-			TO      { _render_chat_message $w false [dict get $d Text] [dict get $d Recipients] [dict get $d Sender] [dict get $d ToAll] [dict get $d ToGM] }
-			ROLL    { DisplayDieRoll $d }
-			CC	{
-				set by [dict get $d RequestedBy]
-				if {[dict get $d DoSilently]} {
-					_render_chat_message $w 1 "Chat history cleared." {} {}
-				} elseif {$by eq "*"} {
-					_render_chat_message $w 1 "Chat history cleared/re-synced." {} {}
-				} else {
-					_render_chat_message $w 1 "Chat history cleared by $by." {} {}
-				}
-			}
-		}
-	}
-}
-#
-# Load up the chat window with what's in our in-memory chat history list.
-#
 proc LoadChatHistory {} {
 	global ChatHistory
 	set w .chatwindow.p.chat.1.text
 
 	foreach msg $ChatHistory {
 	if {[set m [ValidateChatHistoryEntry $msg]] ne {}} {
-            switch -- [lindex $m 0] {
-                ROLL { DisplayDieRoll {*}[lrange $m 1 5] }
-                TO   { _render_chat_message $w [expr "{[lindex $m 1]}" eq {{-system}}] [lindex $m 3] [lindex $m 2] [lindex $m 1] }
+	    lassign $m msg_type d msg_id
+
+            switch -exact -- $msg_type {
+		-system { _render_chat_message $w true $d {} {} false false }
+                ROLL { DisplayDieRoll $d }
+                TO   { 
+			set d [lindex $m 1]
+			if {[dict get $d Sender] eq {-system}} {
+				_render_chat_message $w 1 [dict get $d Text] {} {} false false
+			} else {
+				_render_chat_message $w 0 [dict get $d Text] [dict get $d Recipients] [dict get $d Sender] [dict get $d ToAll] [dict get $d ToGM]
+			}
+		}
                 CC	 {
-                    set by [lindex $m 1]
-                    if {$by eq {}} {
-                        _render_chat_message $w 1 "Chat history cleared." {} {}
+                    set by [dict get $d RequestedBy]
+		    if {[dict get $d DoSilently]} {
+                        _render_chat_message $w 1 "Chat history cleared." {} {} false false
                     } elseif {$by eq "*"} {
-                        _render_chat_message $w 1 "Chat history cleared/re-synced." {} {}
+                        _render_chat_message $w 1 "Chat history cleared/re-synced." {} {} false false
                     } else {
-                        _render_chat_message $w 1 "Chat history cleared by $by." {} {}
+                        _render_chat_message $w 1 "Chat history cleared by $by." {} {} false false
                     }
                 }
             }
@@ -12281,110 +12435,6 @@ chat-history=500
 	exit 0
 }
 
-# IThost ITport 
-set ChatHistory {}
-set ChatHistoryFile {}
-set ChatHistoryFileHandle {}
-set ChatHistoryLastMessageID 0
-# We only use ChatHistoryLastMessageID while loading the saved data. From that point on
-# we get the messages in real time and don't ask the server to catch us up again, (or
-# if we do, we can look at our in-memory history for that instead of taking time to update
-# this for every message).
-
-proc InitializeChatHistory {} {
-	global ChatHistoryFile ChatHistory ChatHistoryFileHandle ChatHistoryLastMessageID
-	global path_cache IThost ITport ChatHistoryLimit local_user
-
-	if {$IThost ne {}} {
-		set ChatHistoryFile [file join $path_cache "${IThost}-${ITport}-${local_user}-chat.history"]
-		DEBUG 1 "Loading chat history from $ChatHistoryFile"
-		if {! [file exists $ChatHistoryFile]} {
-			DEBUG 1 "-Creating new file; did not find an existing one"
-		} else {
-			if [catch {set ChatHistoryFileHandle [open $ChatHistoryFile]} err] {
-				DEBUG 0 "Unable to read chat history file $ChatHistoryFile ($err). We will try asking the server for a new history download."
-				set ChatHistoryFileHandle {}
-			} else {
-				while {[gets $ChatHistoryFileHandle msg] >= 0} {
-					if {[set msg [ValidateChatHistoryEntry $msg]] ne {}} {
-						if {[lindex $msg 0] eq {CC}} {
-							set ChatHistory {}
-						} else {
-							set ChatHistoryLastMessageID [expr max($ChatHistoryLastMessageID, [lindex $msg 2]]
-						}
-						lappend ChatHistory $msg
-					} else {
-						DEBUG 1 "InitializeChatHistory: rejecting invalid messsage $msg from $ChatHistoryFile"
-					}
-				}
-				close $ChatHistoryFileHandle
-				set ChatHistoryFileHandle {}
-
-				if {$ChatHistoryLimit > 0 && [llength $ChatHistory] > $ChatHistoryLimit} {
-					DEBUG 1 "Chat history contains [llength $ChatHistory] items; trimming it back to $ChatHistoryLimit."
-					if [catch {set ChatHistoryFileHandle [open $ChatHistoryFile w]} err] {
-						DEBUG 0 "Unable to overwrite the chat history in $ChatHistoryFile ($err). No history will be kept now."
-						set ChatHistoryFileHandle {}
-					} else {
-						set ChatHistory [lrange $ChatHistory end-$ChatHistoryLimit end]
-						foreach msg $ChatHistory {
-							puts $ChatHistoryFileHandle $msg
-						}
-						flush $ChatHistoryFileHandle
-					}
-				}
-			}
-		}
-
-		if {$ChatHistoryFileHandle eq {}} {
-			if [catch {set ChatHistoryFileHandle [open $ChatHistoryFile a]} err] {
-				DEBUG 0 "Unable to append to or create chat history file $ChatHistoryFile ($err). No history will be kept."
-				set ChatHistoryFileHandle {}
-			}
-		}
-		DEBUG 1 "Chat history now has [llength $ChatHistory] items."
-		if {$ChatHistoryLastMessageID <= 0} {
-			if {$ChatHistoryLimit > 0} {
-				DEBUG 1 "We don't have any loaded history; asking server for up to $ChatHistoryLimit messages."
-				::gmaproto::sync_chat -$ChatHistoryLimit
-			} else {
-				DEBUG 1 "We don't have any loaded history; asking server all messages."
-				::gmaproto::sync_chat 0
-			}
-		} else {
-			DEBUG 1 "Asking server for any new messages since $ChatHistoryLastMessageID."
-			::gmaproto::sync_chat $ChatHistoryLastMessageID
-		}
-	}
-}
-
-set _last_known_message_id 0
-# ChatHistoryAppend {CC _ _ ID}
-# ChatHistoryAppend {ROLL _ _ _ _ _ ID}
-# ChatHistoryAppend {TO _ _ _ ID}
-# ChatHistoryAppend {-system * msg -1}
-
-proc ChatHistoryAppend {event} {
-	global ChatHistory ChatHistoryFileHandle _last_known_message_id
-
-	if {[set m [ValidateChatHistoryEntry $event]] ne {}} {
-		set mid [lindex $m 2]
-		if {$mid eq {} || $mid < 0} {
-			set mid ${_last_known_message_id}
-		}
-		if {$mid >= ${_last_known_message_id}} {
-			lappend ChatHistory $m
-			if {$ChatHistoryFileHandle ne {}} {
-				puts $ChatHistoryFileHandle $m
-				flush $ChatHistoryFileHandle
-			}
-		} else {
-		    DEBUG 1 "Rejected chat message $m; message ID $mid < ${_last_known_message_id}"
-		}
-	} else {
-		DEBUG 1 "Rejected invalid chat message '$event'"
-	}
-}
 
 proc PingMarker {w x y} {
 	global zoom
