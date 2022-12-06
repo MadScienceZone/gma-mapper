@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       _______     _______              #
-# (  ____ \(       )(  ___  ) Game         /   )     (  __   )   (  __   )             #
-# | (    \/| () () || (   ) | Master's    / /) |     | (  )  |   | (  )  |             #
-# | |      | || || || (___) | Assistant  / (_) (_    | | /   |   | | /   |             #
-# | | ____ | |(_)| ||  ___  |           (____   _)   | (/ /) |   | (/ /) |             #
-# | | \_  )| |   | || (   ) |                ) (     |   / | |   |   / | |             #
-# | (___) || )   ( || )   ( | Mapper         | |   _ |  (__) | _ |  (__) |             #
-# (_______)|/     \||/     \| Client         (_)  (_)(_______)(_)(_______)             #
+#  _______  _______  _______                ___       _______      __                  #
+# (  ____ \(       )(  ___  ) Game         /   )     (  __   )    /  \                 #
+# | (    \/| () () || (   ) | Master's    / /) |     | (  )  |    \/) )                #
+# | |      | || || || (___) | Assistant  / (_) (_    | | /   |      | |                #
+# | | ____ | |(_)| ||  ___  |           (____   _)   | (/ /) |      | |                #
+# | | \_  )| |   | || (   ) |                ) (     |   / | |      | |                #
+# | (___) || )   ( || )   ( | Mapper         | |   _ |  (__) | _  __) (_               #
+# (_______)|/     \||/     \| Client         (_)  (_)(_______)(_) \____/               #
 #                                                                                      #
 ########################################################################################
 #
@@ -53,7 +53,7 @@
 # @[52]@| defect of the software.
 #
 # Auto-configure values
-set GMAMapperVersion {4.0.0}     ;# @@##@@
+set GMAMapperVersion {4.0.1}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
 set GMAMapperProtocol {400}         ;# @@##@@
 set GMAVersionNumber {4.6.0}            ;# @@##@@
@@ -7385,7 +7385,8 @@ proc DistanceFromMob {MobID} {
 	global MOBdata canvas
 	global iscale
 	lassign [MOBCenterPoint $MobID] MobX MobY MobR
-	lassign [ScreenXYToGridXY $MobX $MobY -exact] Cx Cy
+	set Cx [expr int($MobX/$iscale)]
+	set Cy [expr int($MobY/$iscale)]
 	set z_ft [dict get $MOBdata($MobID) Elev]
 	set MGx0 [expr ($MobX-$MobR)/$iscale]
 	set MGx1 [expr ($MobX+$MobR)/$iscale]
@@ -10716,12 +10717,14 @@ proc ValidateChatHistoryEntry {e} {
 				set d [ParseRecipientList [lindex $e 2] ROLL\
 					Sender [lindex $e 1]\
 					Title  [lindex $e 3]\
-					{Result Result} [lindex $e 4]\
+					Result [dict create Result [lindex $e 4] Details {}]\
 					MessageID [lindex $e 6]\
 				]
+				set rlist {}
 				foreach result [lindex $e 5] {
-					dict lappend d Result Details [dict create Type [lindex $result 0] Value [lindex $result 1]]
+					lappend rlist [dict create Type [lindex $result 0] Value [lindex $result 1]]
 				}
+				dict set d Result Details $rlist
 				DEBUG 3 "-- -> ROLL $d [dict get $d MessageID]"
 				return [list ROLL $d [dict get $d MessageID]]
 			}
