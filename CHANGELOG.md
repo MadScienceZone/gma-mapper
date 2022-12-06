@@ -12,7 +12,7 @@
 * Save file format updated to version 20. This is a *completely* different format, which should be easier to parse and hand-edit than previously had been the case.
    * Rather than an unordered collection of individual object attributes, each creature or map element is represented together as a record, which is JSON-formatted.
    * The mapper still recognizes the previous file format (version 17) and will read version 17 files but will write new files in version 20 format.
-* Die-roll preset file format updated to version 2 format. This is a *completely* different format, similar to the new map file format.
+* Die-roll preset file format updated to version 2. This is a *completely* different format, similar to the new map file format.
    * Rather than the file containing lines of TCL lists with data, the file now is a sequence of records which a JSON-encoded.
    * The mapper still recognizes the previous file format (version 1) and will read version 1 files but will write new files in version 2 format.
 * All client/server interaction code has been re-written. It now supports server protocol 400, which is a total departure from the previous protocol formats.
