@@ -3582,7 +3582,7 @@ proc canceltool {} {
 	bind $canvas <Control-ButtonPress-5> {zoomInBy 0.5}
     bind $canvas <Control-MouseWheel> {zoomInBy [expr {%D>0 ? 2 : 0.5}]}
 	bind $canvas <1> "MOB_StartDrag $canvas %x %y"
-	bind $canvas <Control-1> "MOB_SelectEvent $canvas %x %y"
+	bind $canvas <Control-Button-1> "MOB_SelectEvent $canvas %x %y"
 	bind $canvas <B1-Motion> "MOB_Drag $canvas %x %y"
 	bind $canvas <B1-ButtonRelease> "MOB_EndDrag $canvas"
 	bind $canvas <Motion> {}
@@ -6873,7 +6873,7 @@ proc SetSelectionContextMenu {} {
 }
 
 proc ToggleSelection {id} {
-	global MOB_SELECTED canvas
+	global MOB_SELECTED canvas MOBdata
 	DEBUG 3 "Selecting $id"
 	if {[info exists MOBdata($id)]} {
 		if {[info exists MOB_SELECTED($id)]} {
@@ -7178,6 +7178,231 @@ proc GridDistance {x1 y1 x2 y2} {
 }
 proc GridDeltaDistance {deltaxy} {
 	return [expr round(sqrt(pow([lindex $deltaxy 0],2) + pow([lindex $deltaxy 1],2)))]
+}
+
+#
+# Given a grid (Gx,Gy), return the screen coordinates of the grid's center point.
+#
+proc GridXYToCenterPoint {Gx Gy} {
+	global iscale;			# pixels per grid square
+	puts "Grid $Gx $Gy, scale $iscale"
+	puts "return [expr $Gx*$iscale + ($iscale/2.0)] [expr $Gy*$iscale + ($iscale/2.0)]"
+	return [list [expr $Gx*$iscale + ($iscale/2.0)] [expr $Gy*$iscale + ($iscale/2.0)]]
+}
+
+#
+# Given a grid location with (Gx,Gy) at Gz_ft elevation and a MOB id, calculate
+# the 3D distance from the center of the first grid to the center of the creature's
+# body and the distance to the center of the nearest grid square which contains the
+# creature. The output is in grid units.
+#
+
+proc DistanceToTarget3D {Gx Gy Gz_ft MobID} {
+	global iscale;			# pixels per grid square
+	global MOBdata;			# collection of all possible targets
+
+	set Cx [expr $Gx + 0.5]
+	set Cy [expr $Gy + 0.5]
+
+	lassign [MOBCenterPoint $MobID] Mx My Mr
+	set MGx [expr $Mx/$iscale]
+	set MGy [expr $My/$iscale]
+	#set MGr [expr $Mr/$iscale]
+
+	if {[set Mz_ft [dict get $MOBdata($MobID) Elev]] != $Gz_ft} {
+		return [expr round(sqrt(pow($Cx-$MGx,2) + pow($Cy-$MGy,2) + pow(($Gz_ft/5.0)-($Mz_ft/5.0),2)))]
+	}
+	return [GridDistance $Cx $Cy $MGx $MGy]
+}
+
+proc DebugMarker {title cmd dcmd} {
+	create_dialog .dm
+	wm title .dm $title
+	grid [text .dm.text -yscrollcommand {.dm.sb set}] [scrollbar .dm.sb -orient vertical -command {.dm.text yview}] -sticky news
+	grid [button .dm.ok -text OK -command "$dcmd; destroy .dm"]
+	grid columnconfigure .dm 0 -weight 1
+	grid rowconfigure .dm 0 -weight 1
+	eval $cmd
+	update
+	tkwait window .dm
+}
+
+proc NearestCreatureGridToPoint {Gx Gy Gz_ft MobID} {
+	global iscale MOBdata
+	set distance -1
+	set nearX 0
+	set nearY 0
+	lassign [MOBCenterPoint $MobID] Mx My Mr
+	set MGx0 [expr ($Mx-$Mr)/$iscale]
+	set MGx1 [expr ($Mx+$Mr)/$iscale]
+	set MGy0 [expr ($My-$Mr)/$iscale]
+	set MGy1 [expr ($My+$Mr)/$iscale]
+	set Cx [expr $Gx + 0.5]
+	set Cy [expr $Gy + 0.5]
+	set Mz_ft [dict get $MOBdata($MobID) Elev]
+
+	for {set x $MGx0} {$x < $MGx1} {set x [expr $x + 1.0]} {
+		for {set y $MGy0} {$y < $MGy1} {set y [expr $y + 1.0]} {
+			set d [expr round(sqrt(pow($Cx-($x+.5),2) + pow($Cy-($y+.5),2) + pow(($Gz_ft/5.0)-($Mz_ft/5.0),2)))]
+#			DebugMarker "Measured Distance" "
+#				global canvas
+#				.dm.text insert end \"distance ($Cx,$Cy,$Gz_ft)-($x+.5,$y+.5,$Mz_ft) $d\nnear ([expr int($x)],[expr int($y)]) [LetterLabel [expr int($x)]]$y\n\"
+#				\$canvas create line [expr $Cx*$iscale] [expr $Cy*$iscale] [expr ($x+.5)*$iscale] [expr ($y+.5)*$iscale] -fill green -width 5 -tags DMDM
+#			" "
+#				global canvas
+#				\$canvas delete DMDM
+#			"
+#
+			if {$distance < 0 || $d < $distance} {
+				set distance [expr int($d)]
+				set nearX [expr int($x)]
+				set nearY [expr int($y)]
+			}
+		}
+	}
+	if {$distance < 0} {
+		return [list 0 0 0 {ERROR}]
+	}
+	return [list $distance $nearX $nearY "[LetterLabel $nearX]$nearY"]
+}
+
+proc PixelsToFeet {px} {
+	global iscale
+	return [expr $px / ($iscale / 5.0)]
+}
+
+proc FeetToPixels {ft} {
+	global iscale
+	return [expr $ft * ($iscale / 5.0)]
+}
+
+proc DistanceFromGrid {x y z_ft} {
+	global MOBdata canvas
+	global iscale
+	lassign [ScreenXYToGridXY $x $y -exact] Gx Gy
+
+	create_dialog .dfg
+	wm title .dfg "Distance from grid point [LetterLabel $Gx]$Gy"
+	grid [text .dfg.list -yscrollcommand {.dfg.sb set}] \
+	     [scrollbar .dfg.sb -orient vertical -command {.dfg.list yview}] -sticky news
+	grid [button .dfg.ok -text OK -command "$canvas delete distanceTracer; destroy .dfg"]
+	grid columnconfigure .dfg 0 -weight 1
+	grid rowconfigure .dfg 0 -weight 1
+	set namelen [string length "TARGET"]
+
+	foreach target [array names MOBdata] {
+		set centerdist($target) [DistanceToTarget3D $Gx $Gy $z_ft $target]
+		set dimension($target) [expr [dict get $MOBdata($target) Elev] == $z_ft ? {{2D}} : {{3D}}]
+		set name($target) [dict get $MOBdata($target) Name]
+		lassign [set nearest($target) [NearestCreatureGridToPoint $Gx $Gy $z_ft $target]] neardist nearX nearY nearLbl
+		$canvas create line {*}[GridXYToCenterPoint $Gx $Gy] {*}[lrange [MOBCenterPoint $target] 0 1] \
+			-fill yellow -width 5 -tags distanceTracer -arrow last -arrowshape [list 15 18 8]
+		$canvas create rect [expr $nearX*$iscale] [expr $nearY*$iscale] [expr ($nearX+1)*$iscale] [expr ($nearY+1)*$iscale] \
+			-outline yellow -width 5 -tags distanceTracer
+		set namelen [expr max($namelen, [string length $name($target)])]
+	}
+
+	.dfg.list insert end [format "%-${namelen}s CENTER-TO-CENTER NEAREST-GRID\n" TARGET]
+
+	foreach target [lsort -real -command "SortByValue centerdist" [array names centerdist]] {
+		.dfg.list insert end [format "%-${namelen}s %3dsq %3dft (%s) %3dsq %3dft %s\n" \
+			$name($target) $centerdist($target) [expr $centerdist($target)*5] $dimension($target)\
+			[lindex $nearest($target) 0] [expr [lindex $nearest($target) 0]*5] [lindex $nearest($target) 3]]
+	}
+}
+
+proc SortByValue {arrname i j} {
+	upvar $arrname a
+	return [expr $a($i) - $a($j)]
+}
+
+
+proc DistanceFromMob {MobID} {
+	global MOBdata canvas
+	global iscale
+	lassign [MOBCenterPoint $MobID] MobX MobY MobR
+	lassign [ScreenXYToGridXY $MobX $MobY -exact] Cx Cy
+	set z_ft [dict get $MOBdata($MobID) Elev]
+	set MGx0 [expr ($MobX-$MobR)/$iscale]
+	set MGx1 [expr ($MobX+$MobR)/$iscale]
+	set MGy0 [expr ($MobY-$MobR)/$iscale]
+	set MGy1 [expr ($MobY+$MobR)/$iscale]
+
+	create_dialog .dfg
+	wm title .dfg "Distance from [dict get $MOBdata($MobID) Name]"
+	grid [text .dfg.list -yscrollcommand {.dfg.sb set}] \
+	     [scrollbar .dfg.sb -orient vertical -command {.dfg.list yview}] -sticky news
+	grid [button .dfg.ok -text OK -command "$canvas delete distanceTracer; destroy .dfg"]
+	grid columnconfigure .dfg 0 -weight 1
+	grid rowconfigure .dfg 0 -weight 1
+	set namelen [string length "TARGET"]
+
+	foreach target [array names MOBdata] {
+		if {$target eq $MobID} continue
+		
+		# get center-to-center distance
+		set centerdist($target) [DistanceToTarget3D $Cx $Cy $z_ft $target]
+		set dimension($target) [expr [dict get $MOBdata($target) Elev] == $z_ft ? {{2D}} : {{3D}}]
+		set name($target) [dict get $MOBdata($target) Name]
+		set namelen [expr max($namelen, [string length $name($target)])]
+		$canvas create line $MobX $MobY {*}[lrange [MOBCenterPoint $target] 0 1] \
+			-fill yellow -width 5 -tags distanceTracer -arrow last -arrowshape [list 15 18 8]
+
+		# Now iterate over all the grids occupied by this creature to see what the closest distance
+		# is between ANY grid of this creature and ANY grid of the target.
+		set distance -1
+		lassign [MOBCenterPoint $target] Tx Ty Tr
+		set TGx0 [expr ($Tx-$Tr)/$iscale]
+		set TGx1 [expr ($Tx+$Tr)/$iscale]
+		set TGy0 [expr ($Ty-$Tr)/$iscale]
+		set TGy1 [expr ($Ty+$Tr)/$iscale]
+		set Tz_ft [dict get $MOBdata($target) Elev]
+		for {set x $MGx0} {$x < $MGx1} {set x [expr $x + 1.0]} {
+			for {set y $MGy0} {$y < $MGy1} {set y [expr $y + 1.0]} {
+				for {set tx $TGx0} {$tx < $TGx1} {set tx [expr $tx + 1.0]} {
+					for {set ty $TGy0} {$ty < $TGy1} {set ty [expr $ty + 1.0]} {
+						set d [expr round(sqrt(pow($x-$tx,2) + pow($y-$ty,2) + pow(($z_ft/5.0)-($Tz_ft/5.0),2)))]
+#			DebugMarker "Measured Distance" "
+#				global canvas
+#				.dm.text insert end \"distance ($x,$y,$z_ft)-($tx,$ty,$Tz_ft) $d\n\"
+#				\$canvas create line [expr $x*$iscale] [expr $y*$iscale] [expr ($tx)*$iscale] [expr ($ty)*$iscale] -fill green -width 5 -tags DMDM
+#			" "
+#				global canvas
+#				\$canvas delete DMDM
+#			"
+
+						if {$distance < 0 || $d < $distance} {
+							set distance [expr int($d)]
+							set nearX [expr int($x)]
+							set nearY [expr int($y)]
+							set nearTX [expr int($tx)]
+							set nearTY [expr int($ty)]
+						}
+					}
+				}
+			}
+		}
+		if {$distance < 0} {
+			DEBUG 0 "Unable to calculate the distance between $MobID and $target"
+		} else {
+			set nearest($target) [list $distance $nearTX $nearTY "[LetterLabel $nearTX]$nearTY"]
+			$canvas create rect [expr $nearX*$iscale] [expr $nearY*$iscale] \
+				            [expr ($nearX+1)*$iscale] [expr ($nearY+1)*$iscale] \
+					    -outline yellow -width 5 -tags distanceTracer
+
+			$canvas create rect [expr $nearTX*$iscale] [expr $nearTY*$iscale] \
+				            [expr ($nearTX+1)*$iscale] [expr ($nearTY+1)*$iscale] \
+					    -outline yellow -width 5 -tags distanceTracer
+		}
+	}
+
+	.dfg.list insert end [format "%-${namelen}s CENTER-TO-CENTER NEAREST-GRID\n" TARGET]
+
+	foreach target [lsort -real -command "SortByValue centerdist" [array names centerdist]] {
+		.dfg.list insert end [format "%-${namelen}s %3dsq %3dft (%s) %3dsq %3dft %s\n" \
+			$name($target) $centerdist($target) [expr $centerdist($target)*5] $dimension($target)\
+			[lindex $nearest($target) 0] [expr [lindex $nearest($target) 0]*5] [lindex $nearest($target) 3]]
+	}
 }
 
 proc DistanceAlongRoute {coordlist} {
@@ -7612,14 +7837,17 @@ proc CreateSizeSubMenu {args} {
 		{T t} Tiny
 		{S s} Small
 		{M m} Medium
+		{M20 m20} {Medium (20-ft reach)}
 		l {Large (long)}
 		L {Large (tall)}
+		{L0 l0} {Large (no reach)}
 		h {Huge (long)}
 		H {Huge (tall)}
 		g {Gargantuan (long)}
 		G {Gargantuan (tall)}
 		c {Colossal (long)}
 		C {Colossal (tall)}
+		C80 {80-ft (tall)}
 	} {
 		if {[MobStateList $mob_list Size $size_code]} {
 			$mid add command -command [list $cmd $mob_list [lindex $size_code 0]] -label $size_name -foreground #ff0000
@@ -7634,9 +7862,13 @@ proc DoContext {x y} {
 	global MOB_X MOB_Y canvas MOBdata
 	set MOB_X $x
 	set MOB_Y $y
+	lassign [ScreenXYToGridXY $x $y -exact] Gx Gy
 
 	set mob_list [lsort -unique -command MobNameComparison [concat [ScreenXYToMOBID $canvas $x $y] [GetSelectionList]]]
 	DEBUG 3 "DoContext mob_list $mob_list from [ScreenXYToMOBID $canvas $x $y] + [GetSelectionList]"
+
+	.contextMenu delete 13
+	.contextMenu insert 13 command -command "DistanceFromGrid $x $y 0" -label "Distance from [LetterLabel $Gx]$Gy"
 
 	if {[llength $mob_list] == 0} {
 		.contextMenu delete 0
@@ -7659,6 +7891,10 @@ proc DoContext {x y} {
 		.contextMenu insert 10 command -command "" -label "Set Elevation" -state disabled
 		.contextMenu delete 11
 		.contextMenu insert 11 command -command "" -label "Set Movement Mode" -state disabled
+		.contextMenu delete 14
+		.contextMenu insert 14 command -command "" -label "Distance from..." -state disabled
+		.contextMenu delete 16
+		.contextMenu insert 16 command -command "" -label "Toggle Selection" -state disabled
 	} elseif {[llength $mob_list] == 1} {
 		set mob_id [lindex $mob_list 0]
 		set mob_name [dict get $MOBdata($mob_id) Name]
@@ -7682,6 +7918,10 @@ proc DoContext {x y} {
 		.contextMenu insert 10 cascade -menu [CreateElevationSubMenu -shallow $mob_id] -label "Set Elevation for $mob_name"
 		.contextMenu delete 11
 		.contextMenu insert 11 cascade -menu [CreateMovementModeSubMenu -shallow $mob_id] -label "Set Movement Mode for $mob_name"
+		.contextMenu delete 14
+		.contextMenu insert 14 command -command "DistanceFromMob $mob_id" -label "Distance from $mob_name..."
+		.contextMenu delete 16
+		.contextMenu insert 16 command -command "ToggleSelection $mob_id" -label "Toggle Selection for $mob_name"
 	} else {
 		.contextMenu.del delete 0 end
 		.contextMenu.kill delete 0 end
@@ -7693,6 +7933,8 @@ proc DoContext {x y} {
 		.contextMenu.cond delete 0 end
 		.contextMenu.elev delete 0 end
 		.contextMenu.mmode delete 0 end
+		.contextMenu.dist delete 0 end
+		.contextMenu.tsel delete 0 end
 		foreach mob_id $mob_list {
 			set mob_name [dict get $MOBdata($mob_id) Name]
 			.contextMenu.del add command -command "RemovePerson $mob_id; ::gmaproto::clear $mob_id" -label $mob_name
@@ -7705,6 +7947,8 @@ proc DoContext {x y} {
 			.contextMenu.tag add cascade -menu [CreateTagSubMenu -deep $mob_id] -label $mob_name
 			.contextMenu.elev add cascade -menu [CreateElevationSubMenu -deep $mob_id] -label $mob_name
 			.contextMenu.mmode add cascade -menu [CreateMovementModeSubMenu -deep $mob_id] -label $mob_name
+			.contextMenu.dist add command -command "DistanceFromMob $mob_id" -label $mob_name
+			.contextMenu.tsel add command -command "ToggleSelection $mob_id" -label $mob_name
 		}
 		.contextMenu.del add command -command "RemoveAll $mob_list" -label "(all of the above)"
 		.contextMenu.kill add command -command "KillAll $mob_list" -label "(all of the above)"
@@ -7734,6 +7978,10 @@ proc DoContext {x y} {
 		.contextMenu insert 10 cascade -menu .contextMenu.elev -label "Set Elevation"
 		.contextMenu delete 11
 		.contextMenu insert 11 cascade -menu .contextMenu.mmode -label "Set Movement Mode"
+		.contextMenu delete 14
+		.contextMenu insert 14 cascade -menu .contextMenu.dist -label "Distance From..."
+		.contextMenu delete 16
+		.contextMenu insert 16 cascade -menu .contextMenu.tsel -label "Toggle Selection for"
 	}
 
 	set wx [expr [winfo rootx $canvas] + $x]
@@ -7759,26 +8007,32 @@ menu .contextMenu.tag -tearoff 0
 menu .contextMenu.cond -tearoff 0
 menu .contextMenu.elev -tearoff 0
 menu .contextMenu.mmode -tearoff 0
+menu .contextMenu.dist -tearoff 0
+menu .contextMenu.tsel -tearoff 0
 #menu .addPlayerMenu
-.contextMenu add command -command "" -label Remove -state disabled							;# 0
+.contextMenu add command -command "" -label Remove -state disabled					;# 0
 .contextMenu add command -command {AddPlayerMenu player} -label {Add Player...}				;# 1
 .contextMenu add command -command {AddPlayerMenu monster} -label {Add Monster...}			;# 2
-.contextMenu add command -command "" -label {Toggle Death} -state disabled					;# 3
-.contextMenu add command -command "" -label {Cycle Reach} -state disabled					;# 4
+.contextMenu add command -command "" -label {Toggle Death} -state disabled				;# 3
+.contextMenu add command -command "" -label {Cycle Reach} -state disabled				;# 4
 .contextMenu add command -command "" -label {Toggle Spell Area} -state disabled				;# 5
-.contextMenu add command -command "" -label {Polymorph} -state disabled						;# 6
-.contextMenu add command -command "" -label {Change Size} -state disabled					;# 7
+.contextMenu add command -command "" -label {Polymorph} -state disabled					;# 6
+.contextMenu add command -command "" -label {Change Size} -state disabled				;# 7
 .contextMenu add command -command "" -label {Toggle Condition} -state disabled				;# 8 
-.contextMenu add command -command "" -label {Tag} -state disabled							;# 9 
-.contextMenu add command -command "" -label {Elevation} -state disabled						;# 10
-.contextMenu add command -command "" -label {Movement Mode} -state disabled					;# 11
-.contextMenu add separator																	;# 12
-.contextMenu add command -command "ClearSelection" -label {Deselect All} -state disabled	;# 13
-.contextMenu add command -command "FindNearby" -label {Scroll to Visible Objects}			;# 14
-.contextMenu add command -command "SyncView" -label {Scroll Others' Views to Match Mine}	;# 15
-.contextMenu add command -command "refreshScreen" -label {Refresh Display}					;# 16
-.contextMenu add command -command "aboutMapper" -label {About Mapper...}					;# 17
-.contextMenu add separator																	;# 18
+.contextMenu add command -command "" -label {Tag} -state disabled					;# 9 
+.contextMenu add command -command "" -label {Elevation} -state disabled					;# 10
+.contextMenu add command -command "" -label {Movement Mode} -state disabled				;# 11
+.contextMenu add separator										;# 12
+.contextMenu add command -command "" -label {Distance from...} -state disabled		 		;# 13 NEW
+.contextMenu add command -command "" -label {Distance from...} -state disabled				;# 14 NEW
+.contextMenu add separator										;# 15 NEW
+.contextMenu add command -command "" -label {Toggle Selection} -state disabled				;# 16 NEW
+.contextMenu add command -command "ClearSelection" -label {Deselect All} -state disabled		;# 17, was 13
+.contextMenu add command -command "FindNearby" -label {Scroll to Visible Objects}			;# 18, was 14
+.contextMenu add command -command "SyncView" -label {Scroll Others' Views to Match Mine}		;# 19, was 15
+.contextMenu add command -command "refreshScreen" -label {Refresh Display}				;# 20, was 16
+.contextMenu add command -command "aboutMapper" -label {About Mapper...}				;# 21, was 17
+.contextMenu add separator										;# 22, was 18
 
 # AddPlayer name color ?area? ?size? ?id?  defaults to 1x1, generated ID
 proc AddPlayer {name color args} {
