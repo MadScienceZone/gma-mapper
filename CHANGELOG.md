@@ -19,6 +19,11 @@
    * Instead of each server command being a TCL list of parameters, the parameters are now sent as JSON-encoded objects.
    * A legacy compatibility mode is included, which allows the mapper to connect to an older server running protocol version 333. The mapper will translate incoming and outgoing data from its internal JSON-based format to the legacy protocol 333 when talking to an old server.
 
+## Added
+* You can now right-click on a creature token or a grid square to calculate the distance from that point to all creature tokens.
+  * If measuring from a grid, it measures from the center of the grid to the center of each creature and to the nearest grid center occupied by each creature.
+  * If measuring from a creature, it measures from the center of the creature to the center of each other creature as well as finding the shortest distance between *any* grid occupied by the referenced creature to *any* grid occupied by each target.
+
 # 3.44.0
 ## Enhancements
 * Enlarged arrowheads for line objects so they're more visible.
