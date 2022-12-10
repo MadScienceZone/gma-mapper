@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___       _______      __                  #
-# (  ____ \(       )(  ___  ) Game         /   )     (  __   )    /  \                 #
-# | (    \/| () () || (   ) | Master's    / /) |     | (  )  |    \/) )                #
-# | |      | || || || (___) | Assistant  / (_) (_    | | /   |      | |                #
-# | | ____ | |(_)| ||  ___  |           (____   _)   | (/ /) |      | |                #
-# | | \_  )| |   | || (   ) |                ) (     |   / | |      | |                #
-# | (___) || )   ( || )   ( | Mapper         | |   _ |  (__) | _  __) (_               #
-# (_______)|/     \||/     \| Client         (_)  (_)(_______)(_) \____/               #
+#  _______  _______  _______                ___       _______     _______              #
+# (  ____ \(       )(  ___  ) Game         /   )     (  __   )   / ___   )             #
+# | (    \/| () () || (   ) | Master's    / /) |     | (  )  |   \/   )  |             #
+# | |      | || || || (___) | Assistant  / (_) (_    | | /   |       /   )             #
+# | | ____ | |(_)| ||  ___  |           (____   _)   | (/ /) |     _/   /              #
+# | | \_  )| |   | || (   ) |                ) (     |   / | |    /   _/               #
+# | (___) || )   ( || )   ( | Mapper         | |   _ |  (__) | _ (   (__/\             #
+# (_______)|/     \||/     \| Client         (_)  (_)(_______)(_)\_______/             #
 #                                                                                      #
 ########################################################################################
 #
@@ -81,7 +81,7 @@ namespace eval ::gmafile {
 		POLY     {Spline f Join i ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		RECT     {ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		SAOE     {AoEShape i ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
-		TEXT     {Text s Font {o {Family s Size f Weight i Slant i Anchor i}} ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
+		TEXT     {Text s Font {o {Family s Size f Weight i Slant i}} Anchor i ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		TILE     {Image s BBHeight f BBWidth f ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		PRESET   {Name s Description s DieRollSpec s}
 	}

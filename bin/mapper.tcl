@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       _______      __                  #
-# (  ____ \(       )(  ___  ) Game         /   )     (  __   )    /  \                 #
-# | (    \/| () () || (   ) | Master's    / /) |     | (  )  |    \/) )                #
-# | |      | || || || (___) | Assistant  / (_) (_    | | /   |      | |                #
-# | | ____ | |(_)| ||  ___  |           (____   _)   | (/ /) |      | |                #
-# | | \_  )| |   | || (   ) |                ) (     |   / | |      | |                #
-# | (___) || )   ( || )   ( | Mapper         | |   _ |  (__) | _  __) (_               #
-# (_______)|/     \||/     \| Client         (_)  (_)(_______)(_) \____/               #
+#  _______  _______  _______                ___       _______     _______              #
+# (  ____ \(       )(  ___  ) Game         /   )     (  __   )   / ___   )             #
+# | (    \/| () () || (   ) | Master's    / /) |     | (  )  |   \/   )  |             #
+# | |      | || || || (___) | Assistant  / (_) (_    | | /   |       /   )             #
+# | | ____ | |(_)| ||  ___  |           (____   _)   | (/ /) |     _/   /              #
+# | | \_  )| |   | || (   ) |                ) (     |   / | |    /   _/               #
+# | (___) || )   ( || )   ( | Mapper         | |   _ |  (__) | _ (   (__/\             #
+# (_______)|/     \||/     \| Client         (_)  (_)(_______)(_)\_______/             #
 #                                                                                      #
 ########################################################################################
 #
@@ -53,7 +53,7 @@
 # @[52]@| defect of the software.
 #
 # Auto-configure values
-set GMAMapperVersion {4.0.1}     ;# @@##@@
+set GMAMapperVersion {4.0.2}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
 set GMAMapperProtocol {400}         ;# @@##@@
 set GMAVersionNumber {4.6.0}            ;# @@##@@
@@ -4670,7 +4670,7 @@ proc StartObj {w x y} {
 		tile {
 			set OBJtype($OBJ_CURRENT) tile
 			set OBJdata($OBJ_CURRENT) [::gmaproto::new_dict LS-TILE ID $OBJ_CURRENT \
-				X [expr [SnapCoord $x / $zoom] Y [SnapCoord $y / $zoom] Z $z \
+				X [expr [SnapCoord $x] / $zoom] Y [expr [SnapCoord $y] / $zoom] Z $z \
 				Layer $layer \
 			]
 
@@ -8705,7 +8705,7 @@ proc MoveObjUnderMouse {w x y} {
 	set cx [$w canvasx $x]
 	set cy [$w canvasy $y]
 	set candidates {}
-	global ClockDisplay MO_disp MO_last_obj OBJdata
+	global ClockDisplay MO_disp MO_last_obj OBJdata OBJtype
 	set MO_disp $ClockDisplay
 
 	foreach element [$w find overlapping [expr $cx-2] [expr $cy-2] [expr $cx+2] [expr $cy+2]] {
