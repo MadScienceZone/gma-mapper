@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___       _______      __                  #
-# (  ____ \(       )(  ___  ) Game         /   )     (  __   )    /  \                 #
-# | (    \/| () () || (   ) | Master's    / /) |     | (  )  |    \/) )                #
-# | |      | || || || (___) | Assistant  / (_) (_    | | /   |      | |                #
-# | | ____ | |(_)| ||  ___  |           (____   _)   | (/ /) |      | |                #
-# | | \_  )| |   | || (   ) |                ) (     |   / | |      | |                #
-# | (___) || )   ( || )   ( | Mapper         | |   _ |  (__) | _  __) (_               #
-# (_______)|/     \||/     \| Client         (_)  (_)(_______)(_) \____/               #
+#  _______  _______  _______                ___       _______     _______              #
+# (  ____ \(       )(  ___  ) Game         /   )     (  __   )   / ___   )             #
+# | (    \/| () () || (   ) | Master's    / /) |     | (  )  |   \/   )  |             #
+# | |      | || || || (___) | Assistant  / (_) (_    | | /   |       /   )             #
+# | | ____ | |(_)| ||  ___  |           (____   _)   | (/ /) |     _/   /              #
+# | | \_  )| |   | || (   ) |                ) (     |   / | |    /   _/               #
+# | (___) || )   ( || )   ( | Mapper         | |   _ |  (__) | _ (   (__/\             #
+# (_______)|/     \||/     \| Client         (_)  (_)(_______)(_)\_______/             #
 #                                                                                      #
 ########################################################################################
 #
@@ -226,6 +226,10 @@ namespace eval ::gmaproto {
 		MoveMode {land burrow climb fly swim} \
 	    CreatureType {unknown monster player} \
 	]
+}
+
+proc ::gmaproto::is_enabled {} {
+	return [expr {$::gmaproto::host} ne {{}}]
 }
 
 proc ::gmaproto::is_connected {} {
@@ -903,6 +907,11 @@ proc ::gmaproto::_backport_message {new_message} {
 }
 
 proc ::gmaproto::_raw_send {message} {
+	if {![::gmaproto::is_enabled]} {
+		::DEBUG 1 "server not configured; not sending \"$message\""
+		return
+	}
+
 	if {$::gmaproto::legacy} {
 		set messages [::gmaproto::_backport_message $message]
 	} else {
