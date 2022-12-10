@@ -2445,7 +2445,7 @@ proc loadfile {file args} {
 					}
 				}
 				MAP {
-					set map_id [dict get $element_data File]
+					set map_id [dict get $d File]
 					DEBUG 2 "Defining map file $map_id"
 					if [catch {
 						set cache_filename [fetch_map_file $map_id]
