@@ -39,9 +39,10 @@ designation.
 The JSON-formatted
 .I object
 data must either be completely contained on one line, or be continued
-over multiple following lines, all of which must be indented by at least
-one space or tab, except for the final closing \*(lq}\*(rq which must be on
-a line by itself (not indented).
+over multiple following lines, all of which SHOULD be indented by at least
+one space or tab. A line MUST NOT begin with the character \[Fo] unless it is the start of a new
+record or the EOF marker (i.e., this character in the first position on a line marks the start of
+a new record).
 .LP
 The delimiter characters \[Fo] and \[Fc] are Unicode codepoints U+AB and U+BB respectively.
 .LP

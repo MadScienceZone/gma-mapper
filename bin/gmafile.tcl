@@ -411,9 +411,11 @@ proc ::gmafile::upgrade_elements {filedata} {
 		set obj_type $OldObjs(TYPE:$obj_id)
 
 		switch -exact -- $obj_type {
-			arc - circ {
+			arc {
 				default_arr OldObjs $obj_id -value 0 START EXTENT
 				default_arr OldObjs $obj_id ARCMODE
+			}
+			circ {
 			}
 			line {
 				default_arr OldObjs $obj_id ARROW
@@ -426,7 +428,7 @@ proc ::gmafile::upgrade_elements {filedata} {
 			}
 			saoe {
 				require_arr OldObjs $obj_id AOESHAPE
-				default_arr OldObjs $obj_id ARCMODE START EXTENT
+#				default_arr OldObjs $obj_id ARCMODE START EXTENT
 			}
 			text {
 				require_arr OldObjs $obj_id TEXT FONT
