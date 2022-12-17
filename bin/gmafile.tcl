@@ -584,8 +584,6 @@ proc ::gmafile::default_arr {aname id args} {
 proc ::gmafile::save_dice_presets_to_file {f objlist} {
 	puts $f "__DICE__:$::gmafile::dice_version"
 	lassign $objlist meta presets
-	DEBUG 0 "saving to $f: $objlist"
-	DEBUG 0 "meta=$meta, presets=$presets"
 	if {![dict exists $meta Timestamp]} {
 		set now [clock seconds]
 		dict set meta Timestamp $now 
@@ -597,8 +595,6 @@ proc ::gmafile::save_dice_presets_to_file {f objlist} {
 	::json::write indented true
 	puts $f "\u00ab__META__\u00bb [::gmaproto::_encode_payload $meta $::gmafile::_data_payload(__DMETA__)]"
 	foreach r $presets {
-		DEBUG 0 "saving preset $r"
-		DEBUG 0 "$f \"\u00abPRESET\u00bb [::gmaproto::_encode_payload $r $::gmafile::_data_payload(PRESET)]\""
 		puts $f "\u00abPRESET\u00bb [::gmaproto::_encode_payload $r $::gmafile::_data_payload(PRESET)]"
 	}
 	puts $f "\u00ab__EOF__\u00bb"
@@ -685,13 +681,15 @@ proc ::gmafile::load_dice_presets_from_file {f} {
 }
 
 proc ::gmafile::load_legacy_preset_file {f vid oldmeta} {
-	set meta [dict create FileVersion $vid]
+	set meta [dict create FileVersion $vid Comment {} DateTime {} Timestamp 0]
 	set plist {}
 
 	if {[llength $oldmeta] > 0} {
 		dict set meta Timestamp [lindex $oldmeta 0]
 		if {[llength $oldmeta] > 1} {
 			dict set meta DateTime [lindex $oldmeta 1]
+		} else {
+			dict set meta DateTime [clock format [lindex $oldmeta 0] -format "%d-%b-%Y %H:%M:%S"]
 		}
 	}
 
