@@ -9146,7 +9146,7 @@ proc DoCommandIL {d} {}
 proc DoCommandAC {d} {
 	# Add character to the menu
 	global PC_IDs
-	::gmautil::dassign $d Name name ObjID id Color color Area area Size size
+	::gmautil::dassign $d Name name ID id Color color Area area Size size
 	set creature_name [AcceptCreatureImageName $name]
 	if {[info exists PC_IDs($creature_name)]} {
 		if {$PC_IDs($creature_name) ne $id} {

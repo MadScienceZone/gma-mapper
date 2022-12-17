@@ -155,8 +155,9 @@ namespace eval ::gmaproto {
 		update_status_marker      DSM
 		update_turn               I
 	}
+		#AC      {Name s ObjID s Color s Area s Size s}
 	array set _message_payload {
-		AC      {Name s ObjID s Color s Area s Size s}
+		AC      {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l Elev i Color s Note s Size s Area s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i}
 		ACCEPT  {Messages l}
 		AI      {Name s Sizes {a {File s ImageData b IsLocalFile ? Zoom f}}}
 		AI?	{Name s Sizes {a {Zoom f}}}
@@ -167,7 +168,7 @@ namespace eval ::gmaproto {
 		CLR     {ObjID s}
 		CLR@    {File s IsLocalFile ?}
 		CO      {Enabled ?}
-		CONN    {PeerList {a {Addr s User s Client s LastPolo f IsAuthenticated ? IsMe ? IsMain ? IsWriteOnly ?}}}
+		CONN    {PeerList {a {Addr s User s Client s LastPolo f IsAuthenticated ? IsMe ?}}}
 		CS      {Absolute f Relative f}
 		D       {Recipients l ToAll ? ToGM ? RollSpec s}
 		DD      {For s Presets {a {Name s Description s DieRollSpec s}}}
@@ -848,8 +849,6 @@ proc ::gmaproto::_backport_message {new_message} {
 		}
 		MARK	{ set nparams [list [dict get $params X] [dict get $params Y]] }
 		POLO	{ }
-		NO	{ }
-		NO+	{ }
 		OA	{ 
 			set kvlist {}
 			dict for {k v} [dict get $params NewAttrs] {
@@ -1361,11 +1360,7 @@ proc ::gmaproto::update_status_marker {condition shape color desc} {
 }
 
 proc ::gmaproto::write_only {is_main} {
-	if {$is_main} {
-		::gmaproto::_protocol_send NO+
-	} else {
-		::gmaproto::_protocol_send NO
-	}
+	# deprecated function
 }
 
 proc ::gmaproto::subscribe {msg_list} {
@@ -1511,7 +1506,7 @@ proc ::gmaproto::_repackage_legacy_packet {cmd params} {
 		AC {
 			# AC name id color area size
 			::gmautil::rdist 5 5 AC $params n i c a s
-			return [list "AC {\"Name\":[json::write string $n],\"ObjID\":[json::write string $i],\"Color\":[json::write string $c],\"Area\":[json::write string $a],\"Size\":[json::write string $s]}"]
+			return [list "AC {\"Name\":[json::write string $n],\"ID\":[json::write string $i],\"Color\":[json::write string $c],\"Area\":[json::write string $a],\"Size\":[json::write string $s]}"]
 		}
 		AI {
 			# AI name size
@@ -1768,7 +1763,7 @@ proc ::gmaproto::_repackage_legacy_packet {cmd params} {
 		}
 		CONN: {
 			# CONN: i you|peer addr user client auth? pri? w/o? polo
-			::gmautil::rdist 9 9 CONN: $params i who a u c au pr wo po
+			::gmautil::rdist 7 9 CONN: $params i who a u c au pr wo po
 			::gmaproto::_continue_stream CONN [dict create Data $params] $params -lappend
 		}
 		CONN. {
@@ -1780,9 +1775,9 @@ proc ::gmaproto::_repackage_legacy_packet {cmd params} {
 			set clist {}
 			foreach c [dict get $sdata Data] {
 				puts $c
-				lassign $c i who a u c au pr wo po
+				lassign $c i who a u c au pr
 				puts $i
-				lappend clist "{\"Addr\":[json::write string $a],\"User\":[json::write string $u],\"Client\":[json::write string $c],\"LastPolo\":$po,\"IsAuthenticated\":[::gmaproto::json_bool $au],\"IsMe\":[::gmaproto::json_bool [expr {$who} eq {{you}}]],\"IsMain\":[::gmaproto::json_bool $pr],\"IsWriteOnly\":[::gmaproto::json_bool $wo]}"
+				lappend clist "{\"Addr\":[json::write string $a],\"User\":[json::write string $u],\"Client\":[json::write string $c],\"LastPolo\":$po,\"IsAuthenticated\":[::gmaproto::json_bool $au],\"IsMe\":[::gmaproto::json_bool [expr {$who} eq {{you}}]]}"
 			}
 
 			return [list "CONN {\"PeerList\":\[[join $clist ,]\]}"]
@@ -1907,10 +1902,10 @@ proc ::gmaproto::_login {} {
 								::gmaproto::DEBUG "Updated mapper version [dict get $inst Version] available (OS=[dict get $inst OS], Arch=[dict get $inst Arch], Token=[dict get $inst Token])"
 								::gmaproto::DEBUG "This version is more specific than the one I found before, switching to it instead."
 								set update_ready $inst
-							} else {
-								::gmaproto::DEBUG "Updated mapper version [dict get $inst Version] available (OS=[dict get $inst OS], Arch=[dict get $inst Arch], Token=[dict get $inst Token])"
-								set update_ready $inst
 							}
+						} elseif {$update_ready eq {}} {
+							::gmaproto::DEBUG "Updated mapper version [dict get $inst Version] available (OS=[dict get $inst OS], Arch=[dict get $inst Arch], Token=[dict get $inst Token])"
+							set update_ready $inst
 						}
 					}
 				}

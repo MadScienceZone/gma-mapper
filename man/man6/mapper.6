@@ -1,4 +1,5 @@
-.\" *** 332 ***
+'\" t
+'\" *** 332 ***
 '\" <<ital-is-var>>
 '\" <<bold-is-fixed>>
 .TH MAPPER 6 "GMA Toolkit 4.6.0" 09-Dec-2022 "Games" \" @@mp@@
@@ -1554,7 +1555,9 @@ map clients update themselves accordingly.  If the mapper receives
 the command from the service, it should comply to make the
 corresponding change to itself.
 .LP
-The software MUST allow Unicode text encoded as UTF-8
+The software 
+.B MUST 
+allow Unicode text encoded as UTF-8
 everywhere (of which 7-bit ASCII is a subset).
 .LP
 Each command (sent or received) consists of a command word
@@ -1570,37 +1573,35 @@ an appropriate \*(lqzero\*(rq value (i.e., empty string, zero numeric
 value, empty list, boolean false, etc.). Any fields which are not expected are silently
 ignored.
 .LP
-JSON field names are matched case-sensitively. A client MAY match names
-regardless of case but MUST emit them as documented here.
+JSON field names are matched case-sensitively. A client 
+.B MAY 
+match names
+regardless of case but 
+.B MUST 
+emit them as documented here.
 .LP
 Field values are strings unless otherwise noted.
-'\".LP
-'\"Each command must be a properly-formed TCL list value (in simplest
-'\"terms, a space-separated list of elements with curly braces surrounding
-'\"elements with embedded spaces; braces must be balanced).  The first
-'\"element of the list determines the request being made, and therefore
-'\"the meaning of the other elements of the list.
 .LP
 Unless otherwise noted, there is no response expected from
 these commands. Even where a response is expected, it will be
-asynchronously sent. In any case the client SHOULD NOT wait for a server
+asynchronously sent. In any case the client 
+.B "SHOULD NOT"
+wait for a server
 response before considering its request to be completed. As a special
-case, a client MAY be implemented to wait synchronously for a server
+case, a client 
+.B MAY 
+be implemented to wait synchronously for a server
 response during the authentication negotiation stage.
 .LP
 This describes protocol version 400. These notes are intended to be 
 detailed enough to implement a client from and should be considered
-the definitive reference to the protocol.
-'\".LP
-'\"See also the documentation of the map file format in
-'\".BR mapper (5)
-'\"which defines some of the data items referenced here.
-'\".LP
-'\"Where boolean values are indicated, clients SHOULD use 0 for false and 1 for true,
-'\"but MAY accept any non-zero value as true.
+the definitive standard reference to the protocol.
 .LP
 In the protocol command descriptions,
+'\" <<TeX>>
+'\" {\ttfamily fixed-width}
 .B BOLD
+'\" <</TeX>>
 text indicates literal text to be sent as-is,
 .I Italics
 indicate a parameter whose value should appear in place of the name shown, and
@@ -1619,7 +1620,8 @@ and/or
 commands, then send an 
 .B OK
 command to indicate to the client its protocol version and to issue an
-authentication challenge (if configured to authenticate). It is RECOMMENDED
+authentication challenge (if configured to authenticate). It is 
+.B RECOMMENDED
 that the initial greeting be limited only to comments, waiting until after authentication
 to send anything more specific about your game.
 .LP
@@ -1631,13 +1633,17 @@ command if it is required to authenticate. The server will respond with
 .B GRANTED
 or
 .B DENIED
-and then MAY issue more of the initial greeting commands listed above.
+and then 
+.B MAY 
+issue more of the initial greeting commands listed above.
 .LP
 Finally, the server will issue a
 .B READY
 command to the client and begin normal interaction with the client.
 .LP
-The server MUST NOT send the
+The server 
+.B "MUST NOT"
+send the
 .BR AC ,
 .BR DENIED ,
 .BR GRANTED ,
@@ -1654,6 +1660,87 @@ Clients MUST NOT send the
 command after receiving the server's
 .B READY
 signal.
+.SS "Command Summary"
+.LP
+The messages sent by clients and servers is summarized in the following table
+and then explained in detail in the following paragraphs.
+In the table, Message is the standard message name recommended for identifier names
+in source code, Command is the string actually sent over the network, C\[<>]S indicates
+whether the message is only sent from client to server, only from server to client, or
+if it could be sent in either direction. Priv indicates if the command may only be
+sent by a client authenticated as the GM.
+Note that Reply indicates the command which
+.B SHOULD
+(eventually) arrive in response, but no guarantee is made as to if or when that happens
+since all communications are asynchronous.
+.LP
+.TS
+center;
+lB lB cB lB lB lB lB
+lfC lfC c lfC c c l.
+Message	Command	C\[<>]S	Reply	Priv	Payload	Description
+Accept	ACCEPT	C\[->]S	\fR\(em\fP	no	JSON	Subscribe to a set of messages
+AddCharacter	AC	C\[<-]S	\fR\(em\fP	N/A	JSON	Add primary PC to party
+AddDicePresets	DD+	C\[->]S	DD=	no	JSON	Add presets to user's set
+AddImage	AI	C\[<>]S	\fR\(em\fP	no	JSON	Add image to client's known set
+AddObjAttributes	OA+	C\[<>]S	\fR\(em\fP	no	JSON	Add values to an attribute
+AdjustView	AV	C\[<>]S	\fR\(em\fP	no	JSON	Scroll clients' views
+Allow	ALLOW	C\[->]S	\fR\(em\fP	no	JSON	Indicate supported features
+Auth	AUTH	C\[->]S	GRANTED	no	JSON	Authenticate to server
+Challenge	OK	C\[<-]S	AUTH	N/A	JSON	Ask client to authenticate
+ChatMessage	TO	C\[<>]S	\fR\(em\fP	no	JSON	Send chat message
+Clear	CLR	C\[<>]S	\fR\(em\fP	no	JSON	Remove objects from client
+ClearChat	CC	C\[<>]S	\fR\(em\fP	no	JSON	Clear the chat history
+ClearFrom	CLR@	C\[<>]S	\fR\(em\fP	no	JSON	Remove elements from a map file
+CombatMode	CO	C\[<>]S	\fR\(em\fP	yes	JSON	Turn on/off combat mode
+Comment	//	C\[<-]S	\fR\(em\fP	no	any	Human-readable comment
+DefineDicePresets	DD	C\[->]S	DD=	no	JSON	Store new presets for user
+Denied	DENIED	C\[<-]S	\fR\(em\fP	N/A	JSON	Server denies access
+FilterDicePresets	DD/	C\[->]S	DD=	no	JSON	Remove some presets for user
+Granted	GRANTED	C\[<-]S	\fR\(em\fP	N/A	JSON	Server grants access
+LoadArcObject	LS-ARC	C\[<>]S	\fR\(em\fP	no	JSON	Add an arc to the map
+LoadCircleObject	LS-CIRC	C\[<>]S	\fR\(em\fP	no	JSON	Add an ellipse to the map
+LoadFrom	L	C\[<>]S	\fR\(em\fP	no	JSON	Load elements from file
+LoadLineObject	LS-LINE	C\[<>]S	\fR\(em\fP	no	JSON	Add a line to the map
+LoadPolygonObject	LS-POLY	C\[<>]S	\fR\(em\fP	no	JSON	Add a polygon to the map
+LoadRectangleObject	LS-RECT	C\[<>]S	\fR\(em\fP	no	JSON	Add a rectangle to the map
+LoadSpellArea\fR-\fP	LS-SAOE	C\[<>]S	\fR\(em\fP	no	JSON	Add an area of effect to the map
+\ OfEffectObject	\^	\^	\^	\^	\^	\^
+LoadTextObject	LS-TEXT	C\[<>]S	\fR\(em\fP	no	JSON	Add some text to the map
+LoadTileObject	LS-TILE	C\[<>]S	\fR\(em\fP	no	JSON	Add a graphic tile to the map
+Marco	MARCO	C\[<-]S	POLO	N/A	none	Check if client is alive
+Mark	MARK	C\[<>]S	\fR\(em\fP	no	JSON	Visually mark a spot
+PlaceSomeone	PS	C\[<>]S	\fR\(em\fP	no	JSON	Place creature token
+Polo	POLO	C\[->]S	\fR\(em\fP	no	none	Acknowledge server's ping
+Priv	PRIV	C\[<-]S	\fR\(em\fP	N/A	JSON	Priveleged command denied
+Protocol	PROTOCOL	C\[<-]S	\fR\(em\fP	N/A	int	Signal protocol version in use
+QueryDicePresets	DR	C\[->]S	DD=	no	none	Request user's presets
+QueryImage	AI?	C\[<>]S	AI	no	JSON	Ask for definition of image
+QueryPeers	/CONN	C\[->]S	CONN	no	none	Request list of peer clients
+Ready	READY	C\[<-]S	\fR\(em\fP	N/A	none	Server sign-on complete
+RemoveObjAttributes	OA-	C\[<>]S	\fR\(em\fP	no	JSON	Remove values from an attribute
+RollDice	D	C\[->]S	ROLL	no	JSON	Initiate a die roll
+RollResult	ROLL	C\[<-]S	\fR\(em\fP	N/A	JSON	Result of a die roll
+Sync	SYNC	C\[->]S	\fRany\fP	no	none	Request replay of commands
+SyncChat	SYNC-CHAT	C\[->]S	CC	no	JSON	Request replay of messages
+\^	\^	\^	ROLL	\^	\^	\^
+\^	\^	\^	TO	\^	\^	\^
+Toolbar	TB	C\[<>]S	\fR\(em\fP	yes	JSON	Turn on/off client toolbar
+UpdateClock	CS	C\[<>]S	\fR\(em\fP	yes	JSON	Change the current time of day
+UpdateDicePresets	DD=	C\[<-]S	\fR\(em\fP	N/A	JSON	Receive user's presets
+UpdateInitiative	IL	C\[<>]S	\fR\(em\fP	yes	JSON	Update the initiative list
+UpdateObjAttributes	OA	C\[<>]S	\fR\(em\fP	no	JSON	Update object attributes
+UpdatePeerList	CONN	C\[<-]S	\fR\(em\fP	N/A	JSON	Notify of all connected peers
+UpdateProgress	PROGRESS	C\[<>]S	\fR\(em\fP	no	JSON	Indicate progress on task
+UpdateStatusMarker	DSM	C\[<>]S	\fR\(em\fP	yes	JSON	Define creature status marker
+UpdateTurn	I	C\[<>]S	\fR\(em\fP	yes	JSON	Indicate turn in combat
+UpdateVersions	UPDATES	C\[<-]S	\fR\(em\fP	N/A	JSON	Advertise software updates
+World	WORLD	C\[<-]S	\fR\(em\fP	N/A	JSON	Campaign world info
+.TE
+.SS "Command Details"
+.LP
+The client/server messages and their parameters are detailed below, ordered by the server
+command string sent or received.
 '\" <<list>>
 .TP 12
 .B //
@@ -1695,49 +1782,51 @@ on the map and ensures that such tokens are given consistent
 .I id
 values rather than generating a random one.
 Clients MUST NOT send this command to each other; it is intended for the server to send to the clients.
-The payload includes the following parameters:
+The payload includes the same fields as the
+.B PS
+command.
 '\" <<desc>>
-.RS
-.TP 8
-.B Name
-The name of the creature as displayed on the map. As with the 
-.B \-c
-option, this has the format
-.RI [ image\fB=\fP ] name
-which allows for creatures whose image names are different than their character name.
-.TP
-.B ObjID
-The fixed ID for this creature. This will be used for internal references to this object on the map.
-.TP
-.B Color
-The color to use when shading in the creature's threatened space when it has initiative to act.
-The
-.I color
-value may be in the form 
-.BI # rgb \fR,\fP
-.BI # rrggbb \fR,\fP
-.BI # rrrgggbbb \fR,\fP
-.BI # rrrrggggbbbb \fR,\fP
-or a color name as defined by the local system. (For example, on a Unix-like system which uses the standard
-.I rgb.txt
-file, a certain shade of blue with 8-bit values for red=0x46, green=0x82, and blue=0xb4, 
-could be specified as 
-.RB \*(lq #4682b4 \*(rq
-or 
-.RB \*(lq "steel blue" \*(rq).
-.TP
-.B Area
-The size of the area threatened by the creature on the map. This can be the number of squares in diameter,
-but more commonly it should be a standard size code such as 
-.RB \*(lq M \*(rq
-for medium-size creatures.
-.TP
-.B Size
-The size occupied by the creature on the map. This can be the number of squares in diameter,
-but more commonly it should be a standard size code such as 
-.RB \*(lq M \*(rq
-for medium-size creatures.
-.RE
+'\".RS
+'\".TP 8
+'\".B Name
+'\"The name of the creature as displayed on the map. As with the 
+'\".B \-c
+'\"option, this has the format
+'\".RI [ image\fB=\fP ] name
+'\"which allows for creatures whose image names are different than their character name.
+'\".TP
+'\".B ObjID
+'\"The fixed ID for this creature. This will be used for internal references to this object on the map.
+'\".TP
+'\".B Color
+'\"The color to use when shading in the creature's threatened space when it has initiative to act.
+'\"The
+'\".I color
+'\"value may be in the form 
+'\".BI # rgb \fR,\fP
+'\".BI # rrggbb \fR,\fP
+'\".BI # rrrgggbbb \fR,\fP
+'\".BI # rrrrggggbbbb \fR,\fP
+'\"or a color name as defined by the local system. (For example, on a Unix-like system which uses the standard
+'\".I rgb.txt
+'\"file, a certain shade of blue with 8-bit values for red=0x46, green=0x82, and blue=0xb4, 
+'\"could be specified as 
+'\".RB \*(lq #4682b4 \*(rq
+'\"or 
+'\".RB \*(lq "steel blue" \*(rq).
+'\".TP
+'\".B Area
+'\"The size of the area threatened by the creature on the map. This can be the number of squares in diameter,
+'\"but more commonly it should be a standard size code such as 
+'\".RB \*(lq M \*(rq
+'\"for medium-size creatures.
+'\".TP
+'\".B Size
+'\"The size occupied by the creature on the map. This can be the number of squares in diameter,
+'\"but more commonly it should be a standard size code such as 
+'\".RB \*(lq M \*(rq
+'\"for medium-size creatures.
+'\".RE
 '\" <</>>
 .TP
 .B ACCEPT
@@ -2203,13 +2292,13 @@ If true, the client successfully negotiated the server's authentication process.
 .TP
 .BI IsMe " (bool)"
 If true, this object describes the client which received this command.
-.TP
-.BI IsMain " (bool)"
-If true, the client is running as the \*(lqmain\*(rq or \*(lqprimary\*(rq
-client.
-.TP
-.BI IsWriteOnly " (bool)"
-If true, the client has requested not to receive most commands from the server.
+'\".TP
+'\".BI IsMain " (bool)"
+'\"If true, the client is running as the \*(lqmain\*(rq or \*(lqprimary\*(rq
+'\"client.
+'\".TP
+'\".BI IsWriteOnly " (bool)"
+'\"If true, the client has requested not to receive most commands from the server.
 '\" <<//>>
 .RE
 '\" <<//>>
@@ -2602,10 +2691,10 @@ which matches all creatures whose names match the regular expression
 The number of hours elapsed since the start of combat.
 .TP
 .BI Minutes " (int)"
-The number of minutes elapsed since the start of combat.
+The number of minutes elapsed since the start of this hour of combat.
 .TP
 .BI Seconds " (int)"
-The number of seconds elapsed since the start of combat.
+The number of seconds elapsed since the start of this minute of combat.
 .TP
 .BI Rounds " (int)"
 The number of rounds elapsed since the start of combat.
