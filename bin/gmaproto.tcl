@@ -184,7 +184,7 @@ namespace eval ::gmaproto {
 		LS-ARC  {ArcMode i Start f Extent f ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		LS-CIRC {ArcMode i Start f Extent f ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		LS-LINE {Arrow i ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
-		LS-POLY {Spline f Join i ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
+		LS-POLY {Spline i Join i ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		LS-RECT {ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		LS-SAOE {AoEShape i ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		LS-TEXT {Text s Font {o {Family s Size f Weight i Slant i}} Anchor i ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
@@ -690,131 +690,123 @@ proc ::gmaproto::_backport_message {new_message} {
 			}
 		}
 		LS-ARC {
-			lappend newlist "LS"
+			set d [::gmaproto::start_stream LS]
 			set id [dict get $params ID]
 			foreach attr {X Y Z Line Fill Width Layer Level Group Hidden Locked
 				      Start Extent} {
-				lappend newlist [list LS: [list [string toupper $attr]:$id [dict get $params $attr]]]
+
+				::gmaproto::continue_stream d LS: [list [string toupper $attr]:$id [dict get $params $attr]]
 			}
-			lappend newlist [list LS: [list DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]]
+			::gmaproto::continue_stream d LS: [list DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]
+
 			set plist {}
 			foreach v [dict get $params Points] {
 				lappend plist [dict get $v X]
 				lappend plist [dict get $v Y]
 			}
-			lappend newlist [list LS: [list POINTS:$id $plist]]
-
-			lappend newlist [list LS: [list ARCMODE:$id [::gmaproto::from_enum ArcMode [dict get $params ArcMode]]]]
-			lappend newlist [list LS: [list TYPE:$id arc]]
-			lappend newlist [list LS. 17 {}]
+			::gmaproto::continue_stream d LS: [list POINTS:$id $plist]
+			::gmaproto::continue_stream d LS: [list ARCMODE:$id [::gmaproto::from_enum ArcMode [dict get $params ArcMode]]]
+			::gmaproto::continue_stream d LS: [list TYPE:$id arc]
+			set newlist [::gmaproto::end_stream d LS.]
 		}
 		LS-CIRC {
-			lappend newlist "LS"
+			set d [::gmaproto::start_stream LS]
 			set id [dict get $params ID]
-			foreach attr {X Y Z Line Fill Width Layer Level Group Hidden Locked
-				      Start Extent} {
-				lappend newlist [list LS: [list [string toupper $attr]:$id [dict get $params $attr]]]
+			foreach attr {X Y Z Line Fill Width Layer Level Group Hidden Locked Start Extent} {
+				::gmaproto::continue_stream d LS: [list [string toupper $attr]:$id [dict get $params $attr]]
 			}
-			lappend newlist [list LS: [list DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]]
+			::gmaproto::continue_stream d LS: [list DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]
 			set plist {}
 			foreach v [dict get $params Points] {
 				lappend plist [dict get $v X]
 				lappend plist [dict get $v Y]
 			}
-			lappend newlist [list LS: [list POINTS:$id $plist]]
-
-			lappend newlist [list LS: [list ARCMODE:$id [::gmaproto::from_enum ArcMode [dict get $params ArcMode]]]]
-			lappend newlist [list LS: [list TYPE:$id circ]]
-			lappend newlist [list LS. 17 {}]
+			::gmaproto::continue_stream d LS: [list POINTS:$id $plist]
+			::gmaproto::continue_stream d LS: [list TYPE:$id circ]
+			set newlist [::gmaproto::end_stream d LS.]
 		}
 		LS-LINE {
-			lappend newlist LS
+			set d [::gmaproto::start_stream LS]
 			set id [dict get $params ID]
 			foreach attr {X Y Z Line Fill Width Layer Level Group Hidden Locked} {
-				lappend newlist [list LS: [list [string toupper $attr]:$id [dict get $params $attr]]]
+				::gmaproto::continue_stream d LS: [list [string toupper $attr]:$id [dict get $params $attr]]
 			}
-			lappend newlist [list LS: [list DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]]
+			::gmaproto::continue_stream d LS: [list DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]
 			set plist {}
 			foreach v [dict get $params Points] {
 				lappend plist [dict get $v X]
 				lappend plist [dict get $v Y]
 			}
-			lappend newlist [list LS: [list POINTS:$id $plist]]
-
-			lappend newlist [list LS: [list ARROW:$id [::gmaproto::from_enum Arrow [dict get $params Arrow]]]]
-			lappend newlist [list LS: [list TYPE:$id line]]
-			lappend newlist [list LS. 15 {}]
+			::gmaproto::continue_stream d LS: [list POINTS:$id $plist]
+			::gmaproto::continue_stream d LS: [list ARROW:$id [::gmaproto::from_enum Arrow [dict get $params Arrow]]]
+			::gmaproto::continue_stream d LS: [list TYPE:$id line]
+			set newlist [::gmaproto::end_stream d LS.]
 		}
 		LS-POLY {
-			lappend newlist LS
+			set d [::gmaproto::start_stream LS]
 			set id [dict get $params ID]
-			foreach attr {X Y Z Line Fill Width Layer Level Group Hidden Locked
-				      Spline} {
-				lappend newlist [list LS: [list [string toupper $attr]:$id [dict get $params $attr]]]
+			foreach attr {X Y Z Line Fill Width Layer Level Group Hidden Locked Spline} {
+				::gmaproto::continue_stream d LS: [list [string toupper $attr]:$id [dict get $params $attr]]
 			}
-			lappend newlist [list LS: [list DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]]
+			::gmaproto::continue_stream d LS: [list DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]
 			set plist {}
 			foreach v [dict get $params Points] {
 				lappend plist [dict get $v X]
 				lappend plist [dict get $v Y]
 			}
-			lappend newlist [list LS: [list POINTS:$id $plist]]
-
-			lappend newlist [list LS: [list JOIN:$id [::gmaproto::from_enum Join [dict get $params Join]]]]
-			lappend newlist [list LS: [list TYPE:$id poly]]
-			lappend newlist [list LS. 16 {}]
+			::gmaproto::continue_stream d LS: [list POINTS:$id $plist]
+			::gmaproto::continue_stream d LS: [list JOIN:$id [::gmaproto::from_enum Join [dict get $params Join]]]
+			::gmaproto::continue_stream d LS: [list TYPE:$id poly]
+			set newlist [::gmaproto::end_stream d LS.]
 		}
 		LS-RECT {
-			lappend newlist LS
+			set d [::gmaproto::start_stream LS]
 			set id [dict get $params ID]
 			foreach attr {X Y Z Line Fill Width Layer Level Group Hidden Locked} {
-				lappend newlist [list LS: [list [string toupper $attr]:$id [dict get $params $attr]]]
+				::gmaproto::continue_stream d LS: [list [string toupper $attr]:$id [dict get $params $attr]]
 			}
-			lappend newlist [list LS: [list DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]]
+			::gmaproto::continue_stream d LS: [list DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]
 			set plist {}
 			foreach v [dict get $params Points] {
 				lappend plist [dict get $v X]
 				lappend plist [dict get $v Y]
 			}
-			lappend newlist [list LS: [list POINTS:$id $plist]]
-
-			lappend newlist [list LS: [list TYPE:$id poly]]
-			lappend newlist [list LS. 14 {}]
+			::gmaproto::continue_stream d LS: [list POINTS:$id $plist]
+			::gmaproto::continue_stream d LS: [list TYPE:$id rect]
+			set newlist [::gmaproto::end_stream d LS.]
 		}
 		LS-SAOE {
-			lappend newlist LS
+			set d [::gmaproto::start_stream LS]
 			set id [dict get $params ID]
 			foreach attr {X Y Z Line Fill Width Layer Level Group Hidden Locked} {
-				lappend newlist [list LS: [list [string toupper $attr]:$id [dict get $params $attr]]]
+				::gmaproto::continue_stream d LS: [list [string toupper $attr]:$id [dict get $params $attr]]
 			}
-			lappend newlist [list LS: [list DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]]
+			::gmaproto::continue_stream d LS: [list DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]
 			set plist {}
 			foreach v [dict get $params Points] {
 				lappend plist [dict get $v X]
 				lappend plist [dict get $v Y]
 			}
-			lappend newlist [list LS: [list POINTS:$id $plist]]
-
-			lappend newlist [list LS: [list AOESHAPE:$id [::gmaproto::from_enum AoEShape [dict get $params AoEShape]]]]
-			lappend newlist [list LS: [list TYPE:$id poly]]
-			lappend newlist [list LS. 15 {}]
+			::gmaproto::continue_stream d LS: [list POINTS:$id $plist]
+			::gmaproto::continue_stream d LS: [list AOESHAPE:$id [::gmaproto::from_enum AoEShape [dict get $params AoEShape]]]
+			::gmaproto::continue_stream d LS: [list TYPE:$id aoe]
+			set newlist [::gmaproto::end_stream d LS.]
 		}
 		LS-TEXT {
-			lappend newlist LS
+			set d [::gmaproto::start_stream LS]
 			set id [dict get $params ID]
 			foreach attr {X Y Z Line Fill Width Layer Level Group Hidden Locked
 				     Text} {
-				lappend newlist [list LS: [list [string toupper $attr]:$id [dict get $params $attr]]]
+				::gmaproto::continue_stream d LS: [list [string toupper $attr]:$id [dict get $params $attr]]
 			}
-			lappend newlist [list LS: [list DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]]
+			::gmaproto::continue_stream d LS: [list DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]
 			set plist {}
 			foreach v [dict get $params Points] {
 				lappend plist [dict get $v X]
 				lappend plist [dict get $v Y]
 			}
-			lappend newlist [list LS: [list POINTS:$id $plist]]
-
-			lappend newlist [list LS: [list ANCHOR:$id [::gmaproto::from_enum Anchor [dict get $params Anchor]]]]
+			::gmaproto::continue_stream d LS: [list POINTS:$id $plist]
+			::gmaproto::continue_stream d LS: [list ANCHOR:$id [::gmaproto::from_enum Anchor [dict get $params Anchor]]]
 			set fontspec [list [dict get $params Font Family] [dict get $params Font Size]]
 			if {[dict get $params Font Weight] == 1} {
 				lappend fontspec bold
@@ -824,27 +816,25 @@ proc ::gmaproto::_backport_message {new_message} {
 			} else {
 				lappend fontspec roman
 			}
-			lappend newlist [list LS: [list FONT:$id $fontspec]]
-			lappend newlist [list LS: [list TYPE:$id text]]
-			lappend newlist [list LS. 17 {}]
+			::gmaproto::continue_stream d LS: [list FONT:$id $fontspec]
+			::gmaproto::continue_stream d LS: [list TYPE:$id text]
+			set newlist [::gmaproto::end_stream d LS.]
 		}
 		LS-TILE {
-			lappend newlist LS
+			set d [::gmaproto::start_stream LS]
 			set id [dict get $params ID]
-			foreach attr {X Y Z Line Fill Width Layer Level Group Hidden Locked
-				     Image BBHeight BBWidth} {
-				lappend newlist [list LS: [list [string toupper $attr]:$id [dict get $params $attr]]]
+			foreach attr {X Y Z Line Fill Width Layer Level Group Hidden Locked Image BBHeight BBWidth} {
+				::gmaproto::continue_stream d LS: [list [string toupper $attr]:$id [dict get $params $attr]]
 			}
-			lappend newlist [list LS: [list DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]]
+			::gmaproto::continue_stream d LS: [list DASH:$id [::gmaproto::from_enum Dash [dict get $params Dash]]]
 			set plist {}
 			foreach v [dict get $params Points] {
 				lappend plist [dict get $v X]
 				lappend plist [dict get $v Y]
 			}
-			lappend newlist [list LS: [list POINTS:$id $plist]]
-
-			lappend newlist [list LS: [list TYPE:$id tile]]
-			lappend newlist [list LS. 17 {}]
+			::gmaproto::continue_stream d LS: [list POINTS:$id $plist]
+			::gmaproto::continue_stream d LS: [list TYPE:$id tile]
+			set newlist [::gmaproto::end_stream d LS.]
 		}
 		MARK	{ set nparams [list [dict get $params X] [dict get $params Y]] }
 		POLO	{ }
@@ -1444,23 +1434,24 @@ proc ::gmaproto::_read_poll {} {
 		set res [list "" ""]
 		if [catch {
 			set message [::gmautil::lpop ::gmaproto::recv_buffer 0]
-			if {[llength $message] == 0} {
-				return $res
-			}
-			set cmd [lindex $message 0]
-			set params [lrange $message 1 end]
-			set json [::gmaproto::_repackage_legacy_packet $cmd $params]
-			if {[llength $json] == 0} {
-				::gmaproto::DEBUG "translated to nothing"
-				return [list "" ""]
-			}
-			foreach j $json {
-				::gmaproto::DEBUG "translated to $j"
-				if {[lindex [set translated_j [::gmaproto::_parse_data_packet $j]] 0] ne {NIL}} {
-					lappend ::gmaproto::poll_buffer $translated_j
+			if {[llength $message] > 0} {
+				set cmd [lindex $message 0]
+				set params [lrange $message 1 end]
+				set json [::gmaproto::_repackage_legacy_packet $cmd $params]
+				if {[llength $json] == 0} {
+					::gmaproto::DEBUG "translated to nothing"
+				} else {
+					foreach j $json {
+						::gmaproto::DEBUG "translated to $j"
+						if {[lindex [set translated_j [::gmaproto::_parse_data_packet $j]] 0] ne {NIL}} {
+							lappend ::gmaproto::poll_buffer $translated_j
+						}
+					}
+					if {[llength ${::gmaproto::poll_buffer}] > 0} {
+						set res [::gmautil::lpop ::gmaproto::poll_buffer 0]
+					}
 				}
 			}
-			set res [::gmautil::lpop ::gmaproto::poll_buffer 0]
 		} err] {
 			::gmaproto::DEBUG "ERROR parsing received string \"$message\": $err"
 		}
@@ -1516,7 +1507,7 @@ proc ::gmaproto::_repackage_legacy_packet {cmd params} {
 		AI {
 			# AI name size
 			::gmautil::rdist 2 2 AI $params n s
-			::gmaproto::_start_stream AI [dict create Name $n Size $s]
+			::gmaproto::_start_stream AI [dict create Name $n Size $s Data {}]
 		}
 		AI: {
 			# AI: data
@@ -1590,7 +1581,7 @@ proc ::gmaproto::_repackage_legacy_packet {cmd params} {
 		}
 		DD= {
 			# DD=
-			::gmaproto::_start_stream DD {}
+			::gmaproto::_start_stream DD [dict create Data {}] 
 		}
 		DD: {
 			# DD: pos name desc dice
@@ -1640,12 +1631,13 @@ proc ::gmaproto::_repackage_legacy_packet {cmd params} {
 			return [list "L {\"File\":[json::write string $f],\"IsLocalFile\":true}"]
 		}
 		LS {
-			::gmaproto::_start_stream LS {}
+			::gmaproto::_start_stream LS [dict create Data {}]
 		}
 		LS: {
 			# LS: data
 			::gmautil::rdist 1 1 LS: $params d
-			::gmaproto::_continue_stream LS [dict create Data $d] $params -lappend
+			::DEBUG 0 "($params) -> $d cs($params)"
+			::gmaproto::_continue_stream LS [dict create Data $d] $d -lappend
 		}
 		LS. {
 			# LS. count checksum
@@ -1764,7 +1756,7 @@ proc ::gmaproto::_repackage_legacy_packet {cmd params} {
 		}
 		CONN {
 			# CONN
-			::gmaproto::_start_stream CONN {}
+			::gmaproto::_start_stream CONN [dict create Data {}]
 		}
 		CONN: {
 			# CONN: i you|peer addr user client auth? pri? w/o? polo
@@ -1957,6 +1949,21 @@ proc ::gmaproto::_background_poll {} {
 	}
 }
 
+# list functions with included checksums for legacy streams
+proc ::gmaproto::start_stream {initcmd} {
+	return [dict create Checksum [::sha2::SHA256Init] StreamData [list $initcmd]]
+}
+proc ::gmaproto::continue_stream {dictname contcmd data} {
+	upvar 1 $dictname d
+	::sha2::SHA256Update [dict get $d Checksum] $data
+	dict lappend d StreamData [list $contcmd $data]
+}
+proc ::gmaproto::end_stream {dictname endcmd} {
+	upvar 1 $dictname d
+	dict lappend d StreamData [list $endcmd [expr [llength [dict get $d StreamData]] - 1] [::base64::encode [::sha2::SHA256Final [dict get $d Checksum]]]]
+	return [dict get $d StreamData]
+}
+
 proc ::gmaproto::auth_response {challenge} {
 	if {[catch {
 		binary scan $challenge S passes
@@ -2051,7 +2058,7 @@ proc ::gmaproto::_end_stream {cmd expected_len expected_cs} {
 	}
 	if {$expected_cs != {} && [::base64::encode $digest] != $expected_cs} {
 		::DEBUG 0 "Stream rejected for $cmd; checksum error"
-		error "$cmd stream rejected (checksum)"
+		error "$cmd stream rejected (checksum) ($expected_cs) != ([::base64::encode $digest])"
 	}
 	return $::gmaproto::stream_dict
 }
