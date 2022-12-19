@@ -62,17 +62,21 @@ File metadata. The JSON object may contain the following fields:
 .BI Timestamp " (int)"
 Modificaion time as a number of seconds from the epoch.
 .TP
-.BI DateTime
+.B DateTime
 The modification time as a human-readable string value in any form.
 (Software always uses the
 .I Timestamp
 field; this is only for the convenience of human readers.)
 .TP
-.BI Comment
+.B Comment
 Random comments about the file.
 .TP
-.BI Location
+.B Location
 The name or description of the location described by the file.
+.TP
+.BI FileVersion " (int)"
+When a file is read, this field is populated with the input file's format version number.
+It is ignored if present when writing a map file.
 .RE
 .TP
 .BI \[Fo] element_type \[Fc]
