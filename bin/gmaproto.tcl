@@ -130,6 +130,7 @@ namespace eval ::gmaproto {
 		clear_from                CLR@
 		combat_mode               CO
 		comment                   //
+		echo                      ECHO
 		load_from                 L
 		load_arc                  LS-ARC
 		load_circle               LS-CIRC
@@ -178,6 +179,7 @@ namespace eval ::gmaproto {
 		DENIED  {Reason s}
 		DR      {}
 		DSM     {Condition s Shape s Color s Description s}
+		ECHO    {s s i i o d}
 		GRANTED {User s}
 		I       {ActorID s Hours i Minutes i Seconds i Rounds i Count i}
 		IL      {InitiativeList {a {Slot i CurrentHP i Name s IsHolding ? HasReadiedAction ? IsFlatFooted ?}}}

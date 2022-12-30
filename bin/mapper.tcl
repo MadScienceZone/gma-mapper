@@ -621,6 +621,10 @@ proc default_style_data {} {
 	}
 	if $dark_mode {
 		append default_styles {
+			bg_dialog black
+			fg_dialog_heading cyan
+			fg_dialog_normal white
+			fg_dialog_highlight yellow
 			fg_best       #aaaaaa
 			fg_bonus      #fffb00
 			fg_comment    #fffb00
@@ -650,6 +654,10 @@ proc default_style_data {} {
 		}
 	} else {
 		append default_styles {
+			bg_dialog white
+			fg_dialog_heading blue
+			fg_dialog_normal black
+			fg_dialog_highlight red
 			bg_fullresult blue
 			fg_fullresult #ffffff
 			fg_best       #888888
@@ -7338,18 +7346,19 @@ proc FeetToPixels {ft} {
 proc DistanceFromGrid {x y z_ft} {
 	global MOBdata canvas
 	global iscale
+	global display_styles
 	lassign [ScreenXYToGridXY $x $y -exact] Gx Gy
 
 	create_dialog .dfg
 	wm title .dfg "Distance from grid point [LetterLabel $Gx]$Gy"
-	grid [text .dfg.list -yscrollcommand {.dfg.sb set} -bg black] \
+	grid [text .dfg.list -background $display_styles(bg_dialog) -yscrollcommand {.dfg.sb set}] \
 	     [scrollbar .dfg.sb -orient vertical -command {.dfg.list yview}] -sticky news
 	grid [button .dfg.ok -text OK -command "$canvas delete distanceTracer; destroy .dfg"]
 	grid columnconfigure .dfg 0 -weight 1
 	grid rowconfigure .dfg 0 -weight 1
-	.dfg.list tag configure key -foreground yellow
-	.dfg.list tag configure normal -foreground white
-	.dfg.list tag configure title -foreground cyan
+	.dfg.list tag configure key -foreground $display_styles(fg_dialog_highlight)
+	.dfg.list tag configure normal -foreground $display_styles(fg_dialog_normal)
+	.dfg.list tag configure title -foreground $display_styles(fg_dialog_heading)
 	set namelen [string length "TARGET"]
 
 	foreach target [array names MOBdata] {
@@ -7384,6 +7393,7 @@ proc SortByValue {arrname i j} {
 proc DistanceFromMob {MobID} {
 	global MOBdata canvas
 	global iscale
+	global display_styles
 	lassign [MOBCenterPoint $MobID] MobX MobY MobR
 	set Cx [expr int($MobX/$iscale)]
 	set Cy [expr int($MobY/$iscale)]
@@ -7395,14 +7405,14 @@ proc DistanceFromMob {MobID} {
 
 	create_dialog .dfg
 	wm title .dfg "Distance from [dict get $MOBdata($MobID) Name]"
-	grid [text .dfg.list -yscrollcommand {.dfg.sb set}] \
+	grid [text .dfg.list -background $display_styles(bg_dialog) -yscrollcommand {.dfg.sb set}] \
 	     [scrollbar .dfg.sb -orient vertical -command {.dfg.list yview}] -sticky news
 	grid [button .dfg.ok -text OK -command "$canvas delete distanceTracer; destroy .dfg"]
 	grid columnconfigure .dfg 0 -weight 1
 	grid rowconfigure .dfg 0 -weight 1
-	.dfg.list tag configure key -foreground yellow
-	.dfg.list tag configure normal -foreground white
-	.dfg.list tag configure title -foreground cyan
+	.dfg.list tag configure key -foreground $display_styles(fg_dialog_highlight)
+	.dfg.list tag configure normal -foreground $display_styles(fg_dialog_normal)
+	.dfg.list tag configure title -foreground $display_styles(fg_dialog_heading)
 	set namelen [string length "TARGET"]
 
 	foreach target [array names MOBdata] {
@@ -9260,20 +9270,16 @@ proc DoCommandCONN {d} {
 			DEBUG 1 "Correcting my local username to $local_user per server request"
 		}
 		if {[dict get $peer IsAuthenticated]} {
-			if {![dict get $peer IsWriteOnly]} {
-				if {$peer_user ne {} && $peer_user ne {None}} {
-					# we check for "None" because of the behavior of the Python server (sigh)
-					if {$peer_user ne $local_user} {
-						lappend PeerList $peer_user
-						DEBUG 3 "Peerlist=$PeerList"
-					} else {
-						DEBUG 2 "Excluding $peer (this is my username)"
-					}
+			if {$peer_user ne {} && $peer_user ne {None}} {
+				# we check for "None" because of the behavior of the Python server (sigh)
+				if {$peer_user ne $local_user} {
+					lappend PeerList $peer_user
+					DEBUG 3 "Peerlist=$PeerList"
 				} else {
-					DEBUG 2 "Excluding $peer (no username given)"
+					DEBUG 2 "Excluding $peer (this is my username)"
 				}
 			} else {
-				DEBUG 2 "Excluding $peer (client not listening)"
+				DEBUG 2 "Excluding $peer (no username given)"
 			}
 		} else {
 			DEBUG 2 "Excluding $peer (not authenticated)"

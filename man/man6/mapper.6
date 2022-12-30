@@ -2188,7 +2188,7 @@ otherwise it SHOULD indicate the action to the user.
 If 0 or missing, clear all messages in the history. Otherwise, if positive, clear all
 messages with 
 .I messageID
-greater than the
+less than the
 .I target
 value. If negative, clear all but the most recent
 .RI \- target
@@ -2311,10 +2311,10 @@ The JSON payload includes the following fields:
 .RS
 .TP
 .BI Absolute " (float)"
-The absolute time on the GMA world clock (in seconds since the epoch).
+The absolute time on the GMA world clock (in tenths of seconds since the epoch).
 .TP
 .BI Relative " (float)"
-The elapsed time on the GMA world clock (in seconds since the GM set a
+The elapsed time on the GMA world clock (in tenths of seconds since the GM set a
 reference point, e.g., the start of combat).
 .TP
 .BI Running " (bool)"
@@ -2345,6 +2345,8 @@ Not even the requester will see the result of the roll, only the GM will.
 .TP
 .BI RollSpec
 The die-roll specification, like \*(lqd20+12\*(rq or \*(lq6d6 fire\*(rq.
+If this field is empty, the previous die-roll from this client is repeated,
+or \*(lq1d20\*(rq if there was no previous one.
 '\" <</>>
 .RE
 .TP
@@ -2654,6 +2656,26 @@ A description of the effects on the character of having that condition
 applied. This is intended to be shown to players (for example,
 if they hover their mouse over an affected creature token).
 '\" <</>>
+.RE
+.TP
+.B ECHO
+Ask that the server send this message back to you. This may be used
+for synchronization since it indicates to the client when the server
+got to this request amongst the others it received. The following
+fields may be populated:
+.RS
+.TP 10
+.B s
+An arbitrary string value.
+.TP
+.BI "i " (int)
+An arbitrary integer value.
+.TP
+.BI "b " (bool)
+An arbitrary boolean value.
+.TP
+.BI "o " (object)
+An arbitrary set of key/value pairs, with each value having any type.
 .RE
 .TP
 .B GRANTED
