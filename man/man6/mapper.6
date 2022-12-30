@@ -2,7 +2,7 @@
 '\" *** 332 ***
 '\" <<ital-is-var>>
 '\" <<bold-is-fixed>>
-.TH MAPPER 6 "GMA Toolkit 5.0.0" 17-Dec-2022 "Games" \" @@mp@@
+.TH MAPPER 6 "GMA Toolkit 5.0.0-alpha" 29-Dec-2022 "Games" \" @@mp@@
 .SH NAME
 mapper \- GMA battle grid map
 .SH SYNOPSIS
@@ -2310,10 +2310,10 @@ The JSON payload includes the following fields:
 '\" <<desc>>
 .RS
 .TP
-.BI Absolute " (float)"
+.BI Absolute " (int64)"
 The absolute time on the GMA world clock (in tenths of seconds since the epoch).
 .TP
-.BI Relative " (float)"
+.BI Relative " (int64)"
 The elapsed time on the GMA world clock (in tenths of seconds since the GM set a
 reference point, e.g., the start of combat).
 .TP
