@@ -277,7 +277,7 @@ proc say {msg} {
 }
 
 #
-# We now accept image:name wherever a creature name could be input.
+# We now accept image=name wherever a creature name could be input.
 # to facilitate this, the following functions will take an input creature
 # name, and:
 #	SplitCreatureImageName:  return a list of two elements: bare name and
