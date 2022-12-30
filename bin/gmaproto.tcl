@@ -1962,6 +1962,7 @@ proc ::gmaproto::end_stream {dictname endcmd} {
 }
 
 proc ::gmaproto::auth_response {challenge} {
+	global ::tcl_platform
 	if {[catch {
 		binary scan $challenge S passes
 		set passes [expr $passes & 0xffff]
