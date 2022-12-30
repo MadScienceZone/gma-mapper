@@ -476,19 +476,19 @@ proc ::gmautil::rdist {minargs maxargs cmd arglist args} {
 #   linux, freebsd, darwin, windows
 #   amd64
 proc ::gmautil::my_os {} {
-    switch $tcl_platform(os) {
+    switch $::tcl_platform(os) {
         Darwin  { return darwin }
         Linux   { return linux }
         FreeBSD { return freebsd }
     }
-    return $tcl_platform(os)
+    return $::tcl_platform(os)
 }
 
 proc ::gmautil::my_arch {} {
-    switch $tcl_platform(machine) {
+    switch $::tcl_platform(machine) {
         x86_64  { return amd64 }
     }
-    return $tcl_platform(machine)
+    return $::tcl_platform(machine)
 }
 
 # export the keys of a dictionary to local variables 
