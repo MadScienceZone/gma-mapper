@@ -53,7 +53,7 @@
 # @[52]@| defect of the software.
 #
 # Auto-configure values
-set GMAMapperVersion {4.0.5-alpha.1}     ;# @@##@@
+set GMAMapperVersion {4.0.5-alpha.2}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
 set GMAMapperProtocol {400}         ;# @@##@@
 set GMAVersionNumber {5.0.0-alpha}            ;# @@##@@
@@ -2330,9 +2330,10 @@ proc loadfile {file args} {
 	set mergep false
 	set sendp true
 	set forcep false
+	set sendflag {-send}
 	if {[lsearch -exact $args -force] >= 0} { set forcep true }
 	if {[lsearch -exact $args -merge] >= 0} { set mergep true }
-	if {[lsearch -exact $args -nosend] >= 0} { set sendp false }
+	if {[lsearch -exact $args -nosend] >= 0} { set sendp false; set sendflag {} }
 
 	set LastFileComment {}
 	if {$OBJ_MODIFIED && !$mergep && !$forcep && [tk_messageBox \
@@ -2401,8 +2402,11 @@ proc loadfile {file args} {
 	set ClockDisplay "Loading [dict get $meta_data Location]..."
 	update
 
+	set progress_id [begin_progress * "Loading map data" [llength $record_data] $sendflag]
+	set progress_i 0
 	if [catch {
 		foreach record $record_data {
+			update_progress $progress_id [incr progress_i] [llength $record_data] $sendflag
 			lassign $record element_type d
 			switch -exact -- $element_type {
 				IMG {
@@ -2489,6 +2493,7 @@ proc loadfile {file args} {
 				}
 			}
 		}
+		end_progress $progress_id $sendflag
 	} err] {
 		say "Failed to import data: $err"
 		return
