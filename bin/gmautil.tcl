@@ -163,6 +163,38 @@ proc ::gmautil::version_compare {v1 v2} {
 	if {$v1 eq $v2} {
 		return 0
 	}
+	if {![regexp {^([^+-]+)([^-]+)?(?:-(.+))?$} $v1 _ v1base v1build v1pre]} {
+		error "version $v1 does not conform to semver standard"
+	}
+	if {![regexp {^([^+-]+)([^-]+)?(?:-(.+))?$} $v2 _ v2base v2build v2pre]} {
+		error "version $v2 does not conform to semver standard"
+	}
+	set cmp [::gmautil::_vc $v1base $v2base]
+	puts "($v1base)($v1build)($v1pre)"
+	puts "($v2base)($v2build)($v2pre)"
+	puts "$cmp"
+	if {$cmp == 0} {
+		# the base versions are the same. In this case the one without a prerelease
+		# string is older, or we just compare prerelease strings
+		if {$v1pre eq {} && $v2pre eq {}} {
+			puts "no pre tags"
+			return 0
+		}
+		if {$v1pre eq {}} {
+			puts "v1 no tag"
+			return 1
+		}
+		if {$v2pre eq {}} {
+			puts "v2 no tag"
+			return -1
+		}
+		puts "comparing $v1pre vs $v2pre"
+		return [::gmautil::_vc $v1pre $v2pre]
+	}
+	return $cmp
+}
+
+proc ::gmautil::_vc {v1 v2} {
 	set l1 [split $v1 .]
 	set l2 [split $v2 .]
 	while {[llength $l2] != [llength $l1]} {
@@ -175,7 +207,10 @@ proc ::gmautil::version_compare {v1 v2} {
 
 	for {set i 0} {$i < [llength $l1]} {incr i} {
 		if {[lindex $l1 $i] != [lindex $l2 $i]} {
-			return [expr [lindex $l1 $i] - [lindex $l2 $i]]
+			if {[lindex $l1 $i] < [lindex $l2 $i]} {
+				return -1
+			}
+			return 1
 		}
 	}
 	return 0
