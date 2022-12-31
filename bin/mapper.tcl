@@ -7651,7 +7651,7 @@ proc CreateMovementModeSubMenu {args} {
 	catch {$mid delete 0 end; destroy $mid}
 	menu $mid -tearoff 0
 	foreach {value label} {{} Land burrow Burrow climb Climb fly Fly swim Swim} {
-		if [MobState $mob_list MoveMode $value] {
+		if [MobState $mob_list MoveMode [::gmaproto::to_enum MoveMode $value]] {
 			$mid add command -command [list $cmd $mob_list $value] -label $label -foreground #ff0000
 		} else {
 			$mid add command -command [list $cmd $mob_list $value] -label $label
@@ -7693,7 +7693,7 @@ proc CreateElevationSubMenu {args} {
 	catch {$mid delete 0 end; destroy $mid}
 	menu $mid
 	foreach {value label} {0 (Ground) +30 +30 +20 +20 +10 +10 +5 +5 -5 -5 -10 -10 -20 -20 -30 -30 -40 -40 -60 -60} {
-		if [MobState $mob_list Elev $value] {
+		if {$value == 0 && [MobState $mob_list Elev $value]} {
 			$mid add command -command [list $cmd $mob_list $value] -label $label -foreground #ff0000
 		} else {
 			$mid add command -command [list $cmd $mob_list $value] -label $label
@@ -9148,6 +9148,13 @@ proc DoCommandOA    {d} { SetObjectAttribute [dict get $d ObjID] [dict get $d Ne
 proc DoCommandOA+   {d} { AddToObjectAttribute [dict get $d ObjID] [dict get $d AttrName] [dict get $d Values]; RefreshGrid 0; RefreshMOBs }
 proc DoCommandOA-   {d} { RemoveFromObjectAttribute [dict get $d ObjID] [dict get $d AttrName] [dict get $d Values]; RefreshGrid 0; RefreshMOBs }
 proc DoCommandTB    {d} { global MasterClient; if {!$MasterClient} {toolBarState [dict get $d Enabled]} }
+
+proc DoCommandPRIV {d} {
+	tk_messageBox -type ok -icon error -title "Permission Denied" \
+		-message "You are not allowed to send command \"[dict get $d Command]\" to the server. ([dict get $d Reason])" \
+		-detail "The operation you attempted to carry out which sent the command shown here is only allowed for privileged users, and in the words of Chevy Chase, \"you're not.\""
+}
+
 
 # ignored commands
 proc DoCommandCS {d} {}
@@ -12105,6 +12112,32 @@ proc connectToServer {} {
 proc WaitForConnectToServer {} {
 	connectToServer
 }
+#
+#
+# hack to try waiting long enough for our windows to appear on-screen
+# after which we can look at them to see if the system has dark mode
+# engaged and has influenced them. Then we adjust a few of our custom
+# colors to ones that are more compatible with that.
+#
+# The --dark option causes this to happen immediately so we avoid this
+# silliness and race condition.
+#
+if {! $dark_mode } {
+	after 500 {
+		if [catch {
+			set dark_mode [tk::unsupported::MacWindowStyle isdark .]
+		}] {
+			set dark_mode 0 
+		}
+		if $dark_mode {
+			.toolbar2.clock configure -foreground white
+			refreshScreen
+		}
+		LoadDefaultStyles
+	}
+} else {
+	LoadDefaultStyles
+}
 
 report_progress "Connecting to server..."
 if {$IThost ne {}} {
@@ -12180,31 +12213,6 @@ proc SelectFont {canvas args} {
 	}
 }
 
-#
-# hack to try waiting long enough for our windows to appear on-screen
-# after which we can look at them to see if the system has dark mode
-# engaged and has influenced them. Then we adjust a few of our custom
-# colors to ones that are more compatible with that.
-#
-# The --dark option causes this to happen immediately so we avoid this
-# silliness and race condition.
-#
-if {! $dark_mode } {
-	after 1000 {
-		if [catch {
-			set dark_mode [tk::unsupported::MacWindowStyle isdark .]
-		}] {
-			set dark_mode 0 
-		}
-		if $dark_mode {
-			.toolbar2.clock configure -foreground white
-			refreshScreen
-		}
-		LoadDefaultStyles
-	}
-} else {
-	LoadDefaultStyles
-}
 
 #
 # functions that perform one-time operations and then exit
