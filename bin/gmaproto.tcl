@@ -170,7 +170,7 @@ namespace eval ::gmaproto {
 		CLR@    {File s IsLocalFile ?}
 		CO      {Enabled ?}
 		CONN    {PeerList {a {Addr s User s Client s LastPolo f IsAuthenticated ? IsMe ?}}}
-		CS      {Absolute f Relative f}
+		CS      {Absolute f Relative f Running ?}
 		D       {Recipients l ToAll ? ToGM ? RollSpec s}
 		DD      {For s Presets {a {Name s Description s DieRollSpec s}}}
 		DD+     {For s Presets {a {Name s Description s DieRollSpec s}}}
@@ -319,7 +319,6 @@ proc ::gmaproto::_receive {s} {
 			::gmaproto::background_redial 1
 			return
 		}
-		::gmaproto::DEBUG "still waiting for complete input line"
 		return
 	}
 
@@ -337,11 +336,14 @@ proc ::gmaproto::_receive {s} {
 
 proc ::gmaproto::_dispatch {} {
 	if {$::gmaproto::pending_login} {
+		::DEBUG 1 "_dispatch not taken (pending login)"
 		return
 	}
 	while true {
 		lassign [::gmaproto::_read_poll] cmd params
+		::DEBUG 2 "_dispatch: cmd=($cmd), params=($params)"
 		if {$cmd eq {}} {
+			::DEBUG 2 "_dispatch ends (no more input waiting)"
 			return
 		}
 		if {$cmd eq "//"} {
@@ -449,7 +451,7 @@ proc ::gmaproto::_attribute_encode {k v} {
 		Dash     -
 		Join     -
 		MoveMode -
-		CreatureType { return [::gmaproto::to_enum $k $v] }
+		CreatureType { return $v }
 
 		Dim      -
 		Hidden   -
@@ -1327,8 +1329,8 @@ proc ::gmaproto::toolbar {enabled} {
 	::gmaproto::_protocol_send TB Enabled $enabled
 }
 
-proc ::gmaproto::update_clock {a r} {
-	::gmaproto::_protocol_send CS Absolute $a Relative $r
+proc ::gmaproto::update_clock {a r running} {
+	::gmaproto::_protocol_send CS Absolute $a Relative $r Running $running
 }
 
 proc ::gmaproto::update_obj_attributes {obj_id kvdict} {
@@ -1769,7 +1771,7 @@ proc ::gmaproto::_repackage_legacy_packet {cmd params} {
 			set clist {}
 			foreach c [dict get $sdata Data] {
 				puts $c
-				lassign $c i who a u c au pr
+				lassign $c i who a u c au po
 				puts $i
 				lappend clist "{\"Addr\":[json::write string $a],\"User\":[json::write string $u],\"Client\":[json::write string $c],\"LastPolo\":$po,\"IsAuthenticated\":[::gmaproto::json_bool $au],\"IsMe\":[::gmaproto::json_bool [expr {$who} eq {{you}}]]}"
 			}
