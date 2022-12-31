@@ -473,9 +473,9 @@ proc ::gmafile::upgrade_elements {filedata} {
 				lappend new_filedata [list ARC $element]
 			}
 			circ {
-				dict set element ArcMode [::gmaproto::to_enum ArcMode $OldObjs(ARCMODE:$obj_id)]
-				dict set element Start $OldObjs(START:$obj_id)
-				dict set element Extent $OldObjs(EXTENT:$obj_id)
+#				dict set element ArcMode [::gmaproto::to_enum ArcMode $OldObjs(ARCMODE:$obj_id)]
+#				dict set element Start $OldObjs(START:$obj_id)
+#				dict set element Extent $OldObjs(EXTENT:$obj_id)
 				lappend new_filedata [list CIRC $element]
 			}
 			line {
@@ -494,9 +494,9 @@ proc ::gmafile::upgrade_elements {filedata} {
 				set shape [::gmaproto::to_enum AoEShape $OldObjs(AOESHAPE:$obj_id)]
 				dict set element AoEShape $shape
 				if {$shape == 0 || $shape == 1} {
-					dict set element ArcMode [::gmaproto::to_enum ArcMode $OldObjs(ARCMODE:$obj_id)]
-					dict set element Start $OldObjs(START:$obj_id)
-					dict set element Extent $OldObjs(EXTENT:$obj_id)
+#					dict set element ArcMode [::gmaproto::to_enum ArcMode $OldObjs(ARCMODE:$obj_id)]
+#					dict set element Start $OldObjs(START:$obj_id)
+#					dict set element Extent $OldObjs(EXTENT:$obj_id)
 				}
 						
 				lappend new_filedata [list SAOE $element]

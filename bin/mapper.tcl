@@ -6044,7 +6044,7 @@ array set MarkerDescription {
 	prone       		{Prone: lying on ground. -4 on melee attacks, cannot use ranged weapon except crossbows. +4 AC vs. ranged attacks but -4 AC vs. melee attacks. Standing up is a move-equivalent action that provokes attacks of opportunity.}
 
 	exhausted   		{Exhausted: move 1/2 speed, cannot run or charge, -6 Strength and Dexterity. Change to fatigued after 1 hour of complete rest.}
-	fatigued    		V
+	fatigued    		{Fatigued: can't run or charge, -2 penalty to Strength and Dexterity. Advance to exhausted if doing anything that would normally cause fatigue; Remove after 8 hours of complete rest.}
 	nauseated   		{Nauseated: Cannot attack, cast spells, concentrate on spells, or do anything else requiring attention. Can only take a single move action.}
 	sickened    		{Sickened: -2 on attacks, weapon damage, saving throws, skill checks, ability checks.}
 
