@@ -9441,7 +9441,7 @@ proc DoCommandLS-TILE {d} {DoLS tile $d}
 proc DoLS {t d} {
 	# load map elements (generic handler for all element types)
 	global OBJdata OBJtype
-	DEBUG 0 "Drawing type=$t, data=$d"
+	#DEBUG 0 "Drawing type=$t, data=$d"
 	set OBJdata([dict get $d ID]) $d
 	set OBJtype([dict get $d ID]) $t
 	RefreshGrid false
