@@ -5,8 +5,8 @@
 # | |      | || || || (___) | Assistant  / (_) (_    | | /   |   | (____   _____ | (__ #
 # | | ____ | |(_)| ||  ___  |           (____   _)   | (/ /) |   (_____ \ (_____)|  __ #
 # | | \_  )| |   | || (   ) |                ) (     |   / | |         ) )       | (   #
-# | (___) || )   ( || )   ( | Mapper         | |   _ |  (__) | _ /\____) )       | )   #
-# (_______)|/     \||/     \| Client         (_)  (_)(_______)(_)\______/        |/    #
+# | (___) || )   ( || )   ( | Mapper         | |   _ |  (__) | _ /\____) )       | )__ #
+# (_______)|/     \||/     \| Client         (_)  (_)(_______)(_)\______/        |/ \_ #
 #                                                                                      #
 ########################################################################################
 # version 1.0, 17 July 2020.
@@ -170,25 +170,18 @@ proc ::gmautil::version_compare {v1 v2} {
 		error "version $v2 does not conform to semver standard"
 	}
 	set cmp [::gmautil::_vc $v1base $v2base]
-	puts "($v1base)($v1build)($v1pre)"
-	puts "($v2base)($v2build)($v2pre)"
-	puts "$cmp"
 	if {$cmp == 0} {
 		# the base versions are the same. In this case the one without a prerelease
 		# string is older, or we just compare prerelease strings
 		if {$v1pre eq {} && $v2pre eq {}} {
-			puts "no pre tags"
 			return 0
 		}
 		if {$v1pre eq {}} {
-			puts "v1 no tag"
 			return 1
 		}
 		if {$v2pre eq {}} {
-			puts "v2 no tag"
 			return -1
 		}
-		puts "comparing $v1pre vs $v2pre"
 		return [::gmautil::_vc $v1pre $v2pre]
 	}
 	return $cmp
