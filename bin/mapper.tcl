@@ -53,7 +53,7 @@
 # @[52]@| defect of the software.
 #
 # Auto-configure values
-set GMAMapperVersion {4.0.5-alpha.2}     ;# @@##@@
+set GMAMapperVersion {4.0.5-beta.1}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
 set GMAMapperProtocol {400}         ;# @@##@@
 set GMAVersionNumber {5.0.0-alpha}            ;# @@##@@

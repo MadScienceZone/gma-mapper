@@ -1635,7 +1635,7 @@ proc ::gmaproto::_repackage_legacy_packet {cmd params} {
 		LS: {
 			# LS: data
 			::gmautil::rdist 1 1 LS: $params d
-			::DEBUG 0 "($params) -> $d cs($params)"
+			#::DEBUG 0 "($params) -> $d cs($params)"
 			::gmaproto::_continue_stream LS [dict create Data $d] $d -lappend
 		}
 		LS. {
