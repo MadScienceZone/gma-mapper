@@ -1,13 +1,4 @@
 ![GitHub](https://img.shields.io/github/license/fizban-of-ragnarok/gma-mapper)
-# Important Note
-I don't know how I managed it, but somehow the git history got messed up recently.
-I have repaired the damage and what is on the `main` branch is stable and correct.
-The more recent releases, since v3.42.7, are fine to pull and use as-is.
-
-However, if you have been working on a clone of the repo from earlier than 3.42.7,
-it might be best to just re-clone a fresh copy of the repo at this point and move
-forward from that, in case your clone has weird commit histories in it from the mishap.
-
 # gma-mapper
 Fantasy role-playing battle grid map for use with GMA or standalone.
 
@@ -72,11 +63,17 @@ script can't find it on its own.
 
 ## Versioning
 Until the mapper is rewritten in Python and/or Go, it has its own 3._x_ version
-number. Once it is ported, that will bump its version to 4._x_. We have not yet
-decided whether to keep it in lock-step with the GMA version numbers or remain
-separate.
+number. A new 4.0 version is in the works which represents a breaking change
+in the form of a substantial rewrite of the client to be compatible with our
+new game server protocol 400.
 
 ## Other Software
 Includes Paul Walton's scrollable frame code `sframe.tcl`, available at [http://wiki.tcl.tk/9223]().
 
 Also uses a modified version of [Silk Icons](http://www.famfamfam.com/lab/icons/silk/).
+
+## Game System Neutral
+The GMA software and the gma-mapper client in this repository are intended to be game-system-neutral.
+They are not written for, nor intended for use with, the Dungeons & Dragons game from Wizards of the Coast,
+nor do they rely upon OGL intellectual property. Where any game system was in mind for these tools, it
+was the Pathfinder role-playing game system from Paizo, Inc.
