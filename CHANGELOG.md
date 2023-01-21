@@ -1,10 +1,10 @@
 # Game Master's Assistant / Mapper Client
 # Release Notes
 ## Current Version Information
- * Supported GMA Mapper Version: 4.0.5-beta-alpha.2-alpha.1      <!-- @@##@@ -->
+ * Supported GMA Mapper Version: 4.0.5-beta.2 <!-- @@##@@ -->
  * Supported GMA Mapper File Format: 20	     <!-- @@##@@ -->
  * Supported GMA Mapper Protocol: 400        <!-- @@##@@ -->
- * Effective Date: 31-Dec-2022               <!-- @@##@@ -->
+ * Effective Date: 21-Jan-2023               <!-- @@##@@ -->
 
 # 4.0.0
 ## Changes

@@ -12,7 +12,7 @@
 ########################################################################################
 #
 # GMA Mapper Client with background I/O processing.
-# @[00]@| GMA 5.0.0-alpha
+# @[00]@| GMA 4.7.0
 # @[01]@|
 # @[10]@| Copyright © 1992–2022 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
@@ -53,10 +53,10 @@
 # @[52]@| defect of the software.
 #
 # Auto-configure values
-set GMAMapperVersion {4.0.5-beta.1}     ;# @@##@@
+set GMAMapperVersion {4.0.5-beta.2}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
 set GMAMapperProtocol {400}         ;# @@##@@
-set GMAVersionNumber {5.0.0-alpha}            ;# @@##@@
+set GMAVersionNumber {4.7.0}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
