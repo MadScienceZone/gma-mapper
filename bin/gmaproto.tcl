@@ -843,6 +843,28 @@ proc ::gmaproto::_backport_message {new_message} {
 		}
 		MARK	{ set nparams [list [dict get $params X] [dict get $params Y]] }
 		POLO	{ }
+		PROGRESS {
+			#PROGRESS {OperationID s Title s Value i MaxValue i IsDone ?}
+			#// BEGIN id max|* title
+			#// UPDATE id value newmax
+			#// END id
+			global ::gmaproto::old_progress_meters
+			set meter_id [dict get $params OperationID]
+			set new_max [dict get $params MaxValue]
+			if {$new_max == 0} {
+				set new_max *
+			}
+			if {[dict get $params IsDone]} {
+				lappend newlist [list // END $meter_id]
+				array unset ::gmaproto::old_progress_meters $meter_id
+			} else {
+				if {![info exists ::gmaproto::old_progress_meters($meter_id)]} {
+					set ::gmaproto::old_progress_meters($meter_id) 0
+					lappend newlist [list // BEGIN $meter_id $new_max [dict get $params Title]]
+				} 
+				lappend newlist [list // UPDATE $meter_id [dict get $params Value] $new_max]
+			}
+		}
 		OA	{ 
 			set kvlist {}
 			dict for {k v} [dict get $params NewAttrs] {

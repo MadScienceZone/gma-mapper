@@ -184,7 +184,7 @@ proc update_progress { id value newmax args } {
                     .toolbar2.progbar stop
                     .toolbar2.progbar configure -mode determinate
                 }
-                set progress_data($id:max) $max
+                set progress_data($id:max) $newmax
                 .toolbar2.progbar configure -maximum $newmax
             }
             if {$progress_data($id:max) eq "*"} {
@@ -6063,13 +6063,13 @@ array set MarkerDescription {
 }
 
 
-proc CreatureStatusMarker {w id x y s} {
+proc CreatureStatusMarker {w id x y s calc_condition} {
 	global MOBdata MarkerColor MarkerShape
 	
 	# HEALTH conditions
 	#  normal/{} flat staggered unconscious stable disabled dying
 	# dying: half-slash through the token
-	set conditions {}
+	set conditions $calc_condition
 	if [info exists MOBdata($id)] {
 		if {[dict get $MOBdata($id) Health] ne {}} {
 			if {[set condition [dict get $MOBdata($id) Health Condition]] ne {}} {
@@ -6636,7 +6636,7 @@ proc RenderSomeone {w id} {
 		set bc black
 	}
 
-	CreatureStatusMarker $w $id [expr $x*$iscale] [expr $y*$iscale] [expr $mob_size*$iscale]
+	CreatureStatusMarker $w $id [expr $x*$iscale] [expr $y*$iscale] [expr $mob_size*$iscale] $condition
 	if {$MOB_COMBATMODE} {
 		if {$show_healthbar} {
 			if {$its_dead_jim} {
@@ -11472,7 +11472,7 @@ proc ResolveObjectId_OA {id} {
 }
 
 proc SetObjectAttribute {id kvlist} {
-	global canvas MOB_IMAGE
+	global canvas MOB_IMAGE MOBid MOBdata
 	if {[set idlist [ResolveObjectId_OA $id]] eq {}} {
 		return
 	}
