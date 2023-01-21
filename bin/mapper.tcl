@@ -6304,6 +6304,27 @@ proc RenderSomeone {w id} {
 	global HealthBarWidth HealthBarFrameWidth HealthBarConditionFrameWidth
 	global ShowHealthStats
 
+	#
+	# find out where everyone is
+	# TODO: This would be more efficient to do less frequently than every time we call RenderSomeone
+	#
+	array unset WhereIsMOB
+	foreach mob_id [array names MOBdata] {
+		DEBUG 1 "Looking for location of $mob_id"
+		if {![dict get $MOBdata($mob_id) Killed]} {
+			set xx [dict get $MOBdata($mob_id) Gx]
+			set yy [dict get $MOBdata($mob_id) Gy]
+			set sz [MonsterSizeValue [dict get $MOBdata($mob_id) Size]]
+			DEBUG 1 "- Found at ($xx,$yy), size=$sz:"
+			for {set xi 0} {$xi < $sz} {incr xi} {
+				for {set yi 0} {$yi < $sz} {incr yi} {
+					lappend WhereIsMOB([expr $xx+$xi],[expr $yy+$yi]) $mob_id
+					DEBUG 1 "-- ($xx+$xi, $yy+$yi) = $WhereIsMOB([expr $xx+$xi],[expr $yy+$yi])"
+				}
+			}
+		}
+	}
+
 	set x [dict get $MOBdata($id) Gx]
 	set y [dict get $MOBdata($id) Gy]
 	lassign [ReachMatrix [dict get $MOBdata($id) Area]] mob_area mob_reach mob_matrix
@@ -6519,7 +6540,16 @@ proc RenderSomeone {w id} {
 			label $nametag_w -background [::tk::Darken [dict get $MOBdata($id) Color] 40] \
 				-foreground white -font [FontBySize [dict get $MOBdata($id) Size]] -text $mob_name 
 		}
-		$w create window [expr $x*$iscale] [expr $y*$iscale] -anchor nw -window $nametag_w -tags "M#$id MF#$id MT#$id allMOB"
+		# is anyone above me?
+		set nametag_anchor sw
+		set look_y [expr $y - 1]
+		for {set look_x $x} {$look_x < [expr $x+$mob_size]} {incr look_x} {
+			if {[info exists WhereIsMOB($look_x,$look_y)]} {
+				set nametag_anchor nw
+				break
+			}
+		}
+		$w create window [expr $x*$iscale] [expr $y*$iscale] -anchor $nametag_anchor -window $nametag_w -tags "M#$id MF#$id MT#$id allMOB"
 	} else {
 		DEBUG 3 "No $image_pfx:$zoom found in TILE_SET"
 		$w create oval [expr $x*$iscale] [expr $y*$iscale] [expr ($x+$mob_size)*$iscale] [expr ($y+$mob_size)*$iscale] -fill $fillcolor -tags "mob MF#$id M#$id MN#$id allMOB"
@@ -6622,14 +6652,28 @@ proc RenderSomeone {w id} {
 		# x,y 		grid coords
 		# mob_size	grids across/down
 		# iscale	multiplier to turn grids to pixels
+		# is anyone below me?
+		set pull_up_bar false
+		set look_y [expr $y + $mob_size]
+		for {set look_x $x} {$look_x < [expr $x+$mob_size]} {incr look_x} {
+			if {[info exists WhereIsMOB($look_x,$look_y)]} {
+				set pull_up_bar true
+				break
+			}
+		}
 		set Xhw [expr $mob_size * $iscale]
 		set Xh0 [expr $x * $iscale]
 		set Xhl [expr ($x + $mob_size) * $iscale]
 		set Yh0 [expr ($y + $mob_size) * $iscale]
-		set Yh1 [expr ($y + $mob_size) * $iscale - $HealthBarWidth]
+		if {$pull_up_bar} {
+			set Yh1 [expr ($y + $mob_size) * $iscale - $HealthBarWidth]
+			set TxY [expr $Yh0 - 0.5*$HealthBarWidth]
+		} else {
+			set Yh1 [expr ($y + $mob_size) * $iscale + $HealthBarWidth]
+			set TxY [expr $Yh0 + 0.5*$HealthBarWidth]
+		}
 		set Thl [list "M#$id" "MHB#$id" "allMOB"]
 		set TxX [expr $Xh0 + 0.5*$Xhw]
-		set TxY [expr $Yh0 - 0.5*$HealthBarWidth]
 		set full_stats [expr $ShowHealthStats && [dict get $MOBdata($id) CreatureType] == 2]
 
 		set bw $HealthBarFrameWidth
@@ -6786,22 +6830,6 @@ proc RenderSomeone {w id} {
 		global PI
 		$w delete "MArrows"
 		DEBUG 4 "Deleting arrows, redrawing them"
-
-		foreach mob_id [array names MOBdata] {
-			DEBUG 1 "Looking for location of $mob_id"
-			if {![dict get $MOBdata($mob_id) Killed]} {
-				set xx [dict get $MOBdata($mob_id) Gx]
-				set yy [dict get $MOBdata($mob_id) Gy]
-				set sz [MonsterSizeValue [dict get $MOBdata($mob_id) Size]]
-				DEBUG 1 "- Found at ($xx,$yy), size=$sz:"
-				for {set xi 0} {$xi < $sz} {incr xi} {
-					for {set yi 0} {$yi < $sz} {incr yi} {
-						lappend WhereIsMOB([expr $xx+$xi],[expr $yy+$yi]) $mob_id
-						DEBUG 1 "-- ($xx+$xi, $yy+$yi) = $WhereIsMOB([expr $xx+$xi],[expr $yy+$yi])"
-					}
-				}
-			}
-		}
 
 		foreach threatening_mob_id [array names MOBdata] {
 			DEBUG 1 "Checking who $threatening_mob_id is threatening"
