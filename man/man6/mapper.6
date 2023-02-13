@@ -1775,6 +1775,12 @@ have a JSON data payload attached to them. The protocol version number is
 simply sent as an ASCII string of digits separated from the 
 .B PROTOCOL
 command word by a space.
+.RS
+.LP
+Servers which implement protocol versions 400 and later MUST send this message
+at the start of their conversations. Servers which implement older protocol versions
+SHOULD send it.
+.RE
 .TP
 .B AC
 Add a character to the pop-up menu for map clients. This makes it easy to place important character tokens
