@@ -171,7 +171,7 @@ namespace eval ::gmaproto {
 		CO      {Enabled ?}
 		CONN    {PeerList {a {Addr s User s Client s LastPolo f IsAuthenticated ? IsMe ?}}}
 		CS      {Absolute f Relative f Running ?}
-		D       {Recipients l ToAll ? ToGM ? RollSpec s}
+		D       {Recipients l ToAll ? ToGM ? RollSpec s RequestID s}
 		DD      {For s Presets {a {Name s Description s DieRollSpec s}}}
 		DD+     {For s Presets {a {Name s Description s DieRollSpec s}}}
 		DD/     {For s Filter s}
@@ -203,7 +203,7 @@ namespace eval ::gmaproto {
 		PROGRESS {OperationID s Title s Value i MaxValue i IsDone ?}
 		PS      {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l Elev i Color s Note s Size s Area s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i}
 		READY   {}
-		ROLL    {Sender s Recipients l MessageID i ToAll ? ToGM ? Title s Result {o {Result i Details {a {Type s Value s}}}}}
+		ROLL    {Sender s Recipients l MessageID i ToAll ? ToGM ? Title s Result {o {Result i Details {a {Type s Value s}}}} RequestID s MoreResults ?}
 		SYNC    {}
 		SYNC-CHAT {Target i}
 		TB      {Enabled ?}
