@@ -12175,6 +12175,10 @@ if {! $dark_mode } {
 	LoadDefaultStyles
 }
 
+report_progress "Drawing battle grid"
+DrawScreen $zoom $animatePlacement
+cleargrid
+
 report_progress "Connecting to server..."
 if {$IThost ne {}} {
 	WaitForConnectToServer
@@ -12625,9 +12629,6 @@ if {$UpgradeNotice} {
 }
 report_progress "Configuring SaF"
 configureSafCapability
-report_progress "Drawing battle grid"
-DrawScreen $zoom $animatePlacement
-cleargrid
 if {![::gmaproto::is_ready] && $IThost ne {}} {
     report_progress "Mapper Client Ready (awaiting server login to complete)"
 } else {
