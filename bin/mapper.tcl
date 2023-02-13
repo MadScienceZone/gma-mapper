@@ -4114,7 +4114,7 @@ proc movetool {} {
 
 set OBJ_CURRENT 0
 set CURRENT_TEXT_WIDGET {}
-set CURRENT_FONT {TkDefaultFont}
+set CURRENT_FONT {{Helvetica 10}}
 set ARCMODE pieslice
 
 proc cmp_obj_attr_z {a b} {
