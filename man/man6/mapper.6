@@ -2335,6 +2335,14 @@ The names of the people who should receive the results
 of the die roll. For global or GM results, this should be 
 .BR null .
 .TP
+.B RequestID
+If you put a string value in this field, it will be sent back in any
+.B ROLL
+response messages the server sends to you in response to this request. This
+allows a client to associate responses to the requests that generated them.
+You may leave this blank or omit it if you don't care to match requests with
+responses.
+.TP
 .BI ToAll " (bool)"
 If true, this is a global die-roll, and the result should be
 sent to all clients.
@@ -3574,6 +3582,18 @@ global messages, this should be
 .BI MessageID " (int)"
 The unique number assigned by the server for this chat message. (Die roll
 results are essentially a kind of chat message.) 
+.TP
+.BI MoreResults " (bool)"
+If true, there will be more
+.B ROLL
+messages yet to come which are part of the result set for the same die roll
+request.
+.TP
+.B RequestID
+The 
+.B RequestID
+string passed by the client when requesting this die roll, or the empty string
+if they didn't.
 .TP
 .BI ToAll " (bool)"
 If true, this is a global message sent to all clients.
