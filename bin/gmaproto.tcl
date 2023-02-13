@@ -363,7 +363,8 @@ proc ::gmaproto::_dispatch {} {
 }
 
 proc ::gmaproto::_dispatch_to_app {cmd params} {
-	if [catch {::DoCommand$cmd $params} err] {
+	if [catch {::DoCommand$cmd $params} err opts] {
+		::DEBUG 0 "err=$err; opts=$opts"
 		catch {::DoCommandError $cmd $params $err}
 	}
 }
@@ -473,7 +474,16 @@ proc ::gmaproto::_attribute_encode {k v} {
 		Y        -
 		Z        { return $v }
 
-		AoE      { return "{\"Radius\":[dict get $v Radius],\"Color\":[json::write string [dict get $v Color]]}" }
+		AoE      {
+			if {$v eq {}} {
+				return "null"
+			}
+			if {[dict exists $v Radius] && [dict exists $v Color]} {
+				return "{\"Radius\":[dict get $v Radius],\"Color\":[json::write string [dict get $v Color]]}"
+			}
+			::DEBUG 0 "AoE value ($v) is not valid; sending null object instead"
+			return "null"
+		}
 
 		SkinSize   { return [::json::write array {*}$v] }
 		StatusList { return [::json::write array {*}[lmap s $v {json::write string $s}]] }
