@@ -9130,6 +9130,7 @@ proc fetch_image {name zoom id} {
 	}
 	create_image_from_file $tile_id $cache_filename
 	set ClockDisplay $oldcd
+	refreshScreen
 }
 
 #
