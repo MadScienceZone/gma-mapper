@@ -3922,6 +3922,12 @@ and
 .B WORLD
 commands.
 .LP
+As of the beta-3 release, the
+.B RequestID
+and
+.B MoreResults
+fields were added to die roll requests and results messages.
+.LP
 Version 332 added the
 .B GRANTED
 server response, guaranteeing that
@@ -4129,8 +4135,7 @@ In fact, at this point the thing just needs to be rewritten using the newer
 GMA code base.
 .LP
 Calculation of threatened spaces needs to take elevation into account.
-.LP
-Arrowheads need to be drawn bigger.
+(Although the mapper now includes a 3D-aware distance calculation when requested.)
 .LP
 The
 .B \-h
