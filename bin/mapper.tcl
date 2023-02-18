@@ -53,7 +53,7 @@
 # @[52]@| defect of the software.
 #
 # Auto-configure values
-set GMAMapperVersion {4.0.5-beta.4}     ;# @@##@@
+set GMAMapperVersion {4.0.5-beta.5}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
 set GMAMapperProtocol {400}         ;# @@##@@
 set GMAVersionNumber {5.0.0-alpha.1}            ;# @@##@@
@@ -6547,7 +6547,7 @@ proc RenderSomeone {w id} {
 		# is anyone above me?
 		set nametag_anchor sw
 		set look_y [expr $y - 1]
-		for {set look_x $x} {$look_x < [expr $x+$mob_size]} {incr look_x} {
+		for {set look_x $x} {$look_x < [expr $x+$mob_size]} {set look_x [expr $look_x + 1]} {
 			if {[info exists WhereIsMOB($look_x,$look_y)]} {
 				set nametag_anchor nw
 				break
@@ -6659,7 +6659,7 @@ proc RenderSomeone {w id} {
 		# is anyone below me?
 		set pull_up_bar false
 		set look_y [expr $y + $mob_size]
-		for {set look_x $x} {$look_x < [expr $x+$mob_size]} {incr look_x} {
+		for {set look_x $x} {$look_x < [expr $x+$mob_size]} {set look_x [expr $look_x + 1]} {
 			if {[info exists WhereIsMOB($look_x,$look_y)]} {
 				set pull_up_bar true
 				break
