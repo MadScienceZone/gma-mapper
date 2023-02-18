@@ -1230,8 +1230,12 @@ if {$dark_mode} {
 # tile ID
 # 
 
+proc normalize_zoom {z} {
+	return [format %.2f $z]
+}
+
 proc tile_id {name zoom} {
-	return "$name:$zoom"
+	return "$name:[normalize_zoom $zoom]"
 }
 
 #
@@ -1244,7 +1248,7 @@ proc cache_filename {name zoom} {
 		file mkdir $path_cache
 		file mkdir [file nativename [file join $path_cache _[string range $name 4 4]]]
 	}
-	return [file nativename [file join $path_cache _[string range $name 4 4] "$name@${zoom}.gif"]]
+	return [file nativename [file join $path_cache _[string range $name 4 4] "$name@[normalize_zoom $zoom].gif"]]
 }
 proc cache_file_dir {name} {
 	global path_cache
@@ -6504,7 +6508,7 @@ proc RenderSomeone {w id} {
 		#
 		# if we already know we have this image, just use it
 		#
-		if {[info exists TILE_SET($image_pfx:$zoom)]} {
+		if {[info exists TILE_SET([tile_id $image_pfx $zoom])]} {
             DEBUG 3 "- Found $image_pfx, using that"
             set found_image true
 			break
@@ -6518,7 +6522,7 @@ proc RenderSomeone {w id} {
         foreach ip $image_candidates {
             DEBUG 3 "- Trying $ip"
             FindImage $ip $zoom
-            if {[info exists TILE_SET($ip:$zoom)]} {
+            if {[info exists TILE_SET([tile_id $ip $zoom])]} {
                 DEBUG 3 "-- Found $ip, using that."
                 set image_pfx $ip
                 break
@@ -6529,10 +6533,10 @@ proc RenderSomeone {w id} {
 	#
 	# if we found a copy of the image, it will now appear in TILE_SET.
 	#
-	if [info exists TILE_SET($image_pfx:$zoom)] {
-		DEBUG 3 "$image_pfx:$zoom = $TILE_SET($image_pfx:$zoom)"
+	if [info exists TILE_SET([tile_id $image_pfx $zoom])] {
+		DEBUG 3 "$image_pfx:$zoom = $TILE_SET([tile_id $image_pfx $zoom])"
 		$w create oval [expr $x*$iscale] [expr $y*$iscale] [expr ($x+$mob_size)*$iscale] [expr ($y+$mob_size)*$iscale] -fill $fillcolor -tags "mob MF#$id M#$id MN#$id allMOB"
-		$w create image [expr $x*$iscale] [expr $y*$iscale] -anchor nw -image $TILE_SET($image_pfx:$zoom) -tags "mob M#$id MN#$id allMOB"
+		$w create image [expr $x*$iscale] [expr $y*$iscale] -anchor nw -image $TILE_SET([tile_id $image_pfx $zoom]) -tags "mob M#$id MN#$id allMOB"
 		set nametag_w "$w.nt_$id"
 		if {[winfo exists $nametag_w]} {
 			$nametag_w configure -font [FontBySize [dict get $MOBdata($id) Size]] -text $mob_name
