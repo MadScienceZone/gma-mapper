@@ -53,7 +53,7 @@
 # @[52]@| defect of the software.
 #
 # Auto-configure values
-set GMAMapperVersion {4.0.5-beta.3}     ;# @@##@@
+set GMAMapperVersion {4.0.5-beta.4}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
 set GMAMapperProtocol {400}         ;# @@##@@
 set GMAVersionNumber {5.0.0-alpha.1}            ;# @@##@@
@@ -6025,7 +6025,7 @@ array set MarkerDescription {
 	bleed	    		{Bleeding: take damage each turn unless stopped by a DC 15 Heal check or any spell that cures hit point damage.}
 	{ability drained} 	{Ability Drained}
 	{energy drained}  	{Energy Drained: has negative levels. Take cumulative -1 penalty per level drained on all ability checks, attack rolls, combat maneuver checks, combat maneuver defense, saving throws, and skill checks. Current and total hit points reduce by 5 per negative level. Treated as level reduction for level-dependent variables. No loss of prepared spells or slots. Daily saving throw to remove each negative level unless permanent.  If negative levels >= hit dice, dies.}
-	poisoned    		{Poisoned: may have onset delay and additional saving throws andadditional damage over time as the poison runs its course.}
+	poisoned    		{Poisoned: may have onset delay and additional saving throws and additional damage over time as the poison runs its course.}
 	deafened			{Deafened: cannot hear. -4 initiative, automatically fails Perception checks based on sound, -4 on opposed Perception checks, 20% of spell failure when casting spells with verbal components.}
 	stable      		{Stable: no longer dying but unconscious. May make DC 10 Constitution check hourly to become conscious and disabled even with negative hit points, with check penalty equal to negative hit points. If became stable without help, can make hourly Con check to become stable as above but failure causes 1 hit point damage.}
 

@@ -1930,10 +1930,10 @@ proc ::gmaproto::_login {} {
 								::gmaproto::DEBUG "Updated mapper version [dict get $inst Version] available (OS=[dict get $inst OS], Arch=[dict get $inst Arch], Token=[dict get $inst Token])"
 								::gmaproto::DEBUG "This version is more specific than the one I found before, switching to it instead."
 								set update_ready $inst
+							} elseif {$update_ready eq {}} {
+								::gmaproto::DEBUG "Updated mapper version [dict get $inst Version] available (OS=[dict get $inst OS], Arch=[dict get $inst Arch], Token=[dict get $inst Token])"
+								set update_ready $inst
 							}
-						} elseif {$update_ready eq {}} {
-							::gmaproto::DEBUG "Updated mapper version [dict get $inst Version] available (OS=[dict get $inst OS], Arch=[dict get $inst Arch], Token=[dict get $inst Token])"
-							set update_ready $inst
 						}
 					}
 				}
