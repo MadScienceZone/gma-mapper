@@ -1,22 +1,20 @@
-# vi:set ai sm nu ts=4 sw=4 fileencoding=utf-8 expandtab:
-#
 ########################################################################################
 #  _______  _______  _______                ___       _______     _______              #
-# (  ____ \(       )(  ___  )              /   )     (  ____ \   (  __   )             #
-# | (    \/| () () || (   ) |             / /) |     | (    \/   | (  )  |             #
-# | |      | || || || (___) |            / (_) (_    | (____     | | /   |             #
-# | | ____ | |(_)| ||  ___  |           (____   _)   (_____ \    | (/ /) |             #
-# | | \_  )| |   | || (   ) | Game           ) (           ) )   |   / | |             #
-# | (___) || )   ( || )   ( | Master's       | |   _ /\____) ) _ |  (__) |             #
-# (_______)|/     \||/     \| Assistant      (_)  (_)\______/ (_)(_______)             #
+# (  ____ \(       )(  ___  ) Game         /   )     (  __   )   (  ____ \             #
+# | (    \/| () () || (   ) | Master's    / /) |     | (  )  |   | (    \/             #
+# | |      | || || || (___) | Assistant  / (_) (_    | | /   |   | (____               #
+# | | ____ | |(_)| ||  ___  |           (____   _)   | (/ /) |   (_____ \              #
+# | | \_  )| |   | || (   ) |                ) (     |   / | |         ) )             #
+# | (___) || )   ( || )   ( | Mapper         | |   _ |  (__) | _ /\____) )             #
+# (_______)|/     \||/     \| Client         (_)  (_)(_______)(_)\______/              #
 #                                                                                      #
 ########################################################################################
 # version 1.0, 17 July 2020.
 # Steve Willoughby <steve@madscience.zone>
 #
-# @[00]@| GMA 4.5.0
+# @[00]@| GMA 5.0.0
 # @[01]@|
-# @[10]@| Copyright © 1992–2022 by Steven L. Willoughby (AKA MadScienceZone)
+# @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
 # @[12]@| Aloha, Oregon, USA. All Rights Reserved.
 # @[13]@| Distributed under the terms and conditions of the BSD-3-Clause
@@ -56,8 +54,8 @@
 #
 # General utility functions
 
-package provide gmautil 1.0
-package require Tcl 8.5
+package provide gmautil 1.1
+package require Tcl 8.6
 package require sha256
 
 namespace eval ::gmautil {
@@ -165,6 +163,31 @@ proc ::gmautil::version_compare {v1 v2} {
 	if {$v1 eq $v2} {
 		return 0
 	}
+	if {![regexp {^([^+-]+)([^-]+)?(?:-(.+))?$} $v1 _ v1base v1build v1pre]} {
+		error "version $v1 does not conform to semver standard"
+	}
+	if {![regexp {^([^+-]+)([^-]+)?(?:-(.+))?$} $v2 _ v2base v2build v2pre]} {
+		error "version $v2 does not conform to semver standard"
+	}
+	set cmp [::gmautil::_vc $v1base $v2base]
+	if {$cmp == 0} {
+		# the base versions are the same. In this case the one without a prerelease
+		# string is older, or we just compare prerelease strings
+		if {$v1pre eq {} && $v2pre eq {}} {
+			return 0
+		}
+		if {$v1pre eq {}} {
+			return 1
+		}
+		if {$v2pre eq {}} {
+			return -1
+		}
+		return [::gmautil::_vc $v1pre $v2pre]
+	}
+	return $cmp
+}
+
+proc ::gmautil::_vc {v1 v2} {
 	set l1 [split $v1 .]
 	set l2 [split $v2 .]
 	while {[llength $l2] != [llength $l1]} {
@@ -177,10 +200,30 @@ proc ::gmautil::version_compare {v1 v2} {
 
 	for {set i 0} {$i < [llength $l1]} {incr i} {
 		if {[lindex $l1 $i] != [lindex $l2 $i]} {
-			return [expr [lindex $l1 $i] - [lindex $l2 $i]]
+			if {[lindex $l1 $i] < [lindex $l2 $i]} {
+				return -1
+			}
+			return 1
 		}
 	}
 	return 0
+}
+
+if {[::gmautil::version_compare $::tcl_version 8.7] >= 0} {
+    proc ::gmautil::lpop {var args} {
+	upvar 1 $var l
+        return [::lpop l {*}$args]
+    }
+} else {
+    proc ::gmautil::lpop {var index} {
+        # pop indexth element from list
+        # unlike the built-in one from tcl 8.7, we don't currently
+        # consider sublists.
+        upvar 1 $var l
+        set removed [lindex $l $index]
+        set l [lreplace $l $index $index]
+        return $removed
+    }
 }
 
 #
@@ -439,3 +482,49 @@ proc ::gmautil::_countdown {sec cb pfx} {
 	}
 	after 1000 [list ::gmautil::_countdown [expr $sec - 1] $cb $pfx]
 }
+
+proc ::gmautil::rdist {minargs maxargs cmd arglist args} {
+    if {[llength $arglist] < $minargs} {
+        error "$cmd has only [llength $arglist] parameters but $minargs are required ($arglist)"
+    }
+    if {[llength $arglist] > $maxargs} {
+        error "$cmd has [llength $arglist] parameters but only up to $maxargs are allowed ($arglist)"
+    }
+    for {set i 0} {$i < [llength $args]} {incr i} {
+        upvar 1 [lindex $args $i] v
+        if {$i < [llength $arglist]} {
+            set v [lindex $arglist $i]
+        } else {
+            set v {}
+        }
+    }
+}
+
+# we standardize these values as:
+#   linux, freebsd, darwin, windows
+#   amd64
+proc ::gmautil::my_os {} {
+    switch $::tcl_platform(os) {
+        Darwin  { return darwin }
+        Linux   { return linux }
+        FreeBSD { return freebsd }
+    }
+    return $::tcl_platform(os)
+}
+
+proc ::gmautil::my_arch {} {
+    switch $::tcl_platform(machine) {
+        x86_64  { return amd64 }
+    }
+    return $::tcl_platform(machine)
+}
+
+# export the keys of a dictionary to local variables 
+# if a key has space-separated words, it is treated as a list of sub-keys.
+proc ::gmautil::dassign {dictval args} {
+    foreach {k var} $args {
+        upvar 1 $var v
+        set v [dict get $dictval {*}$k]
+    }
+}
+
