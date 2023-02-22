@@ -1,10 +1,17 @@
 # Game Master's Assistant / Mapper Client
 # Release Notes
 ## Current Version Information
- * Supported GMA Mapper Version: 4.0.5-beta.5 <!-- @@##@@ -->
+ * Supported GMA Mapper Version: 4.0.5 <!-- @@##@@ -->
  * Supported GMA Mapper File Format: 20	     <!-- @@##@@ -->
  * Supported GMA Mapper Protocol: 400        <!-- @@##@@ -->
- * Effective Date: 18-Feb-2023               <!-- @@##@@ -->
+ * Effective Date: 21-Feb-2023               <!-- @@##@@ -->
+
+# 4.0.5
+## Fixes
+* Numerous bug fixes to get the new protocol working.
+* Corrected problem in detecting if a new version is staged for upgrading.
+* Corrected problem where the mapper would not correctly find image tiles stored on the server.
+* Now immediately updates loaded images instead of waiting for a manual refresh.
 
 # 4.0.0
 ## Changes
