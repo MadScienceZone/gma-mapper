@@ -61,11 +61,9 @@ repository (thus `$GMA_MAPPER/bin/mapper.tcl` is the executable mapper script).
 You may need to set `GMA_TCLSH` to point to your `tclsh` interpreter if the `gma`
 script can't find it on its own.
 
-## Versioning
-Until the mapper is rewritten in Python and/or Go, it has its own 3._x_ version
-number. A new 4.0 version is in the works which represents a breaking change
-in the form of a substantial rewrite of the client to be compatible with our
-new game server protocol 400.
+# Versioning
+Although intended for use with the GMA software suite, the gma-mapper tool has an independent version number
+from that project.
 
 ## Other Software
 Includes Paul Walton's scrollable frame code `sframe.tcl`, available at [http://wiki.tcl.tk/9223]().
@@ -74,6 +72,6 @@ Also uses a modified version of [Silk Icons](http://www.famfamfam.com/lab/icons/
 
 ## Game System Neutral
 The GMA software and the gma-mapper client in this repository are intended to be game-system-neutral.
-They are not written for, nor intended for use with, the Dungeons & Dragons game from Wizards of the Coast,
+They are not written specifically for, nor intended spevfically for use with, the oldest fantasy role-playing game,
 nor do they rely upon OGL-licensed intellectual property from Wizards of the Coast. Where any game system 
 was in mind for these tools, it was the Pathfinder role-playing game system from Paizo, Inc.

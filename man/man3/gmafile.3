@@ -1,0 +1,428 @@
+'\" <<bold-is-fixed>>
+'\" <<ital-is-var>>
+.TH GMAFILE 3 "GMA Toolkit 5.0.0" 21-Feb-2023 "API Functions" \" @@mp@@
+.SH NAME
+gmafile \- GMA file access functions
+.SH SYNOPSIS
+'\" <<usage>>
+.na
+(If package installed globally)
+.br
+.B package
+.B require
+.B gmafile
+.LP
+(Otherwise)
+.br
+.B source
+.B gmafile.tcl
+.LP
+.B ::gmafile::default_arr
+.I aname
+.I id
+.RB ? \-value
+.IR v ?
+.RB ? \-\- ?
+.I attr
+.RI ? attr ...?
+.LP
+.B ::gmafile::load_dice_presets_from_file
+.I f
+\[->]
+.I meta
+.I plist
+.LP
+.B ::gmafile::load_from_file
+.I f
+\[->]
+.I meta
+.I objlist
+.LP
+.B ::gmafile::load_legacy_map_data
+.I vlist
+.I meta
+\[->]
+.I meta
+.I objlist
+.LP
+.B ::gmafile::load_legacy_map_file
+.I f
+.I ver
+.I oldmeta
+\[->]
+.I meta
+.I objlist
+.LP
+.B ::gmafile::require_arr
+.I aname
+.I id
+.I attr
+.RB ? attr ...?
+.LP
+.B ::gmafile::load_legacy_preset_file
+.I f
+.I ver
+.I oldmeta
+\[->]
+.I meta
+.I plist
+.LP
+.B ::gmafile::save_arrays_to_file
+.I f
+.I meta
+.I elements
+.I elementtypes
+.I creatures
+.LP
+.B ::gmafile::save_dice_presets_to_file
+.I f
+.I objlist
+.LP
+.B ::gmafile::save_to_file
+.I f
+.I objlist
+.LP
+.B ::gmafile::upgrade_elements
+.I filedata
+\[->]
+.I dictlist
+.ad
+'\" <</usage>>
+.SH DESCRIPTION
+.LP
+This module provides the functionality for reading and writing data files used by
+GMA, including map files and saved die-roll presets. Reading of legacy formats
+is supported, but new files will only be saved in the current format.
+'\" <<list>>
+.TP 10
+.BI "::gmafile::default_arr " aname " " id " \fR?\fP\-value " v\fR?\fP " \fR?\fP\-\-\fR?\fP " attr " " \fR?\fPattr\fR...?\fP
+.I "This function is intended for reading legacy files and may disappear in the future."
+Ensures that a number of required entries are defined in the array named as
+.IR aname .
+For each listed attribute
+.IR attr ,
+the array must contain a value associated with the key 
+.IB attr : id\fR.\fP
+If no such key is found, it will be created with the default value
+.I v
+provided via the
+.B \-value
+option (or the empty string if no
+.B \-value
+option was given).
+.RS
+.LP
+The 
+.B \-\- 
+option may be used to explicitly terminate the list of options in case
+.B \-value
+might be the name of an attribute.
+.RE
+.TP
+.BI "::gmafile::load_dice_presets_from_file " f
+Given an open file stream
+.IR f ,
+this reads a set of die-roll presets from that file, returning them as a list of
+two elements:
+.RS
+.TP
+.I meta
+A dictionary with the following fields, any of which may be empty or zero if they were not found in the file:
+.RS
+.TP 12
+.I Timestamp
+The time the file claims to have been generated, as a UNIX timestamp value (seconds since the epoch).
+.TP
+.I DateTime
+The time the file claims to have been generated, as a human-readable string in arbitrary format.
+No attempt is made to reconcile this and
+.IR Timestamp ,
+they are simply presented as they were in the file.
+.TP
+.I Comment
+A comment that was stored in the file.
+.TP
+.I FileVersion
+The file format version of the data read.
+.RE
+.TP
+.I plist
+A Tcl list of die-roll presets. Each of these is a dictionary with the following fields:
+.RS
+.TP 12
+.I Name
+The name of the die-roll preset as shown to the user. This name may include a vertical bar
+.RB ( | ).
+If so, the text up to and including the bar should be hidden from the user, but used for the
+purposes of sorting the list on-screen.
+.TP
+.I Description
+The description of what the preset is for.
+.TP
+.I DieRollSpec
+The actual specification for the die roller
+.BR dice (3).
+.RE
+.RE
+.TP
+.BI "::gmafile::load_from_file " f
+Given an open file stream
+.IR f ,
+this reads map file data from it and returns them as a list of two elements:
+.RS
+.TP
+.I meta
+A dictionary of values describing what was just read. This has the following fields, any of which may be empty:
+.RS
+.TP 12
+.I Timestamp
+The time the file claims to have been generated, as a UNIX timestamp value (seconds since the epoch).
+.TP
+.I DateTime
+The time the file claims to have been generated, as a human-readable string in arbitrary format.
+No attempt is made to reconcile this and
+.IR Timestamp ,
+they are simply presented as they were in the file.
+.TP
+.I Comment
+A comment that was stored in the file.
+.TP
+.I Location
+The name of the location which the file represents.
+.TP
+.I FileVersion
+The file format version of the data read.
+.RE
+.TP
+.I objlist
+A Tcl list of the objects loaded from the map file. Each element of this list is itself a Tcl list
+with the following two elements:
+.RS
+.TP
+.I type
+The type of object. This will be one of the types as documented in
+.BR mapper (5),
+such as
+.BR ARC ,
+.BR POLY ,
+.BR IMG ,
+.BR MAP ,
+.BR CREATURE ,
+etc.
+.TP
+.I d
+A dictionary which describes the object of the given type. The specific fields for each type
+are documented in the protocol specification in
+.BR mapper (6).
+.RE
+.RE
+.TP
+.BI "::gmafile::load_legacy_map_data " vlist " " meta
+.I "This function is provided to handle legacy-format map data and may disappear in the future."
+.I "You should never need to call this function directly; it is automatically invoked as needed by"
+.BR ::gmafile::load_from_file .
+Reads partially-parsed lines from
+.IR vlist .
+Each element of this list is a 2-element list where the first element is one of:
+.RS
+.TP
+.B IMG
+The second element is a dictionary describing an image advertised by the server.
+.TP
+.B MAP
+The second element is a dictionary describing a map file advertised by the server.
+.TP
+.B RAW
+The second element is a raw, unparsed line of legacy-format data loaded from the file.
+.LP
+The
+.I meta
+parameter is a dictionary of metadata already loaded with information about the input data.
+.LP
+Returns a list in the same format as
+.BR ::gmaproto::load_from_file .
+.RE
+.TP
+.BI "::gmafile::load_legacy_map_file " f " " ver " " oldmeta
+.I "This function is provided to handle legacy-format map data and may disappear in the future."
+.I "You should never need to call this function directly; it is automatically invoked as needed by"
+.BR ::gmafile::load_from_file .
+Reads legacy-format data from the open file stream
+.IR f ,
+which is already known to be in file format version
+.IR ver .
+The
+.I oldmeta
+value is a Tcl list with the old-style metadata as documented in the version 17 revision of
+.BR mapper (5).
+.RS
+.LP
+Returns a list in the same format as
+.BR ::gmaproto::load_from_file .
+.RE
+.TP
+.BI "::gmafile::require_arr " aname " " id " " attr " " \fR?\fPattr\fR...?\fP
+This works just like
+.B ::gmafile::default_arr
+except that it does not set default values into the array named as
+.IR aname .
+It only checks that the named attributes already exist in the array, stored
+under keys called
+.IB attr : id\fR.\fP
+.TP
+.BI "::gmafile::load_legacy_preset_file " f " " ver " " oldmeta
+.I "This function is provided to handle legacy-format preset data and may disappear in the future."
+.I "You should never need to call this function directly; it is automatically invoked as needed by"
+.BR ::gmafile::load_dice_presets_from_file .
+.RS
+.LP
+In a manner analogous to
+.BR ::gmafile::load_legacy_map_file ,
+this reads data from the open stream
+.I f
+which are in legacy file format version
+.I ver
+and have the old-format metadata
+.IR oldmeta .
+.LP
+Returns the same values as
+.BR ::gmafile::load_dice_presets_from_file .
+.RE
+.TP
+.BI "::gmafile::save_arrays_to_file " f " " meta " " elements " " elementtypes " " creatures
+Given an open writable file stream
+.IR f ,
+this saves the map data stored in the following array variable names to a mapper data file:
+.RS
+.TP 12
+.I elements
+This names an array variable containing all of the map elements other than creatures which appear
+in the mapper client. The keys for each are the object's ID, which should also be the value stored
+in the object's
+.I ID
+field. The values in the array are the corresponding dictionary defining that object's attributes.
+.TP
+.I elementtypes
+This names an array variable containing a mapping of object IDs to their internal data type. There
+must be an element in this array for each element in the
+.I elements
+array. The type strings are the ones as known in the mapper code, not the server's protocol,
+as would be output by
+.BR ::gmaproto::GMATypeToObjType .
+.TP
+.I creatures
+This names an array variable containing a mapping of creature IDs to a dictionary describing each creature.
+The keys of this array are not referenced.
+.LP
+The
+.I meta
+parameter is a dictionary describing this collection of map data, and has the following fields:
+.TP 12
+.I Timestamp
+The UNIX timestamp representing the date and time when this map data were generated. If this
+field is missing from the dictionary, the current date and time will be used.
+.TP
+.I DateTime
+A human-readable string describing the
+.I Timestamp
+field's value. If this field is missing from the dictionary, one will automatically be
+generated based on the
+.I Timestamp
+value.
+.TP
+.I Comment
+Any comment you wish to be associated with this map file.
+.TP
+.I Location
+The name of the location which the file represents.
+.RE
+.TP
+.BI "::gmafile::save_dice_presets_to_file " f " " objlist
+Given an open writable stream
+.IR f ,
+this saves a collection of die-roll presets to disk.
+The
+.I objlist
+parameter is a Tcl list with two elements:
+.RS
+.TP
+.I meta
+A dictionary describing this file, with the following fields:
+.RS
+.TP 12
+.I Timestamp
+The UNIX timestamp representing the date and time when this preset data were generated. If this
+field is missing from the dictionary, the current date and time will be used.
+.TP
+.I DateTime
+A human-readable string describing the
+.I Timestamp
+field's value. If this field is missing from the dictionary, one will automatically be
+generated based on the
+.I Timestamp
+value.
+.TP
+.I Comment
+Any comment you wish to be associated with this file.
+.RE
+.TP
+.I plist
+A Tcl list of dictionaries, each describing a single die-roll preset with the same fields
+as documented for
+.BR ::gmafile::load_dice_presets_from_file .
+.RE
+.TP
+.BI "::gmafile::save_to_file " f " " objlist
+As an alternative to
+.BR ::gmafile::save_arrays_to_file ,
+this function writes the map data as found in
+.IR objlist ,
+which is a Tcl list containing the following two elements:
+.RS
+.TP 10
+.I meta
+A metadata dictionary as described for
+.BR ::gmafile::save_arrays_to_file .
+.TP
+.I elements
+A Tcl list of all map elements to be saved. Each element of this list is itself a Tcl list
+of two elements:
+.RS
+.TP
+.I type
+The element type name as known in the mapper software.
+.TP
+.I d
+The dictionary describing the object.
+.RE
+.RE
+.TP
+.BI "::gmafile::upgrade_elements " filedata
+.I "This function is intended for reading legacy files and may disappear in the future."
+Each element in
+.I filedata
+is a tuple as described for
+.BR ::gmafile::load_legacy_map_data .
+This function converts all entries of
+.B RAW
+type into their new-format equivalents. A new copy of
+.I filedata
+with those substitutions in place is returned.
+'\" <</>>
+.SH DIAGNOSTICS
+.LP
+An exception is thrown if a serious error is encountered.
+.LP
+Messages are printed to standard output to indicate progress or provide debugging information.
+.SH "SEE ALSO"
+.BR openssl (1).
+.SH AUTHOR
+.LP
+Steve Willoughby / steve@madscience.zone.
+.SH HISTORY
+.LP
+This document describes version 1.0 of the 
+.B gmafile
+package, released in December 2022.
+.SH COPYRIGHT
+Part of the GMA software suite, copyright \(co 1992\-2023 by Steven L. Willoughby, Aloha, Oregon, USA. All Rights Reserved. Distributed under BSD-3-Clause License. \"@m(c)@

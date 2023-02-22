@@ -1,7 +1,7 @@
-.\" vim:set syntax=nroff:
+'\" t
 '\" <<bold-is-fixed>>
 '\" <<ital-is-var>>
-.TH GMAUTIL 3 "GMA Toolkit 4.5.0" 20-Nov-2022 "API Functions" \" @@mp@@
+.TH GMAUTIL 3 "GMA Toolkit 5.0.0" 21-Feb-2023 "API Functions" \" @@mp@@
 .SH NAME
 gmautil \- General Tcl Utility Routines
 .SH SYNOPSIS
@@ -18,16 +18,39 @@ gmautil \- General Tcl Utility Routines
 .B source
 .B gmautil.tcl
 .LP
+.B ::gmautil::dassign
+.I dict
+.I key1
+.I var1
+.RI ? key2
+.IR var2 ...?
+.LP
 .B ::gmautil::is_git
 .I path
+\[->]
+.B bool
 .LP
-.B ::gmautil::verify
-.I data
-.I signature
+.B ::gmautil::lpop
+.I var
+.I index
+\[->]
+.I element
 .LP
-.B ::gmautil::version_compare
-.I v1
-.I v2
+.B ::gmautil::my_arch
+\[->]
+.I arch
+.LP
+.B ::gmautil::my_os
+\[->]
+.I os
+.LP
+.B ::gmautil::rdist
+.I min
+.I max
+.I cmd
+.I arglist
+.I var
+.RI ? var ...?
 .LP
 .B ::gmautil::upgrade
 .I destination
@@ -41,6 +64,18 @@ gmautil \- General Tcl Utility Routines
 .I msg
 .I proxy
 .I curl
+.LP
+.B ::gmautil::verify
+.I data
+.I signature
+\[->]
+.I bool
+.LP
+.B ::gmautil::version_compare
+.I v1
+.I v2
+\[->]
+cmp
 .ad
 '\" <</usage>>
 .SH DESCRIPTION
@@ -49,37 +84,119 @@ This module provides a set of miscellaneous utility functions that could be
 useful to more than one part of the overall product suite.
 '\" <<list>>
 .TP 10
+.BI "::gmautil::dassign " dict " " key1 " " var1 " " \fR?\fPkey2 " " var2...\fR?\fP
+This is analogous to the Tcl built-in 
+.B lassign
+command, but it operates on a dictionary value
+.I dict
+instead of a list. For each pair of arguments after the 
+.I dict
+value, the named
+.I key
+is looked up in the dictionary and its value is assigned to the variable
+.IR var .
+.RS
+.LP
+If any
+.I key
+is a space-separated list of names, they are considered to be a list of nested sub-keys to be fetched from the
+dictionary in the same manner as 
+.B dict
+.BR get .
+For example, given the
+.I key
+.B "{foo bar}"
+it will retrieve the value stored under the key
+.BR foo ,
+which is itself a dictionary value, in which the key
+.B bar
+is looked up, and its value assigned to the corresponding
+.I var
+variable.
+.RE
+.TP
 .BI "::gmautil::is_git " path
 Returns true if the directory
 .I path
 resides inside a Git working directory tree.
 .TP
-.BI "::gmautil::verify " data " " signature
-Given a binary data string
-.IR data ,
-return true if the binary cryptographic signature
-in
-.I signature
-is valid for that data. This uses our built-in
-product public key.
+.BI "::gmautil::lpop " var " " index
+This removes the
+.IR index th
+element from the list variable
+.IR var ,
+returning the removed element.
+This is intended to provide the basic functionality of the Tcl 8.7 built-in command
+.BR lpop ,
+and in fact if the Tcl interpreter is at least version 8.7 it simply calls the
+.B lpop
+provided by the language, which has additional capabilities not implemented by this version.
 .TP
-.BI "::gmautil::version_compare " v1 " " v2
-Compares two version number strings to see which order they should go in, chronologically.
-Each string must consist of one or more integers (as ASCII digit sequences) separated by dots.
-The first such number is the most significant (major) version, the next is the next-most significant
-sub-version within the major one, and so forth. Thus, 1.2 comes before 1.10, 2.2.4 comes before 2.3, etc.
-Returns 0 if 
-.I v1
-and
-.I v2
-are equal or equivalent, a number <0 if
-.IR v1 < v2
-(i.e.,
-.I v1
-comes before
-.IR v2 ), 
-or a number >0 if
-.IR v1 > v2 .
+.B ::gmautil::my_arch
+Returns the name of the hardware architecture running the program, with naming convention
+standard to the GMA suite. Currently, it translates the Tcl runtime's machine names as obtained
+from
+.B tcl_platform(machine)
+with the following translation:
+.TS
+center;
+lB lB
+l l.
+Tcl Name	GMA Name
+x86_64	amd64
+.TE
+.RS
+.LP
+Any name not otherwise listed is returned as-is from the Tcl runtime. More names will likely
+be added to this translation list in the future.
+.RE
+.TP
+.B ::gmautil::my_os
+Returns the name of the operating system running the program, with naming convention
+standard to the GMA suite. Currently, it translates the Tcl runtime's os names as obtained
+from
+.B tcl_platform(os)
+with the following translation:
+.TS
+center;
+lB lB
+l l.
+Tcl Name	GMA Name
+Darwin	darwin
+Linux	linux
+FreeBSD	freebsd
+.TE
+.RS
+.LP
+Any name not otherwise listed is returned as-is from the Tcl runtime. More names will likely
+be added to this translation list in the future.
+.RE
+.TP
+.BI "::gmautil::rdist " min " " max " " cmd " " arglist " " var " " \fR?\fPvar\fR...?\fP
+This is a specialized version of
+.BR lassign ,
+which is intended to receive a number of parameters in
+.I arglist
+to a GMA command called 
+.IR cmd .
+It requires that
+.I arglist
+contain at least 
+.I min
+ant at most
+.I max
+elements, generating an error if that condition is not met.
+The values in
+.I arglist
+are then distributed out into the list of named variables in the order given.
+If there are more
+.I var
+variable names than elements in
+.IR arglist ,
+the remaining variables are set to the empty string.
+Note that
+.I cmd
+is only used for forming error messages.
 .TP
 .BI "::gmautil::upgrade " destination " " tmp " " url " " file " " old " " new " " strip " " launch " " msg " " proxy " " curl
 This function facilitates automatic upgrades within an application. The application is downloaded using the CURL
@@ -139,6 +256,33 @@ and
 are the current and to-be-installed version numbers. Warnings will be issued before
 downgrading. The routine will refuse to continue if the versions are equal to each other.
 .RE
+.TP
+.BI "::gmautil::verify " data " " signature
+Given a binary data string
+.IR data ,
+return true if the binary cryptographic signature
+in
+.I signature
+is valid for that data. This uses our built-in
+product public key.
+.TP
+.BI "::gmautil::version_compare " v1 " " v2
+Compares two version number strings to see which order they should go in, chronologically.
+Each string must consist of one or more integers (as ASCII digit sequences) separated by dots.
+The first such number is the most significant (major) version, the next is the next-most significant
+sub-version within the major one, and so forth. Thus, 1.2 comes before 1.10, 2.2.4 comes before 2.3, etc.
+Returns 0 if 
+.I v1
+and
+.I v2
+are equal or equivalent, a number <0 if
+.IR v1 < v2
+(i.e.,
+.I v1
+comes before
+.IR v2 ), 
+or a number >0 if
+.IR v1 > v2 .
 '\" <</>>
 .SH DIAGNOSTICS
 .LP
@@ -150,6 +294,10 @@ An exception is thrown if a serious error is encountered.
 Steve Willoughby / steve@madscience.zone.
 .SH HISTORY
 .LP
+This document describes version 1.1 of the 
+.B gmautil
+package, released in December 2022.
+.LP
 Initial version created 17 July 2020.
 .SH COPYRGHT
-Part of the GMA software suite, copyright \(co 1992\-2022 by Steven L. Willoughby, Aloha, Oregon, USA. All Rights Reserved. Distributed under BSD-3-Clause License. \"@m(c)@
+Part of the GMA software suite, copyright \(co 1992\-2023 by Steven L. Willoughby, Aloha, Oregon, USA. All Rights Reserved. Distributed under BSD-3-Clause License. \"@m(c)@
