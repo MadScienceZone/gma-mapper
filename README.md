@@ -72,6 +72,6 @@ Also uses a modified version of [Silk Icons](http://www.famfamfam.com/lab/icons/
 
 ## Game System Neutral
 The GMA software and the gma-mapper client in this repository are intended to be game-system-neutral.
-They are not written specifically for, nor intended spevfically for use with, the oldest fantasy role-playing game,
+They are not written specifically for, nor intended specifically for use with, the oldest fantasy role-playing game,
 nor do they rely upon OGL-licensed intellectual property from Wizards of the Coast. Where any game system 
 was in mind for these tools, it was the Pathfinder role-playing game system from Paizo, Inc.
