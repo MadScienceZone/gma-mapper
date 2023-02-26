@@ -5,16 +5,16 @@ pack [::gmaclock::widget .c -- -width 200 -height 200]
 update
 ::gmaclock::draw_face .c
 ::gmaclock::set_time_value .c 1423842384
-::gmaclock::update_clock .c
+::gmaclock::_update_clock .c
 
 proc advance {} {
 	global adv
 	if {[incr adv] > 100} {
-		::gmaclock::stop_clock .c 1 sc
+		::gmaclock::_stop_clock .c 1 sc
 		return
 	}
 	::gmaclock::advance_clock .c 1
-	::gmaclock::update_clock .c
+	::gmaclock::_update_clock .c
 	after 100 advance
 }
 proc sc {} {
@@ -26,19 +26,19 @@ proc sc {} {
 proc c_advance {} {
 	global adv
 	if {[incr adv] > 100} {
-		::gmaclock::stop_combat .c 1 sk
+		::gmaclock::_stop_combat .c 1 sk
 		return
 	}
 	::gmaclock::advance_clock .c 1
 	::gmaclock::advance_delta .c 1
-	::gmaclock::update_combat .c
+	::gmaclock::_update_combat .c
 	after 100 c_advance
 }
 
 proc sk {} {
 	global adv
 	set adv 0
-	::gmaclock::start_clock .c 0 advance
+	::gmaclock::_start_clock .c 0 advance
 }
 
 sk

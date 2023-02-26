@@ -63,7 +63,7 @@ proc widget {w args} {
 				dict set _clock_state($w) hand_scale [lindex $args $i]
 			}
 			-calendar {
-				incr i
+incr i
 				if {$i >= [llength $args]} {
 					error "-calendar requires an argument"
 				}
@@ -90,7 +90,7 @@ proc widget {w args} {
 	canvas $w {*}$opts
 #	bind $w <Configure> "::gmaclock::_window_change $w"
 #	_draw_face $w
-	return $w
+return $w
 }
 
 proc draw_face {w} {
@@ -101,8 +101,8 @@ proc draw_face {w} {
 #	_draw_face $w
 #}
 
-# start_clock w ?scale=0? ?callback?
-proc start_clock {w {scale 0} {callback {}}} {
+# _start_clock w ?scale=0? ?callback?
+proc _start_clock {w {scale 0} {callback {}}} {
 	variable _clock_state
 
 	$w delete ticks
@@ -111,10 +111,10 @@ proc start_clock {w {scale 0} {callback {}}} {
 		_draw_hand $w $p $hm 0.95 1 [expr 0.95-(0.1*$scale)] 2 {face ticks}
 	}
 	if {$scale < 1} {
-		update_clock $w $scale
-		after 10 [list ::gmaclock::start_clock $w [expr $scale+0.01] $callback]
+		_update_clock $w $scale
+		after 10 [list ::gmaclock::_start_clock $w [expr $scale+0.01] $callback]
 	} else {
-		update_clock $w
+		_update_clock $w
 		if {$callback ne {}} {
 			{*}$callback
 		}
@@ -136,17 +136,17 @@ proc start_combat {w {scale 0} {callback {}}} {
 	}
 
 	if {$scale < 1} {
-		update_combat $w $scale
+		_update_combat $w $scale
 		after 10 [list ::gmaclock::start_combat $w [expr $scale+0.01] $callback]
 	} else {
-		update_combat $w
+		_update_combat $w
 		if {$callback ne {}} {
 			{*}$callback
 		}
 	}
 }
 
-proc stop_combat {w {scale 1} {callback {}}} {
+proc _stop_combat {w {scale 1} {callback {}}} {
 	variable _clock_state
 
 	if {[dict get $_clock_state($w) dark_mode]} {
@@ -160,19 +160,19 @@ proc stop_combat {w {scale 1} {callback {}}} {
 	}
 
 	if {$scale > 0} {
-		update_combat $w $scale
-		after 10 [list ::gmaclock::stop_combat $w [expr $scale-0.01] $callback]
+		_update_combat $w $scale
+		after 10 [list ::gmaclock::_stop_combat $w [expr $scale-0.01] $callback]
 	} else {
-		update_combat $w
+		_update_combat $w
 		if {$callback ne {}} {
 			{*}$callback
 		}
 	}
-	dict set _clock_state($w) combat_mode false
+dict set _clock_state($w) combat_mode false
 }
 
-# stop_clock w ?scale=1? ?callback?
-proc stop_clock {w {scale 1} {callback {}}} {
+# _stop_clock w ?scale=1? ?callback?
+proc _stop_clock {w {scale 1} {callback {}}} {
 	variable _clock_state
 
 	$w delete ticks
@@ -182,10 +182,10 @@ proc stop_clock {w {scale 1} {callback {}}} {
 		_draw_hand $w $p $hm 0.95 1 [expr 0.95-(0.1*$scale)] 2 {face ticks}
 	}
 	if {$scale > 0} {
-		update_clock $w $scale
-		after 10 [list ::gmaclock::stop_clock $w [expr $scale-0.01] $callback]
+		_update_clock $w $scale
+		after 10 [list ::gmaclock::_stop_clock $w [expr $scale-0.01] $callback]
 	} else {
-		update_clock $w 0
+		_update_clock $w 0
 		if {$callback ne {}} {
 			{*}$callback
 		}
@@ -229,8 +229,8 @@ proc _draw_face {w} {
 	$w create oval 5 5 [expr $wd-1] [expr $h-1] -width 4 -tags face -outline $color
 }
 
-# update_clock w ?scale=1? ?-complete? ?-running?
-proc update_clock {w {time_scale 1} args} {
+# _update_clock w ?scale=1? ?-complete? ?-running?
+proc _update_clock {w {time_scale 1} args} {
 	variable _clock_state
 	variable minute_mod
 	variable second_mod
@@ -272,7 +272,7 @@ proc _draw_sweep {w position total length {time_scale 1} args} {
 	}
 }
 
-proc update_combat {w {time_scale 1} {new_delta_time {}}} {
+proc _update_combat {w {time_scale 1} {new_delta_time {}}} {
 	variable _clock_state
 	variable round_units
 	variable minute_units
@@ -449,7 +449,352 @@ proc advance_time {w delta {unit_name {}}} {
 	_recalc $w
 	return [expr [dict get $_clock_state($w) calendar now] - $previous]
 }
+
+
+
+#
+# Initiative tracker
+#
+# from InitiativeDisplayWindow, InitiativeSlot of GMA's MadScienceZone.GMA.GUI.ClockForm
+#
+# initiative_display_window w ?limit=20? ?dark_mode=false? ?frameopts ...? -> w
+variable _window_state
+proc initiative_display_window {w {limit 20} {dark_mode false} args} {
+	variable _window_state
+	#
+	# window paths (under $w)
+	#  timeclock	clock widget
+	#  timedisp	label
+	#  turndisp	label
+	#  turntick	label
+	#  slotN	label for slot #N (as listed in dlist)
+	#
+	# state values of note
+	#  flist	dict of ".sep"|slot#:field-window-path	list of tk fields we're updating
+	#  ilist	dict of slot#:(dict of attr:value (name,hold,ready,health_tracker))
+	#  			health_tracker: dict of attr:value (value)
+	#  dlist	list of slot#s we're displaying
+	#
+
+	set _window_state($w) [dict create \
+		_autosize_last_height	{} \
+		_autosize_inhibit 	false \
+		_autosize_task		{} \
+		combat_mode		false \
+		flist			{} \
+		ilist			{} \
+		limit			$limit \
+		font_name		{Helvetica 24} \
+	]
+
+	frame $w {*}$args
+	if {$dark_mode} {
+		widget $w.timeclock -dark -- -width 200 -height 200
+	} else {
+		widget $w.timeclock -- -width 200 -height 200
+	}
+	pack $w.timeclock -side top
+	pack [label $w.timedisp -anchor n] -side top -fill x
+	pack [label $w.turndisp -anchor n] -side top -fill x
+	pack [label $w.turntick -anchor n] -side top -fill x
+	_start_clock $w.timeclock
+	bind $w <Configure> "::gmaclock::autosize $w"
+	return $w
 }
+
+proc set_font_name {w name} {
+	variable _window_state
+	dict set _window_state($w) font_name $name
+}
+
+# prevent too many calls to _autosize at once
+proc autosize {w} {
+	variable _window_state
+
+	if {[dict get $_window_state($w) _autosize_inhibit]} {
+		return
+	}
+
+	if {[set taskID [dict get $_window_state($w) _autosize_task]] ne {}} {
+		after cancel $taskID
+	}
+	dict set _window_state($w) _autosize_task [after 500 "::gmaclock::_autosize $w"]
+}
+
+proc _autosize {w} {
+	variable _window_state
+
+	set cur_height [winfo height $w]
+	if {[dict get $_window_state($w) _autosize_last_height] ne {} \
+	&&  [dict get $_window_state($w) _autosize_last_height] == $cur_height} {
+		return
+	}
+
+	dict set _window_state($w) _autosize_last_height $cur_height
+	dict set _window_state($w) _autosize_inhibit true
+
+	set height [expr $cur_height - [winfo height $w.timeclock] - [winfo height $w.timedisp] - [winfo height $w.turndisp]]
+
+	if {[set flist [dict get $_window_state($w) flist]] ne {}} {
+		dict for k fld $flist {
+			pack forget $fld
+			destroy $fld
+		}
+		dict set _window_state($w) flist {}
+	}
+	pack [label $w.test -background #000000 -font [dict get $_window_state($w) font_name] \
+		-foreground #ffffff -text {<---[XXX]--->} -anchor center -relief solid -highlightbackground #ff0000 \
+		-highlightthickness 0] -side top -padx 2 -pady 1 -fill x
+	update
+	set f_height [winfo height $w.test]
+	dict set _window_state($w) limit [expr int($height / $f_height)]
+	pack forget $w.test
+	destroy $w.test
+	
+	update_initiative_slots $w {} -force
+	update
+	dict set _window_state($w) _autosize_task {}
+	dict set _window_state($w) _autosize_inhibit false
+}
+
+# update_initiative_slots w ?limit={}? ?-force?
+proc update_initiative_slots {w {limit {}} args} {
+	variable _window_state
+
+	set force_redraw false
+	if {[set dark_mode [dict get $_window_state($w) dark_mode]]} {
+		set flist_fg #ffffff
+		set flist_bg #222222
+		set next_fg  #ffffff
+		set next_bg  #cc0000
+		set cur_bg   #775500
+		set ready_bg #ff0000
+		set hold_bg  #ff7777
+	} else {
+		set flist_fg #000000
+		set flist_bg #ffffff
+		set next_fg  #ffffff
+		set next_bg  #000000
+		set cur_bg   #ffff00
+		set ready_bg #ff0000
+		set hold_bg  #ffaaaa
+	}
+	if {[lsearch -exact $args -force] >= 0} {
+		set force_redraw true
+	}
+	if {$limit eq {}} {
+		set limit [dict get $_window_state($w) limit]
+	}
+	dict for k f [dict get $_window_state($w) flist] {
+		$f configure -background $flist_bg -foreground $flist_fg
+	}
+	if {[dict get $_window_state($w) combat_mode]} {
+		set slot [current_initiative_slot $w]
+		if {$force_redraw && [set flist [dict get $_window_state($w) flist]] ne {}} {
+			dict for k fld $flist {
+				pack forget $fld
+				destroy $fld
+			}
+			dict set _window_state($w) flist {}
+		}
+		# dlist is the display list: all the slot numbers in order in which we display someone
+		set dlist {}
+		set first_slot -1
+		foreach k [lsort -integer [dict keys [dict get $_window_state($w) ilist]] {
+			if {! [dict get $_window_state($w) ilist $k skip]} {
+				lappend dlist $k
+			}
+		}
+		if {[set cur [lsearch $dlist $slot]] >= 0} {
+			if {[set flist [dict get $_window_state($w) flist]] ne {}} {
+				dict for k fld $flist {
+					pack forget $fld
+					destroy $fld
+				}
+				dict set _window_state($w) flist {}
+			}
+			if {[llength $dlist] > $limit} {
+				set first_slot [lindex $dlist 0]
+				if {$cur < $limit/2} {
+					if {[dict get $_clock_state($w.timeclock) delta_time] >= 60} {
+						incr cur [llength $dlist]
+						lappend dlist {*}$dlist
+						set dlist [lrange $dlist [expr $cur-int($limit/2)] end]
+					}
+					set dlist [lrange $dlist 0 [expr $limit-1]]
+				} else {
+					lappend dlist {*}$dlist
+					set dlist [lrange $dlist [expr $cur-int($limit/2)] end]
+					set dlist [lrange $dlist 0 [expr $limit-1]]
+				}
+			}
+
+			foreach i $dlist {
+				if {$first_slot >= 0 && $i == $first_slot} {
+					dict set _window_state($w) flist .sep [label $w.sep -background $next_bg \
+						-foreground $next_fg -text "NEXT ROUND" -relief solid
+					pack $w.sep -side top -padx 2 -pady 1 -fill x
+				}
+				dict set _window_state($w) flist $i [label $w.slot$i -background $flist_bg -foreground $flist_fg \
+					-font [dict get $_window_state($w) font_name \
+					-text [dict get $_window_state($w) ilist $i name] -anchor n -relief solid]
+				pack $w.slot$i -side top -padx 2 -pady 1 -fill x
+				if {$i == $slot} {
+					$w.slot$i configure -background $cur_bg
+				} elseif {[dict get $_window_state($w) ilist $i hold]} {
+					if {[dict get $_window_state($w) ilist $i ready]} {
+						$w.slot$i configure -background $ready_bg
+					} else {
+						$w.slot$i configure -background $hold_bg
+					}
+				}
+
+				if {[dict get $_window_state($w) ilist $i health_tracker] ne {}} {
+					if {[dict get $_window_state($w) ilist $i health_tracker value] == 0} {
+						$w.slot$i configure -highlightbackground #ff0000 -highlightcolor #ff0000 -highlightthickness 4
+					} elseif {[dict get $_window_state($w) ilist $i health_tracker value] < 0} {
+						$w.slot$i configure -highlightbackground #000000 -highlightcolor #000000 -highlightthickness 4
+						if {$dark_mode} {
+							$w.slot$i configure -foreground #ffffff -background #000000
+						}
+					} elseif {[dict get $_window_state($w) ilist $i health_tracker is_flat_footed]} {
+						$w.slot$i configure -highlightbackground #3333ff -highlightcolor #3333ff -highlightthickness 4
+					} else {
+						$w.slot$i configure -highlightbackground #000000 -highlightcolor #000000 -highlightthickness 0
+					}
+				}
+			}
+		} else {
+			if {[dict get $_window_state($w) flist] eq {}} {
+				set i 0
+				foreach slot [lsort -integer [dict keys [dict get $_window_state($w) ilist]] {
+					if {$i < $limit} {
+						dict set _window_state($w) flist $slot [label $w.slot$slot -background $flist_bg \
+							-font [dict get $_window_state($w) font_name] \
+							-text [dict get $_window_state($w) ilist $slot name] \
+							-anchor n -relief solid]
+						pack $w.slot$slot -side top -padx 2 -pady 1 -fill x
+					}
+				}
+			}
+
+			dict for i v [dict get $_window_state($w) flist] {
+				if {$i eq {.sep}} {
+					continue
+				}
+				if {[dict get $_window_state($w) ilist $i hold]} {
+					if {[dict get $_window_state($w) ilist $i ready]} {
+						$w.slot$i configure -background $ready_bg
+					} else {
+						$w.slot$i configure -background $hold_bg
+					}
+				} else {
+					$w.slot$i configure -background $flist_bg
+				}
+
+				if {[dict get $_window_state($w) ilist $i health_tracker] ne {}} {
+					if {[dict get $_window_state($w) ilist $i health_tracker value] == 0} {
+						$w.slot$i configure -highlightbackground #ff0000 -highlightcolor #ff0000 -highlightthickness 4
+					} elseif {[dict get $_window_state($w) ilist $i health_tracker value] < 0} {
+						$w.slot$i configure -highlightbackground #000000 -highlightcolor #000000 -highlightthickness 4
+						if {$dark_mode} {
+							$w.slot$i configure -background #000000 -foreground #ffffff
+						}
+					} elseif {[dict get $_window_state($w) ilist $i health_tracker is_flat_footed]} {
+						$w.slot$i configure -highlightbackground #3333ff -highlightcolor #3333ff -highlightthickness 4
+					} else {
+						$w.slot$i configure -highlightbackground #000000 -highlightcolor #000000 -highlightthickness 0
+					}
+				}
+			}
+		}
+	} else {
+		if {[dict get $_window_state($w) flist] ne {}} {
+			dict for k f [dict get $_window_state($w) flist] {
+				pack forget $f
+				destroy $f
+			}
+			dict set _window_state($w) flist {}
+		}
+	}
+	update
+}
+
+
+
+
+				
+
+
+
+
+}
+# combat_mode w enabled		call in response to CO from server
+proc combat_mode {w enabled} {
+	error "not implemented"
+}
+
+# start_clock w ?clockwidget-opts...?
+proc start_clock {w args} {
+	variable _window_state
+	dict set _window_state($w) combat_mode false
+	_start_clock $w.timeclock {*}$args
+	update_clock $w
+}
+
+# start_combat w ?clockwidget-opts...?
+proc start_combat {w args} {
+	variable _window_state
+	variable _clock_state
+
+	dict set _window_state($w) combat_mode true
+	_start_combat $w.timeclock {*}$args
+	update_combat $w [dict get $_clock_state($w.timeclock) delta_time]
+}
+
+proc stop_clock {w args} { _stop_clock $w.timeclock {*}$args}
+proc stop_combat {w args} { _stop_combat $w.timeclock {*}$args}
+	
+# update_clock w ?clockwidget-opts...?
+proc update_clock {w args} {
+	_update_clock $w.timeclock {*}$args
+	$w.timedisp configure -text [to_string 4]
+	$w.turndisp configure -text {}
+	update_initiative_slots $w
+}
+
+# update_combat w ?new_delta_time=0?
+proc update_combat {w {new_delta_time 0}} {
+	variable _clock_state
+	_update_combat $w.timeclock 1 $new_delta_time
+	$w.timedisp configure -text [to_string 4]
+	$w.turndisp configure -text [delta_string [dict get $_clock_state delta_time]]
+	update_initiative_slots $w
+}
+
+# set_initiative_slots w newlist ?-force?
+proc set_initiative_slots {w newlist args} {
+	variable _window_state
+	if {[dict get $_window_state($w) ilist] ne $newlist} {
+		dict set _window_state($w) ilist $newlist
+		update_initiative_slots $w {} -force
+	}
+}
+
+# current_initiative_slot w -> slot_no
+proc current_initiative_slot {w} {
+	variable _clock_state
+	return [expr [dict get $_clock_state($w.timeclock) delta_time] % 60]
+}
+
+# to_string style -> string
+# delta_string delta -> string	(strict assumed false)
+#
+# CO	combat_mode w
+# UC	set elapsed=rel {set_time_value w abs} {update_combat delta=elapsed --OR-- update_clock ?-running?}
+# IL	rebuild slotlist
+# OA	track flat-footed condition for @name
+
 #
 # @[00]@| GMA 5.0.0
 # @[01]@|
