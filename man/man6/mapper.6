@@ -1791,49 +1791,6 @@ Clients MUST NOT send this command to each other; it is intended for the server 
 The payload includes the same fields as the
 .B PS
 command.
-'\" <<desc>>
-'\".RS
-'\".TP 8
-'\".B Name
-'\"The name of the creature as displayed on the map. As with the 
-'\".B \-c
-'\"option, this has the format
-'\".RI [ image\fB=\fP ] name
-'\"which allows for creatures whose image names are different than their character name.
-'\".TP
-'\".B ObjID
-'\"The fixed ID for this creature. This will be used for internal references to this object on the map.
-'\".TP
-'\".B Color
-'\"The color to use when shading in the creature's threatened space when it has initiative to act.
-'\"The
-'\".I color
-'\"value may be in the form 
-'\".BI # rgb \fR,\fP
-'\".BI # rrggbb \fR,\fP
-'\".BI # rrrgggbbb \fR,\fP
-'\".BI # rrrrggggbbbb \fR,\fP
-'\"or a color name as defined by the local system. (For example, on a Unix-like system which uses the standard
-'\".I rgb.txt
-'\"file, a certain shade of blue with 8-bit values for red=0x46, green=0x82, and blue=0xb4, 
-'\"could be specified as 
-'\".RB \*(lq #4682b4 \*(rq
-'\"or 
-'\".RB \*(lq "steel blue" \*(rq).
-'\".TP
-'\".B Area
-'\"The size of the area threatened by the creature on the map. This can be the number of squares in diameter,
-'\"but more commonly it should be a standard size code such as 
-'\".RB \*(lq M \*(rq
-'\"for medium-size creatures.
-'\".TP
-'\".B Size
-'\"The size occupied by the creature on the map. This can be the number of squares in diameter,
-'\"but more commonly it should be a standard size code such as 
-'\".RB \*(lq M \*(rq
-'\"for medium-size creatures.
-'\".RE
-'\" <</>>
 .TP
 .B ACCEPT
 A client sends this message to the server to indicate that from this point
@@ -2069,7 +2026,6 @@ Calculation of the
 field is as follows.
 .LP
 Given:
-'\" <<desc>>
 '\" <<TeX>>
 '\" \begin{align*}
 '\"  C & \text{ is the server's challenge as a binary string of bytes }\\
@@ -2089,6 +2045,7 @@ Given:
 '\"   \item Let $D=D'$.
 '\"  \end{enumerate}
 '\" \end{enumerate}
+.\" <<desc>>
 .TP 5
 .I C
 is the server's challenge as a binary string of bytes (after decoding from the base-64 string actually sent by the server),
@@ -2105,12 +2062,12 @@ means to concatenate strings
 .I x
 and 
 .IR y ,
-'\" <</>>
+.\" <</>>
 .LP
 To calculate the
 .I response
 string, the client must do the following:
-'\" <<enum>>
+.\" <<enum>>
 .TP 4
 (1)
 Obtain
@@ -2128,13 +2085,11 @@ Repeat
 .I i
 times: Calculate 
 .IR D '=H( P || D "); then let " D = D '
+.\" <</>>
 '\" <</TeX>>
-'\" <</>>
 .LP
 The binary value of 
-'\" <</ital-is-var>>
 .I D
-'\" <<ital-is-var>>
 is then encoded using base-64 and sent as the
 .I response
 value.
@@ -2162,12 +2117,12 @@ The payload is a JSON object with the following fields:
 '\" <<desc>>
 .RS
 .TP
-.BI XView " (float)
+.BI XView " (float)"
 The fraction of full distance the
 .IR x -axis
 scrollbar should be moved to.
 .TP
-.BI YView " (float)
+.BI YView " (float)"
 As
 .IR xview ,
 but for the 
@@ -2228,7 +2183,6 @@ which removes a creature token whose display name matches the
 value.
 .RE
 '\" <</>>
-
 .TP
 .B CLR@
 This command tells the client to \*(lqunload\*(rq the contents of a map
@@ -2298,16 +2252,9 @@ If true, the client successfully negotiated the server's authentication process.
 .TP
 .BI IsMe " (bool)"
 If true, this object describes the client which received this command.
-'\".TP
-'\".BI IsMain " (bool)"
-'\"If true, the client is running as the \*(lqmain\*(rq or \*(lqprimary\*(rq
-'\"client.
-'\".TP
-'\".BI IsWriteOnly " (bool)"
-'\"If true, the client has requested not to receive most commands from the server.
-'\" <<//>>
+'\" <</>>
 .RE
-'\" <<//>>
+'\" <</>>
 .RE
 .TP
 .B CS
@@ -2496,8 +2443,7 @@ then the condition is effectively removed from the list of conditions
 known to the mapper. Creature conditions are in effect if their name appears in the list value
 for that creature's 
 .B STATUSLIST
-attribute.\" as documented in
-'\".BR mapper (5).
+attribute.
 The mapper comes with the following conditions pre-defined:
 .BR "ability drained" ,
 .BR bleed ,
@@ -2576,6 +2522,7 @@ that they are all visible at the same time. This value may be one of the
 '\"\end{table}
 following:
 .RS
+.\" <<desc>>
 .TP
 .B |v
 A small downward-pointing triangle against the middle of the left edge of the token.
@@ -2643,6 +2590,7 @@ A large diamond drawn around the entire token.
 A large circle drawn around the entire token.
 (This is an upper-case letter \*(lqO\*(rq.)
 .RE
+.\" <</>>
 '\" <</TeX>>
 .TP
 .B Color
@@ -2943,10 +2891,13 @@ If true, this element MUST NOT be displayed on-screen.
 .BI Locked " (bool)"
 If true, this element MUST NOT be edited further by clients.
 '\" <</>>
+.RS
 .LP
-Each of the following commands defines a different kind of map element:
-'\" <<desc>>
-.TP 10
+Each of the following commands which begin with 
+.B LS-
+defines a different kind of map element.
+.RE
+.TP
 .B LS-ARC
 Draws an arc on the canvas. 
 The arc is drawn around the circumference
@@ -2972,7 +2923,7 @@ Arc; does not connect the endpoints to anything else.
 .TP
 2
 Chord; connects the endpoints to each other via a straight line segment.
-'\" <<//>>
+'\" <</>>
 .RE
 .TP
 .BI Start " (float)"
@@ -3171,8 +3122,6 @@ The bounding-box height for the region bordering the image.
 The bounding-box width for the region bordering the image.
 '\" <</>>
 .RE
-'\" <</>>
-.RE
 .TP
 .B MARCO
 Status check. If received, reply with a 
@@ -3209,29 +3158,6 @@ The
 coordinate of the marker.
 '\" <</>>
 .RE
-'\" **.TP
-'\" **.B NO
-'\" **Request that the server send no more data to the client.
-'\" **.TP
-'\" **.B NO+
-'\" **Same as 
-'\" **.BR NO ,
-'\" **but the client is also asserting primary control role to the other clients.
-'\" **(This is generally done by the GM console. The effect is that the server sends
-'\" **a 
-'\" **.RB \*(lq TB
-'\" **.BR 0 \*(rq
-'\" **command to tell all mapper clients to turn off their toolbars (unless, of course,
-'\" **they were invoked with the
-'\" **.B \-\-keep\-tools
-'\" **option) and the server will automatically tell all clients which connect after this
-'\" **point to start with their toolbars disabled as well.)
-'\" **Once all \*(lqprimary\*(rq clients (those who issued this command) have disconnected,
-'\" **the server will stop telling new clients to turn off their toolbars.
-'\" **'\" <</ital-is-var>>
-'\" **.I "This is deprecated. In the future, the concept of a primary client will not be"
-'\" **.I "supported by servers, and management of toolbars will be at the clients' discretion."
-'\" **'\" <<ital-is-var>>
 .TP
 .B OA
 Updates attributes of a specified map object. Any attributes not listed in the
@@ -3317,7 +3243,6 @@ It is not an error if the value wasn't there to begin with.
 '\" <</>>
 .TP
 .B OK
-'\" **.BI "OK " v " \fR[\fP" challenge \fR]\fP
 The server sends this to the client when it is ready for the client to start
 sending commands to it. The accompanying JSON payload includes the following
 fields:
@@ -3650,6 +3575,7 @@ The value for this part of the result (as a string).
 .RE
 '\" <</>>
 .RE
+'\" <</>>
 .RE
 .TP
 .B SYNC
@@ -4017,9 +3943,6 @@ modern *NIX-like platform (tested on FreeBSD 12.0, Ubuntu 18.04 LTS, and Ubuntu 
 .LP
 It was also tested (briefly) on Windows 10. Specific notes about
 using it on that platform are in the following section.
-'\"Whether it will run correctly on Microsoft Windows is anyone's guess. It should at least have some
-'\"code added to properly handle what pathnames look like on that platform, but fully porting it to
-'\"Windows should be a fairly easy job to perform.
 .SH "WINDOWS USAGE"
 .LP
 To install on Windows, you will need to install the following

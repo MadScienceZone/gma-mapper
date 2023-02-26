@@ -738,6 +738,7 @@ is true, the client is also signalling that it wishes to be the primary client i
 This package will invoke the following procedures in the main application to carry out
 its operations, typically in response to having received a server command for the client
 to do something.
+'\" <<list>>
 .TP 10
 .BI "::DEBUG " level " " message
 This is called to report a diagnostic condition or provide some level of verbose detail
@@ -763,6 +764,7 @@ parameter is a dictionary of values as sent by the server.
 Handles any error encountered when trying to execute a
 .BI ::DoCommand cmd
 call.
+'\" <</>>
 .SH DIAGNOSTICS
 .LP
 An exception is thrown if a serious error is encountered.
