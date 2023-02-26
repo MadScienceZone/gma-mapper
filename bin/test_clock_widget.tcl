@@ -20,7 +20,7 @@ proc advance {} {
 proc sc {} {
 	global adv
 	set adv 0
-	::gmaclock::start_combat .c 0 c_advance
+	::gmaclock::_start_combat .c 0 c_advance
 }
 
 proc c_advance {} {

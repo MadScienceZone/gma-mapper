@@ -94,7 +94,7 @@ return $w
 }
 
 proc draw_face {w} {
-	_draw_face $w
+	_draw_face $w.timeclock
 }
 
 #proc _window_change {w} {
@@ -121,7 +121,7 @@ proc _start_clock {w {scale 0} {callback {}}} {
 	}
 }
 
-proc start_combat {w {scale 0} {callback {}}} {
+proc _start_combat {w {scale 0} {callback {}}} {
 	variable _clock_state
 
 	dict set _clock_state($w) combat_mode true
@@ -137,7 +137,7 @@ proc start_combat {w {scale 0} {callback {}}} {
 
 	if {$scale < 1} {
 		_update_combat $w $scale
-		after 10 [list ::gmaclock::start_combat $w [expr $scale+0.01] $callback]
+		after 10 [list ::gmaclock::_start_combat $w [expr $scale+0.01] $callback]
 	} else {
 		_update_combat $w
 		if {$callback ne {}} {
@@ -459,6 +459,16 @@ proc advance_time {w delta {unit_name {}}} {
 #
 # initiative_display_window w ?limit=20? ?dark_mode=false? ?frameopts ...? -> w
 variable _window_state
+proc dest {w} {
+	variable _window_state
+	destroy_clock $w.timeclock
+
+	if {[info exists _window_state($w)]} {
+		catch { $w destroy }
+		array unset _window_state $w
+	}
+}
+
 proc initiative_display_window {w {limit 20} {dark_mode false} args} {
 	variable _window_state
 	#
@@ -472,7 +482,7 @@ proc initiative_display_window {w {limit 20} {dark_mode false} args} {
 	# state values of note
 	#  flist	dict of ".sep"|slot#:field-window-path	list of tk fields we're updating
 	#  ilist	dict of slot#:(dict of attr:value (name,hold,ready,health_tracker))
-	#  			health_tracker: dict of attr:value (value)
+	#  			health_tracker: dict of attr:value (value,is_flat_footed)
 	#  dlist	list of slot#s we're displaying
 	#
 
@@ -720,20 +730,6 @@ proc update_initiative_slots {w {limit {}} args} {
 	update
 }
 
-
-
-
-				
-
-
-
-
-}
-# combat_mode w enabled		call in response to CO from server
-proc combat_mode {w enabled} {
-	error "not implemented"
-}
-
 # start_clock w ?clockwidget-opts...?
 proc start_clock {w args} {
 	variable _window_state
@@ -772,14 +768,6 @@ proc update_combat {w {new_delta_time 0}} {
 	update_initiative_slots $w
 }
 
-# set_initiative_slots w newlist ?-force?
-proc set_initiative_slots {w newlist args} {
-	variable _window_state
-	if {[dict get $_window_state($w) ilist] ne $newlist} {
-		dict set _window_state($w) ilist $newlist
-		update_initiative_slots $w {} -force
-	}
-}
 
 # current_initiative_slot w -> slot_no
 proc current_initiative_slot {w} {
@@ -795,6 +783,86 @@ proc current_initiative_slot {w} {
 # IL	rebuild slotlist
 # OA	track flat-footed condition for @name
 
+# CO {Enabled:bool}
+# combat_mode w enabled callback
+proc combat_mode {w enabled callback} {
+	variable _window_state
+	if {$enabled} {
+		if {! [dict get $_window_state($w) combat_mode]} {
+			stop_clock $w 1 [list ::gmaclock::start_combat $w 0 $callback]
+		}
+	} else {
+		if {[dict get $_window_state($w) combat_mode]} {
+			stop_combat $w 1 [list ::gmaclock::start_clock $w 0 $callback]
+		}
+	}
+}
+
+# CS {Absolute:int, Relative:int, Running:bool}
+# update_time w abs rel	?-running? ?clockwidgetopts...?
+proc update_time {w absolute relative args} {
+	variable _window_state
+	set_time_value $w.timeclock $absolute
+	if {[dict get $_window_state($w) combat_mode]} {
+		update_combat $w $relative
+	} else {
+		update_clock $w {*}$args
+	}
+}
+
+# IL {InitiativeList:[Slot:int, CurrentHP:int, Name:str, IsHolding:bool, HasReadiedAction:bool, IsFlatFooted:bool ...]}
+# set_initiative_slots w slotlist ?-force?  (slotlist is a list of slot dicts as above; -force to force redraw)
+proc set_initiative_slots {w newlist args} {
+	variable _window_state
+	set newdict {}
+	foreach slotdict $newlist {
+		dict set newdict [dict get $slotdict Slot] [dict create \
+			name	[dict get $slotdict Name] \
+			hold	[dict get $slotdict IsHolding] \
+			ready	[dict get $slotdict HasReadiedAction] \
+			health_tracker [dict create \
+				value [dict get $slotdict CurrentHP] \
+				is_flat_footed [dict get $slotdict IsFlatFooted] \
+			]\
+		]
+	}
+
+	dict set _window_state($w) ilist $newdict
+	update_initiative_slots $w {} {*}$args
+}
+
+
+# OA {ObjID:@name, NewAttrs:{Health:{IsFlatFooted:bool ...} ...}}
+# track_health_change w oadict
+proc track_health_change {w oadict} {
+	variable _window_state
+
+	# we're only interested in targets with @<name> format
+	if {[string length [set name [dict get $oadict ObjID]]] > 1 && [string range $name 0 0] eq {@}} {
+		set name [string range $name 1 end]
+		dict for slot_no slot_data [dict get $_window_state($w) ilist] {
+			# and only if <name> is in the initiative list
+			if {[dict get $slot_data name] eq $name} {
+				# and only if we're getting an update to their health status
+				if {[dict exists $oadict NewAttrs Health]} {
+					set ff [dict get $oadict NewAttrs Health IsFlatFooted]
+					if {bool($ff) != bool([dict get $slot_data health_tracker is_flat_footed])} {
+						dict set _window_state($w) ilist $slot_no health_tracker is_flat_footed $ff
+						update_initiative_slots $w
+						return
+					}
+				}
+			}
+		}
+	}
+}
+
+proc exists {w} {
+	variable _window_state
+	return [info exists _window_state($w)]
+}
+
+}
 #
 # @[00]@| GMA 5.0.0
 # @[01]@|
