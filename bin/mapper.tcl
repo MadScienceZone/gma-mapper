@@ -1939,6 +1939,9 @@ proc setCombatMode {mode} {
 	global MOB_COMBATMODE MOB_BLINK ClockDisplay
 	
 	set MOB_COMBATMODE $mode
+	if {[::gmaclock::exists .initiative.clock]} {
+		::gmaclock::combat_mode .initiative.clock $mode
+	}
 	.toolbar.combat configure -relief [expr $MOB_COMBATMODE ? {{sunken}} : {{raised}}]
 	if {$MOB_COMBATMODE} {
 #		bind . <Key-comma> "MobTurn prev"
@@ -7976,7 +7979,7 @@ proc DoCommandCS {d} {
 
 proc DoCommandIL {d} {
 	if {[::gmaclock::exists .initiative.clock]} {
-		::gmaclock::set_initiative_slots [dict get $d InitiativeList]
+		::gmaclock::set_initiative_slots .initiative.clock [dict get $d InitiativeList]
 	}
 }
 
@@ -10515,12 +10518,15 @@ proc display_initiative_clock {} {
 	::gmaclock::dest .initiative.clock
 	catch {destroy .initiative}
 	toplevel .initiative -background $global_bg_color
+	wm title .initiative "Game Clock"
 	wm protocol .initiative WM_DELETE_WINDOW {
 		::gmaclock::dest .initiative.clock
 		destroy .initiative
 	}
 
 	::gmaclock::initiative_display_window .initiative.clock 20 $dark_mode -background $global_bg_color
+	::gmaclock::set_font_name .initiative.clock {Helvetica 16} -time
+	::gmaclock::set_font_name .initiative.clock {Helvetica 24}
 	pack .initiative.clock -side top -fill both -expand 1
 	update
 	::gmaclock::draw_face .initiative.clock
