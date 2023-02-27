@@ -496,6 +496,7 @@ proc initiative_display_window {w {limit 20} {dark_mode false} args} {
 		ilist			{} \
 		limit			$limit \
 		font_name		{Helvetica 24} \
+		time_font_name		{Helvetica 24} \
 	]
 
 	frame $w {*}$args
@@ -505,17 +506,26 @@ proc initiative_display_window {w {limit 20} {dark_mode false} args} {
 		widget $w.timeclock -- -width 200 -height 200
 	}
 	pack $w.timeclock -side top
-	pack [label $w.timedisp -anchor n] -side top -fill x
-	pack [label $w.turndisp -anchor n] -side top -fill x
-	pack [label $w.turntick -anchor n] -side top -fill x
+	set font_name [dict get $_window_state($w) time_font_name]
+	pack [label $w.timedisp -anchor n -font $font_name] -side top -fill x
+	pack [label $w.turndisp -anchor n -font $font_name] -side top -fill x
+	#pack [label $w.turntick -anchor n -font $font_name] -side top -fill x
 	_start_clock $w.timeclock
 	bind $w <Configure> "::gmaclock::autosize $w"
 	return $w
 }
 
-proc set_font_name {w name} {
+# set_font_name fontname ?-time?
+proc set_font_name {w name args} {
 	variable _window_state
-	dict set _window_state($w) font_name $name
+	if {[lsearch -exact $args -time] >= 0} {
+		dict set _window_state($w) time_font_name $name
+		$w.timedisp configure -font $name
+		$w.turndisp configure -font $name
+		#$w.turntick configure -font $name
+	} else {
+		dict set _window_state($w) font_name $name
+	}
 }
 
 # prevent too many calls to _autosize at once
@@ -571,6 +581,7 @@ proc _autosize {w} {
 # update_initiative_slots w ?limit={}? ?-force?
 proc update_initiative_slots {w {limit {}} args} {
 	variable _window_state
+	variable _clock_state
 
 	set force_redraw false
 	if {[set dark_mode [dict get $_window_state($w) dark_mode]]} {
@@ -609,13 +620,9 @@ proc update_initiative_slots {w {limit {}} args} {
 			dict set _window_state($w) flist {}
 		}
 		# dlist is the display list: all the slot numbers in order in which we display someone
-		set dlist {}
 		set first_slot -1
-		foreach k [lsort -integer [dict keys [dict get $_window_state($w) ilist]] {
-			if {! [dict get $_window_state($w) ilist $k skip]} {
-				lappend dlist $k
-			}
-		}
+		set dlist [lsort -integer [dict keys [dict get $_window_state($w) ilist]]] 
+
 		if {[set cur [lsearch $dlist $slot]] >= 0} {
 			if {[set flist [dict get $_window_state($w) flist]] ne {}} {
 				dict for {k fld} $flist {
@@ -643,11 +650,11 @@ proc update_initiative_slots {w {limit {}} args} {
 			foreach i $dlist {
 				if {$first_slot >= 0 && $i == $first_slot} {
 					dict set _window_state($w) flist .sep [label $w.sep -background $next_bg \
-						-foreground $next_fg -text "NEXT ROUND" -relief solid
+						-foreground $next_fg -text "NEXT ROUND" -relief solid]
 					pack $w.sep -side top -padx 2 -pady 1 -fill x
 				}
 				dict set _window_state($w) flist $i [label $w.slot$i -background $flist_bg -foreground $flist_fg \
-					-font [dict get $_window_state($w) font_name \
+					-font [dict get $_window_state($w) font_name] \
 					-text [dict get $_window_state($w) ilist $i name] -anchor n -relief solid]
 				pack $w.slot$i -side top -padx 2 -pady 1 -fill x
 				if {$i == $slot} {
@@ -678,7 +685,7 @@ proc update_initiative_slots {w {limit {}} args} {
 		} else {
 			if {[dict get $_window_state($w) flist] eq {}} {
 				set i 0
-				foreach slot [lsort -integer [dict keys [dict get $_window_state($w) ilist]] {
+				foreach slot [lsort -integer [dict keys [dict get $_window_state($w) ilist]]] {
 					if {$i < $limit} {
 						dict set _window_state($w) flist $slot [label $w.slot$slot -background $flist_bg \
 							-font [dict get $_window_state($w) font_name] \
@@ -755,7 +762,7 @@ proc stop_combat {w args} { _stop_combat $w.timeclock {*}$args}
 # update_clock w ?clockwidget-opts...?
 proc update_clock {w args} {
 	_update_clock $w.timeclock {*}$args
-	$w.timedisp configure -text [to_string $w.timeclock 4]
+	$w.timedisp configure -text [to_string $w.timeclock 2]
 	$w.turndisp configure -text {}
 	update_initiative_slots $w
 }
@@ -764,8 +771,8 @@ proc update_clock {w args} {
 proc update_combat {w {new_delta_time 0}} {
 	variable _clock_state
 	_update_combat $w.timeclock 1 $new_delta_time
-	$w.timedisp configure -text [to_string $w.timeclock 4]
-	$w.turndisp configure -text [delta_string [dict get $_clock_state($w) delta_time]]
+	$w.timedisp configure -text [to_string $w.timeclock 2]
+	$w.turndisp configure -text [delta_string [dict get $_clock_state($w.timeclock) delta_time]]
 	update_initiative_slots $w
 }
 
@@ -779,16 +786,32 @@ proc current_initiative_slot {w} {
 # to_string w style -> string
 proc to_string {w style} {
 	variable _clock_state
+	variable month_info
 
-	if {$style != 4} {
-		error "style $style not implemented"
+	switch $style {
+		2 {	;# style 2: dd-MMM-yyyy HH:MM:SS.T
+			return [format "%02d-%s-%d %02d:%02d:%02d.%d" \
+				[dict get $_clock_state($w) calendar date] \
+				[lindex [lindex $month_info [dict get $_clock_state($w) calendar month]-1] 1]\
+				[dict get $_clock_state($w) calendar year] \
+				[dict get $_clock_state($w) calendar hour] \
+				[dict get $_clock_state($w) calendar minute] \
+				[dict get $_clock_state($w) calendar second] \
+				[dict get $_clock_state($w) calendar tick] \
+			]
+		}
+		4 {	;# style 4: HH:MM:SS.T
+			return [format "%02d:%02d:%02d.%d" \
+				[dict get $_clock_state($w) calendar hour] \
+				[dict get $_clock_state($w) calendar minute] \
+				[dict get $_clock_state($w) calendar second] \
+				[dict get $_clock_state($w) calendar tick] \
+			]
+		}
+		default {
+			error "date style $style not supported"
+		}
 	}
-	return [format "%02d:%02d:%02d.%d" \
-		[dict get $_clock_state($w) calendar hour] \
-		[dict get $_clock_state($w) calendar minute] \
-		[dict get $_clock_state($w) calendar second] \
-		[dict get $_clock_state($w) calendar tick] \
-	]
 }
 # delta_string delta ?-strict? -> string	(strict assumed false)
 proc delta_string {delta args} {
@@ -848,17 +871,19 @@ proc delta_string {delta args} {
 	}
 	
 	set res $sign
-	if {$delta >= $day_units} {
-		append res [expr $delta / $day_units] :
+	set days [expr $delta / $day_units]
+	set hours [expr $delta / $hour_units % $hour_mod]
+	if {$days > 0} {
+		append res $days {d }
 	}
-	if {$delta >= $hour_units} {
-		append res [format "%02d:" [expr $delta / $hour_units % $hour_mod]]
+	if {$days > 0 || $hours > 0} {
+		append res [format "%02d:" $hours]
 	}
-	append res [format "%02d:%02d" [expr $delta / $minute_units % $minute_mod] [expr $delta / $second_units % $second_mod]]
-	if {$delta % $tick_mod == 0} {
-		append res . [expr $delta % $tick_mod]
-	}
-	return $res
+	return [format "%s%02d:%02d.%d %4.1fr" $res \
+		[expr $delta / $minute_units % $minute_mod] \
+		[expr $delta / $second_units % $second_mod] \
+		[expr $delta % $tick_mod] \
+		[expr double($delta) / $round_units]]
 }
 
 
