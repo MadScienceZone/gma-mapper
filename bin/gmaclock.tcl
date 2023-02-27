@@ -351,7 +351,7 @@ variable month_info {
 	{Arodus    ARO {31 31}}
 	{Rova      ROV {30 30}}
 	{Lamashan  LAM {31 31}}
-	{Neth      NET {30 30}}
+	{Neth  NET {30 30}}
 	{Kuthona   KUT {31 31}}
 }
 variable season_names {Winter Spring Summer Fall}
@@ -360,7 +360,7 @@ variable day_names {Moonday Toilday Wealday Oathday Fireday Starday Sunday}
 
 proc set_time_value {w current_time} {
 	variable _clock_state
-	dict set _clock_state($w) calendar now $current_time
+dict set _clock_state($w) calendar now $current_time
 	_recalc $w
 }
 
@@ -491,6 +491,7 @@ proc initiative_display_window {w {limit 20} {dark_mode false} args} {
 		_autosize_inhibit 	false \
 		_autosize_task		{} \
 		combat_mode		false \
+		dark_mode		$dark_mode \
 		flist			{} \
 		ilist			{} \
 		limit			$limit \
@@ -546,7 +547,7 @@ proc _autosize {w} {
 	set height [expr $cur_height - [winfo height $w.timeclock] - [winfo height $w.timedisp] - [winfo height $w.turndisp]]
 
 	if {[set flist [dict get $_window_state($w) flist]] ne {}} {
-		dict for k fld $flist {
+		dict for {k fld} $flist {
 			pack forget $fld
 			destroy $fld
 		}
@@ -595,13 +596,13 @@ proc update_initiative_slots {w {limit {}} args} {
 	if {$limit eq {}} {
 		set limit [dict get $_window_state($w) limit]
 	}
-	dict for k f [dict get $_window_state($w) flist] {
+	dict for {k f} [dict get $_window_state($w) flist] {
 		$f configure -background $flist_bg -foreground $flist_fg
 	}
 	if {[dict get $_window_state($w) combat_mode]} {
 		set slot [current_initiative_slot $w]
 		if {$force_redraw && [set flist [dict get $_window_state($w) flist]] ne {}} {
-			dict for k fld $flist {
+			dict for {k fld} $flist {
 				pack forget $fld
 				destroy $fld
 			}
@@ -617,7 +618,7 @@ proc update_initiative_slots {w {limit {}} args} {
 		}
 		if {[set cur [lsearch $dlist $slot]] >= 0} {
 			if {[set flist [dict get $_window_state($w) flist]] ne {}} {
-				dict for k fld $flist {
+				dict for {k fld} $flist {
 					pack forget $fld
 					destroy $fld
 				}
@@ -688,7 +689,7 @@ proc update_initiative_slots {w {limit {}} args} {
 				}
 			}
 
-			dict for i v [dict get $_window_state($w) flist] {
+			dict for {i v} [dict get $_window_state($w) flist] {
 				if {$i eq {.sep}} {
 					continue
 				}
@@ -720,7 +721,7 @@ proc update_initiative_slots {w {limit {}} args} {
 		}
 	} else {
 		if {[dict get $_window_state($w) flist] ne {}} {
-			dict for k f [dict get $_window_state($w) flist] {
+			dict for {k f} [dict get $_window_state($w) flist] {
 				pack forget $f
 				destroy $f
 			}
@@ -754,7 +755,7 @@ proc stop_combat {w args} { _stop_combat $w.timeclock {*}$args}
 # update_clock w ?clockwidget-opts...?
 proc update_clock {w args} {
 	_update_clock $w.timeclock {*}$args
-	$w.timedisp configure -text [to_string 4]
+	$w.timedisp configure -text [to_string $w.timeclock 4]
 	$w.turndisp configure -text {}
 	update_initiative_slots $w
 }
@@ -763,8 +764,8 @@ proc update_clock {w args} {
 proc update_combat {w {new_delta_time 0}} {
 	variable _clock_state
 	_update_combat $w.timeclock 1 $new_delta_time
-	$w.timedisp configure -text [to_string 4]
-	$w.turndisp configure -text [delta_string [dict get $_clock_state delta_time]]
+	$w.timedisp configure -text [to_string $w.timeclock 4]
+	$w.turndisp configure -text [delta_string [dict get $_clock_state($w) delta_time]]
 	update_initiative_slots $w
 }
 
@@ -775,17 +776,95 @@ proc current_initiative_slot {w} {
 	return [expr [dict get $_clock_state($w.timeclock) delta_time] % 60]
 }
 
-# to_string style -> string
-# delta_string delta -> string	(strict assumed false)
-#
-# CO	combat_mode w
-# UC	set elapsed=rel {set_time_value w abs} {update_combat delta=elapsed --OR-- update_clock ?-running?}
-# IL	rebuild slotlist
-# OA	track flat-footed condition for @name
+# to_string w style -> string
+proc to_string {w style} {
+	variable _clock_state
+
+	if {$style != 4} {
+		error "style $style not implemented"
+	}
+	return [format "%02d:%02d:%02d.%d" \
+		[dict get $_clock_state($w) calendar hour] \
+		[dict get $_clock_state($w) calendar minute] \
+		[dict get $_clock_state($w) calendar second] \
+		[dict get $_clock_state($w) calendar tick] \
+	]
+}
+# delta_string delta ?-strict? -> string	(strict assumed false)
+proc delta_string {delta args} {
+	variable day_units
+	variable hour_units
+	variable minute_units
+	variable round_units
+	variable second_units
+	variable tick_mod
+	variable hour_mod
+	variable minute_mod
+	variable second_mod
+
+	set strict [expr [lsearch -exact $args -strict] >= 0]
+
+	if {$delta < 0} {
+		set delta [expr -$delta]
+		set sign "-"
+		set mult -1
+	} else {
+		set sign "+"
+		set mult 1
+	}
+
+	if {$strict} {
+		if {$delta == 0} {
+			return "nil"
+		}
+		foreach {u lim uname plural} {
+			$day_units {} day days
+			$hour_units $day_units hour hours
+			$minute_units $hour_units minute minutes
+			$round_units [expr 10*$minute_units], round rounds
+			$second_units $minute_units second seconds
+			1 10 {} {}
+		} {
+			set q [expr $delta / $u]
+			if {$delta % $u == 0 && ($lim eq {} || $delta < $lim)} {
+				if {$q == 1 && $sign eq {+}} {
+					return $uname
+				}
+				return [format "%s %s" [expr $mult*$q] [expr $q == 1 ? $uname : $plural]]
+			}
+		}
+		set res $sign
+		if {$delta >= $day_units} {
+			append res [expr $delta / $day_units] :
+		}
+		if {$delta >= $hour_units} {
+			append res [format "%02d:" [expr $delta / $hour_units % $hour_mod]]
+		}
+		append res [format "%02d:%02d" [expr $delta / $minute_units % $minute_mod] [expr $delta / $second_units % $second_mod]]
+		if {$delta % $tick_mod != 0} {
+			append res . [expr $delta % $tick_mod]
+		}
+		return $res
+	}
+	
+	set res $sign
+	if {$delta >= $day_units} {
+		append res [expr $delta / $day_units] :
+	}
+	if {$delta >= $hour_units} {
+		append res [format "%02d:" [expr $delta / $hour_units % $hour_mod]]
+	}
+	append res [format "%02d:%02d" [expr $delta / $minute_units % $minute_mod] [expr $delta / $second_units % $second_mod]]
+	if {$delta % $tick_mod == 0} {
+		append res . [expr $delta % $tick_mod]
+	}
+	return $res
+}
+
 
 # CO {Enabled:bool}
 # combat_mode w enabled callback
-proc combat_mode {w enabled callback} {
+proc combat_mode {w enabled {callback {}}} {
 	variable _window_state
 	if {$enabled} {
 		if {! [dict get $_window_state($w) combat_mode]} {
@@ -840,7 +919,7 @@ proc track_health_change {w oadict} {
 	# we're only interested in targets with @<name> format
 	if {[string length [set name [dict get $oadict ObjID]]] > 1 && [string range $name 0 0] eq {@}} {
 		set name [string range $name 1 end]
-		dict for slot_no slot_data [dict get $_window_state($w) ilist] {
+		dict for {slot_no slot_data} [dict get $_window_state($w) ilist] {
 			# and only if <name> is in the initiative list
 			if {[dict get $slot_data name] eq $name} {
 				# and only if we're getting an update to their health status
