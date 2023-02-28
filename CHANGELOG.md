@@ -1,10 +1,14 @@
 # Game Master's Assistant / Mapper Client
 # Release Notes
 ## Current Version Information
- * Supported GMA Mapper Version: 4.0.5 <!-- @@##@@ -->
+ * Supported GMA Mapper Version: 4.1 <!-- @@##@@ -->
  * Supported GMA Mapper File Format: 20	     <!-- @@##@@ -->
  * Supported GMA Mapper Protocol: 400        <!-- @@##@@ -->
- * Effective Date: 21-Feb-2023               <!-- @@##@@ -->
+ * Effective Date: 27-Feb-2023               <!-- @@##@@ -->
+
+# 4.1
+# Added
+* New feature which displays a game clock window. This tracks the in-game date and time, and shows the state of the initiative order list during combat.
 
 # 4.0.5
 ## Fixes
