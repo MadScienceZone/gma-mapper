@@ -47,6 +47,7 @@ proc widget {w args} {
 		delta_time 0\
 		half_hours true \
 		hand_scale 2 \
+		realtime_tick_task {} \
 	]
 
 	set opts {}
@@ -104,6 +105,7 @@ proc draw_face {w} {
 # _start_clock w ?scale=0? ?callback?
 proc _start_clock {w {scale 0} {callback {}}} {
 	variable _clock_state
+	_cancel_realtime_tick $w
 
 	$w delete ticks
 	set hm [dict get $_clock_state($w) hm]
@@ -123,6 +125,7 @@ proc _start_clock {w {scale 0} {callback {}}} {
 
 proc _start_combat {w {scale 0} {callback {}}} {
 	variable _clock_state
+	_cancel_realtime_tick $w
 
 	dict set _clock_state($w) combat_mode true
 	if {[dict get $_clock_state($w) dark_mode]} {
@@ -148,6 +151,7 @@ proc _start_combat {w {scale 0} {callback {}}} {
 
 proc _stop_combat {w {scale 1} {callback {}}} {
 	variable _clock_state
+	_cancel_realtime_tick $w
 
 	if {[dict get $_clock_state($w) dark_mode]} {
 		set fill #aaaaaa
@@ -168,12 +172,13 @@ proc _stop_combat {w {scale 1} {callback {}}} {
 			{*}$callback
 		}
 	}
-dict set _clock_state($w) combat_mode false
+	dict set _clock_state($w) combat_mode false
 }
 
 # _stop_clock w ?scale=1? ?callback?
 proc _stop_clock {w {scale 1} {callback {}}} {
 	variable _clock_state
+	_cancel_realtime_tick $w
 
 	$w delete ticks
 	set hm [dict get $_clock_state($w) hm]
@@ -235,6 +240,7 @@ proc _update_clock {w {time_scale 1} args} {
 	variable minute_mod
 	variable second_mod
 
+	_cancel_realtime_tick $w
 	set complete false
 	set running false
 
@@ -257,6 +263,26 @@ proc _update_clock {w {time_scale 1} args} {
 	_draw_hand $w $fhour $hm 0.5 $time_scale 0 [expr 3*$hand_scale] hands {} {2 2} -arrow last
 	_draw_hand $w $fminute $minute_mod 0.7 $time_scale 0 [expr 2*$hand_scale] hands {} {2 2} -arrow last
 	_draw_hand $w $fsecond $second_mod 0.9 $time_scale 0 $hand_scale hands
+	if {$running} {
+		dict set _clock_state($w) realtime_tick_task [after 100 [list ::gmaclock::_realtime_tick $w]]
+		_refresh_clock_display $w
+	} 
+}
+
+proc _realtime_tick {w} {
+	variable _clock_state
+	if {[dict get $_clock_state($w) realtime_tick_task] ne {}} {
+		advance_time $w 1
+		_update_clock $w 1 -running
+	}
+}
+
+proc _cancel_realtime_tick {w} {
+	variable _clock_state
+	if {[set id [dict get $_clock_state($w) realtime_tick_task]] ne {}} {
+		after cancel $id
+	}
+	dict set _clock_state($w) realtime_tick_task {}
 }
 
 proc _draw_sweep {w position total length {time_scale 1} args} {
@@ -360,7 +386,7 @@ variable day_names {Moonday Toilday Wealday Oathday Fireday Starday Sunday}
 
 proc set_time_value {w current_time} {
 	variable _clock_state
-dict set _clock_state($w) calendar now $current_time
+	dict set _clock_state($w) calendar now $current_time
 	_recalc $w
 }
 
@@ -761,10 +787,15 @@ proc stop_combat {w args} { _stop_combat $w.timeclock {*}$args}
 	
 # update_clock w ?clockwidget-opts...?
 proc update_clock {w args} {
-	_update_clock $w.timeclock {*}$args
+	_update_clock $w.timeclock 1 {*}$args
 	$w.timedisp configure -text [to_string $w.timeclock 2]
 	$w.turndisp configure -text {}
 	update_initiative_slots $w
+}
+
+proc _refresh_clock_display {w} {
+	set parent [join [lrange [split $w .] 0 end-1] .]
+	$parent.timedisp configure -text [to_string $w 2]
 }
 
 # update_combat w ?new_delta_time=0?

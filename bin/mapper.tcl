@@ -7969,11 +7969,14 @@ proc DoCommandPRIV {d} {
 proc DoCommandCS {d} {
 	global time_abs
 	global time_rel
+	set args {}
 	set time_abs [dict get $d Absolute]
 	set time_rel [dict get $d Relative]
-	# XXX Running
+	if {[dict get $d Running]} {
+		lappend args -running
+	}
 	if {[::gmaclock::exists .initiative.clock]} {
-		::gmaclock::update_time .initiative.clock $time_abs $time_rel
+		::gmaclock::update_time .initiative.clock $time_abs $time_rel {*}$args
 	}
 }
 
