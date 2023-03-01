@@ -1,10 +1,14 @@
 # Game Master's Assistant / Mapper Client
 # Release Notes
 ## Current Version Information
- * Supported GMA Mapper Version: 4.2 <!-- @@##@@ -->
+ * Supported GMA Mapper Version: 4.2.1 <!-- @@##@@ -->
  * Supported GMA Mapper File Format: 20	     <!-- @@##@@ -->
  * Supported GMA Mapper Protocol: 401        <!-- @@##@@ -->
- * Effective Date: 28-Feb-2023               <!-- @@##@@ -->
+ * Effective Date: 01-Mar-2023               <!-- @@##@@ -->
+
+# 4.2.1
+## Fixed
+ * Corrected issue with function definition order that caused an error on startup if the server asked for scrolling to a grid label.
 
 # 4.2
 ## Added
