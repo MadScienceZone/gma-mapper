@@ -1593,7 +1593,7 @@ case, a client
 be implemented to wait synchronously for a server
 response during the authentication negotiation stage.
 .LP
-This describes protocol version 400. These notes are intended to be 
+This describes protocol version 401. These notes are intended to be 
 detailed enough to implement a client from and should be considered
 the definitive standard reference to the protocol.
 .LP
@@ -2107,15 +2107,26 @@ went.
 .RE
 .TP
 .B AV
-Adjust view by setting the horizontal scrollbar to 
+Adjust the map's viewport by making the grid square identified by the
+.B Grid
+parameter visible at the top-left of the display. If this field is not
+present or is empty, then clients MAY fall back to the older behavior of
+adjusting the
+view by setting the horizontal scrollbar to 
 .I xview
 as a fraction of its full distance, where 0.0 is all the way to the left and
-1.0 is all the way to the right. The vertical scrollbar is similarly set based on
+1.0 is all the way to the right; the vertical scrollbar is similarly set based on
 .I yview
 where 0.0 is all the way to the top and 1.0 is all the way to the bottom.
 The payload is a JSON object with the following fields:
 '\" <<desc>>
 .RS
+.TP
+.B Grid
+The name of the grid square which should be in the upper-left of the display.
+This uses the same naming convention as the grid is labelled on the display
+(e.g., the far upper-left grid square of the entire map is
+.BR A0 ).
 .TP
 .BI XView " (float)"
 The fraction of full distance the
@@ -3837,8 +3848,15 @@ the server tracks game state, simply exiting and restarting the map client accom
 the same effect (possibly better). Now this button requests a "sync" operation with the
 server. 
 .LP
-This document also describes map protocol version 400,
-which changed the server communication protocol to use JSON instead of TCL lists.
+This document also describes map protocol version 401,
+which introduced the
+.B Grid
+parameter to the
+.B AV
+command.
+.LP
+Protocol version 400
+changed the server communication protocol to use JSON instead of TCL lists.
 It also introduced the
 .BR PROGRESS ,
 .BR PROTOCOL ,
