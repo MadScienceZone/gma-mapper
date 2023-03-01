@@ -1,13 +1,18 @@
 # Game Master's Assistant / Mapper Client
 # Release Notes
 ## Current Version Information
- * Supported GMA Mapper Version: 4.1 <!-- @@##@@ -->
+ * Supported GMA Mapper Version: 4.2 <!-- @@##@@ -->
  * Supported GMA Mapper File Format: 20	     <!-- @@##@@ -->
- * Supported GMA Mapper Protocol: 400        <!-- @@##@@ -->
- * Effective Date: 27-Feb-2023               <!-- @@##@@ -->
+ * Supported GMA Mapper Protocol: 401        <!-- @@##@@ -->
+ * Effective Date: 28-Feb-2023               <!-- @@##@@ -->
+
+# 4.2
+## Added
+ * Improved scrolling when zooming the map in and out, so that it does a better job of keeping the map scrolled to where it was before the zoom operation.
+ * Improved scrolling between clients so they go to the same area of the map even if they are at different zoom levels from each other.
 
 # 4.1
-# Added
+## Added
 * New feature which displays a game clock window. This tracks the in-game date and time, and shows the state of the initiative order list during combat.
 
 # 4.0.5
