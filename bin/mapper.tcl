@@ -131,6 +131,46 @@ proc begin_progress { id title max args } {
     return $id
 }
 
+proc TopLeftGridLabel {} {
+	lassign [ScreenXYToGridXY 0 0 -exact] x y
+	return "[LetterLabel $x]$y"
+}
+
+proc LetterLabelToGridXY {label} {
+	if [regexp {^([A-Z]+)([0-9]+)$} [string toupper $label] _ xlabel ylabel] {
+		set x -1
+		foreach letter [split $xlabel {}] {
+			incr x
+			set x [expr $x*26 + [scan $letter %c] - 65]
+		}
+		return [list $x $ylabel]
+	} 
+	error "$label is not a valid map locator value"
+}
+
+# scroll screen so (gx,gy) is at the top-left of the screen
+proc ScrollToGridXY {gx gy} {
+	global canvas
+	set x [GridToCanvas $gx]
+	set y [GridToCanvas $gy]
+	set region [$canvas cget -scrollregion]
+	if {[llength $region] == 0} {
+		error "no -scrollregion set on canvas"
+	}
+	lassign $region x1 y1 x2 y2
+	$canvas xview moveto [expr double($x)/$x2]
+	$canvas yview moveto [expr double($y)/$y2]
+}
+
+proc ScrollToGridLabel {label} {
+	if [catch {
+		lassign [LetterLabelToGridXY $label] gx gy
+		ScrollToGridXY $gx $gy
+	} err] {
+		DEBUG 0 "Unable to scroll to $label: $err"
+	}
+}
+
 #
 # update_progress id value newmax|* ?-send?
 #
@@ -10507,45 +10547,6 @@ proc display_initiative_clock {} {
 	::gmaclock::combat_mode .initiative.clock $MOB_COMBATMODE
 }
 
-proc TopLeftGridLabel {} {
-	lassign [ScreenXYToGridXY 0 0 -exact] x y
-	return "[LetterLabel $x]$y"
-}
-
-proc LetterLabelToGridXY {label} {
-	if [regexp {^([A-Z]+)([0-9]+)$} [string toupper $label] _ xlabel ylabel] {
-		set x -1
-		foreach letter [split $xlabel {}] {
-			incr x
-			set x [expr $x*26 + [scan $letter %c] - 65]
-		}
-		return [list $x $ylabel]
-	} 
-	error "$label is not a valid map locator value"
-}
-
-# scroll screen so (gx,gy) is at the top-left of the screen
-proc ScrollToGridXY {gx gy} {
-	global canvas
-	set x [GridToCanvas $gx]
-	set y [GridToCanvas $gy]
-	set region [$canvas cget -scrollregion]
-	if {[llength $region] == 0} {
-		error "no -scrollregion set on canvas"
-	}
-	lassign $region x1 y1 x2 y2
-	$canvas xview moveto [expr double($x)/$x2]
-	$canvas yview moveto [expr double($y)/$y2]
-}
-
-proc ScrollToGridLabel {label} {
-	if [catch {
-		lassign [LetterLabelToGridXY $label] gx gy
-		ScrollToGridXY $gx $gy
-	} err] {
-		DEBUG 0 "Unable to scroll to $label: $err"
-	}
-}
 
 #
 # Perform actions requested by command-line options now
