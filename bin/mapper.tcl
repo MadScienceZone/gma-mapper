@@ -1,23 +1,23 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___        __                              #
-# (  ____ \(       )(  ___  ) Game         /   )      /  \                             #
-# | (    \/| () () || (   ) | Master's    / /) |      \/) )                            #
-# | |      | || || || (___) | Assistant  / (_) (_       | |                            #
-# | | ____ | |(_)| ||  ___  |           (____   _)      | |                            #
-# | | \_  )| |   | || (   ) |                ) (        | |                            #
-# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_                           #
-# (_______)|/     \||/     \| Client         (_)  (_) \____/                           #
+#  _______  _______  _______                ___       _______                          #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___   )                         #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |                         #
+# | |      | || || || (___) | Assistant  / (_) (_        /   )                         #
+# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /                          #
+# | | \_  )| |   | || (   ) |                ) (      /   _/                           #
+# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\                         #
+# (_______)|/     \||/     \| Client         (_)  (_)\_______/                         #
 #                                                                                      #
 ########################################################################################
 #
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.1}     ;# @@##@@
+set GMAMapperVersion {4.2}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
-set GMAMapperProtocol {400}         ;# @@##@@
-set GMAVersionNumber {5.0.0}            ;# @@##@@
+set GMAMapperProtocol {401}         ;# @@##@@
+set GMAVersionNumber {5.1}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -10576,7 +10576,7 @@ if {![::gmaproto::is_ready] && $IThost ne {}} {
     after 5000 {report_progress {}}
 }
 
-# @[00]@| GMA 5.0.0
+# @[00]@| GMA 5.1
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
