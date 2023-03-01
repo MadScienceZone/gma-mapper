@@ -7910,7 +7910,6 @@ proc BackgroundConnectToServer {tries} {
 #
 
 # simple commands
-proc DoCommandAV    {d} { AdjustView [dict get $d XView] [dict get $d YView] }
 proc DoCommandCLR   {d} { ClearObjectById [dict get $d ObjID] }
 proc DoCommandCO    {d} { setCombatMode [dict get $d Enabled] }
 proc DoCommandMARCO {d} { ::gmaproto::polo }
@@ -7924,6 +7923,14 @@ proc DoCommandOA    {d} {
 proc DoCommandOA+   {d} { AddToObjectAttribute [dict get $d ObjID] [dict get $d AttrName] [dict get $d Values]; RefreshGrid 0; RefreshMOBs }
 proc DoCommandOA-   {d} { RemoveFromObjectAttribute [dict get $d ObjID] [dict get $d AttrName] [dict get $d Values]; RefreshGrid 0; RefreshMOBs }
 proc DoCommandTB    {d} { global MasterClient; if {!$MasterClient} {toolBarState [dict get $d Enabled]} }
+
+proc DoCommandAV {d} { 
+	if {[set grid_label [dict get $d Grid]] ne {}} {
+		ScrollToGridLabel $grid_label
+	} else {
+		AdjustView [dict get $d XView] [dict get $d YView] 
+	}
+}
 
 proc DoCommandPRIV {d} {
 	tk_messageBox -type ok -icon error -title "Permission Denied" \
@@ -9564,7 +9571,7 @@ proc AdjustView {x y} {
 }
 
 proc SyncView {} {
-	::gmaproto::adjust_view [lindex [.c xview] 0] [lindex [.c yview] 0]
+	::gmaproto::adjust_view [lindex [.c xview] 0] [lindex [.c yview] 0] [TopLeftGridLabel]
 }
 
 proc aboutMapper {} {
