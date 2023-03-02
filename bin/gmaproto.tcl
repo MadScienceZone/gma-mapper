@@ -60,6 +60,7 @@ namespace eval ::gmaproto {
 	variable protocol 401
 	variable min_protocol 333
 	variable max_protocol 401
+	variable max_max_protocol 499
 	variable debug_f {}
 	variable legacy false
 	variable host {}
@@ -1842,8 +1843,12 @@ proc ::gmaproto::_login {} {
 				if {$::gmaproto::protocol < $::gmaproto::min_protocol} {
 					error "The server speaks a protocol too old for me to understand ($::gmaproto::protocol)"
 				}
+				if {$::gmaproto::protocol > $::gmaproto::max_max_protocol} {
+					error "The server speaks a protocol too new for me to understand at all ($::gmaproto::protocol)"
+				}
 				if {$::gmaproto::protocol > $::gmaproto::max_protocol} {
-					error "The server speaks a protocol too new for me to understand ($::gmaproto::protocol)"
+					DEBUG 0 "The server speaks a protocol too new for me; checking for available updates..."
+					DEBUG 0 "It may be possible to proceed with this client but not all commands may work as expected."
 				}
 				if {$challenge ne {}} {
 					::gmaproto::DEBUG "Authenticating to server"
