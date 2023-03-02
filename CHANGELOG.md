@@ -1,10 +1,16 @@
 # Game Master's Assistant / Mapper Client
 # Release Notes
 ## Current Version Information
- * Supported GMA Mapper Version: 4.2.2 <!-- @@##@@ -->
+ * Supported GMA Mapper Version: 4.2.3 <!-- @@##@@ -->
  * Supported GMA Mapper File Format: 20	     <!-- @@##@@ -->
  * Supported GMA Mapper Protocol: 401        <!-- @@##@@ -->
- * Effective Date: 01-Mar-2023               <!-- @@##@@ -->
+ * Effective Date: 02-Mar-2023               <!-- @@##@@ -->
+
+# 4.2.3
+## Fixed
+ * There was either a race condition or failure to clean up a failed chat history cache load, causing subsequently-received messages to throw an exception when received. The code around those operations has been replaced with a more defensive implementation which should recover from an error in initial load and also avoid trying to write new entries to the cache while a load operation is underway.
+ * Changed the chat history cache load so it happens after successful server login, so we know the correct user's cache file is loaded (really only an issue for GMs who sign on to the server with a non-GM username initially).
+ * Installed code to tell the user that moving or nudging spell area-of-effect zones is not implemented, rather than letting them try which leads to an error as the mapper fails to do that correctly.
 
 # 4.2.2
 ## Added
