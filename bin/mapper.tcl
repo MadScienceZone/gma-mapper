@@ -1,20 +1,20 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       _______      __                  #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___   )    /  \                 #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |    \/) )                #
-# | |      | || || || (___) | Assistant  / (_) (_        /   )      | |                #
-# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /       | |                #
-# | | \_  )| |   | || (   ) |                ) (      /   _/        | |                #
-# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\ _  __) (_               #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/(_) \____/               #
+#  _______  _______  _______                ___       _______     _______              #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___   )   / ___   )             #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |   \/   )  |             #
+# | |      | || || || (___) | Assistant  / (_) (_        /   )       /   )             #
+# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /      _/   /              #
+# | | \_  )| |   | || (   ) |                ) (      /   _/      /   _/               #
+# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\ _ (   (__/\             #
+# (_______)|/     \||/     \| Client         (_)  (_)\_______/(_)\_______/             #
 #                                                                                      #
 ########################################################################################
 #
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.2.1}     ;# @@##@@
+set GMAMapperVersion {4.2.2}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
 set GMAMapperProtocol {401}         ;# @@##@@
 set GMAVersionNumber {5.1}            ;# @@##@@
@@ -2411,6 +2411,7 @@ proc modifiedflag {file state} {
 
 proc refresh_title {} {
 	global OBJ_FILE OBJ_MODIFIED TX_QUEUE_STATUS ModuleID
+	global IThost ITport local_user
 
 	if {$ModuleID ne {}} {
 		set tag "\[$ModuleID\] "
@@ -2418,10 +2419,16 @@ proc refresh_title {} {
 		set tag {}
 	}
 
-	if {$OBJ_MODIFIED} {
-		wm title . "${tag}Mapper: $OBJ_FILE (*) $TX_QUEUE_STATUS"
+	if {$IThost ne {}} {
+		set host "\[$local_user@$IThost:$ITport\]"
 	} else {
-		wm title . "${tag}Mapper: $OBJ_FILE $TX_QUEUE_STATUS"
+		set host "\[offline\]"
+	}
+
+	if {$OBJ_MODIFIED} {
+		wm title . "${tag}Mapper: $OBJ_FILE (*) $TX_QUEUE_STATUS $host"
+	} else {
+		wm title . "${tag}Mapper: $OBJ_FILE $TX_QUEUE_STATUS $host"
 	}
 }
 
@@ -10574,7 +10581,7 @@ if {![::gmaproto::is_ready] && $IThost ne {}} {
     report_progress "Mapper Client Ready (awaiting server login to complete)"
 } else {
     report_progress "Mapper Client Ready"
-    after 5000 {report_progress {}}
+    after 5000 {report_progress {}; refresh_title}
 }
 
 # @[00]@| GMA 5.1
