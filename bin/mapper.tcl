@@ -713,6 +713,7 @@ proc LoadDefaultStyles {} {
 set ChatHistory {}
 set ChatHistoryFile {}
 set ChatHistoryFileHandle {}
+set ChatHistoryFileDirection {}
 set ChatHistoryLastMessageID 0
 # We only use ChatHistoryLastMessageID while loading the saved data. From that point on
 # we get the messages in real time and don't ask the server to catch us up again, (or
@@ -722,8 +723,13 @@ set ChatHistoryLastMessageID 0
 proc InitializeChatHistory {} {
 	global ChatHistoryFile ChatHistory ChatHistoryFileHandle ChatHistoryLastMessageID
 	global path_cache IThost ITport ChatHistoryLimit local_user
+	global ChatHistoryFileDirection
 
 	if {$IThost ne {}} {
+		if {$ChatHistoryFileDirection ne {}} {
+			DEBUG 0 "Refusing to load the chat history from cache because someone beat me to the file! (mode $ChatHistoryFileDirection) This shouldn't happen."
+			return
+		}
 		set ChatHistoryFile [file join $path_cache "${IThost}-${ITport}-${local_user}-chat.history"]
 		DEBUG 1 "Loading chat history from $ChatHistoryFile"
 		if {! [file exists $ChatHistoryFile]} {
@@ -732,39 +738,47 @@ proc InitializeChatHistory {} {
 			if [catch {set ChatHistoryFileHandle [open $ChatHistoryFile]} err] {
 				DEBUG 0 "Unable to read chat history file $ChatHistoryFile ($err). We will try asking the server for a new history download."
 				set ChatHistoryFileHandle {}
+				set ChatHistoryFileDirection {}
 			} else {
-				while {[gets $ChatHistoryFileHandle msg] >= 0} {
-					DEBUG 2 "read $msg from cache"
-					if {[lindex $msg 0] eq {CHAT}} {
-						# new-style entry:	{CHAT ROLL|TO|CC|-system json-dict}
-						DEBUG 3 "parsing new style message"
-						lassign [UnmarshalChatHistoryEntry $msg] ctype d
-						DEBUG 2 "new-style -> $ctype, $d"
-					} else {
-						# old-style entry:	{ROLL|TO|CC|-system a b c ...}
-						DEBUG 3 "parsing old style message"
-						if {[set o [ValidateChatHistoryEntry $msg]] eq {}} {
-							DEBUG 1 "$ChatHistoryFile: Rejecting invalid old-style entry $msg"
-							continue
+				set ChatHistoryFileDirection r
+				if [catch {
+					while {[gets $ChatHistoryFileHandle msg] >= 0} {
+						DEBUG 2 "read $msg from cache"
+						if {[lindex $msg 0] eq {CHAT}} {
+							# new-style entry:	{CHAT ROLL|TO|CC|-system json-dict}
+							DEBUG 3 "parsing new style message"
+							lassign [UnmarshalChatHistoryEntry $msg] ctype d
+							DEBUG 2 "new-style -> $ctype, $d"
+						} else {
+							# old-style entry:	{ROLL|TO|CC|-system a b c ...}
+							DEBUG 3 "parsing old style message"
+							if {[set o [ValidateChatHistoryEntry $msg]] eq {}} {
+								DEBUG 1 "$ChatHistoryFile: Rejecting invalid old-style entry $msg"
+								continue
+							}
+							lassign $o ctype d
+							DEBUG 2 "old-style -> $ctype, $d"
 						}
-						lassign $o ctype d
-						DEBUG 2 "old-style -> $ctype, $d"
-					}
 
-					if {$ctype eq {-system}} {
-						set mid -1
-					} else {
-						set mid [dict get $d MessageID]
-					}
+						if {$ctype eq {-system}} {
+							set mid -1
+						} else {
+							set mid [dict get $d MessageID]
+						}
 
-					if {$ctype eq {CC}} {
-						set ChatHistory {}
-					} else {
-						set ChatHistoryLastMessageID [expr max($ChatHistoryLastMessageID, $mid)]
+						if {$ctype eq {CC}} {
+							set ChatHistory {}
+						} else {
+							set ChatHistoryLastMessageID [expr max($ChatHistoryLastMessageID, $mid)]
+						}
+						lappend ChatHistory [list $ctype $d $mid]
 					}
-					lappend ChatHistory [list $ctype $d $mid]
+				} err] {
+					# error reading cache file; don't leave it open
+					DEBUG 0 "Error loading chat history from cache: $err"
 				}
 				close $ChatHistoryFileHandle
+				set ChatHistoryFileDirection {}
 				set ChatHistoryFileHandle {}
 
 				if {$ChatHistoryLimit > 0 && [llength $ChatHistory] > $ChatHistoryLimit} {
@@ -773,6 +787,7 @@ proc InitializeChatHistory {} {
 						DEBUG 0 "Unable to overwrite the chat history in $ChatHistoryFile ($err). No history will be kept now."
 						set ChatHistoryFileHandle {}
 					} else {
+						set ChatHistoryFileDirection w
 						set ChatHistory [lrange $ChatHistory end-$ChatHistoryLimit end]
 						foreach msg $ChatHistory {
 							puts $ChatHistoryFileHandle [MarshalChatHistoryEntry $msg]
@@ -783,10 +798,12 @@ proc InitializeChatHistory {} {
 			}
 		}
 
+		set ChatHistoryFileDirection a
 		if {$ChatHistoryFileHandle eq {}} {
 			if [catch {set ChatHistoryFileHandle [open $ChatHistoryFile a]} err] {
 				DEBUG 0 "Unable to append to or create chat history file $ChatHistoryFile ($err). No history will be kept."
 				set ChatHistoryFileHandle {}
+				set ChatHistoryFileDirection {}
 			}
 		}
 		DEBUG 1 "Chat history now has [llength $ChatHistory] items."
@@ -833,7 +850,7 @@ proc UnmarshalChatHistoryEntry {m} {
 # ChatHistoryAppend {CC|ROLL|TO d mid}
 # ChatHistoryAppend {-system msg -1}
 proc ChatHistoryAppend {event} {
-	global ChatHistory ChatHistoryFileHandle _last_known_message_id
+	global ChatHistory ChatHistoryFileHandle _last_known_message_id ChatHistoryFileDirection
 
 	if {[set m [ValidateChatHistoryEntry $event]] ne {}} {
 		set mid [lindex $m 2]
@@ -843,8 +860,12 @@ proc ChatHistoryAppend {event} {
 		if {$mid >= ${_last_known_message_id}} {
 			lappend ChatHistory $m
 			if {$ChatHistoryFileHandle ne {}} {
-				puts $ChatHistoryFileHandle [MarshalChatHistoryEntry $m]
-				flush $ChatHistoryFileHandle
+				if {$ChatHistoryFileDirection eq {a}} {
+					puts $ChatHistoryFileHandle [MarshalChatHistoryEntry $m]
+					flush $ChatHistoryFileHandle
+				} else {
+					DEBUG 0 "(chat message not written to cache because cache file is busy (mode $ChatHistoryFileDirection))"
+				}
 			}
 		} else {
 		    DEBUG 1 "Rejected chat message $m; message ID $mid < ${_last_known_message_id}"
@@ -5968,11 +5989,17 @@ proc GridToCanvas {x} {
 set OBJ_MOVING {}
 set OBJ_MOVING_SELECTED {}
 proc MoveObjById {w id} {
-	global OBJdata OBJ_MOVING OBJ_MOVING_SELECTED ClockDisplay
+	global OBJdata OBJ_MOVING OBJ_MOVING_SELECTED ClockDisplay OBJtype
 	if [info exists OBJdata($id)] {
-		set OBJ_MOVING [list $id [$w coords obj$id]]
-		set OBJ_MOVING_SELECTED {}
-		set ClockDisplay $OBJ_MOVING
+		if {$OBJtype($id) eq {aoe} || $OBJtype($id) eq {saoe}} {
+			say "Moving spell area of effect is not yet implemented."
+			set OBJ_MOVING {}
+			set OBJ_MOVING_SELECTED {}
+		} else {
+			set OBJ_MOVING [list $id [$w coords obj$id]]
+			set OBJ_MOVING_SELECTED {}
+			set ClockDisplay $OBJ_MOVING
+		}
 	}
 }
 
@@ -7425,13 +7452,17 @@ set MO_disp {}
 set MO_last_obj {}
 proc NudgeObject {w dx dy} {
 	global MO_last_obj ClockDisplay
-	global OBJdata
+	global OBJdata OBJtype
 	DEBUG 3 "NudgeObject w=$w dx=$dx dy=$dy obj=$MO_last_obj"
 	if {$MO_last_obj eq {}} {
 		set ClockDisplay "No current object to move; move one with mouse first"
 		return
 	}
 	if [info exists OBJdata($MO_last_obj)] {
+		if {$OBJtype($MO_last_obj) eq {aoe} || $OBJtype($MO_last_obj) eq {saoe}} {
+			say "Nudging spell area of effect is not yet implemented."
+			return
+		}
 		dict set OBJdata($MO_last_obj) X [expr [dict get $OBJdata($MO_last_obj) X] + $dx]
 		dict set OBJdata($MO_last_obj) Y [expr [dict get $OBJdata($MO_last_obj) Y] + $dy]
 		set new_coords {}
@@ -8329,7 +8360,10 @@ proc DoCommandTO {d} {
 # Hook for any post-login activities we need to do
 #
 proc DoCommandLoginSuccessful {} {
-	InitializeChatHistory
+	global local_user
+
+	set local_user $::gmaproto::username
+	refresh_title
 }
 
 #
@@ -10069,6 +10103,7 @@ proc connectToServer {} {
 
 proc WaitForConnectToServer {} {
 	connectToServer
+	InitializeChatHistory
 }
 #
 #
@@ -10581,7 +10616,7 @@ if {![::gmaproto::is_ready] && $IThost ne {}} {
     report_progress "Mapper Client Ready (awaiting server login to complete)"
 } else {
     report_progress "Mapper Client Ready"
-    after 5000 {report_progress {}; refresh_title}
+    after 5000 {report_progress {}}
 }
 
 # @[00]@| GMA 5.1
