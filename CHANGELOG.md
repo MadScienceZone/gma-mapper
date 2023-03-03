@@ -1,10 +1,14 @@
 # Game Master's Assistant / Mapper Client
 # Release Notes
 ## Current Version Information
- * Supported GMA Mapper Version: 4.2.4 <!-- @@##@@ -->
+ * Supported GMA Mapper Version: 4.2.5 <!-- @@##@@ -->
  * Supported GMA Mapper File Format: 20	     <!-- @@##@@ -->
  * Supported GMA Mapper Protocol: 401        <!-- @@##@@ -->
- * Effective Date: 02-Mar-2023               <!-- @@##@@ -->
+ * Effective Date: 03-Mar-2023               <!-- @@##@@ -->
+
+# 4.2.5
+## Fixed
+ * Activestate Tcl apparently supplies JSON library version 1.3.3, but the mapper was asking for at least 1.3.4 (since that's the current version in our dev environment). This caused Windows clients to refuse to run so this release backs off the minimum json library version to 1.3.3 which makes the mapper run successfully in Activestate Tcl on Windows (tested on Win10).
 
 # 4.2.4
 ## Fixed
