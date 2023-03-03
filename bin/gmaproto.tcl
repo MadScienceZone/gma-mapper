@@ -51,7 +51,7 @@
 
 package provide gmaproto 1.1
 package require Tcl 8.5
-package require json 1.3.4
+package require json 1.3.3
 package require json::write 1.0.3
 package require base64 2.4.2
 package require uuid 1.0.1
