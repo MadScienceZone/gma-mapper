@@ -6,6 +6,10 @@
  * Supported GMA Mapper Protocol: 401        <!-- @@##@@ -->
  * Effective Date: 03-Mar-2023               <!-- @@##@@ -->
 
+# Upcoming release
+## Added
+ * A new script, `bin/check_install.tcl`, is provided to check to see that you have the Tcl/Tk libraries on which the mapper tool depends. If you don't, it will give you some instructions as to where to find the missing library.
+
 # 4.2.5
 ## Fixed
  * Activestate Tcl apparently supplies JSON library version 1.3.3, but the mapper was asking for at least 1.3.4 (since that's the current version in our dev environment). This caused Windows clients to refuse to run so this release backs off the minimum json library version to 1.3.3 which makes the mapper run successfully in Activestate Tcl on Windows (tested on Win10).
