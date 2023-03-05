@@ -2,7 +2,55 @@
 #
 # Check the dependencies of the mapper tool to be sure they're installed.
 #
-source gmautil.tcl
+proc version_compare {v1 v2} {
+	if {$v1 eq $v2} {
+		return 0
+	}
+	if {![regexp {^([^+-]+)([^-]+)?(?:-(.+))?$} $v1 _ v1base v1build v1pre]} {
+		error "version $v1 does not conform to semver standard"
+	}
+	if {![regexp {^([^+-]+)([^-]+)?(?:-(.+))?$} $v2 _ v2base v2build v2pre]} {
+		error "version $v2 does not conform to semver standard"
+	}
+	set cmp [_vc $v1base $v2base]
+	if {$cmp == 0} {
+		# the base versions are the same. In this case the one without a prerelease
+		# string is older, or we just compare prerelease strings
+		if {$v1pre eq {} && $v2pre eq {}} {
+			return 0
+		}
+		if {$v1pre eq {}} {
+			return 1
+		}
+		if {$v2pre eq {}} {
+			return -1
+		}
+		return [_vc $v1pre $v2pre]
+	}
+	return $cmp
+}
+
+proc _vc {v1 v2} {
+	set l1 [split $v1 .]
+	set l2 [split $v2 .]
+	while {[llength $l2] != [llength $l1]} {
+		if {[llength $l2] < [llength $l1]} {
+			lappend l2 0
+		} else {
+			lappend l1 0
+		}
+	}
+
+	for {set i 0} {$i < [llength $l1]} {incr i} {
+		if {[lindex $l1 $i] != [lindex $l2 $i]} {
+			if {[lindex $l1 $i] < [lindex $l2 $i]} {
+				return -1
+			}
+			return 1
+		}
+	}
+	return 0
+}
 set tcllib {
 		The %s package is included in the Tcl Standard Library (tcllib).
 		It appears that you are either missing this library or it's incomplete
@@ -54,7 +102,7 @@ foreach {package minimum_version instructions} {
 		puts [format $instructions $package]
 		continue
 	}
-	set cmp [::gmautil::version_compare $installed_version $minimum_version]
+	set cmp [version_compare $installed_version $minimum_version]
 	if {$cmp == 0 || $minimum_version == 0} {
 		puts "Congratulations, you have $package version $installed_version installed."
 	} elseif {$cmp < 0} {
