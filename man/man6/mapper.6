@@ -2,7 +2,7 @@
 '\" *** 332 ***
 '\" <<ital-is-var>>
 '\" <<bold-is-fixed>>
-.TH MAPPER 6 "GMA Toolkit 5.1" 03-Mar-2023 "Games" \" @@mp@@
+.TH MAPPER 6 "GMA Toolkit 5.2" 05-Mar-2023 "Games" \" @@mp@@
 .SH NAME
 mapper \- GMA battle grid map
 .SH SYNOPSIS
@@ -1593,7 +1593,7 @@ case, a client
 be implemented to wait synchronously for a server
 response during the authentication negotiation stage.
 .LP
-This describes protocol version 401. These notes are intended to be 
+This describes protocol version 402. These notes are intended to be 
 detailed enough to implement a client from and should be considered
 the definitive standard reference to the protocol.
 .LP
@@ -3570,6 +3570,22 @@ The result of the die roll. This is an object with the following fields:
 .BI Result " (int)"
 The final numerical result of the die-roll.
 .TP
+.BI InvalidRequest " (bool)"
+If true, the die roll never happened because the request could not be understood.
+In this case, the details about the request and reason for failure are in the
+.B Details
+array. The
+.B Result
+integer field should be disregarded since there was no result generated.
+.TP
+.BI ResultSuppressed " (bool)"
+If true, this result message describes a die roll request without disclosing the
+results of the roll. This is used, for example, when sending a die roll for the
+GM to see privately (not even showing the requester the result).
+In this case, the value of the
+.B Result
+field should be ignored.
+.TP
 .BI Details " (list of objects)"
 The details behind how that result was generated are given as a list of objects
 with the following fields:
@@ -3848,8 +3864,13 @@ the server tracks game state, simply exiting and restarting the map client accom
 the same effect (possibly better). Now this button requests a "sync" operation with the
 server. 
 .LP
-This document also describes map protocol version 401,
-which introduced the
+This document also describes map protocol version 402,
+which improved the 
+.B ROLL
+server message by adding support for blind rolls to the GM.
+.LP
+Protocol version 401
+introduced the
 .B Grid
 parameter to the
 .B AV

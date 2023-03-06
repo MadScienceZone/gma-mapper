@@ -1,23 +1,23 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       _______     _______              #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___   )   (  ____ \             #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |   | (    \/             #
-# | |      | || || || (___) | Assistant  / (_) (_        /   )   | (____               #
-# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /    (_____ \              #
-# | | \_  )| |   | || (   ) |                ) (      /   _/           ) )             #
-# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\ _ /\____) )             #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/(_)\______/              #
+#  _______  _______  _______                ___       ______                           #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \                          #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \                         #
+# | |      | || || || (___) | Assistant  / (_) (_       ___) /                         #
+# | | ____ | |(_)| ||  ___  |           (____   _)     (___ (                          #
+# | | \_  )| |   | || (   ) |                ) (           ) \                         #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /                         #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/                          #
 #                                                                                      #
 ########################################################################################
 #
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.2.5}     ;# @@##@@
+set GMAMapperVersion {4.3}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
-set GMAMapperProtocol {401}         ;# @@##@@
-set GMAVersionNumber {5.1}            ;# @@##@@
+set GMAMapperProtocol {402}         ;# @@##@@
+set GMAVersionNumber {5.2}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -579,6 +579,8 @@ proc default_style_data {} {
 		font_until		If12
 		font_worst      If12
 		font_comment	If12
+		font_error	Hf12
+		font_notice	If12
 		fg_diebonus     red
 		fg_fail         red
 		fg_fullmax      red
@@ -586,7 +588,11 @@ proc default_style_data {} {
 		fg_maxroll      red
 		fg_short        red
 		fg_to           red
+		fg_error	red
+		fg_notice	yellow
 		overstrike_discarded 1
+		fmt_error	{ERROR: %s}
+		fmt_notice	{[%s]}
 		fmt_best		{ best of %s}
 		fmt_worst	{ worst of %s}
 		fmt_critlabel	{Confirm: }
@@ -1430,7 +1436,7 @@ foreach icon_name {
 	shape_square_go dash0 dash24 dash44 dash64 dash6424 dash642424 
 	arrow_both arrow_first arrow_none arrow_last arrow_refresh heart
 	saf saf_open saf_merge saf_unload saf_group_go die16 die16c information info20 die20 die20c
-	delete add menu clock
+	delete add menu clock dieb16
 } {
 	if {$dark_mode && [file exists "${ICON_DIR}/d_${icon_name}${icon_size}.gif"]} {
 		set icon_filename "${ICON_DIR}/d_${icon_name}${icon_size}.gif"
@@ -8508,9 +8514,8 @@ proc format_with_style {value format} {
 }
 
 set drd_id 0
-#proc DisplayDieRoll {from recipientlist title result details} 
 proc DisplayDieRoll {d} {
-	global icon_die16 icon_die16c SuppressChat drd_id
+	global icon_dieb16 icon_die16 icon_die16c SuppressChat drd_id
 
 	if {$SuppressChat} {
 		return
@@ -8521,7 +8526,9 @@ proc DisplayDieRoll {d} {
 		Recipients       recipientlist \
 		Title            title \
 		{Result Result}  result \
-		{Result Details} details
+		{Result Details} details \
+		{Result InvalidRequest} is_invalid \
+		{Result ResultSuppressed} is_blind
 
 	set w .chatwindow.p.chat
 
@@ -8535,12 +8542,17 @@ proc DisplayDieRoll {d} {
 			break
 		}
 	}
+	if {$is_blind || $is_invalid} {
+		set icon $icon_dieb16
+	}
 
-	TranscribeDieRoll $from $recipientlist $title $result $details [dict get $d ToAll] [dict get $d ToGM]
+	TranscribeDieRoll $from $recipientlist $title $result $details [dict get $d ToAll] [dict get $d ToGM] $is_blind $is_invalid
 	$w.1.text configure -state normal
 	$w.1.text image create end -align baseline -image $icon -padx 2
-	$w.1.text insert end [format_with_style $result fullresult] fullresult
-	$w.1.text insert end " "
+	if {!$is_blind && !$is_invalid} {
+		$w.1.text insert end [format_with_style $result fullresult] fullresult
+		$w.1.text insert end " "
+	}
 	ChatAttribution $w.1.text $from $recipientlist [dict get $d ToAll] [dict get $d ToGM]
 	if {$title != {}} {
 		global display_styles
@@ -8971,7 +8983,7 @@ proc DisplayChatMessage {d args} {
 			best bonus comment constant critlabel critspec dc diebonus diespec discarded
 			exceeded fail from fullmax fullresult iteration label max maximized maxroll 
 			met min moddelim normal operator repeat result roll separator short sf success 
-			title to until worst system subtotal
+			title to until worst system subtotal error notice
 		} {
 			set options {}
 			foreach {stylekey optkey} "fg_$tag -foreground bg_$tag -background overstrike_$tag -overstrike font_$tag -font underline_$tag -underline offset_$tag -offset" {
@@ -9256,7 +9268,7 @@ proc _log_transcription {message} {
 	}
 }
 
-proc TranscribeDieRoll {from recipientlist title result details toall togm} {
+proc TranscribeDieRoll {from recipientlist title result details toall togm {is_blind false} {is_invalid false}} {
 	global ChatTranscript
 
 	if {$ChatTranscript ne {}} {
@@ -9264,6 +9276,9 @@ proc TranscribeDieRoll {from recipientlist title result details toall togm} {
 			set message "\[ROLL $result\] $from: "
 		} else {
 			set message "\[ROLL $result\] $from ($private): "
+		}
+		if {$is_invalid} {
+			append message "ERROR "
 		}
 		if {$title ne {}} {
 			append message "$title: "
@@ -9292,12 +9307,14 @@ proc TranscribeDieRoll {from recipientlist title result details toall togm} {
 				# critlabel	"Confirm:"
 				# subtotal      "(n)"
 				switch -exact [dict get $dd Type] {
+					error  		{append message "\[ERROR: [dict get $dd Value]\] "}
+					notice 		{append message "\[[dict get $dd Value]\] "}
 					discarded	{append message "(DISCARDED: [dict get $dd Value])"}
 					maxroll		{append message "(MAXIMIZED: [dict get $dd Value])"}
 					diebonus	{append message "(per-die bonus [dict get $dd Value])"}
-					fullmax     {append message "MAXIMIZED ROLL: [dict get $dd Value]"}
-					subtotal    {append message "([dict get $dd Value])"}
-					roll        {append message "{[dict get $dd Value]}"}
+					fullmax     	{append message "MAXIMIZED ROLL: [dict get $dd Value]"}
+					subtotal    	{append message "([dict get $dd Value])"}
+					roll        	{append message "{[dict get $dd Value]}"}
 					default 	{append message [dict get $dd Value]}
 				}
 			}
@@ -10619,7 +10636,7 @@ if {![::gmaproto::is_ready] && $IThost ne {}} {
     after 5000 {report_progress {}}
 }
 
-# @[00]@| GMA 5.1
+# @[00]@| GMA 5.2
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
