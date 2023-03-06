@@ -589,7 +589,6 @@ proc default_style_data {} {
 		fg_short        red
 		fg_to           red
 		fg_error	red
-		fg_notice	yellow
 		overstrike_discarded 1
 		fmt_error	{ERROR: %s}
 		fmt_notice	{[%s]}
@@ -643,6 +642,7 @@ proc default_style_data {} {
 			fg_repeat     #aaaaaa
 			fg_roll       #00fa92
 			fg_subtotal   #00fa92
+			fg_notice	yellow
 			fg_sf         #aaaaaa
 			fg_success    #00fa92
 			fg_system     cyan
@@ -671,6 +671,7 @@ proc default_style_data {} {
 			fg_from       blue
 			fg_iteration  #888888
 			fg_label      blue
+			fg_notice     red
 			fg_max        #888888
 			fg_met        green
 			fg_min        #888888
@@ -1646,6 +1647,8 @@ proc configureChatCapability {} {
 	if {$IThost eq {}} {
 		.toolbar.chat configure -image $icon_blank -state disabled
 		tooltip::tooltip .toolbar.chat "Chat/die roll tool is not available unless connected to a server."
+		.toolbar.iniclock configure -image $icon_blank -state disabled
+		tooltip::tooltip .toolbar.iniclock "Game clock tool is not available unless connected to a server."
 	}
 }
 
