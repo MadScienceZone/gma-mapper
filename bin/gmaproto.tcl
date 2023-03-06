@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___       _______     _______              #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___   )   (  ____ \             #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |   | (    \/             #
-# | |      | || || || (___) | Assistant  / (_) (_        /   )   | (____               #
-# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /    (_____ \              #
-# | | \_  )| |   | || (   ) |                ) (      /   _/           ) )             #
-# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\ _ /\____) )             #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/(_)\______/              #
+#  _______  _______  _______                ___       ______                           #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \                          #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \                         #
+# | |      | || || || (___) | Assistant  / (_) (_       ___) /                         #
+# | | ____ | |(_)| ||  ___  |           (____   _)     (___ (                          #
+# | | \_  )| |   | || (   ) |                ) (           ) \                         #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /                         #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/                          #
 #                                                                                      #
 ########################################################################################
 #
@@ -14,7 +14,7 @@
 # Mapper JSON protocol handling functions.
 # Steve Willoughby <steve@madscience.zone>
 #
-# Implements GMA Mapper Protocol 400.
+# Implements GMA Mapper Protocol >=400.
 # // ... \n		ignored
 # PROTOCOL <version>\n
 # <command> <json> \n
@@ -57,9 +57,9 @@ package require base64 2.4.2
 package require uuid 1.0.1
 
 namespace eval ::gmaproto {
-	variable protocol 401
+	variable protocol 402
 	variable min_protocol 333
-	variable max_protocol 401
+	variable max_protocol 402
 	variable max_max_protocol 499
 	variable debug_f {}
 	variable legacy false
@@ -165,7 +165,7 @@ namespace eval ::gmaproto {
 		PROGRESS {OperationID s Title s Value i MaxValue i IsDone ?}
 		PS      {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l Elev i Color s Note s Size s Area s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i}
 		READY   {}
-		ROLL    {Sender s Recipients l MessageID i ToAll ? ToGM ? Title s Result {o {Result i Details {a {Type s Value s}}}} RequestID s MoreResults ?}
+		ROLL    {Sender s Recipients l MessageID i ToAll ? ToGM ? Title s Result {o {InvalidRequest ? ResultSuppressed ? Result i Details {a {Type s Value s}}}} RequestID s MoreResults ?}
 		SYNC    {}
 		SYNC-CHAT {Target i}
 		TB      {Enabled ?}
@@ -2108,7 +2108,7 @@ proc ::gmaproto::GMATypeToProtocolCommand {gt} {
 	}
 	return $gt
 }
-# @[00]@| GMA 5.1
+# @[00]@| GMA 5.2
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
