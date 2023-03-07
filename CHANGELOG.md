@@ -4,11 +4,16 @@
  * Supported GMA Mapper Version: 4.3 <!-- @@##@@ -->
  * Supported GMA Mapper File Format: 20	     <!-- @@##@@ -->
  * Supported GMA Mapper Protocol: 402        <!-- @@##@@ -->
- * Effective Date: 05-Mar-2023               <!-- @@##@@ -->
+ * Effective Date: 06-Mar-2023               <!-- @@##@@ -->
 
-# Upcoming release
+# 4.3
 ## Added
  * A new script, `bin/check_install.tcl`, is provided to check to see that you have the Tcl/Tk libraries on which the mapper tool depends. If you don't, it will give you some instructions as to where to find the missing library.
+ * Now implements protocol 402, which enhances the responses to die roll requests to include the cases where blind rolls are made to or by the GM, and reports of invalid roll requests.
+ * Now uses GMA application icon where supported by the window manager.
+
+## Fixed
+ * Added documentation to die-roll help screen about the `>` prefix to a die roll.
 
 # 4.2.5
 ## Fixed
