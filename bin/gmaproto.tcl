@@ -1847,8 +1847,8 @@ proc ::gmaproto::_login {} {
 					error "The server speaks a protocol too new for me to understand at all ($::gmaproto::protocol)"
 				}
 				if {$::gmaproto::protocol > $::gmaproto::max_protocol} {
-					DEBUG 0 "The server speaks a protocol too new for me; checking for available updates..."
-					DEBUG 0 "It may be possible to proceed with this client but not all commands may work as expected."
+					::DEBUG 0 "The server speaks a protocol too new for me; checking for available updates..."
+					::DEBUG 0 "It may be possible to proceed with this client but not all commands may work as expected."
 				}
 				if {$challenge ne {}} {
 					::gmaproto::DEBUG "Authenticating to server"
