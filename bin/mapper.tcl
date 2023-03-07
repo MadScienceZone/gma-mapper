@@ -3395,6 +3395,8 @@ proc ShowDiceSyntax {} {
 		{p {}}
 		{p "You can put \"" i name b = p "\" in front of the entire expression to label it for what it represents. For example, \"" b {attack=d20+5 | c} p "\" rolls d20+5 (with confirmation check) but reports it along with the name \"attack\" to make it clear what the roll was for."}
 		{p {}}
+		{p "If you put a \"" b > p "\" in front of a multi-die roll, such as \"" b >3d6 p "\", the first die will be maximized while the remaining ones will be random. So in this example, the actual roll will be equivalent to \"" b 2d6+6 p "\". This is usually used for hit points of creatures with class levels."}
+		{p {}}
 		{p {The } b {best of} p { pattern will cause the die following it to be rolled } i n 
 		 p " times and the best of them taken. (Similarly, you can use \"" b worst 
 		 p "\" in place of \"" b best p "\".)"}
