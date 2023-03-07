@@ -1420,10 +1420,10 @@ report_progress "Setting up UI"
 #
 #
 
-foreach icon_size {512 256 128 48 32 16} {
-	set icon_gma_$icon_size [image create photo -format gif -file "${ICON_DIR}/gma_icon_${icon_size}.gif"]
+foreach app_icon_size {512 256 128 48 32 16} {
+	set icon_gma_$app_icon_size [image create photo -format gif -file "${ICON_DIR}/gma_icon_${app_icon_size}.gif"]
 }
-wm photoicon . $icon_gma_512 $icon_gma_256 $icon_gma_128 $icon_gma_48 $icon_gma_32 $icon_gma_16
+wm iconphoto . -default $icon_gma_512 $icon_gma_256 $icon_gma_128 $icon_gma_48 $icon_gma_32 $icon_gma_16
 
 foreach icon_name {
 	line rect poly circ arc blank play
