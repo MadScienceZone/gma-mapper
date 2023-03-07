@@ -10596,6 +10596,13 @@ proc display_initiative_clock {} {
 	global time_abs
 	global time_rel
 	global MOB_COMBATMODE
+	global IThost
+
+	if {![::gmaproto::is_connected]} {
+		tk_messageBox -type ok -icon error -title "No Connection to Server" \
+			-message "Your client must be connected to the map server to use this function."
+		return
+	}
 
 	::gmaclock::dest .initiative.clock
 	catch {destroy .initiative}
