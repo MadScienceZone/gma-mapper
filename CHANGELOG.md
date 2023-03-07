@@ -9,6 +9,7 @@
 # 4.3.1
 ## Fixed
  * If the server's protocol version is higher than expected, a debugging message is printed to the user letting them know. There was a bug in the code that threw an error trying to print that message.
+ * Added check_install.tcl to the standalone distribution archive files.
 
 # 4.3
 ## Added
