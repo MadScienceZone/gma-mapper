@@ -6,6 +6,10 @@
  * Supported GMA Mapper Protocol: 402        <!-- @@##@@ -->
  * Effective Date: 07-Mar-2023               <!-- @@##@@ -->
 
+# 4.3.1
+## Fixed
+ * If the server's protocol version is higher than expected, a debugging message is printed to the user letting them know. There was a bug in the code that threw an error trying to print that message.
+
 # 4.3
 ## Added
  * A new script, `bin/check_install.tcl`, is provided to check to see that you have the Tcl/Tk libraries on which the mapper tool depends. If you don't, it will give you some instructions as to where to find the missing library.
