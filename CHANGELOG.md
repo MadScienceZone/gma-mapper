@@ -10,6 +10,7 @@
 ## Enhancements
  * Added support for mapper to use PNG format graphic images as an alternative to GIF.
  * Updated documentation.
+ * GUI output for `check_installation.tcl` so it works better on Windows.
 
 # 4.3.1
 ## Fixed
