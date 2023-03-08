@@ -32,6 +32,8 @@ mapper \- GMA battle grid map
 .RI [ image\fB=\fP ] name [\fB:\fP color ]]
 .RB [ \-D ]
 .RB [ \-d ]
+.RB [ \-f
+.IR fmt ]
 .RB [ \-G
 .IR n [\fB+\fP x [\fB:\fP y ]]]
 .RB [ \-g
@@ -42,7 +44,6 @@ mapper \- GMA battle grid map
 .RB [ \-l ]
 .RB [ \-M
 .IR module ]
-'\".RB [ \-m ]
 .RB [ \-n ]
 .RB [ \-P
 .IR pass ]
@@ -60,18 +61,26 @@ mapper \- GMA battle grid map
 .IR proxyurl ]
 .RB [ \-\-button\-size
 .BR small | medium | large ]
+.RB [ \-\-chat\-history
+.IR n ]
 .RB [ \-\-curl\-path
 .IR path ]
 .RB [ \-\-curl\-url\-base
 .IR url ]
 .RB [ \-\-dark ]
+.RB [ \-\-debug\-protocol ]
+.RB [ \-\-generate\-config
+.IR path ]
+.RB [ \-\-generate\-style\-config
+.IR path ]
 .RB [ \-\-mkdir\-path
 .IR path ]
 .RB [ \-\-nc\-path
 .IR path ]
+.RB [ \-\-no\-animate ]
 .RB [ \-\-no\-blur\-all ]
 .RB [ \-\-scp\-dest
-.IR path ]
+.IR dir ]
 .RB [ \-\-scp\-path
 .IR path ]
 .RB [ \-\-scp\-server
@@ -80,7 +89,6 @@ mapper \- GMA battle grid map
 .IR path ]
 .RB [ \-\-update\-url
 .IR url ]
-.RI [ mapfiles... ]
 .LP
 .B gma
 .B mapper
@@ -90,10 +98,8 @@ mapper \- GMA battle grid map
 .IR value ]
 .RI [ "other wish options" ]
 .B \-\-
-.RB [ \-\-animate ]
-.RB [ \-\-no\-animate ]
-.RB [ \-\-blur\-all ]
-.RB [ \-\-no\-blur\-all ]
+.RB [ \-\- [ no\- ] animate ]
+.RB [ \-\- [ no\- ] blur\-all ]
 .RB [ \-\-blur\-hp
 .IR pct ]
 .RB [ \-\-button\-size
@@ -110,6 +116,7 @@ mapper \- GMA battle grid map
 .IR url ]
 .RB [ \-\-dark ]
 .RB [ \-\-debug ]
+.RB [ \-\-debug\-protocol ]
 .RB [ \-\-generate\-config
 .IR path ]
 .RB [ \-\-generate\-style\-config
@@ -118,10 +125,11 @@ mapper \- GMA battle grid map
 .IR n [\fB+\fP x [\fB:\fP y ]]]
 .RB [ \-\-host
 .IR hostname ]
+.RB [ \-\-image\-format
+.IR fmt ]
 .RB [ \-\-keep\-tools ]
 .RB [ \-\-major
 .IR n [\fB+\fP x [\fB:\fP y ]]]
-'\".RB [ \-\-master ]
 .RB [ \-\-mkdir\-path
 .IR path ]
 .RB [ \-\-module
@@ -154,28 +162,51 @@ mapper \- GMA battle grid map
 .IR url ]
 .RB [ \-\-username
 .IR name ]
-.RI [ mapfiles... ]
 .ad
 '\" <</usage>>
 .LP
 Options cannot be combined into a single CLI argument.
 They are evaluated in the order they are received.
-While not recommended (nor guaranteed to always be the case), it happens that
-options specified after 
-.IR mapfile s 
-will affect only 
-.IR mapfile s 
-named following those
-later options. Thus, if a
-.I mapfile
-has a name beginning with a hyphen, it is necessary to specify it in some
-sneaky way, such as prefixing it with a 
-.RB \*(lq ./ \*(rq.
 .LP
-(Depending on your system, you may need to run as
-.B wish
+As shown above, if you have the GMA Core package installed, you may invoke the
+.B mapper
+program via the main
+.B gma
+program as
+.RS
+.LP
+.B gma
+.B mapper
+\&...
+.RE
+.LP
+If you installed 
+.B mapper
+as a stand-alone package by itself, you need to invoke it by running the
 .B mapper.tcl
-\&...)
+program found in the
+.B bin
+directory of the
+.B GMA-Mapper
+package as unpacked or cloned from git.
+Depending on your system's particular configuration, you may be able to run it
+directly, as
+.RS
+.LP
+.B bin/mapper.tcl
+.RE
+.LP
+or you may need to explicitly run the
+.BR wish (1)
+interpreter in a form such as
+.RS
+.LP
+.B wish 
+.B bin/mapper.tcl
+.br
+.B wish8.6
+.B bin/mapper.tcl
+.RE
 .SH DESCRIPTION
 .LP
 The
@@ -254,16 +285,8 @@ uploaded.
 The following options control the behavior of
 .BR mapper .
 '\" <<list>>
-.TP 16
-.BR \-A , \-\-no\-animate
-Suppress the animation effects enabled by the 
-.B \-a
-.RB ( \-\-animate )
-option. This is the default, so it only needs to be given to cancel an
-.B \-a
-option which appeared previously or which was read from a configuration file.
-.TP
-.BR \-a , \-\-animate
+.TP 20
+.BR \-a ", " \-\-animate
 This option causes
 the mapper to make a lame attempt to \*(lqanimate\*(rq the appearance
 of objects being drawn onto the screen by updating the display after each one.
@@ -272,7 +295,15 @@ computer displays of his childhood at the time. If you don't know what that mean
 watch an episode of the 1970s-era Battlestar Galactica and look at most of their
 computer screens.)
 .TP
-.BR \-B , \-\-blur\-all
+.BR \-A ", " \-\-no\-animate
+Suppress the animation effects enabled by the 
+.B \-a
+.RB ( \-\-animate )
+option. This is the default, so it only needs to be given to cancel an
+.B \-a
+option which appeared previously or which was read from a configuration file.
+.TP
+.BR \-B ", " \-\-blur\-all
 Normally, the imprecision introduced to health bar displays by the 
 .B \-b
 .RB ( \-\-blur\-hp )
@@ -285,7 +316,7 @@ Cancels the effect of the
 .RB ( \-\-blur\-all )
 option.
 .TP
-.BI "\-b\fR,\fP\-\-blur\-hp " pct
+.BI "\-b\fR, \fP\-\-blur\-hp " pct
 This option \*(lqblurs\*(rq the health bar displays by rounding off the displayed
 hit point total to only be accurate in
 .IR pct -percent
@@ -322,7 +353,7 @@ or
 .BR l ,
 representing small, medium, or large-size icons. Small buttons are the default.
 .TP
-.BI "\-C\fR,\fP\-\-config " file
+.BI "\-C\fR, \fP\-\-config " file
 Read a set of command-line options from the named
 .I file
 as if they appeared at this point in the list of command-line
@@ -357,8 +388,8 @@ following:
 .RE
 '\" <</TeX>>
 .LP
-Note that any line whose very first character is a pound sign
-.RB (\*(lq # \*(rq))
+Note that any line whose very first character is an octothorpe
+.RB (\*(lq # \*(rq)
 is ignored as a comment.
 .LP
 If the file
@@ -375,7 +406,7 @@ command line. This may be used to split up options into different files, such as
 settings common to all sessions, and specific settings based on networks or different games.
 .RE
 .TP
-.BI "\-c\fR,\fP\-\-character \fR[\fP" image =\fR]\fP name \fR[\fP: color \fR]\fP
+.BI "\-c\fR, \fP\-\-character \fR[\fP" image =\fR]\fP name \fR[\fP: color \fR]\fP
 Add player
 .I name
 to the list of standard players tracked by the mapper.
@@ -401,8 +432,8 @@ Multiple
 .B \-c
 options may be given.  Each adds another name to the list.
 .LP
-Note that when the mapper is networked with the GM's console, the
-default list of names actually comes from the GM's console so it
+Note that when the mapper is networked, the
+default list of names actually comes from the server, so it
 should not be necessary to specify these names to the client from
 the command line or configuration file.
 .RE
@@ -444,55 +475,22 @@ This is used when fetching image and map files from the server.
 Specify the base URL on the data server. The files downloaded by mapper
 clients will be in a directory hierarchy appended to this string.
 .TP
-.BR \-D , \-\-debug
-Increase debugging output level. Multiple 
-.B \-D 
-options further increase verbosity of debugging messages. These are displayed
-in a separate window.
-.TP
-.BR \-d , \-\-dark
+.BR \-d ", " \-\-dark
 This option changes the default color palette to use a darker background which
 may be easier to look at for longer periods of time. On macOS systems running
 up-to-date versions of Tcl/Tk (not the default legacy version supplied by
 Apple), dark mode is automatically selected if the macOS session is also
 configured for dark mode.
 .TP
-.BI "\-G\fR,\fP\-\-major " n
-Make every
-.IR n th
-gridline green (very thick lines).
-This is for major guide lines on the map. 
+.BR \-D ", " \-\-debug
+Increase debugging output level. Multiple 
+.B \-D 
+options further increase verbosity of debugging messages. These are displayed
+in a separate window.
 .TP
-.BI "\-G\fR,\fP\-\-major " n + o
-As above, but offset the major guide lines to the right and down by
-.I o
-lines.
-The
-.B +
-character is required, but the value of
-.I o
-may be negative, so the option 
-.RB \*(lq \-G
-.IB n +\-3\fR\*(rq\fP
-would move the lines to the left and up by 3 lines.
-.TP
-.BI "\-G\fR,\fP\-\-major " n + x : y
-If expressed this way, rather than use the same offset in both directions, move the guide
-lines 
-.I x
-lines to the right and
-.I y
-lines down.
-.TP
-.BI "\-g\fR,\fP\-\-guide " n
-Make every
-.IR n th
-gridline red (thick lines).
-This is for minor guide lines. The value of
-.I n
-may be specified in all the same ways as for the
-.BR \-G / \-\-major
-option (see above).
+.BI \-\-debug\-protocol
+Turns on debugging messages showing all interactions between client and server, and the client-side
+procesesing that is done to support that interaction.
 .TP
 .BI "\-\-generate\-config " path
 Append a set of example settings to the file named in
@@ -525,16 +523,29 @@ entries you wish to leave at the built-in default values.
 After writing to this file, the mapper client will exit.
 .RE
 .TP
+.BI "\-g\fR, \fP\-\-guide " n
+Make every
+.IR n th
+gridline red (thick lines).
+This is for minor guide lines. The value of
+.I n
+may be specified in all the same ways as for the
+.BR \-G / \-\-major
+option (see below).
+.TP
 .B \-\-help
 Print a summary of the command invocation options and exit.
 .TP
-.BI "\-h\fR,\fP\-\-host " hostname
+.BI "\-h\fR, \fP\-\-host " hostname
 Connect to a map control service running on the designated host.  This will 
 send updates to item positions, display of rooms, etc.
 If this option is not specified, no control connection is made, and the mapper
 runs in stand-alone mode.
 .TP
-.BR \-k , \-\-keep\-tools
+.BR \-f ", " "\-\-image\-format gif" | png
+Sets the preferred image file format to request when retrieving images from the server to display on the map.
+.TP
+.BR \-k ", " \-\-keep\-tools
 Normally, map clients have their toolbars turned off to maximize
 the available screen space for the battle map. The GM can turn on and off their toolbars from
 his console as needed.  If this option is given, this causes the client to unconditionally
@@ -542,12 +553,32 @@ display its toolbar anyway. This is used for the main map run by the GM or whome
 managing the group map and needs the toolbar active, or if people just want to keep the toolbar all
 the time.
 .TP
-.BR \-l , \-\-preload
-Pre-load all the cached images into memory at start-up, instead of loading them
-as needed during the map's operation. Note that this only loads cached images
-which are new enough that the mapper wouldn't check the server for newer versions
-anyway, thus allowing a mapper client to be restarted mid-game with a minimum of
-impact to game performance.
+.BI "\-G\fR, \fP\-\-major " n
+Make every
+.IR n th
+gridline green (very thick lines).
+This is for major guide lines on the map. 
+.TP
+.BI "\-G\fR, \fP\-\-major " n + o
+As above, but offset the major guide lines to the right and down by
+.I o
+lines.
+The
+.B +
+character is required, but the value of
+.I o
+may be negative, so the option 
+.RB \*(lq \-G
+.IB n +\-3\fR\*(rq\fP
+would move the lines to the left and up by 3 lines.
+.TP
+.BI "\-G\fR, \fP\-\-major " n + x : y
+If expressed this way, rather than use the same offset in both directions, move the guide
+lines 
+.I x
+lines to the right and
+.I y
+lines down.
 .TP
 .BI "\-\-mkdir\-path " path
 Specify the 
@@ -560,7 +591,7 @@ program which will be used when uploading files
 '\" <<ital-is-var>>
 the data server (authorized users only).
 .TP
-.BI "\-M\fR,\fP\-\-module " module
+.BI "\-M\fR, \fP\-\-module " module
 Use the module ID code
 .I module
 for this session. This is used to differentiate server-side resources
@@ -577,10 +608,10 @@ program which will be used when sending files
 '\" <<ital-is-var>>
 the data server (authorized users only) through a SOCKS proxy server.
 .TP
-.BR \-n , \-\-no\-chat
+.BR \-n ", " \-\-no\-chat
 Suppress the display of incoming chat messages including die rolls.
 .TP
-.BI "\-P\fR,\fP\-\-password " pass
+.BI "\-P\fR, \fP\-\-password " pass
 For servers which require authentication, this specifies the password to gain entry to that server.
 This is a fairly simple authentication mechanism intended to block nuisance connections, spam,
 and accidental connections of legitimate clients to the wrong game server. If 
@@ -590,26 +621,35 @@ is given as a single question mark
 then the user will be prompted to enter their password manually when connecting to the server.
 This avoids placing the plaintext password on the command line or in a configuration file.
 .TP
-.BI "\-p\fR,\fP\-\-port " port
+.BI "\-p\fR, \fP\-\-port " port
 If the
 .B \-h
 .RB ( \-\-host )
 option is given, connect to the specified TCP
 .I port
 number on that host.  The default is port 2323.
-'\" .TP
-'\" .BI \-S " hostname"
-'\" Connect to the map server via SOCKS5 proxy host with the
-'\" given
-'\" .IR hostname .
-'\" .TP
-'\" .BI \-s " port"
-'\" Specify the TCP port for the SOCKS5 proxy named with the
-'\" .B \-S
-'\" option.
-'\" .TP
-'\" .BI \-U " user"
-'\" Specify the user name for the SOCKS5 proxy server, if needed.
+.TP
+.BR \-l ", " \-\-preload
+Pre-load all the cached images into memory at start-up, instead of loading them
+as needed during the map's operation. Note that this only loads cached images
+which are new enough that the mapper wouldn't check the server for newer versions
+anyway, thus allowing a mapper client to be restarted mid-game with a minimum of
+impact to game performance.
+.TP
+.BI "\-X\fR, \fP\-\-proxy\-host " host \fR[\fP: port \fR]\fP
+For sending files
+'\" <</ital-is-var>>
+.I to
+'\" <<ital-is-var>>
+the server (for authorized users only), use the specified SOCKS5 proxy
+server. (E.g.,
+.BR "\-X proxy.example.org:1080" .)
+.TP
+.BI "\-x\fR, \fP\-\-proxy\-url " proxyurl
+Use the given URL to connect through a proxy server to fetch image data.
+This does not affect the connection to the map server used by GMA (yet).
+(E.g., 
+.BR "\-x http://proxy.example.org:1080" .)
 .TP
 .BI "\-\-scp\-dest " path
 Specify the 
@@ -652,7 +692,7 @@ exists, that file will be read by default. See
 .BR style.conf (5)
 for details about what can go in this file.
 .TP
-.BI "\-t\fR,\fP\-\-transcript " path
+.BI "\-t\fR, \fP\-\-transcript " path
 Records all chat window activity (including results of die rolls) to the
 specified file
 .IR path .
@@ -663,7 +703,7 @@ The following special tokens may appear in the
 .I path
 string, which will be replaced with values based on the time of day
 the file is opened:
-.TP 4
+.TP 6
 .B %a
 Mon, Tue, etc.
 .TP
@@ -730,25 +770,10 @@ program may be obtained. This enables automatic upgrades. The
 will, with the user's approval, download updated versions of itself
 from this URL and install them.
 .TP
-.BI "\-u\fR,\fP\-\-username " name
+.BI "\-u\fR, \fP\-\-username " name
 Sets the name used to identify you amongst the other players on your server.
 If this option is not provided, your current system username will be used
 instead.
-.TP
-.BI "\-X\fR,\fP\-\-proxy\-host " host \fR[\fP: port \fR]\fP
-For sending files
-'\" <</ital-is-var>>
-.I to
-'\" <<ital-is-var>>
-the server (for authorized users only), use the specified SOCKS5 proxy
-server. (E.g.,
-.BR "\-X proxy.example.org:1080" .)
-.TP
-.BI "\-x\fR,\fP\-\-proxy\-url " proxyurl
-Use the given URL to connect through a proxy server to fetch image data.
-This does not affect the connection to the map server used by GMA (yet).
-(E.g., 
-.BR "\-x http://proxy.example.org:1080" .)
 '\" <</>>
 .SH "INVOCATION"
 .LP
@@ -1901,6 +1926,8 @@ were
 .RB \*(lq abcdefg \*(rq,
 the URL of the file to be retrieved would be
 .IB base /a/ab/abcdefg.gif
+or
+.IB base /a/ab/abcdefg.png
 where
 .I base
 is the base URL as specified to the 
@@ -1917,9 +1944,9 @@ files such as
 or
 .B a/ab/abcdefg.png
 may be retrieved for clients which use those other formats. 
-Due to implementation limitations of the framework used, 
+Currently,
 .B mapper.tcl
-always uses GIF format files.
+uses GIF or PNG format files.
 .RE
 .TP
 .B AI?

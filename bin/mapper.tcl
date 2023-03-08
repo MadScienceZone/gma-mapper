@@ -1004,13 +1004,14 @@ proc usage {} {
 	puts $stderr "This is mapper, version $GMAMapperVersion"
 	puts $stderr "Usage: $argv0 \[-display name\] \[-geometry value\] \[other wish options...\] -- \[--help]"
 	puts $stderr {        [-A] [-a] [-B] [-b pct] [-C file] [-c name[:color]] [-D] [-d]}
+	puts $stderr {        [-f fmt]
 	puts $stderr {        [-G n[+x[:y]]] [-g n[+x[:y]]] [-h hostname] [-k] [-l] [-M moduleID]}
 	puts $stderr {        [-n] [-P pass] [-p port] [-s stylefile] [-t transcriptfile] [-u name]}
 	puts $stderr {        [-x proxyurl] [-X proxyhost] [--button-size size] [--chat-history n]}
-	puts $stderr {        [--curl-path path] [--curl-url-base url] [--debug-protocol] [--generate-config path]}
-	puts $stderr {        [--generate-style-config path] [--mkdir-path path] [--nc-path path]}
-	puts $stderr {        [--no-blur-all] [--scp-path path] [--scp-dest dir] [--scp-server hostname]}
-	puts $stderr {        [--update-url url] [mapfiles...]}
+	puts $stderr {        [--curl-path path] [--curl-url-base url] [--dark] [--debug-protocol]}
+	puts $stderr {        [--generate-config path] [--generate-style-config path]}
+	puts $stderr {        [--mkdir-path path] [--nc-path path] [--no-animate] [--no-blur-all] [--scp-dest dir]}
+	puts $stderr {        [--scp-path path] [--scp-server hostname] [--ssh-path path] [--update-url url]}
 	puts $stderr {Each option and its argument must appear in separate CLI parameters (words).}
 	puts $stderr {   -A, --animate:     Enable animation of drawing onto the map}
 	puts $stderr {   -a, --no-animate:  Suppress animation of drawing onto the map}
@@ -1020,9 +1021,9 @@ proc usage {} {
 	puts $stderr {       --button-size: Set button size to "small" (default), "medium", or "large"}
 	puts $stderr {   -C, --config:      Read options from specified file (subsequent options further modify)}
 	puts $stderr {   -c, --character:   Add another character name for menu}
+	puts $stderr {   -d, --dark:        Adjust colors for dark mode}
 	puts $stderr {   -D, --debug:       Increase debug output level}
 	puts $stderr {       --debug-protocol: Show a transcript of network I/O data in debug window}
-	puts $stderr {   -d, --dark:        Adjust colors for dark mode}
 	puts $stderr {   -f, --image-format: Image format for map graphics (png or gif)}
 	puts $stderr {   -G, --major:       Set major grid guidlines every n (offset by x and/or y)}
 	puts $stderr {   -g, --guide:       Set minor grid guidlines every n (offset by x and/or y)}
@@ -1043,16 +1044,15 @@ proc usage {} {
 	puts $stderr "   --chat-history:   number of chat messages to retain between sessions \[$ChatHistoryLimit\]"
 	puts $stderr "   --curl-path:      pathname of curl command to invoke \[$CURLpath\]"
 	puts $stderr "   --curl-url-base:  base URL for stored data \[$CURLserver\]"
+	puts $stderr "   --generate-config: append example mapper.conf file to specified pathname."
+	puts $stderr "   --generate-style-config: append example style.conf file to specified pathname."
 	puts $stderr "   --mkdir-path:     pathname of server-side mkdir command \[$SERVER_MKDIRpath\]"
 	puts $stderr "   --nc-path:        pathname of nc command to invoke \[$NCpath\]"
-	puts $stderr "   --scp-path:       pathname of scp command to invoke \[$SCPpath\]"
 	puts $stderr "   --scp-dest:       server-side top-level storage directory \[$SCPdest\]"
+	puts $stderr "   --scp-path:       pathname of scp command to invoke \[$SCPpath\]"
 	puts $stderr "   --scp-server:     storage server hostname \[$SCPserver\]"
 	puts $stderr "   --ssh-path:       pathname of ssh command to invoke \[$SSHpath\]"
-	puts $stderr "   --generate-style-config: append example style.conf file to specified pathname."
-	puts $stderr "   --generate-config: append example mapper.conf file to specified pathname."
 	puts $stderr "   --update-url:     base URL to automatically download software updates from."
-	puts $stderr {   If map files are named, they are loaded at startup.}
 	exit 1
 }
 

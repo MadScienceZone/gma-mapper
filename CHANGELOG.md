@@ -6,6 +6,11 @@
  * Supported GMA Mapper Protocol: 402        <!-- @@##@@ -->
  * Effective Date: 07-Mar-2023               <!-- @@##@@ -->
 
+# Unreleased
+## Enhancements
+ * Added support for mapper to use PNG format graphic images as an alternative to GIF.
+ * Updated documentation.
+
 # 4.3.1
 ## Fixed
  * If the server's protocol version is higher than expected, a debugging message is printed to the user letting them know. There was a bug in the code that threw an error trying to print that message.
