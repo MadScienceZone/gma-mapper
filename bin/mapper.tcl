@@ -1003,8 +1003,7 @@ proc usage {} {
 
 	puts $stderr "This is mapper, version $GMAMapperVersion"
 	puts $stderr "Usage: $argv0 \[-display name\] \[-geometry value\] \[other wish options...\] -- \[--help]"
-	puts $stderr {        [-A] [-a] [-B] [-b pct] [-C file] [-c name[:color]] [-D] [-d]}
-	puts $stderr {        [-f fmt]
+	puts $stderr {        [-A] [-a] [-B] [-b pct] [-C file] [-c name[:color]] [-D] [-d] [-f fmt]}
 	puts $stderr {        [-G n[+x[:y]]] [-g n[+x[:y]]] [-h hostname] [-k] [-l] [-M moduleID]}
 	puts $stderr {        [-n] [-P pass] [-p port] [-s stylefile] [-t transcriptfile] [-u name]}
 	puts $stderr {        [-x proxyurl] [-X proxyhost] [--button-size size] [--chat-history n]}
