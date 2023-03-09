@@ -1,4 +1,4 @@
-#!/usr/bin/env tclsh
+#!/usr/bin/env wish
 #
 # Check the dependencies of the mapper tool to be sure they're installed.
 #
