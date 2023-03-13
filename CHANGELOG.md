@@ -1,15 +1,15 @@
 # Game Master's Assistant / Mapper Client
 # Release Notes
 ## Current Version Information
- * This Package Version: 4.3.2-alpha.0.0               <!-- @@##@@ -->
- * Effective Date: 08-Mar-2023               <!-- @@##@@ -->
+ * This Package Version: 4.3.2               <!-- @@##@@ -->
+ * Effective Date: 12-Mar-2023               <!-- @@##@@ -->
 
 ## Compatibility
  * GMA Core API Library Version: 5.2 <!-- @@##@@ -->
  * GMA Mapper File Format: 20	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 402        <!-- @@##@@ -->
 
-# Unreleased
+# 4.3.2
 ## Enhancements
  * Added support for mapper to use PNG format graphic images as an alternative to GIF.
  * Updated documentation.
