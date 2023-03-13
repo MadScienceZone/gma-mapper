@@ -124,50 +124,49 @@ by the
 server command.
 '\" <</>>
 .SH EXAMPLE
-\guillemotleft
 '\" <<TeX>>
-'\" \begin{SourceCode}
-'\" __MAPPER__:20
-'\" \guillemotleft __META__\guillemotright{} {
-'\"   "Timestamp": 1650611775,
-'\"   "DateTime": "Fri Apr 22 00:16:15 PDT 2022",
-'\"   "Location": "Room 12 of the Dungeon"
-'\" }
-'\" \guillemotleft LINE\guillemotright{} {
-'\"   "ID": 1,
-'\"   "Fill": "#00e400",
-'\"   "X": 425,
-'\"   "Y": 107,
-'\"   "Z": 1,
-'\"   "Points": [
-'\"     {"X": 433, "Y": 337}, 
-'\"     {"X": 553, "Y": 392}, 
-'\"     {"X": 600, "Y": 243},
-'\"     {"X": 424, "Y": 108}
-'\"   ],
-'\"   "Width": 5
-'\" }
-'\" \guillemotleft RECT\guillemotright{} {
-'\"   "ID": 2,
-'\"   "Line": "black",
-'\"   "Fill": "#00e400",
-'\"   "Width": 5,
-'\"   "X": 593,
-'\"   "Y": 122,
-'\"   "Z": 2,
-'\"   "Points": [
-'\"     {"X": 807, "Y": 443}
-'\"   ]
-'\" }
-'\" \guillemotleft IMG\guillemotright{} {
-'\"   "Name": "re5_e2",
-'\"   "Sizes": [
-'\"     {"File": "SJy9rpbTDElsCfklYHMvsgre5_e2@50", "Zoom": 1.0},
-'\"     {"File": "SJy9rpbTDElsCfklYHMvsgre5_e2@100", "Zoom": 2.0}
-'\"   ]
-'\" }
-'\" \guillemotleft __EOF__\guillemotright{}
-'\" \end{SourceCode}
+'\" \begin{Coding}
+'\" |__MAPPER__:20|\\
+'\" \guillemotleft|__META__|\guillemotright{}| {|\\
+'\" |  "Timestamp": 1650611775,|\\
+'\" |  "DateTime": "Fri Apr 22 00:16:15 PDT 2022",|\\
+'\" |  "Location": "Room 12 of the Dungeon"|\\
+'\" |}|\\
+'\" \guillemotleft|LINE|\guillemotright{}| {|\\
+'\" |  "ID": 1,|\\
+'\" |  "Fill": "#00e400",|\\
+'\" |  "X": 425,|\\
+'\" |  "Y": 107,|\\
+'\" |  "Z": 1,|\\
+'\" |  "Points": [|\\
+'\" |    {"X": 433, "Y": 337}, |\\
+'\" |    {"X": 553, "Y": 392}, |\\
+'\" |    {"X": 600, "Y": 243},|\\
+'\" |    {"X": 424, "Y": 108}|\\
+'\" |  ],|\\
+'\" |  "Width": 5|\\
+'\" |}|\\
+'\" \guillemotleft|RECT|\guillemotright{}| {|\\
+'\" |  "ID": 2,|\\
+'\" |  "Line": "black",|\\
+'\" |  "Fill": "#00e400",|\\
+'\" |  "Width": 5,|\\
+'\" |  "X": 593,|\\
+'\" |  "Y": 122,|\\
+'\" |  "Z": 2,|\\
+'\" |  "Points": [|\\
+'\" |    {"X": 807, "Y": 443}|\\
+'\" |  ]|\\
+'\" |}|\\
+'\" \guillemotleft|IMG|\guillemotright{}| {|\\
+'\" |  "Name": "re5_e2",|\\
+'\" |  "Sizes": [|\\
+'\" |    {"File": "SJy9rpbTDElsCfklYHMvsgre5_e2@50", "Zoom": 1.0},|\\
+'\" |    {"File": "SJy9rpbTDElsCfklYHMvsgre5_e2@100", "Zoom": 2.0}|\\
+'\" |  ]|\\
+'\" |}|\\
+'\" \guillemotleft|__EOF__|\guillemotright{}
+'\" \end{Coding}
 .LP
 .nf
 .na
@@ -238,6 +237,8 @@ including tall (uppercase) and wide (lowercase) variants, sometimes there are sp
 cases which fall outside that list. The following special codes are also usable:
 '\" <<desc>>
 .TP 8
+.B C80
+Colossal creature with 80-foot space and 80-foot reach (looking at you, Oliphaunt of Jandelay).
 .B L0/l0
 Large creature with no threat zone and no reach (such as a swarm of 
 teensy critters).
