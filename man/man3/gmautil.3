@@ -138,6 +138,13 @@ standard to the GMA suite. Currently, it translates the Tcl runtime's machine na
 from
 .B tcl_platform(machine)
 with the following translation:
+'\"<<TeX>>
+'\"\begin{center}
+'\" \begin{tabular}{ll}\toprule
+'\"  \bfseries Tcl Name&\bfseries\gma\ Name\\\midrule
+'\"  \z{x86\_64}&\z{amd64}\\\bottomrule
+'\" \end{tabular}
+'\"\end{center}
 .TS
 center;
 lB lB
@@ -145,6 +152,7 @@ l l.
 Tcl Name	GMA Name
 x86_64	amd64
 .TE
+'\"<</TeX>>
 .RS
 .LP
 Any name not otherwise listed is returned as-is from the Tcl runtime. More names will likely
@@ -157,6 +165,15 @@ standard to the GMA suite. Currently, it translates the Tcl runtime's os names a
 from
 .B tcl_platform(os)
 with the following translation:
+'\"<<TeX>>
+'\"\begin{center}
+'\" \begin{tabular}{ll}\toprule
+'\"  \bfseries Tcl Name&\bfseries\gma\ Name\\\midrule
+'\"  \z{Darwin}&\z{darwin}\\
+'\"  \z{Linux}&\z{linux}\\
+'\"  \z{FreeBSD}&\z{freebsd}\\\bottomrule
+'\" \end{tabular}
+'\"\end{center}
 .TS
 center;
 lB lB
@@ -166,6 +183,7 @@ Darwin	darwin
 Linux	linux
 FreeBSD	freebsd
 .TE
+'\"<</TeX>>
 .RS
 .LP
 Any name not otherwise listed is returned as-is from the Tcl runtime. More names will likely

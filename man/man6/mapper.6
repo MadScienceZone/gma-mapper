@@ -1603,7 +1603,7 @@ the command from the service, it should comply to make the
 corresponding change to itself.
 .LP
 The software 
-.B MUST 
+MUST 
 allow Unicode text encoded as UTF-8
 everywhere (of which 7-bit ASCII is a subset).
 .LP
@@ -1624,7 +1624,7 @@ JSON field names are matched case-sensitively. A client
 .B MAY 
 match names
 regardless of case but 
-.B MUST 
+MUST 
 emit them as documented here.
 .LP
 Field values are strings unless otherwise noted.
@@ -1632,7 +1632,7 @@ Field values are strings unless otherwise noted.
 Unless otherwise noted, there is no response expected from
 these commands. Even where a response is expected, it will be
 asynchronously sent. In any case the client 
-.B "SHOULD NOT"
+SHOULD NOT
 wait for a server
 response before considering its request to be completed. As a special
 case, a client 
@@ -1668,7 +1668,7 @@ commands, then send an
 .B OK
 command to indicate to the client its protocol version and to issue an
 authentication challenge (if configured to authenticate). It is 
-.B RECOMMENDED
+RECOMMENDED
 that the initial greeting be limited only to comments, waiting until after authentication
 to send anything more specific about your game.
 .LP
@@ -1689,7 +1689,7 @@ Finally, the server will issue a
 command to the client and begin normal interaction with the client.
 .LP
 The server 
-.B "MUST NOT"
+MUST NOT
 send the
 .BR AC ,
 .BR DENIED ,
@@ -1709,6 +1709,7 @@ command after receiving the server's
 signal.
 .SS "Command Summary"
 .LP
+'\"<<TeX>>
 The messages sent by clients and servers is summarized in the following table
 and then explained in detail in the following paragraphs.
 In the table, Message is the standard message name recommended for identifier names
@@ -1717,10 +1718,20 @@ whether the message is only sent from client to server, only from server to clie
 if it could be sent in either direction. Priv indicates if the command may only be
 sent by a client authenticated as the GM.
 Note that Reply indicates the command which
-.B SHOULD
+SHOULD
 (eventually) arrive in response, but no guarantee is made as to if or when that happens
 since all communications are asynchronous.
-'\"<<TeX>>
+'\"The messages sent by clients and servers is summarized in Tables~\ref{tbl:mapper:6:messages}
+'\"and \ref{tbl:mapper:6:messages2},
+'\"and then explained in detail in the following paragraphs.
+'\"In the table, 
+'\"Command is the string actually sent over the network, C$\leftrightarrow$S indicates
+'\"whether the message is only sent from client to server, only from server to client, or
+'\"if it could be sent in either direction. Priv indicates if the command may only be
+'\"sent by a client authenticated as the \gm.
+'\"Note that Reply indicates the command which SHOULD
+'\"(eventually) arrive in response, but no guarantee is made as to if or when that happens
+'\"since all communications are asynchronous.
 '\"\begin{table}
 '\" \begin{tabular}{lcllll}\toprule
 '\"  {\bfseries Command}&{\bfseries C$\leftrightarrow$S}&{\bfseries Reply}&{\bfseries Priv}&{\bfseries Data}&{\bfseries Description}\\\midrule
@@ -1763,7 +1774,7 @@ since all communications are asynchronous.
 '\"  \z{POLO}   &C$\rightarrow$S    &---        &no &none          &Acknowledge server's ping\\
 '\"  \z{PRIV}   &C$\leftarrow$S     &---        &N/A&\acronym{JSON}&Privileged command denied\\\bottomrule
 '\" \end{tabular}
-'\" \caption{Summary of Client/Server Messages\label{tbl:mapper:6:messages}}
+'\" \caption{Summary of Client/Server Messages}\label{tbl:mapper:6:messages}
 '\"\end{table}
 '\"\begin{table}
 '\" \begin{tabular}{lcllll}\toprule
@@ -1784,7 +1795,7 @@ since all communications are asynchronous.
 '\"  \z{UPDATES}&C$\leftarrow$S     &---        &N/A&\acronym{JSON}&Advertise software updates\\
 '\"  \z{WORLD}  &C$\leftarrow$S     &---        &N/A&\acronym{JSON}&Campaign world info\\\bottomrule
 '\" \end{tabular}
-'\" \caption{Summary of Client/Server Messages (continued)\label{tbl:mapper:6:messages2}}
+'\" \caption{Summary of Client/Server Messages (continued)}\label{tbl:mapper:6:messages2}
 '\"\end{table}
 .LP
 .TS
@@ -2001,17 +2012,17 @@ This does not
 '\" <<ital-is-var>>
 the image on the map; it merely defines it so the client knows what to draw when an image of
 the given
-.I Name
+.B Name
 at the specified
-.I Zoom
+.B Zoom
 factor is called for.
 .LP
 Note on clients retrieving images by server ID when
-.I IsLocalFile
+.B IsLocalFile
 is
 .B false
 and
-.I File
+.B File
 contains a server-side ID:
 as currently implemented, the 
 .B mapper
@@ -2180,9 +2191,9 @@ Given:
 '\"  P & \text{ is the password needed to connect to the server, and the notation} \\
 '\"  x || y& \text{ means to concatenate the strings \(x\) and \(y\),}
 '\" \end{align*}
-'\" then the procedure to calculate the \Var*{response} string is:
+'\" then the procedure to calculate the \z{Response} string is:
 '\" \begin{enumerate}
-'\"  \item Obtain $i$ by extracting the first two bytes from \Var*{C} as an unsigned, big-endian,
+'\"  \item Obtain $i$ by extracting the first two bytes from $C$ as an unsigned, big-endian,
 '\" 16-bit integer value.
 '\"  \item Calculate $D=H(C||P)$.
 '\"  \item Repeat $i$ times:
@@ -2211,7 +2222,7 @@ and
 .\" <</>>
 .LP
 To calculate the
-.I response
+.B Response
 string, the client must do the following:
 .\" <<enum>>
 .TP 4
@@ -2235,7 +2246,9 @@ times: Calculate
 '\" <</TeX>>
 .LP
 The binary value of 
+'\" <</ital-is-var>>
 .I D
+'\" <<ital-is-var>>
 is then encoded using base-64 and sent as the
 .B Response
 value.
@@ -2282,7 +2295,7 @@ scrollbar should be moved to.
 .TP
 .BI YView " (float)"
 As
-.IR xview ,
+.BR XView ,
 but for the 
 .I y
 axis.
@@ -2366,7 +2379,7 @@ The pathname or server ID which specifies the map file in question.
 .BI IsLocalFile " (bool)"
 '\" <<ital-is-var>>
 If true, 
-.I file
+.B File
 refers to a local file the client can read directly. Otherwise it is
 a server ID which can be used to fetch the file from its cache or from
 the server.
@@ -3103,7 +3116,7 @@ Draws an arc on the canvas.
 The arc is drawn around the circumference
 of the ellipse inscribed in the rectangle defined by the reference point and the
 first point in the
-.I points
+.B Points
 attribute (as opposite corners of a rectangle).
 The payload is a JSON object with these parameters in addition to
 those common to all map elements:
@@ -4002,7 +4015,7 @@ cases which fall outside that list. The following special codes are also usable:
 '\" <<desc>>
 .TP 10
 .B C80
-Colossal creature with an 80-foot feach zone.
+Colossal creature with a size of 80 feet and an 80-foot threat zone. (Looking at you, Oliphaunt of Jandelay.)
 .TP
 .B M20/m20
 Medium creature (5-foot space, 5-foot threat zone) with a 20-foot reach zone.
