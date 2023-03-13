@@ -1,7 +1,27 @@
-#!/usr/bin/env tclsh
+#!/usr/bin/env wish
 #
 # Check the dependencies of the mapper tool to be sure they're installed.
 #
+proc say {msg} {
+	puts $msg
+	if [catch {
+		if {![winfo exists .w]} {
+			grid [text .w -yscrollcommand {.sb set}] \
+				[scrollbar .sb -orient vertical -command {.w yview}] -sticky news
+			grid [button .x -text Exit -command {destroy .}] -sticky s
+			grid columnconfigure . 0 -weight 1
+			grid rowconfigure . 0 -weight 1
+			wm title . "GMA Mapper Installation Checker"
+		}
+		.w insert end "$msg\n"
+		.w see end
+		update
+	} err] {
+		puts $err
+		tk_messageBox -type ok -icon error -title "Error in script" -message $err
+	}
+}
+
 proc version_compare {v1 v2} {
 	if {$v1 eq $v2} {
 		return 0
@@ -66,6 +86,12 @@ set tklib {
 		we have in the dependencies directory of the gma source tree if you
 		have a copy of that too).
 }
+
+say "GMA Mapper Installation Checker"
+say "We will now verify that your Tcl/Tk environment includes the necessary"
+say "packages for the mapper tool to function."
+say ""
+
 foreach {package minimum_version instructions} {
 	Tcl 8.6 {
 		You need the Tcl interpreter to run the mapper tool on your system.
@@ -74,7 +100,7 @@ foreach {package minimum_version instructions} {
 		your version of Tcl is seriously out of date and should be upgraded anyway.
 	}
 	Tk 8.6 {
-		You need the Tk library along with your Tcl installation in order to get
+		You need the Tk GUI package along with your Tcl installation in order to get
 		the graphical user interface to work. It is possible to have Tcl installed
 		without Tk, and it may be that is how your system is configured. It is also
 		possible that you have a version of Tk that doesn't match the Tcl version,
@@ -98,18 +124,19 @@ foreach {package minimum_version instructions} {
 		set instructions $tklib
 	}
 	if {[catch {set installed_version [package require $package]} err]} {
-		puts "It appears you are missing $package ($err)"
-		puts [format $instructions $package]
+		say "It appears you are missing $package ($err)"
+		say [format $instructions $package]
 		continue
 	}
 	set cmp [version_compare $installed_version $minimum_version]
 	if {$cmp == 0 || $minimum_version == 0} {
-		puts "Congratulations, you have $package version $installed_version installed."
+		say "Congratulations, you have $package version $installed_version installed."
 	} elseif {$cmp < 0} {
-		puts "Your installed version of $package is $installed_version, but we require at least version $minimum_version."
-		puts [format $instructions $package]
+		say "Your installed version of $package is $installed_version, but we require at least version $minimum_version."
+		say [format $instructions $package]
 	} else {
-		puts "Congratulations, you have $package version $installed_version installed ($minimum_version or later required)."
+		say "Congratulations, you have $package version $installed_version installed ($minimum_version or later required)."
 	}
 }
-destroy .
+
+#destroy .

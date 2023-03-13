@@ -1,15 +1,24 @@
 # Game Master's Assistant / Mapper Client
 # Release Notes
 ## Current Version Information
- * Supported GMA Mapper Version: 4.3.1 <!-- @@##@@ -->
- * Supported GMA Mapper File Format: 20	     <!-- @@##@@ -->
- * Supported GMA Mapper Protocol: 402        <!-- @@##@@ -->
- * Effective Date: 07-Mar-2023               <!-- @@##@@ -->
+ * This Package Version: 4.3.2               <!-- @@##@@ -->
+ * Effective Date: 12-Mar-2023               <!-- @@##@@ -->
+
+## Compatibility
+ * GMA Core API Library Version: 5.2 <!-- @@##@@ -->
+ * GMA Mapper File Format: 20	     <!-- @@##@@ -->
+ * GMA Mapper Protocol: 402        <!-- @@##@@ -->
+
+# 4.3.2
+## Enhancements
+ * Added support for mapper to use PNG format graphic images as an alternative to GIF.
+ * Updated documentation.
+ * GUI output for `check_install.tcl` so it works better on Windows.
 
 # 4.3.1
 ## Fixed
  * If the server's protocol version is higher than expected, a debugging message is printed to the user letting them know. There was a bug in the code that threw an error trying to print that message.
- * Added check_install.tcl to the standalone distribution archive files.
+ * Added `check_install.tcl` to the standalone distribution archive files.
 
 # 4.3
 ## Added

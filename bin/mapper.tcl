@@ -1,20 +1,20 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       ______       __                  #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \     /  \                 #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \    \/) )                #
-# | |      | || || || (___) | Assistant  / (_) (_       ___) /      | |                #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ (       | |                #
-# | | \_  )| |   | || (   ) |                ) (           ) \      | |                #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  / _  __) (_               #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/ (_) \____/               #
+#  _______  _______  _______                ___       ______      _______              #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \    / ___   )             #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \   \/   )  |             #
+# | |      | || || || (___) | Assistant  / (_) (_       ___) /       /   )             #
+# | | ____ | |(_)| ||  ___  |           (____   _)     (___ (      _/   /              #
+# | | \_  )| |   | || (   ) |                ) (           ) \    /   _/               #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  / _ (   (__/\             #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/ (_)\_______/             #
 #                                                                                      #
 ########################################################################################
 #
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.3.1}     ;# @@##@@
+set GMAMapperVersion {4.3.2}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
 set GMAMapperProtocol {402}         ;# @@##@@
 set GMAVersionNumber {5.2}            ;# @@##@@
@@ -36,6 +36,7 @@ encoding system utf-8
 set CURLproxy {}
 set CURLpath /usr/bin/curl
 set CURLserver https://www.rag.com/gma/map
+set ImageFormat png
 #
 # SCP/SSH:
 #  The mapper runs SSH and SCP to send files TO the web server for authorized
@@ -1002,14 +1003,14 @@ proc usage {} {
 
 	puts $stderr "This is mapper, version $GMAMapperVersion"
 	puts $stderr "Usage: $argv0 \[-display name\] \[-geometry value\] \[other wish options...\] -- \[--help]"
-	puts $stderr {        [-A] [-a] [-B] [-b pct] [-C file] [-c name[:color]] [-D] [-d]}
+	puts $stderr {        [-A] [-a] [-B] [-b pct] [-C file] [-c name[:color]] [-D] [-d] [-f fmt]}
 	puts $stderr {        [-G n[+x[:y]]] [-g n[+x[:y]]] [-h hostname] [-k] [-l] [-M moduleID]}
 	puts $stderr {        [-n] [-P pass] [-p port] [-s stylefile] [-t transcriptfile] [-u name]}
 	puts $stderr {        [-x proxyurl] [-X proxyhost] [--button-size size] [--chat-history n]}
-	puts $stderr {        [--curl-path path] [--curl-url-base url] [--debug-protocol] [--generate-config path]}
-	puts $stderr {        [--generate-style-config path] [--mkdir-path path] [--nc-path path]}
-	puts $stderr {        [--no-blur-all] [--scp-path path] [--scp-dest dir] [--scp-server hostname]}
-	puts $stderr {        [--update-url url] [mapfiles...]}
+	puts $stderr {        [--curl-path path] [--curl-url-base url] [--dark] [--debug-protocol]}
+	puts $stderr {        [--generate-config path] [--generate-style-config path]}
+	puts $stderr {        [--mkdir-path path] [--nc-path path] [--no-animate] [--no-blur-all] [--scp-dest dir]}
+	puts $stderr {        [--scp-path path] [--scp-server hostname] [--ssh-path path] [--update-url url]}
 	puts $stderr {Each option and its argument must appear in separate CLI parameters (words).}
 	puts $stderr {   -A, --animate:     Enable animation of drawing onto the map}
 	puts $stderr {   -a, --no-animate:  Suppress animation of drawing onto the map}
@@ -1019,9 +1020,10 @@ proc usage {} {
 	puts $stderr {       --button-size: Set button size to "small" (default), "medium", or "large"}
 	puts $stderr {   -C, --config:      Read options from specified file (subsequent options further modify)}
 	puts $stderr {   -c, --character:   Add another character name for menu}
+	puts $stderr {   -d, --dark:        Adjust colors for dark mode}
 	puts $stderr {   -D, --debug:       Increase debug output level}
 	puts $stderr {       --debug-protocol: Show a transcript of network I/O data in debug window}
-	puts $stderr {   -d, --dark:        Adjust colors for dark mode}
+	puts $stderr {   -f, --image-format: Image format for map graphics (png or gif)}
 	puts $stderr {   -G, --major:       Set major grid guidlines every n (offset by x and/or y)}
 	puts $stderr {   -g, --guide:       Set minor grid guidlines every n (offset by x and/or y)}
 	puts $stderr {       --help:        Print this information and exit}
@@ -1041,16 +1043,15 @@ proc usage {} {
 	puts $stderr "   --chat-history:   number of chat messages to retain between sessions \[$ChatHistoryLimit\]"
 	puts $stderr "   --curl-path:      pathname of curl command to invoke \[$CURLpath\]"
 	puts $stderr "   --curl-url-base:  base URL for stored data \[$CURLserver\]"
+	puts $stderr "   --generate-config: append example mapper.conf file to specified pathname."
+	puts $stderr "   --generate-style-config: append example style.conf file to specified pathname."
 	puts $stderr "   --mkdir-path:     pathname of server-side mkdir command \[$SERVER_MKDIRpath\]"
 	puts $stderr "   --nc-path:        pathname of nc command to invoke \[$NCpath\]"
-	puts $stderr "   --scp-path:       pathname of scp command to invoke \[$SCPpath\]"
 	puts $stderr "   --scp-dest:       server-side top-level storage directory \[$SCPdest\]"
+	puts $stderr "   --scp-path:       pathname of scp command to invoke \[$SCPpath\]"
 	puts $stderr "   --scp-server:     storage server hostname \[$SCPserver\]"
 	puts $stderr "   --ssh-path:       pathname of ssh command to invoke \[$SSHpath\]"
-	puts $stderr "   --generate-style-config: append example style.conf file to specified pathname."
-	puts $stderr "   --generate-config: append example mapper.conf file to specified pathname."
 	puts $stderr "   --update-url:     base URL to automatically download software updates from."
-	puts $stderr {   If map files are named, they are loaded at startup.}
 	exit 1
 }
 
@@ -1134,6 +1135,14 @@ for {set argi 0} {$argi < $argc} {incr argi} {
 		--help { usage }
 		-h - --host { 
 			set IThost [getarg -h] 
+		}
+		-f - --image-format { 
+			set ImageFormat [getarg -f] 
+			if {$ImageFormat ne {gif} && $ImageFormat ne {png}} {
+				DEBUG 0 "Invalid --image-format (-f) value \"$ImageFormat\"; must be \"gif\" or \"png\""
+				DEBUG 0 "Defaulting to gif instead."
+				set ImageFormat gif
+			}
 		}
 		-P - --password { set ITpassword [getarg -P] }
 		-p - --port  { set ITport [getarg -p] }
@@ -1236,13 +1245,13 @@ proc tile_id {name zoom} {
 # cache file name from name and zoom
 #
 proc cache_filename {name zoom} {
-	global tcl_platform path_cache
+	global tcl_platform path_cache ImageFormat
 
 	if {$tcl_platform(os) eq "Windows NT"} {
 		file mkdir $path_cache
 		file mkdir [file nativename [file join $path_cache _[string range $name 4 4]]]
 	}
-	return [file nativename [file join $path_cache _[string range $name 4 4] "$name@[normalize_zoom $zoom].gif"]]
+	return [file nativename [file join $path_cache _[string range $name 4 4] "$name@[normalize_zoom $zoom].$ImageFormat"]]
 }
 proc cache_file_dir {name} {
 	global path_cache
@@ -1268,7 +1277,9 @@ proc cache_map_file_dir {id} {
 #   if the name is in an invalid format, name and zoom are empty strings
 #
 proc cache_info {cache_filename} {
-	if [regexp {/([^/]+)@([0-9.]+)\.gif} $cache_filename x image_name image_zoom] {
+	global ImageFormat
+
+	if [regexp [format "%s%s" {/([^/]+)@([0-9.]+)\.} $ImageFormat] $cache_filename x image_name image_zoom] {
 		if [file exists $cache_filename] {
 			return [list 1 [expr ([clock seconds] - [file mtime $cache_filename]) / (24*60*60)] $image_name $image_zoom]
 		}
@@ -1289,6 +1300,7 @@ proc cache_info {cache_filename} {
 #
 proc create_image_from_file {tile_id filename} {
 	global TILE_SET
+	global ImageFormat
 
 	if [catch {set image_file [open $filename r]} err] {
 		DEBUG 0 "Can't open image file $filename ($tile_id): $err"
@@ -1306,7 +1318,7 @@ proc create_image_from_file {tile_id filename} {
 		image delete $TILE_SET($tile_id)
 		unset TILE_SET($tile_id)
 	}
-	if [catch {set TILE_SET($tile_id) [image create photo -format gif -data $image_data]} err] {
+	if [catch {set TILE_SET($tile_id) [image create photo -format $ImageFormat -data $image_data]} err] {
 		DEBUG 0 "Can't use data read from image file $filename ($tile_id): $err"
 		return
 	}
@@ -1316,14 +1328,14 @@ proc create_image_from_file {tile_id filename} {
 # preload all the cached images into the map
 #
 proc load_cached_images {} {
-	global cache_too_old_days path_cache
+	global cache_too_old_days path_cache ImageFormat
 
 	DEBUG 1 "Loading cached images"
 	puts "preloading cached images..."
 	set i 0
 	foreach cache_dir [glob -nocomplain -directory $path_cache _*] {
 		DEBUG 2 "-scanning $cache_dir"
-		foreach cache_filename [glob -nocomplain -directory $cache_dir *.gif] {
+		foreach cache_filename [glob -nocomplain -directory $cache_dir *.$ImageFormat] {
 			set cache_stats [cache_info $cache_filename]
 			if {[incr i] % 20 == 0} {
 				puts -nonewline .
@@ -1353,7 +1365,12 @@ proc load_cached_images {} {
 report_progress "managing cache"
 if {[file exists $path_cache]} {
 	DEBUG 1 "Looking for old-style cache files to move"
-	foreach old_cache [glob -nocomplain -types f -directory $path_cache -tails *.gif] {
+	set filelist [glob -nocomplain -types f -directory $path_cache -tails *.gif]
+	set f [glob -nocomplain -types f -directory $path_cache -tails *.png]
+	if {[llength $f] > 0} {
+		lappend filelist {*}$f
+	}
+	foreach old_cache $filelist {
 		set new_location [cache_file_dir $old_cache]
 		set old_location [file join $path_cache $old_cache]
 		DEBUG 0 "Moving old image file $old_location -> $new_location"
@@ -1421,10 +1438,11 @@ report_progress "Setting up UI"
 #
 
 foreach app_icon_size {512 256 128 48 32 16} {
-	set icon_gma_$app_icon_size [image create photo -format gif -file "${ICON_DIR}/gma_icon_${app_icon_size}.gif"]
+	set icon_gma_$app_icon_size [image create photo -format png -file "${ICON_DIR}/gma_icon_${app_icon_size}.png"]
 }
 wm iconphoto . -default $icon_gma_512 $icon_gma_256 $icon_gma_128 $icon_gma_48 $icon_gma_32 $icon_gma_16
 
+set _icon_format gif
 foreach icon_name {
 	line rect poly circ arc blank play
 	arc_pieslice arc_chord arc_arc
@@ -1442,14 +1460,18 @@ foreach icon_name {
 	shape_square_go dash0 dash24 dash44 dash64 dash6424 dash642424 
 	arrow_both arrow_first arrow_none arrow_last arrow_refresh heart
 	saf saf_open saf_merge saf_unload saf_group_go die16 die16c information info20 die20 die20c
-	delete add menu clock dieb16
+	delete add clock dieb16 -- menu
 } {
-	if {$dark_mode && [file exists "${ICON_DIR}/d_${icon_name}${icon_size}.gif"]} {
-		set icon_filename "${ICON_DIR}/d_${icon_name}${icon_size}.gif"
-	} else {
-		set icon_filename "${ICON_DIR}/${icon_name}${icon_size}.gif"
+	if {$icon_name eq {--}} {
+		set _icon_format png
+		continue
 	}
-	set icon_$icon_name [image create photo -format gif -file $icon_filename]
+	if {$dark_mode && [file exists "${ICON_DIR}/d_${icon_name}${icon_size}.$_icon_format"]} {
+		set icon_filename "${ICON_DIR}/d_${icon_name}${icon_size}.$_icon_format"
+	} else {
+		set icon_filename "${ICON_DIR}/${icon_name}${icon_size}.$_icon_format"
+	}
+	set icon_$icon_name [image create photo -format $_icon_format -file $icon_filename]
 }
 
 set canvas [canvas .c -height $canh -width $canw -scrollregion [list 0 0 $cansw $cansh] -xscrollcommand {.xs set} -yscrollcommand {.ys set}]
@@ -2138,6 +2160,7 @@ proc loadfile {file args} {
 	global TILE_ID
 	global MOBdata MOBid OBJdata OBJtype
 	global canvas
+	global ImageFormat
 
 	set mergep false
 	set sendp true
@@ -2249,7 +2272,7 @@ proc loadfile {file args} {
 								image delete $TILE_SET([tile_id $image_id $image_zoom])
 								unset TILE_SET([tile_id $image_id $image_zoom])
 							}
-							if [catch {set TILE_SET([tile_id $image_id $image_zoom]) [image create photo -format gif -data $image_data]} err] {
+							if [catch {set TILE_SET([tile_id $image_id $image_zoom]) [image create photo -format $ImageFormat -data $image_data]} err] {
 								DEBUG 0 "Can't use data read from image file $image_filename: $err"
 								continue
 							}
@@ -7898,6 +7921,7 @@ proc send_file_to_server {id local_file} {
 #
 proc fetch_image {name zoom id} {
 	global ClockDisplay
+	global ImageFormat
 	global CURLproxy CURLpath CURLserver
 	global cache_too_old_days
 	global my_stdout
@@ -7936,7 +7960,7 @@ proc fetch_image {name zoom id} {
 	} else {
 		set CreateOpt --create-dirs
 	}
-	set url "$CURLserver/[string range $id 0 0]/[string range $id 0 1]/$id.gif"
+	set url "$CURLserver/[string range $id 0 0]/[string range $id 0 1]/$id.$ImageFormat"
 	if [catch {
 		if {$CURLproxy ne {}} {
 			DEBUG 3 "Running $CURLpath $CreateOpt --output [file nativename $cache_filename] --proxy $CURLproxy -f -z [clock format $cache_newer_than] $url"
@@ -8072,6 +8096,7 @@ proc DoCommandAC {d} {
 
 proc DoCommandAI {d} {
 	# add image
+	global ImageFormat
 	set name [dict get $d Name]
 	foreach instance [dict get $d Sizes] {
 		::gmautil::dassign $instance File server_id ImageData raw_data IsLocalFile localp Zoom zoom
@@ -8096,7 +8121,7 @@ proc DoCommandAI {d} {
 				image delete $TILE_SET($t_id)
 				unset TILE_SET($t_id)
 			}
-			set TILE_SET($t_id) [image create photo -format gif -data $raw_data]
+			set TILE_SET($t_id) [image create photo -format $ImageFormat -data $raw_data]
 			DEBUG 3 "Defined bitmap for $name at $zoom: $TILE_SET($t_id)"
 		} else {
 			DEBUG 2 "Caching copy of server image $server_id for $name @$zoom"
@@ -10653,7 +10678,7 @@ if {![::gmaproto::is_ready] && $IThost ne {}} {
     after 5000 {report_progress {}}
 }
 
-# @[00]@| GMA 5.2
+# @[00]@| GMA-Mapper 4.3.2
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
