@@ -637,6 +637,20 @@ proc update_initiative_slots {w {limit {}} args} {
 		$f configure -background $flist_bg -foreground $flist_fg
 	}
 	if {[dict get $_window_state($w) combat_mode]} {
+		dict for {k fld} [dict get $_window_state($w) flist] {
+			if {![dict exists $_window_state($w) ilist $k]} {
+				DEBUG 1 "slot $k disappeared from initiative list; forcing redraw"
+				set force_redraw true
+				break
+			}
+		}
+		dict for {k fld} [dict get $_window_state($w) ilist] {
+			if {![dict exists $_window_state($w) flist]} {
+				DEBUG 1 "slot $k introduced to initiative list; forcing redraw"
+				set force_redraw true
+				break
+			}
+		}
 		set slot [current_initiative_slot $w]
 		if {$force_redraw && [set flist [dict get $_window_state($w) flist]] ne {}} {
 			dict for {k fld} $flist {

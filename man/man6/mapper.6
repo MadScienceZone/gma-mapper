@@ -2191,9 +2191,9 @@ Given:
 '\"  P & \text{ is the password needed to connect to the server, and the notation} \\
 '\"  x || y& \text{ means to concatenate the strings \(x\) and \(y\),}
 '\" \end{align*}
-'\" then the procedure to calculate the \Var*{response} string is:
+'\" then the procedure to calculate the \z{Response} string is:
 '\" \begin{enumerate}
-'\"  \item Obtain $i$ by extracting the first two bytes from \Var*{C} as an unsigned, big-endian,
+'\"  \item Obtain $i$ by extracting the first two bytes from $C$ as an unsigned, big-endian,
 '\" 16-bit integer value.
 '\"  \item Calculate $D=H(C||P)$.
 '\"  \item Repeat $i$ times:
@@ -2222,7 +2222,7 @@ and
 .\" <</>>
 .LP
 To calculate the
-.I response
+.B Response
 string, the client must do the following:
 .\" <<enum>>
 .TP 4
@@ -2246,7 +2246,9 @@ times: Calculate
 '\" <</TeX>>
 .LP
 The binary value of 
+'\" <</ital-is-var>>
 .I D
+'\" <<ital-is-var>>
 is then encoded using base-64 and sent as the
 .B Response
 value.
