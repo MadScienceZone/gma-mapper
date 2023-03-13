@@ -1,13 +1,17 @@
 # Game Master's Assistant / Mapper Client
 # Release Notes
 ## Current Version Information
- * This Package Version: 4.3.2               <!-- @@##@@ -->
- * Effective Date: 12-Mar-2023               <!-- @@##@@ -->
+ * This Package Version: 4.3.3               <!-- @@##@@ -->
+ * Effective Date: 13-Mar-2023               <!-- @@##@@ -->
 
 ## Compatibility
  * GMA Core API Library Version: 5.2 <!-- @@##@@ -->
  * GMA Mapper File Format: 20	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 402        <!-- @@##@@ -->
+
+# 4.3.3
+## Fixes
+ * When initiative slots disappear during combat, the game clock would throw an exception.
 
 # 4.3.2
 ## Enhancements
