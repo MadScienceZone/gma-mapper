@@ -1,13 +1,17 @@
 # Game Master's Assistant / Mapper Client
 # Release Notes
 ## Current Version Information
- * This Package Version: 4.3.3               <!-- @@##@@ -->
- * Effective Date: 13-Mar-2023               <!-- @@##@@ -->
+ * This Package Version: 4.3.4               <!-- @@##@@ -->
+ * Effective Date: 16-Mar-2023               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 5.2 <!-- @@##@@ -->
+ * GMA Core API Library Version: 5.3-alpha.0 <!-- @@##@@ -->
  * GMA Mapper File Format: 20	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 402        <!-- @@##@@ -->
+
+# 4.3.4
+## Fixes
+ * If for some reason (like an older version of Tk) the user's system can't handle PNG files, the Mapper automatically switches to GIF image format for map files and icons.
 
 # 4.3.3
 ## Fixes
