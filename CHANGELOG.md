@@ -9,6 +9,10 @@
  * GMA Mapper File Format: 20	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 402        <!-- @@##@@ -->
 
+# 4.3.4
+## Fixes
+ * If for some reason (like an older version of Tk) the user's system can't handle PNG files, the Mapper automatically switches to GIF image format for map files and icons.
+
 # 4.3.3
 ## Fixes
  * When initiative slots disappear during combat, the game clock would throw an exception.
