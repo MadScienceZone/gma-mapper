@@ -1,20 +1,20 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       ______      ______               #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \    / ___  \              #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \   \/   \  \             #
-# | |      | || || || (___) | Assistant  / (_) (_       ___) /      ___) /             #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ (      (___ (              #
-# | | \_  )| |   | || (   ) |                ) (           ) \         ) \             #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  / _ /\___/  /             #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/ (_)\______/              #
+#  _______  _______  _______                ___       ______         ___               #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \       /   )              #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \     / /) |              #
+# | |      | || || || (___) | Assistant  / (_) (_       ___) /    / (_) (_             #
+# | | ____ | |(_)| ||  ___  |           (____   _)     (___ (    (____   _)            #
+# | | \_  )| |   | || (   ) |                ) (           ) \        ) (              #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  / _      | |              #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/ (_)     (_)              #
 #                                                                                      #
 ########################################################################################
 #
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.3.3}     ;# @@##@@
+set GMAMapperVersion {4.3.4}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
 set GMAMapperProtocol {402}         ;# @@##@@
 set GMAVersionNumber {5.2}            ;# @@##@@
@@ -1437,8 +1437,18 @@ report_progress "Setting up UI"
 #
 #
 
-foreach app_icon_size {512 256 128 48 32 16} {
-	set icon_gma_$app_icon_size [image create photo -format png -file "${ICON_DIR}/gma_icon_${app_icon_size}.png"]
+if {[catch {
+	foreach app_icon_size {512 256 128 48 32 16} {
+		set icon_gma_$app_icon_size [image create photo -format png -file "${ICON_DIR}/gma_icon_${app_icon_size}.png"]
+	}
+} err]} {
+	DEBUG 0 "Your version of Tcl/Tk does not appear to support PNG-format graphics files."
+	DEBUG 0 "(error was $err)"
+	DEBUG 0 "Reverting to GIF-format data files now."
+	set ImageFormat gif
+	foreach app_icon_size {512 256 128 48 32 16} {
+		set icon_gma_$app_icon_size [image create photo -format gif -file "${ICON_DIR}/gma_icon_${app_icon_size}.gif"]
+	}
 }
 wm iconphoto . -default $icon_gma_512 $icon_gma_256 $icon_gma_128 $icon_gma_48 $icon_gma_32 $icon_gma_16
 
@@ -1463,7 +1473,9 @@ foreach icon_name {
 	delete add clock dieb16 -- menu
 } {
 	if {$icon_name eq {--}} {
-		set _icon_format png
+		if {$ImageFormat eq {png}} {
+			set _icon_format png
+		}
 		continue
 	}
 	if {$dark_mode && [file exists "${ICON_DIR}/d_${icon_name}${icon_size}.$_icon_format"]} {
@@ -10678,7 +10690,7 @@ if {![::gmaproto::is_ready] && $IThost ne {}} {
     after 5000 {report_progress {}}
 }
 
-# @[00]@| GMA-Mapper 4.3.3
+# @[00]@| GMA-Mapper 4.3.4
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
