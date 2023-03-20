@@ -1,5 +1,7 @@
 # Game Master's Assistant / Mapper Client
+
 # Release Notes
+
 ## Current Version Information
  * This Package Version: 4.3.4               <!-- @@##@@ -->
  * Effective Date: 16-Mar-2023               <!-- @@##@@ -->
