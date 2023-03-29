@@ -11,6 +11,10 @@
  * GMA Mapper File Format: 20	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 402        <!-- @@##@@ -->
 
+# Unreleased
+## Changes
+ * Moved mapper client/server protocol spec out of `mapper`(6) and into its own manpage, `mapper-protocol`(7).
+
 # 4.3.4
 ## Fixes
  * If for some reason (like an older version of Tk) the user's system can't handle PNG files, the Mapper automatically switches to GIF image format for map files and icons.
