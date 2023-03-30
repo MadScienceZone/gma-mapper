@@ -43,7 +43,7 @@ protocol used when networked.
 
 The [GMA Game Master's Guide](https://www.madscience.zone/gma/gma.pdf) includes
 full tutorials describing how to use the mapper (in addition to the rest of GMA).
-Players should refer to Appendix G, while the GM would want to read Chapters 4, 5, and
+Players should refer to Appendices G, H, and I, while the GM would want to read Chapters 4, 5, and
 possibly 8–10.
 
 ### Standalone Note
