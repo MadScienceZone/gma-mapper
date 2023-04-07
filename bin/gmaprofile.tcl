@@ -14,11 +14,13 @@
 package provide gmaprofile 1.0
 package require json 1.3.3
 package require json::write 1.0.3
+package require getstring
 
 namespace eval ::gmaprofile {
 	namespace export editor
 	variable _profile {}
 	variable _profile_backup {}
+	variable currently_editing_index -1
 	variable _file_format {
 		GMA_Mapper_preferences_version i
 		animate ?
@@ -47,7 +49,8 @@ namespace eval ::gmaprofile {
 		image_format s
 		keep_tools ?
 		preload ?
-		profiles {a {o {
+		profiles {a {
+		        name s
 			host s
 			port i
 			username s
@@ -67,9 +70,67 @@ namespace eval ::gmaprofile {
 			scp_dest s
 			scp_server s
 			scp_proxy s
-		}}}
+		    }
+	    	}
 	}
-
+	proc default_preferences {} {
+		return [dict create \
+			animate         false\
+			button_size     small\
+			curl_path       /usr/bin/curl\
+			current_profile offline\
+			dark            false\
+			debug_level     0\
+			debug_proto     false\
+			guide_lines [dict create \
+				major [dict create interval 0 offsets [dict create x 0 y 0]] \
+				minor [dict create interval 0 offsets [dict create x 0 y 0]] \
+			]\
+			image_format png\
+			keep_tools   false\
+			preload      false\
+			profiles [list [dict create \
+					name offline \
+					host {} \
+					port 2323 \
+					username {} \
+					password {} \
+					curl_proxy {} \
+					blur_all false \
+					blur_pct 0 \
+					suppress_chat false \
+					chat_limit 0 \
+					chat_log {} \
+					curl_server {} \
+					update_url {} \
+					module_id {} \
+					server_mkdir {} \
+					nc_path {} \
+					scp_path {} \
+					scp_dest {} \
+					scp_server {} \
+					scp_proxy {} \
+				] \
+			]\
+		]
+	}
+	proc _add_new {w} {
+		puts "add new to $w"
+		if {[::getstring::tk_getString .new_profile_name newname {Name of new server profile}] && $newname ne {}} {
+			puts "new entry is $newname"
+		}
+	}
+	proc _copy_selected {w} {
+		variable currently_editing_index
+		puts "copy from $currently_editing_index to $w"
+		if {[::getstring::tk_getString .new_profile_name newname {Name of new server profile}] && $newname ne {}} {
+			puts "new entry is $newname"
+		}
+	}
+	proc _delete_selected {w} {
+		variable currently_editing_index
+		puts "delete $currently_editing_index from $w"
+	}
 	proc save {filename data} {
 		variable _file_format
 
@@ -150,24 +211,35 @@ namespace eval ::gmaprofile {
 	}
 	proc _save_server {w} {
 		# If there's a current selection, save its values to _profile
+		variable currently_editing_index
+		if {$currently_editing_index < 0} {
+			return
+		}
 		if {[set cur_idx [$w.n.p.servers curselection]] eq {}} {
 			return
 		}
-		set servername [$w.n.p.servers get [lindex $cur_idx 0]]
+		set servername [$w.n.p.servers get $currently_editing_index]
 		variable _profile
 		global s_hostname s_port s_user s_pass s_curl_proxy s_blur_all
 		global s_blur_hp s_suppress_chat s_chat_limit s_chat_log s_curl_server
 		global s_update_url s_module_id s_server_mkdir s_nc_path s_scp_path
 		global s_scp_dest s_scp_server s_scp_proxy
 		dict set _profile current_profile $servername
-		dict set _profile profiles $servername [dict create \
+		puts "saving $s_blur_hp"
+		if {[catch {scan $s_blur_hp "%d%%" blurpct} err]} {
+			set blurpct 0
+			puts "error $err; using 0"
+		}
+		puts "writing $blurpct"
+		set this_entry [dict create \
+			name       $servername \
 			host       $s_hostname \
 			port       $s_port \
 			username   $s_user \
 			password   $s_pass \
 			curl_proxy $s_curl_proxy \
 			blur_all   $s_blur_all \
-			blur_pct   $s_blur_hp \
+			blur_pct   $blurpct \
 			suppress_chat $s_suppress_chat \
 			chat_limit $s_chat_limit \
 			chat_log   $s_chat_log \
@@ -181,11 +253,43 @@ namespace eval ::gmaprofile {
 			scp_server   $s_scp_server \
 			scp_proxy    $s_scp_proxy \
 		]
+		
+		set existing_profiles [dict get $_profile profiles]
+		if {[set i [find_server_index $_profile $servername]] >= 0} {
+			# replace this entry
+			set existing_profiles [lreplace $existing_profiles $i $i $this_entry]
+			dict set _profile profiles $existing_profiles
+		} else {
+			# We didn't find this server in the list, so just append it now
+			dict lappend _profile profiles $this_entry
+		}
 	}
-
+	proc find_server_index {d servername} {
+		set existing_profiles [dict get $d profiles]
+		for {set i 0} {$i < [llength $existing_profiles]} {incr i} {
+			if {[dict get [lindex $existing_profiles $i] name] eq $servername} {
+				return $i
+			}
+		}
+		return -1
+	}
+	proc list_server_names {d} {
+		set servers {}
+		foreach s [dict get $d profiles] {
+			lappend servers [dict get $s name]
+		}
+		return $servers
+	}
 	proc _select_server {w serveridx} {
+		variable currently_editing_index
 		_save_server $w
 		if {[llength $serveridx] == 0} {
+			# if we just lost focus but didn't select anything, re-select the current entry.
+			if {$currently_editing_index >= 0} {
+				$w.n.p.servers selection set $currently_editing_index
+				return
+			}
+
 			# disable everything
 			foreach f {copy del} {
 				$w.n.p.$f configure -state  disabled
@@ -199,13 +303,13 @@ namespace eval ::gmaprofile {
 		} else {
 			variable _profile
 			set servername [$w.n.p.servers get [lindex $serveridx 0]]
-			if {! [dict exists $_profile profiles $servername]} {
+			if {[set si [find_server_index $_profile $servername]] < 0} {
 				tk_messageBox -type ok -icon error -title "No such server" -message "You tried to select a server called \"$servername\" but no such entry exists in the profile set."
 				_select_server $w {}
 				return
 			}
 			# set up everything for the selected server
-			set serverdata [dict get $_profile profiles $servername]
+			set serverdata [lindex [dict get $_profile profiles] $si]
 
 			$w.n.p.copy configure -state normal -text [format "Copy %s" $servername]
 			$w.n.p.del configure -state normal -text [format "Delete %s" $servername]
@@ -234,11 +338,6 @@ namespace eval ::gmaprofile {
 				$w.n.p.settings.$fld configure -state normal
 				set $var [dict get $serverdata $dfld]
 			}
-
-			# TODO copy from profiles blur_all blur_pct chat_log chat_limit
-			# host port username password module_id suppress_chat curl_proxy
-			# curl-server update_url scp_proxy server_mkdir nc_path scp_path
-			# scp_dest scp_server ssh_path
 		}
 	}
 	proc editor {w d} {
@@ -246,13 +345,15 @@ namespace eval ::gmaprofile {
 		global imgtext debug_proto debug_level curl_path profiles 
 		global major_interval major_offset_x major_offset_y
 		global minor_interval minor_offset_x minor_offset_y
-		global s_hostname s_port s_user s_pass
+		global s_hostname s_port s_user s_pass s_blur_hp
 		variable _profile
 		variable _profile_backup
+		variable currently_editing_index
 		set ::gmaprofile::_profile $d
 		set ::gmaprofile::_profile_backup $d
 		set current_profile {}
-		puts $d
+		set currently_editing_index -1
+
 		::gmautil::dassign $::gmaprofile::_profile \
 			animate animate \
 			button_size button_size \
@@ -340,19 +441,20 @@ namespace eval ::gmaprofile {
 		     [ttk::label $w.n.a.minorl4 -text "down." ] \
 		     	-sticky w
 
+		grid [ttk::label $w.n.t.title -text "PATHS TO SUPPORT PROGRAMS" -anchor center -foreground white -background black] - -sticky we -pady 5
 		grid [ttk::label $w.n.t.curl_label -text "Curl program path:"] \
 		     [ttk::entry $w.n.t.curl -textvariable curl_path] -sticky w
 
+		grid [ttk::label $w.n.d.title -text "DIAGNOSTIC/DEBUGGING OPTIONS" -anchor center -foreground white -background black] - -sticky we -pady 5
 		grid [ttk::label $w.n.d.level_label -text "Debugging level:"] \
 		     [ttk::spinbox $w.n.d.level -values {0 1 2 3 4 5 6} -textvariable debug_level -width 2] -sticky w
 		grid [ttk::checkbutton $w.n.d.proto -text "Debug client/server protocol messages" -variable debug_proto] - -sticky w
 
 		grid [listbox $w.n.p.servers -yscrollcommand "$w.n.p.scroll set" -selectmode browse] -sticky news
 		grid [scrollbar $w.n.p.scroll -orient vertical -command "$w.n.p.servers yview"] -column 1 -row 0 -sticky nsw 
-	        grid [button $w.n.p.add -text {Add New...}] -sticky nw -column 2 -row 0
-		
-		grid ^ ^ [button $w.n.p.copy -text Copy -state disabled] -sticky nw
-		grid ^ ^ [button $w.n.p.del -text Delete -state disabled -foreground red] -sticky sw
+	        grid [button $w.n.p.add -text {Add New...} -command "::gmaprofile::_add_new $w"] -sticky nw -column 2 -row 0
+		grid ^ ^ [button $w.n.p.copy -text Copy -state disabled -command "::gmaprofile::_copy_selected $w"] -sticky nw
+		grid ^ ^ [button $w.n.p.del -text Delete -state disabled -foreground red -command "::gmaprofile::_delete_selected $w"] -sticky sw
 		
 		set s $w.n.p.settings
 		frame $s
@@ -413,11 +515,12 @@ namespace eval ::gmaprofile {
 
 		bind $w.n.p.servers <<ListboxSelect>> "::gmaprofile::_select_server $w \[%W curselection\]"
 		_select_server $w {}
-		foreach profile [dict keys [dict get $_profile profiles]] {
+		foreach profile [list_server_names $_profile] {
 			$w.n.p.servers insert end $profile
 			if {$current_profile eq $profile} {
 				_select_server $w end
 				$w.n.p.servers selection set end
+				set currently_editing_index [expr [$w.n.p.servers index end] - 1]
 			}
 		}
 

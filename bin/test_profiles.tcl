@@ -41,7 +41,7 @@ set SCPdest {}
 set SCPserver {}
 set SSHpath {}
 
-::gmaprofile::save testprefs.json {}
+::gmaprofile::save testprefs.json [::gmaprofile::default_preferences]
 ::gmaprofile::save testprefsout.json [::gmaprofile::editor .profiles [::gmaprofile::load testprefs.json]]
 exit 0
 puts [::gmaprofile::editor .profiles [dict create \
