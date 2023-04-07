@@ -11,16 +11,76 @@
 ########################################################################################
 # Profile editor
 
-package provide gmaprofile 0.0
-#package require gmautil
-#package require Tcl 8.6
-#package require sha256
+package provide gmaprofile 1.0
+package require json 1.3.3
+package require json::write 1.0.3
 
 namespace eval ::gmaprofile {
 	namespace export editor
 	variable _profile {}
 	variable _profile_backup {}
+	variable _file_format {
+		GMA_Mapper_preferences_version i
+		animate ?
+		button_size s
+		curl_path s
+		current_profile s
+		dark ?
+		debug_level i
+		debug_proto ?
+		guide_lines {}
+		image_format s
+		keep_tools ?
+		preload ?
+		profiles {a {o {
+			host s
+			port i
+			username s
+			password s
+			curl_proxy s
+			blur_all ?
+			blur_pct i
+			suppress_chat ?
+			chat_limit i
+			chat_log s
+			curl_server s
+			update_url s
+			module_id s
+			server_mkdir s
+			nc_path s
+			scp_path s
+			scp_dest s
+			scp_server s
+			scp_proxy s
+		}}}
+	}
 
+	proc save {filename data} {
+		variable _file_format
+
+		json::write indented true
+		json::write aligned true
+		dict set data GMA_Mapper_preferences_version 1
+		set f [open $filename w]
+		puts $f [::gmaproto::_encode_payload $data $_file_format]
+		close $f
+		json::write indented false
+		json::write aligned false
+	}
+
+	proc load {filename} {
+		variable _file_format
+
+		set f [open $filename r]
+		set data [::gmaproto::_construct [read $f] $_file_format]
+		close $f
+		return $data
+	}
+	# ::gmaproto::_construct input types	types={fieldname s|i|f|?|b|a types|o types|d|l}	-> dict
+	# ::gmaproto::_encode_payload input types -> json
+	# ::gmaproto::new_dict
+	# ::gmaproto::json_bool b	-> true|false
+	# ::gmaproto::int_bool b	-> 0|1
 	# editor w 
 	# create profile editor toplevel window
 	proc _bsize {v} {
@@ -40,9 +100,10 @@ namespace eval ::gmaprofile {
 	}
 	proc _save {} {
 		global animate button_size bsizetext dark guides image_format keep_tools preload
-		global imgtext debug_level debug_proto curl_path
+		global imgtext debug_level debug_proto curl_path profiles
 		variable _profile
-		set _profile [dict create \
+
+		set _profile [dict replace $_profile \
 			animate $animate \
 			button_size $button_size \
 			curl_path $curl_path \
@@ -55,15 +116,108 @@ namespace eval ::gmaprofile {
 			preload $preload \
 		]
 	}
-	proc _select_server {w servername} {
+	proc _save_server {w} {
+		# If there's a current selection, save its values to _profile
+		if {[set cur_idx [$w.n.p.servers curselection]] eq {}} {
+			return
+		}
+		set servername [$w.n.p.servers get [lindex $cur_idx 0]]
+		variable _profile
+		global s_hostname s_port s_user s_pass s_curl_proxy s_blur_all
+		global s_blur_hp s_suppress_chat s_chat_limit s_chat_log s_curl_server
+		global s_update_url s_module_id s_server_mkdir s_nc_path s_scp_path
+		global s_scp_dest s_scp_server s_scp_proxy
+		dict set _profile current_profile $servername
+		dict set _profile profiles $servername [dict create \
+			host       $s_hostname \
+			port       $s_port \
+			username   $s_user \
+			password   $s_pass \
+			curl_proxy $s_curl_proxy \
+			blur_all   $s_blur_all \
+			blur_pct   $s_blur_hp \
+			suppress_chat $s_suppress_chat \
+			chat_limit $s_chat_limit \
+			chat_log   $s_chat_log \
+			curl_server $s_curl_server \
+			update_url $s_update_url \
+			module_id  $s_module_id \
+			server_mkdir $s_server_mkdir \
+			nc_path      $s_nc_path \
+			scp_path     $s_scp_path \
+			scp_dest     $s_scp_dest \
+			scp_server   $s_scp_server \
+			scp_proxy    $s_scp_proxy \
+		]
+	}
+
+	proc _select_server {w serveridx} {
+		_save_server $w
+		if {[llength $serveridx] == 0} {
+			# disable everything
+			foreach f {copy del} {
+				$w.n.p.$f configure -state  disabled
+			}
+			foreach f {hostname port user pass phost 
+				blurhp nochat chatlim chattx url upd mod
+				gmmkd gmncp gmscp gmscpp gmscph gmscpx
+			} {
+				$w.n.p.settings.$f configure -state disabled
+			}
+		} else {
+			variable _profile
+			set servername [$w.n.p.servers get [lindex $serveridx 0]]
+			if {! [dict exists $_profile profiles $servername]} {
+				tk_messageBox -type ok -icon error -title "No such server" -message "You tried to select a server called \"$servername\" but no such entry exists in the profile set."
+				_select_server $w {}
+				return
+			}
+			# set up everything for the selected server
+			set serverdata [dict get $_profile profiles $servername]
+
+			$w.n.p.copy configure -state normal -text [format "Copy %s" $servername]
+			$w.n.p.del configure -state normal -text [format "Delete %s" $servername]
+			foreach {fld dfld var} {
+				hostname host         s_hostname
+				port     port         s_port
+				user     username     s_user
+				pass     password     s_pass
+				phost    curl_proxy   s_curl_proxy
+				blurall  blur_all     s_blur_all
+				blurhp   blur_pct     s_blur_hp
+				nochat   suppress_chat s_suppress_chat
+				chatlim  chat_limit   s_chat_limit
+				chattx   chat_log     s_chat_log
+				url      curl_server  s_curl_server
+				upd      update_url   s_update_url
+				mod      module_id    s_module_id
+				gmmkd    server_mkdir s_server_mkdir
+				gmncp    nc_path      s_nc_path
+				gmscp    scp_path     s_scp_path
+				gmscpp   scp_dest     s_scp_dest
+				gmscph   scp_server   s_scp_server
+				gmscpx   scp_proxy    s_scp_proxy
+			} {
+				global $var
+				$w.n.p.settings.$fld configure -state normal
+				set $var [dict get $serverdata $dfld]
+			}
+
+			# TODO copy from profiles blur_all blur_pct chat_log chat_limit
+			# host port username password module_id suppress_chat curl_proxy
+			# curl-server update_url scp_proxy server_mkdir nc_path scp_path
+			# scp_dest scp_server ssh_path
+		}
 	}
 	proc editor {w d} {
 		global animate button_size bsizetext dark guides image_format keep_tools preload
-		global imgtext debug_proto debug_level curl_path
+		global imgtext debug_proto debug_level curl_path profiles 
+		global s_hostname s_port s_user s_pass
 		variable _profile
 		variable _profile_backup
 		set ::gmaprofile::_profile $d
 		set ::gmaprofile::_profile_backup $d
+		set current_profile {}
 		::gmautil::dassign $::gmaprofile::_profile \
 			animate animate \
 			button_size button_size \
@@ -74,7 +228,9 @@ namespace eval ::gmaprofile {
 			guide_lines guides \
 			image_format image_format \
 			keep_tools keep_tools \
-			preload preload
+			preload preload \
+			profiles profiles \
+			current_profile current_profile
 
 		_bsize $button_size
 		_imgfmt $image_format
@@ -114,22 +270,83 @@ namespace eval ::gmaprofile {
 		     [ttk::spinbox $w.n.d.level -values {0 1 2 3 4 5 6} -textvariable debug_level -width 2] -sticky w
 		grid [ttk::checkbutton $w.n.d.proto -text "Debug client/server protocol messages" -variable debug_proto] - -sticky w
 
-		grid [listbox $w.n.p.servers -yscrollcommand "$w.n.p.scroll set" -selectmode browse] \
-		     [scrollbar $w.n.p.scroll -orient vertical -command "$w.n.p.servers yview"] -sticky nsw 
+		grid [listbox $w.n.p.servers -yscrollcommand "$w.n.p.scroll set" -selectmode browse] -sticky news
+		grid [scrollbar $w.n.p.scroll -orient vertical -command "$w.n.p.servers yview"] -column 1 -row 0 -sticky nsw 
 	        grid [button $w.n.p.add -text {Add New...}] -sticky nw -column 2 -row 0
 		
 		grid ^ ^ [button $w.n.p.copy -text Copy -state disabled] -sticky nw
 		grid ^ ^ [button $w.n.p.del -text Delete -state disabled -foreground red] -sticky sw
 		
-		bind $w.n.p.servers <<ListboxSelect>> "_select_server $w \[%W curselection\]"
+		set s $w.n.p.settings
+		frame $s
+		grid [ttk::label $s.title -text "CONNECTION" -anchor center -foreground white -background black] - - \
+		     [ttk::label $s.gmtitle -text "GM SETTINGS" -anchor center -foreground white -background #883333] - \
+			     -sticky we -pady 5
+		grid [ttk::label $s.hostlabel -text "Hostname:"] \
+		     [ttk::entry $s.hostname -textvariable s_hostname] - \
+		     [ttk::label $s.gmmkdlbl  -text "Remote mkdir Path:"] \
+		     [ttk::entry $s.gmmkd -textvariable s_server_mkdir] \
+		     -sticky w
+		grid [ttk::label $s.portlabel -text "TCP Port:"] \
+		     [ttk::entry $s.port -textvariable s_port] - \
+		     [ttk::label $s.gmncplbl  -text "Local nc Path:"] \
+		     [ttk::entry $s.gmncp -textvariable s_nc_path] \
+		     -sticky w
+		grid [ttk::label $s.userlabel -text "User/Character Name:"] \
+		     [ttk::entry $s.user -textvariable s_user] - \
+		     [ttk::label $s.gmscplbl  -text "Local scp Path:"] \
+		     [ttk::entry $s.gmscp -textvariable s_scp_path] \
+		     -sticky w
+		grid [ttk::label $s.passlabel -text "Password:"] \
+		     [ttk::entry $s.pass -textvariable s_pass -show *] - \
+		     [ttk::label $s.gmscpplbl  -text "Remote scp Destination:"] \
+		     [ttk::entry $s.gmscpp -textvariable s_scp_dest] \
+		     -sticky w
+		grid [ttk::label $s.phostlbl -text "Proxy Hostname:"] \
+		     [ttk::entry $s.phost -textvariable s_curl_proxy] \
+		     [ttk::label $w.phelp -text "(used with curl for server images)"] \
+		     [ttk::label $s.gmscphlbl -text "Remote Server Hostname:"] \
+		     [ttk::entry $s.gmscph -textvariable s_scp_server] \
+		     -sticky w
+
+		grid [ttk::label $s.title2 -text "GENERAL SETTINGS" -anchor center -foreground white -background black] - - \
+		     [ttk::label $s.gmscpxlbl -text "scp Proxy:"] \
+		     [ttk::entry $s.gmscpx -textvariable s_scp_proxy] \
+			-sticky we -pady 5
+		grid [ttk::checkbutton $s.blurall -text "Blur HP for all creatures" -variable s_blur_all] - - -sticky w
+		grid [ttk::label $s.blurlbl -text "Blur HP to"] \
+		     [ttk::spinbox $s.blurhp -from 0 -to 100 -increment 1 -textvariable s_blur_hp -width 5 -format "%.0f%%"] \
+		     [ttk::label $s.blurhelp -text "(0% to not blur at all)"] -sticky w
+
+		grid [ttk::checkbutton $s.nochat -text "Disable Chat/Die Roll Messages" -variable s_suppress_chat] - - -sticky w
+		grid [ttk::label $s.chatlbl -text "Limit Chat History to"] \
+		     [ttk::spinbox $s.chatlim -from 0 -to 1000 -increment 50 -textvariable s_chat_limit -width 6] \
+		     [ttk::label $s.chathelp -text "(0 to make unlimited)"] -sticky w
+		grid [ttk::label $s.chattxlbl -text "Record Chat Transcript to:"] \
+		     [ttk::entry $s.chattx -textvariable s_chat_log] \
+		     [ttk::label $s.chattxhelp -text "(empty to disable; may use % fields)"] -sticky w
+		grid [ttk::label $s.urllbl -text "Server Image Base URL:"] \
+		     [ttk::entry $s.url -textvariable s_curl_server] - -sticky we
+		grid [ttk::label $s.updlbl -text "Mapper Upgrade URL:"] \
+		     [ttk::entry $s.upd -textvariable s_update_url] - -sticky we
+		grid [ttk::label $s.modlbl -text "Module Code:"] \
+		     [ttk::entry $s.mod -textvariable s_module_id] - -sticky w
+
+	     	grid $s - - - -sticky news
+
+		bind $w.n.p.servers <<ListboxSelect>> "::gmaprofile::_select_server $w \[%W curselection\]"
+		_select_server $w {}
 		foreach profile [dict keys [dict get $_profile profiles]] {
 			$w.n.p.servers insert end $profile
+			if {$current_profile eq $profile} {
+				_select_server $w end
+				$w.n.p.servers selection set end
+			}
 		}
-		_select_server $w {}
 
 		pack $w.n
 		pack [button $w.can -text Cancel -command "::gmaprofile::_cancel; destroy $w"]
-		pack [button $w.ok -text Save -command "::gmaprofile::_save; destroy $w"]
+		pack [button $w.ok -text Save -command "::gmaprofile::_save_server $w; ::gmaprofile::_save; destroy $w"]
 
 		tkwait window $w
 		return $::gmaprofile::_profile
