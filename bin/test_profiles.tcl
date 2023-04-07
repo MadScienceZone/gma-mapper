@@ -1,5 +1,6 @@
 source gmaprofile.tcl
 source gmautil.tcl
+source gmaproto.tcl
 
 set animatePlacement 0
 set ButtonSize small
@@ -40,7 +41,9 @@ set SCPdest {}
 set SCPserver {}
 set SSHpath {}
 
-
+::gmaprofile::save testprefs.json {}
+::gmaprofile::save testprefsout.json [::gmaprofile::editor .profiles [::gmaprofile::load testprefs.json]]
+exit 0
 puts [::gmaprofile::editor .profiles [dict create \
 	animate      $animatePlacement \
 	button_size  $ButtonSize \
@@ -54,6 +57,7 @@ puts [::gmaprofile::editor .profiles [dict create \
 	image_format $ImageFormat \
 	keep_tools   $MasterClient \
 	preload      $OptPreload \
+	current_profile _default \
 	profiles [dict create \
 		_default [dict create \
 			blur_all      $blur_all \
