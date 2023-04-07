@@ -1114,6 +1114,7 @@ proc ::gmaproto::int_bool {b} {
 }
 proc ::gmaproto::_construct {input types} {
 	foreach {field t} $types {
+		puts "construct field=$field t=$t"
 		switch -exact -- [lindex $t 0] {
 			s {
 				if {[dict exists $input $field]} {
@@ -1143,6 +1144,7 @@ proc ::gmaproto::_construct {input types} {
 						error "value for $field is not an integer: [dict get $input $field]"
 					}
 				} else {
+					puts "doing 'dict set input $field 0' in dict $input"
 					dict set input $field 0
 				}
 			}

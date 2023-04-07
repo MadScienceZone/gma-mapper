@@ -28,7 +28,22 @@ namespace eval ::gmaprofile {
 		dark ?
 		debug_level i
 		debug_proto ?
-		guide_lines {}
+		guide_lines {o {
+			major {o {
+				interval i
+				offsets {o {
+					x i
+					y i
+				}}
+			}}
+			minor {o {
+				interval i
+				offsets {o {
+					x i
+					y i
+				}}
+			}}
+		}}
 		image_format s
 		keep_tools ?
 		preload ?
@@ -72,7 +87,7 @@ namespace eval ::gmaprofile {
 		variable _file_format
 
 		set f [open $filename r]
-		set data [::gmaproto::_construct [read $f] $_file_format]
+		set data [::gmaproto::_construct [json::json2dict [read $f]] $_file_format]
 		close $f
 		return $data
 	}
@@ -99,8 +114,10 @@ namespace eval ::gmaprofile {
 		set _profile $_profile_backup
 	}
 	proc _save {} {
-		global animate button_size bsizetext dark guides image_format keep_tools preload
+		global animate button_size bsizetext dark image_format keep_tools preload
 		global imgtext debug_level debug_proto curl_path profiles
+		global major_interval major_offset_x major_offset_y
+		global minor_interval minor_offset_x minor_offset_y
 		variable _profile
 
 		set _profile [dict replace $_profile \
@@ -110,7 +127,22 @@ namespace eval ::gmaprofile {
 			dark $dark \
 			debug_level $debug_level \
 			debug_proto $debug_proto \
-			guide_lines $guides \
+			guide_lines [dict create \
+				major [dict create \
+					interval $major_interval \
+					offsets [dict create \
+						x $major_offset_x \
+						y $major_offset_y\
+					]\
+				]\
+				minor [dict create \
+					interval $minor_interval \
+					offsets [dict create \
+						x $minor_offset_x \
+						y $minor_offset_y \
+					]\
+				]\
+			]\
 			image_format $image_format \
 			keep_tools $keep_tools \
 			preload $preload \
@@ -210,14 +242,17 @@ namespace eval ::gmaprofile {
 		}
 	}
 	proc editor {w d} {
-		global animate button_size bsizetext dark guides image_format keep_tools preload
+		global animate button_size bsizetext dark image_format keep_tools preload
 		global imgtext debug_proto debug_level curl_path profiles 
+		global major_interval major_offset_x major_offset_y
+		global minor_interval minor_offset_x minor_offset_y
 		global s_hostname s_port s_user s_pass
 		variable _profile
 		variable _profile_backup
 		set ::gmaprofile::_profile $d
 		set ::gmaprofile::_profile_backup $d
 		set current_profile {}
+		puts $d
 		::gmautil::dassign $::gmaprofile::_profile \
 			animate animate \
 			button_size button_size \
@@ -232,6 +267,30 @@ namespace eval ::gmaprofile {
 			profiles profiles \
 			current_profile current_profile
 
+		set guides [dict merge [dict create \
+			major [dict create \
+				interval 0\
+				offsets [dict create x 0 y 0]]\
+			minor [dict create \
+				interval 0\
+				offsets [dict create x 0 y 0]]\
+			] $guides\
+		]
+		::gmautil::dassign $guides \
+			{major interval} major_interval \
+			{major offsets x} major_offset_x \
+			{major offsets y} major_offset_y \
+			{minor interval} minor_interval \
+			{minor offsets x} minor_offset_x \
+			{minor offsets y} minor_offset_y
+		
+
+		if {$image_format eq {}} {
+			set image_format png
+		}
+		if {$button_size eq {}} {
+			set button_size small
+		}
 		_bsize $button_size
 		_imgfmt $image_format
 
@@ -256,12 +315,30 @@ namespace eval ::gmaprofile {
 		$w.n.a.m_imgfmt add command -label PNG -command {::gmaprofile::_imgfmt png}
 		$w.n.a.m_imgfmt add command -label GIF -command {::gmaprofile::_imgfmt gif}
 
-		grid [ttk::checkbutton $w.n.a.animate -text "Animate updates" -variable animate] -sticky w
-		grid [ttk::checkbutton $w.n.a.dark -text "Dark theme" -variable dark] -sticky w
-		grid [ttk::checkbutton $w.n.a.keep -text "Keep toolbar visible" -variable keep_tools] -sticky w
-		grid [ttk::checkbutton $w.n.a.preload -text "Pre-load all cached images" -variable preload] -sticky w
-		grid [ttk::menubutton $w.n.a.imgfmt -textvariable imgtext -menu $w.n.a.m_imgfmt] -sticky w
-		grid [ttk::menubutton $w.n.a.bsize -textvariable bsizetext -menu $w.n.a.m_bsize] -sticky w
+		grid [ttk::label $w.n.a.title -text "MAPPER APPEARANCE SETTINGS" -anchor center -foreground white -background black] - - - - - - -sticky we -pady 5
+		grid [ttk::checkbutton $w.n.a.animate -text "Animate updates" -variable animate] - - - - - - -sticky w
+		grid [ttk::checkbutton $w.n.a.dark -text "Dark theme" -variable dark] - - - - - - -sticky w
+		grid [ttk::checkbutton $w.n.a.keep -text "Keep toolbar visible" -variable keep_tools] - - - - - - -sticky w
+		grid [ttk::checkbutton $w.n.a.preload -text "Pre-load all cached images" -variable preload] - - - - - - -sticky w
+		grid [ttk::menubutton $w.n.a.imgfmt -textvariable imgtext -menu $w.n.a.m_imgfmt] - - - - - - -sticky w
+		grid [ttk::menubutton $w.n.a.bsize -textvariable bsizetext -menu $w.n.a.m_bsize] - - - - - - -sticky w
+		grid [ttk::label $w.n.a.title2 -text "EXTRA GRID LINES" -anchor center -foreground white -background black] - - - - - - -sticky we -pady 5
+		grid [ttk::label $w.n.a.majorlbl -text "Major grid lines every"] \
+		     [ttk::spinbox $w.n.a.majori -textvariable major_interval -from 0 -to 100 -increment 1 -width 4] \
+		     [ttk::label $w.n.a.majorl2 -text "offset by"] \
+		     [ttk::spinbox $w.n.a.majorox -textvariable major_offset_x -from -100 -to 100 -increment 1 -width 4] \
+		     [ttk::label $w.n.a.majorl3 -text "right, " ] \
+		     [ttk::spinbox $w.n.a.majoroy -textvariable major_offset_y -from -100 -to 100 -increment 1 -width 4] \
+		     [ttk::label $w.n.a.majorl4 -text "down." ] \
+		     	-sticky w
+		grid [ttk::label $w.n.a.minorlbl -text "Minor grid lines every"] \
+		     [ttk::spinbox $w.n.a.minori -textvariable minor_interval -from 0 -to 100 -increment 1 -width 4] \
+		     [ttk::label $w.n.a.minorl2 -text "offset by"] \
+		     [ttk::spinbox $w.n.a.minorox -textvariable minor_offset_x -from -100 -to 100 -increment 1 -width 4] \
+		     [ttk::label $w.n.a.minorl3 -text "right, " ] \
+		     [ttk::spinbox $w.n.a.minoroy -textvariable minor_offset_y -from -100 -to 100 -increment 1 -width 4] \
+		     [ttk::label $w.n.a.minorl4 -text "down." ] \
+		     	-sticky w
 
 		grid [ttk::label $w.n.t.curl_label -text "Curl program path:"] \
 		     [ttk::entry $w.n.t.curl -textvariable curl_path] -sticky w
