@@ -121,10 +121,11 @@ namespace eval ::gmaprofile {
 		grid ^ ^ [button $w.n.p.copy -text Copy -state disabled] -sticky nw
 		grid ^ ^ [button $w.n.p.del -text Delete -state disabled -foreground red] -sticky sw
 		
-		bind $w.n.p.servers <<ListboxSelect>> "_select_server $w %W"
+		bind $w.n.p.servers <<ListboxSelect>> "_select_server $w \[%W curselection\]"
 		foreach profile [dict keys [dict get $_profile profiles]] {
 			$w.n.p.servers insert end $profile
 		}
+		_select_server $w {}
 
 		pack $w.n
 		pack [button $w.can -text Cancel -command "::gmaprofile::_cancel; destroy $w"]
