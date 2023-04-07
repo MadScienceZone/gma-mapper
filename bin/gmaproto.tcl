@@ -1114,7 +1114,6 @@ proc ::gmaproto::int_bool {b} {
 }
 proc ::gmaproto::_construct {input types} {
 	foreach {field t} $types {
-		puts "construct field=$field t=$t"
 		switch -exact -- [lindex $t 0] {
 			s {
 				if {[dict exists $input $field]} {
@@ -1144,7 +1143,6 @@ proc ::gmaproto::_construct {input types} {
 						error "value for $field is not an integer: [dict get $input $field]"
 					}
 				} else {
-					puts "doing 'dict set input $field 0' in dict $input"
 					dict set input $field 0
 				}
 			}
@@ -1760,15 +1758,15 @@ proc ::gmaproto::_repackage_legacy_packet {cmd params} {
 		}
 		CONN. {
 			# CONN. count checksum
-			puts "conn."
+			#puts "conn."
 			::gmautil::rdist 1 2 CONN. $params l cs
-			puts "conn. $l $cs from $params"
+			#puts "conn. $l $cs from $params"
 			set sdata [::gmaproto::_end_stream CONN $l $cs] 
 			set clist {}
 			foreach c [dict get $sdata Data] {
-				puts $c
+				#puts $c
 				lassign $c i who a u c au po
-				puts $i
+				#puts $i
 				lappend clist "{\"Addr\":[json::write string $a],\"User\":[json::write string $u],\"Client\":[json::write string $c],\"LastPolo\":$po,\"IsAuthenticated\":[::gmaproto::json_bool $au],\"IsMe\":[::gmaproto::json_bool [expr {$who} eq {{you}}]]}"
 			}
 
