@@ -89,47 +89,88 @@ namespace eval ::gmaprofile {
 			image_format png\
 			keep_tools   false\
 			preload      false\
-			profiles [list [dict create \
-					name offline \
-					host {} \
-					port 2323 \
-					username {} \
-					password {} \
-					curl_proxy {} \
-					blur_all false \
-					blur_pct 0 \
-					suppress_chat false \
-					chat_limit 0 \
-					chat_log {} \
-					curl_server {} \
-					update_url {} \
-					module_id {} \
-					server_mkdir {} \
-					nc_path {} \
-					scp_path {} \
-					scp_dest {} \
-					scp_server {} \
-					scp_proxy {} \
-				] \
-			]\
+			profiles [list [empty_server_profile offline]]\
+		]
+	}
+	proc empty_server_profile {name} {
+		return [dict create \
+			name $name \
+			host {} \
+			port 2323 \
+			username {} \
+			password {} \
+			curl_proxy {} \
+			blur_all false \
+			blur_pct 0 \
+			suppress_chat false \
+			chat_limit 0 \
+			chat_log {} \
+			curl_server {} \
+			update_url {} \
+			module_id {} \
+			server_mkdir {} \
+			nc_path {} \
+			scp_path {} \
+			scp_dest {} \
+			scp_server {} \
+			scp_proxy {} \
 		]
 	}
 	proc _add_new {w} {
-		puts "add new to $w"
+		variable _profile
 		if {[::getstring::tk_getString .new_profile_name newname {Name of new server profile}] && $newname ne {}} {
-			puts "new entry is $newname"
+			if {[find_server_index $_profile $newname] >= 0} {
+				tk_messageBox -type ok -icon error -title "Duplicate name" -message "You tried to add a server called \"$newname\" but that name already exists in the profile set."
+				return
+			}
+			$w.n.p.servers insert end $newname
+			dict lappend _profile profiles [empty_server_profile $newname]
+			$w.n.p.servers selection clear 0 end
+			$w.n.p.servers selection set end
+			_select_server $w [expr [$w.n.p.servers index end] - 1]
 		}
 	}
 	proc _copy_selected {w} {
 		variable currently_editing_index
-		puts "copy from $currently_editing_index to $w"
-		if {[::getstring::tk_getString .new_profile_name newname {Name of new server profile}] && $newname ne {}} {
-			puts "new entry is $newname"
+		variable _profile
+		_save_server $w
+		if {$currently_editing_index < 0} {
+			tk_messageBox -type ok -icon error -title "No current selection" -message "You can't make a copy of a profile without first selecting the profile to copy from."
+			return
+		}
+		set serverdata [lindex [dict get $_profile profiles] $currently_editing_index]
+		set servername [dict get $serverdata name]
+		if {[::getstring::tk_getString .new_profile_name newname "Name of new server profile (copy of $servername)"] && $newname ne {}} {
+			if {[find_server_index $_profile $newname] >= 0} {
+				tk_messageBox -type ok -icon error -title "Duplicate name" -message "You tried to add a server called \"$newname\" but that name already exists in the profile set."
+				return
+			}
+			$w.n.p.servers insert end $newname
+			dict set serverdata name $newname
+			dict lappend _profile profiles $serverdata
+			$w.n.p.servers selection clear 0 end
+			$w.n.p.servers selection set end
+			_select_server $w [expr [$w.n.p.servers index end] - 1]
 		}
 	}
 	proc _delete_selected {w} {
 		variable currently_editing_index
-		puts "delete $currently_editing_index from $w"
+		variable _profile
+		if {$currently_editing_index < 0} {
+			tk_messageBox -type ok -icon error -title "No current selection" -message "You can't delete a profile without first selecting it."
+			return
+		}
+		set serverdata [lindex [dict get $_profile profiles] $currently_editing_index]
+		set servername [dict get $serverdata name]
+		if {! [tk_messageBox -type yesno -default no -icon warning -title "Confirm Deletion" -message "Are you SURE you want to delete the server profile \"$servername\"? This operation cannot be undone."]} {
+			return
+		}
+		dict set _profile profiles [lreplace [dict get $_profile profiles] $currently_editing_index $currently_editing_index]
+		$w.n.p.servers delete $currently_editing_index
+		$w.n.p.servers selection clear 0 end
+		set currently_editing_index -1
+		dict set _profile current_profile {}
+		_select_server $w {}
 	}
 	proc save {filename data} {
 		variable _file_format
@@ -225,12 +266,9 @@ namespace eval ::gmaprofile {
 		global s_update_url s_module_id s_server_mkdir s_nc_path s_scp_path
 		global s_scp_dest s_scp_server s_scp_proxy
 		dict set _profile current_profile $servername
-		puts "saving $s_blur_hp"
 		if {[catch {scan $s_blur_hp "%d%%" blurpct} err]} {
 			set blurpct 0
-			puts "error $err; using 0"
 		}
-		puts "writing $blurpct"
 		set this_entry [dict create \
 			name       $servername \
 			host       $s_hostname \
@@ -286,6 +324,7 @@ namespace eval ::gmaprofile {
 		if {[llength $serveridx] == 0} {
 			# if we just lost focus but didn't select anything, re-select the current entry.
 			if {$currently_editing_index >= 0} {
+				$w.n.p.servers selection clear 0 end
 				$w.n.p.servers selection set $currently_editing_index
 				return
 			}
@@ -300,9 +339,13 @@ namespace eval ::gmaprofile {
 			} {
 				$w.n.p.settings.$f configure -state disabled
 			}
+			dict set _profile current_profile {}
+			$w.n.p.servers selection clear 0 end
 		} else {
 			variable _profile
+			set currently_editing_index $serveridx
 			set servername [$w.n.p.servers get [lindex $serveridx 0]]
+			dict set _profile current_profile $servername
 			if {[set si [find_server_index $_profile $servername]] < 0} {
 				tk_messageBox -type ok -icon error -title "No such server" -message "You tried to select a server called \"$servername\" but no such entry exists in the profile set."
 				_select_server $w {}
