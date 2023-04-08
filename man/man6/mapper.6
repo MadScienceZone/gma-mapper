@@ -1,7 +1,7 @@
 '\" t
 '\" <<ital-is-var>>
 '\" <<bold-is-fixed>>
-.TH MAPPER 6 "GMA-Mapper 4.4.0-alpha.0" 08-Apr-2023 "Games" \" @@mp@@
+.TH MAPPER 6 "GMA-Mapper 4.4.0-alpha.1" 08-Apr-2023 "Games" \" @@mp@@
 .SH NAME
 mapper \- GMA battle grid map
 .SH SYNOPSIS
@@ -49,6 +49,8 @@ mapper \- GMA battle grid map
 .IR pass ]
 .RB [ \-p
 .IR port ]
+.RB [ \-S
+.IR profile ]
 .RB [ \-s
 .IR file ]
 .RB [ \-t
@@ -152,6 +154,8 @@ mapper \- GMA battle grid map
 .IR path ]
 .RB [ \-\-scp\-server
 .IR hostname ]
+.RB [ \-\-select
+.IR profile ]
 .RB [ \-\-ssh\-path
 .IR path ]
 .RB [ \-\-style
@@ -725,6 +729,14 @@ The host name of the storage server. Only used when sending files
 .I to
 '\" <<ital-is-var>>
 the server (authorized users only).
+.TP
+.BI "\-S\fR, \fP\-\-select " profile
+Selects the named server
+.I profile
+from the
+.B preferences.json
+file without making it the selected profile
+for other invocations of the mapper.
 .TP
 .BI "\-\-ssh\-path " path
 Specify the path to the 

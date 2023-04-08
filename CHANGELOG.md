@@ -3,7 +3,7 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.4.0-alpha.0               <!-- @@##@@ -->
+ * This Package Version: 4.4.0-alpha.1               <!-- @@##@@ -->
  * Effective Date: 08-Apr-2023               <!-- @@##@@ -->
 
 ## Compatibility
