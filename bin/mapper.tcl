@@ -95,6 +95,14 @@ set ITproxyport 0
 #
 # begin_progress id|* title maxvalue|* ?-send? -> id
 # 
+set IThost {}
+set ITport 2323
+set ITbuffer {}
+set ITpassword {}
+set MasterClient 0
+set ButtonSize small
+set OptAddCharacters {}
+set OptPreload 0
 set time_abs 0
 set time_rel 0
 set ClockProgress 0
@@ -1084,7 +1092,7 @@ proc ApplyDebugProtocol {enabled} {
 		::gmaproto::set_debug {}
 	}
 }
-proc ApplyPreferences {data} {
+proc ApplyPreferences {data args} {
 	global animatePlacement blur_all blur_pct DEBUG_level debug_protocol
 	global dark_mode IThost ImageFormat ITpassword ITport
 	global GuideLineOffset GuideLines MajorGuideLines MajorGuideLineOffset
@@ -1100,6 +1108,7 @@ proc ApplyPreferences {data} {
 	set username {}
 	set current_profile {}
 	set servers {}
+	set cprof {}
 
 	gmautil::dassign $data \
 		animate      animatePlacement \
@@ -1118,7 +1127,11 @@ proc ApplyPreferences {data} {
 		keep_tools   MasterClient \
 		preload      OptPreload \
 		profiles     servers \
-		current_profile CurrentProfileName
+		current_profile cprof
+
+	if {[lsearch -exact $args -override] < 0} {
+		set CurrentProfileName $cprof
+	}
 
 	if {$CurrentProfileName ne {}} {
 		if {[set idx [::gmaprofile::find_server_index $data $CurrentProfileName]] >= 0} {
@@ -1236,7 +1249,7 @@ proc usage {} {
 	puts $stderr "Usage: $argv0 \[-display name\] \[-geometry value\] \[other wish options...\] -- \[--help]"
 	puts $stderr {        [-A] [-a] [-B] [-b pct] [-C file] [-c name[:color]] [-D] [-d] [-f fmt]}
 	puts $stderr {        [-G n[+x[:y]]] [-g n[+x[:y]]] [-h hostname] [-k] [-l] [-M moduleID]}
-	puts $stderr {        [-n] [-P pass] [-p port] [-s stylefile] [-t transcriptfile] [-u name]}
+	puts $stderr {        [-n] [-P pass] [-p port] [-S profile] [-s stylefile] [-t transcriptfile] [-u name]}
 	puts $stderr {        [-x proxyurl] [-X proxyhost] [--button-size size] [--chat-history n]}
 	puts $stderr {        [--curl-path path] [--curl-url-base url] [--dark] [--debug-protocol]}
 	puts $stderr {        [--generate-config path] [--generate-style-config path]}
@@ -1265,6 +1278,7 @@ proc usage {} {
 	puts $stderr {   -n, --no-chat:		Do not display incoming chat messages}
 	puts $stderr {   -P, --password:    Password to log in to the map service}
 	puts $stderr {   -p, --port:        Port for initiative tracker [2323]}
+	puts $stderr {   -S, --select:      Select server profile (but don't make it the default)}
 	puts $stderr {   -s, --style:       Read style settings from specified file}
 	puts $stderr {   -t, --transcript:  Specify file to record a transcript of chat messages and die rolls.}
 	puts $stderr {   -u, --username:    Set the name you go by on your game server}
@@ -1287,12 +1301,6 @@ proc usage {} {
 }
 
 # Initiative Tracking
-set IThost {}
-set ITport 2323
-set ITbuffer {}
-set ITpassword {}
-set MasterClient 0
-set ButtonSize small
 
 proc getarg {opt} {
 	global argv argc stderr
@@ -1316,8 +1324,6 @@ if {$PreferencesData eq {} && [file exists $default_config]} {
 #
 # Set up for delayed actions prompted by the command line options
 #
-set OptAddCharacters {}
-set OptPreload 0
 
 for {set argi 0} {$argi < $argc} {incr argi} {
 	set option [lindex $argv $argi]
@@ -1402,6 +1408,10 @@ for {set argi 0} {$argi < $argc} {incr argi} {
 		-m - --master -
 		-k - --keep-tools { set MasterClient 1 }
 		-n - --no-chat    { set SuppressChat 1 }
+		-S - --select     { 
+			set CurrentProfileName [getarg -S]
+			ApplyPreferences $PreferencesData -override
+		}
 		-s - --style      { LoadCustomStyle [getarg -s] }
 		-t - --transcript { set ChatTranscript [getarg -t] }
 		-u - --username   { set local_user [getarg -u] }
@@ -1425,9 +1435,10 @@ for {set argi 0} {$argi < $argc} {incr argi} {
 		default {
 			if {[string range $option 0 0] eq "-"} {
 				usage
+			} else {
+				puts stderr "Invalid option: $option"
+				usage
 			}
-			DEBUG 2 "Loading map from file $option"
-			loadfile $option -merge
 		}
 	}
 }
@@ -10876,7 +10887,7 @@ proc ConnectToServerByIdx {idx} {
 	}
 	set PreferencesData $newdata
 	::gmaprofile::save $preferences_path $newdata
-	ApplyPreferences $newdata
+	ApplyPreferences $newdata -override
 	catch {::gmaproto::hangup}
 	WaitForConnectToServer
 }
