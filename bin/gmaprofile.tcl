@@ -493,7 +493,9 @@ namespace eval ::gmaprofile {
 		     [ttk::spinbox $w.n.d.level -values {0 1 2 3 4 5 6} -textvariable debug_level -width 2] -sticky w
 		grid [ttk::checkbutton $w.n.d.proto -text "Debug client/server protocol messages" -variable debug_proto] - -sticky w
 
-		grid [listbox $w.n.p.servers -yscrollcommand "$w.n.p.scroll set" -selectmode browse] -sticky news
+		grid [listbox $w.n.p.servers -yscrollcommand "$w.n.p.scroll set" -selectmode browse\
+			-selectforeground white -selectbackground blue\
+			] -sticky news
 		grid [scrollbar $w.n.p.scroll -orient vertical -command "$w.n.p.servers yview"] -column 1 -row 0 -sticky nsw 
 	        grid [button $w.n.p.add -text {Add New...} -command "::gmaprofile::_add_new $w"] -sticky nw -column 2 -row 0
 		grid ^ ^ [button $w.n.p.copy -text Copy -state disabled -command "::gmaprofile::_copy_selected $w"] -sticky nw
