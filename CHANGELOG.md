@@ -3,15 +3,17 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.3.4               <!-- @@##@@ -->
- * Effective Date: 16-Mar-2023               <!-- @@##@@ -->
+ * This Package Version: 4.4.0-alpha.0               <!-- @@##@@ -->
+ * Effective Date: 08-Apr-2023               <!-- @@##@@ -->
 
 ## Compatibility
  * GMA Core API Library Version: 5.3-alpha.0 <!-- @@##@@ -->
  * GMA Mapper File Format: 20	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 402        <!-- @@##@@ -->
 
-# Unreleased
+# 4.4.0-alpha.0
+## Enhancements
+ * Created in-app preferences editor.
 ## Changes
  * Moved mapper client/server protocol spec out of `mapper`(6) and into its own manpage, `mapper-protocol`(7).
 
