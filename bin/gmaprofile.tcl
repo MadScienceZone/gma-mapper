@@ -387,6 +387,11 @@ namespace eval ::gmaprofile {
 			}
 		}
 	}
+	proc set_current_profile {d idx} {
+		dict set d current_profile [dict get [lindex [dict get $d profiles] $idx] name]
+		return $d
+	}
+
 	proc editor {w d} {
 		global animate button_size bsizetext dark image_format keep_tools preload
 		global imgtext debug_proto debug_level curl_path profiles 

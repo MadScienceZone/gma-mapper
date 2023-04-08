@@ -1060,7 +1060,11 @@ $mm.play add command -command {display_initiative_clock} -label "Show Initiative
 $mm.play add separator
 $mm.play add command -command {ClearSelection} -label "Deselect All"
 $mm.play add separator
-$mm.play add cascade -menu $mm.play.servers -state disabled -label "Connect to"
+if {[::gmautil::version_compare [info patchlevel] 8.7] >= 0} {
+	$mm.play add cascade -menu $mm.play.servers -state disabled -label "Connect to"
+} else {
+	$mm.play add cascade -menu $mm.play.servers -label "Connect to"
+}
 set connmenuidx 8
 menu $mm.help
 $mm.help add command -command {aboutMapper} -label "About Mapper..."
@@ -1166,9 +1170,13 @@ proc UpdateConnectionMenu {names} {
 		incr idx
 	}
 	if {[llength $names] > 0} {
-		$mm entryconfigure $connmenuidx -state normal
+		if {[::gmautil::version_compare [info patchlevel] 8.7] >= 0} {
+			$mm entryconfigure $connmenuidx -state normal
+		}
 	} else {
-		$mm entryconfigure $connmenuidx -state disabled
+		if {[::gmautil::version_compare [info patchlevel] 8.7] >= 0} {
+			$mm entryconfigure $connmenuidx -state disabled
+		}
 	}
 }
 
@@ -10858,7 +10866,19 @@ if {![::gmaproto::is_ready] && $IThost ne {}} {
 }
 
 proc ConnectToServerByIdx {idx} {
-	puts "XXX connect to server profile #$idx"
+	global PreferencesData
+	global preferences_path
+	if {[catch {
+		set newdata [::gmaprofile::set_current_profile $PreferencesData $idx]
+	}]} {
+		tk_messageBox -type ok -icon error -title "Unable to Connect" -message "Unable to find the requested server profile."
+		return
+	}
+	set PreferencesData $newdata
+	::gmaprofile::save $preferences_path $newdata
+	ApplyPreferences $newdata
+	catch {::gmaproto::hangup}
+	WaitForConnectToServer
 }
 
 
