@@ -385,6 +385,8 @@ namespace eval ::gmaprofile {
 				$w.n.p.settings.$fld configure -state normal
 				set $var [dict get $serverdata $dfld]
 			}
+			set s_blur_all [::gmaproto::int_bool $s_blur_all]
+			set s_suppress_chat [::gmaproto::int_bool $s_suppress_chat]
 		}
 	}
 	proc set_current_profile {d idx} {
@@ -419,6 +421,12 @@ namespace eval ::gmaprofile {
 			preload preload \
 			profiles profiles \
 			current_profile current_profile
+
+		set animate [::gmaproto::int_bool $animate]
+		set dark [::gmaproto::int_bool $dark]
+		set keep_tools [::gmaproto::int_bool $keep_tools]
+		set preload [::gmaproto::int_bool $preload]
+		set debug_proto [::gmaproto::int_bool $debug_proto]
 
 		set guides [dict merge [dict create \
 			major [dict create \
