@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___       ______         ___               #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \       /   )              #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \     / /) |              #
-# | |      | || || || (___) | Assistant  / (_) (_       ___) /    / (_) (_             #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ (    (____   _)            #
-# | | \_  )| |   | || (   ) |                ) (           ) \        ) (              #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  / _      | |              #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/ (_)     (_)              #
+#  _______  _______  _______                ___          ___       _______         ___ #
+# (  ____ \(       )(  ___  ) Game         /   )        /   )     (  __   )       (  _ #
+# | (    \/| () () || (   ) | Master's    / /) |       / /) |     | (  )  |       | (  #
+# | |      | || || || (___) | Assistant  / (_) (_     / (_) (_    | | /   | _____ | (_ #
+# | | ____ | |(_)| ||  ___  |           (____   _)   (____   _)   | (/ /) |(_____)|  _ #
+# | | \_  )| |   | || (   ) |                ) (          ) (     |   / | |       | (  #
+# | (___) || )   ( || )   ( | Mapper         | |   _      | |   _ |  (__) |       | )  #
+# (_______)|/     \||/     \| Client         (_)  (_)     (_)  (_)(_______)       |/   #
 #                                                                                      #
 ########################################################################################
 #
@@ -230,9 +230,20 @@ proc ::gmaproto::dial {host port user pass proxy proxyport proxyuser proxypass c
 	::gmaproto::redial
 }
 
+proc ::gmaproto::hangup {} {
+	set ::gmaproto::host {}
+	::gmaproto::redial
+}
+
 # we can all redial anytime we find we want to send something and we have no socket
 proc ::gmaproto::redial {} {
 	set ::gmaproto::recv_buffer {}
+	if {$::gmaproto::host eq {}} {
+		catch {close $::gmaproto::sock}
+		set ::gmaproto::sock {}
+		set ::gmaproto::pending_login true
+		return
+	}
 
 	::gmaproto::DEBUG "attempting to connect to ${::gmaproto::host}:${::gmaproto::port}"
 	if {$::gmaproto::sock ne {}} {
@@ -1758,15 +1769,15 @@ proc ::gmaproto::_repackage_legacy_packet {cmd params} {
 		}
 		CONN. {
 			# CONN. count checksum
-			puts "conn."
+			#puts "conn."
 			::gmautil::rdist 1 2 CONN. $params l cs
-			puts "conn. $l $cs from $params"
+			#puts "conn. $l $cs from $params"
 			set sdata [::gmaproto::_end_stream CONN $l $cs] 
 			set clist {}
 			foreach c [dict get $sdata Data] {
-				puts $c
+				#puts $c
 				lassign $c i who a u c au po
-				puts $i
+				#puts $i
 				lappend clist "{\"Addr\":[json::write string $a],\"User\":[json::write string $u],\"Client\":[json::write string $c],\"LastPolo\":$po,\"IsAuthenticated\":[::gmaproto::json_bool $au],\"IsMe\":[::gmaproto::json_bool [expr {$who} eq {{you}}]]}"
 			}
 
@@ -2108,7 +2119,7 @@ proc ::gmaproto::GMATypeToProtocolCommand {gt} {
 	}
 	return $gt
 }
-# @[00]@| GMA-Mapper 4.3.4
+# @[00]@| GMA-Mapper 4.4.0-alpha.0
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

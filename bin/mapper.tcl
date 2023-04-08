@@ -1,20 +1,20 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       ______         ___               #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \       /   )              #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \     / /) |              #
-# | |      | || || || (___) | Assistant  / (_) (_       ___) /    / (_) (_             #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ (    (____   _)            #
-# | | \_  )| |   | || (   ) |                ) (           ) \        ) (              #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  / _      | |              #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/ (_)     (_)              #
+#  _______  _______  _______                ___          ___       _______         ___ #
+# (  ____ \(       )(  ___  ) Game         /   )        /   )     (  __   )       (  _ #
+# | (    \/| () () || (   ) | Master's    / /) |       / /) |     | (  )  |       | (  #
+# | |      | || || || (___) | Assistant  / (_) (_     / (_) (_    | | /   | _____ | (_ #
+# | | ____ | |(_)| ||  ___  |           (____   _)   (____   _)   | (/ /) |(_____)|  _ #
+# | | \_  )| |   | || (   ) |                ) (          ) (     |   / | |       | (  #
+# | (___) || )   ( || )   ( | Mapper         | |   _      | |   _ |  (__) |       | )  #
+# (_______)|/     \||/     \| Client         (_)  (_)     (_)  (_)(_______)       |/   #
 #                                                                                      #
 ########################################################################################
 #
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.3.4}     ;# @@##@@
+set GMAMapperVersion {4.4.0-alpha.0}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
 set GMAMapperProtocol {402}         ;# @@##@@
 set GMAVersionNumber {5.2}            ;# @@##@@
@@ -268,6 +268,7 @@ set path_log(wstdout) [file normalize [file join $path_log_dir "mapper.[pid].std
 set path_log(wstderr) [file normalize [file join $path_log_dir "mapper.[pid].stderr"]]
 set path_cache        [file normalize [file join ~ .gma mapper cache]]
 set path_tmp          [file normalize [file join ~ .gma mapper tmp]]
+set preferences_path  [file normalize [file join ~ .gma mapper preferences.json]]
 set default_config    [file normalize [file join ~ .gma mapper mapper.conf]]
 set default_style_cfg [file normalize [file join ~ .gma mapper style.conf]]
 set path_install_base [file normalize [file join ~ .gma mapper]]
@@ -967,7 +968,7 @@ if {$tcl_platform(os) eq "Darwin"} {
 
 set ICON_DIR [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end-1 end lib MadScienceZone GMA Mapper icons]]]
 set BIN_DIR [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end end]]]
-foreach module {scrolledframe ustar gmaclock gmautil gmaproto gmafile} {
+foreach module {scrolledframe ustar gmaclock gmautil gmaprofile gmaproto gmafile} {
 	source [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end end $module.tcl]]]
 }
 
@@ -991,8 +992,238 @@ set GuideLineOffset {0 0}
 set MajorGuideLineOffset {0 0}
 #set iscale 100
 #set rscale 100.0
+
+frame .toolbar2
+set toolbar2_menu [menubutton .toolbar2.menu -relief raised -menu .toolbar2.menu.main_menu]
+set mm .toolbar2.menu.main_menu
+tooltip::tooltip .toolbar2.menu "Main Application Menu"
+menu $mm
+$mm add cascade -menu $mm.file -label File
+$mm add cascade -menu $mm.edit -label Edit
+$mm add cascade -menu $mm.view -label View
+$mm add cascade -menu $mm.play -label Play
+$mm add cascade -menu $mm.help -label Help
+menu $mm.file
+$mm.file add command -command {loadfile {}} -label "Load Map File..."
+$mm.file add command -command {loadfile {} -merge} -label "Merge Map File..."
+$mm.file add command -command savefile -label "Save Map File..."
+$mm.file add separator
+$mm.file add command -command exitchk -label Exit
+menu $mm.edit
+$mm.edit add command -command playtool -label "Normal Play Mode"
+$mm.edit add separator
+$mm.edit add command -command {cleargrid; ::gmaproto::clear E*} -label "Clear All Map Elements"
+$mm.edit add command -command {clearplayers monster; ::gmaproto::clear M*} -label "Clear All Monsters"
+$mm.edit add command -command {clearplayers player; ::gmaproto::clear P*} -label "Clear All Players"
+$mm.edit add command -command {clearplayers *; ::gmaproto::clear P*; ::gmaproto::clear M*} -label "Clear All Creatures"
+$mm.edit add command -command {cleargrid; clearplayers *; ::gmaproto::clear *} -label "Clear All Objects"
+$mm.edit add separator
+$mm.edit add command -command linetool -label "Draw Lines"
+$mm.edit add command -command recttool -label "Draw Rectangles"
+$mm.edit add command -command polytool -label "Draw Polygons"
+$mm.edit add command -command circtool -label "Draw Circles/Ellipses"
+$mm.edit add command -command arctool  -label "Draw Arcs"
+$mm.edit add command -command texttool -label "Add Text..."
+$mm.edit add command -command killtool -label "Remove Objects"
+$mm.edit add command -command movetool -label "Move Objects"
+$mm.edit add command -command stamptool -label "Stamp Objects"
+$mm.edit add separator
+$mm.edit add command -command toggleNoFill -label "Toggle Fill/No-Fill"
+$mm.edit add command -command {colorpick fill} -label "Choose Fill Color..."
+$mm.edit add command -command {colorpick line} -label "Choose Outline Color..."
+$mm.edit add separator
+$mm.edit add command -command gridsnap -label "Cycle Grid Snap"
+$mm.edit add command -command setwidth -label "Cycle Line Thickness"
+$mm.edit add separator
+$mm.edit add command -command {unloadfile {}} -label "Remove Elements from File..."
+$mm.edit add separator
+$mm.edit add command -command {editPreferences} -label "Preferences..."
+menu $mm.view
+$mm.view add command -command {toolBarState 0} -label "Hide Toolbar"
+$mm.view add command -command {toggleGridEnable} -label "Toggle Grid"
+$mm.view add command -command {toggleShowHealthStats} -label "Toggle Health Stats"
+$mm.view add separator
+$mm.view add command -command {zoomInBy 2} -label "Zoom In"
+$mm.view add command -command {zoomInBy 0.5} -label "Zoom Out"
+$mm.view add command -command {resetZoom} -label "Restore Zoom"
+$mm.view add separator
+$mm.view add command -command {FindNearby} -label "Scroll to Visible Objects"
+$mm.view add command -command {SyncView} -label "Scroll Others' Views to Match Mine"
+$mm.view add command -command {refreshScreen} -label "Refresh Display"
+menu $mm.play
+menu $mm.play.servers
+$mm.play add command -command {togglecombat} -label "Toggle Combat Mode"
+$mm.play add command -command {aoetool} -label "Indicate Area of Effect"
+$mm.play add command -command {rulertool} -label "Measure Distance Along Line(s)"
+$mm.play add command -command {DisplayChatMessage {}} -label "Show Chat/Die-roll Window"
+$mm.play add command -command {display_initiative_clock} -label "Show Initiative Clock"
+$mm.play add separator
+$mm.play add command -command {ClearSelection} -label "Deselect All"
+$mm.play add separator
+if {[::gmautil::version_compare [info patchlevel] 8.7] >= 0} {
+	$mm.play add cascade -menu $mm.play.servers -state disabled -label "Connect to"
+} else {
+	$mm.play add cascade -menu $mm.play.servers -label "Connect to"
+}
+set connmenuidx 8
+menu $mm.help
+$mm.help add command -command {aboutMapper} -label "About Mapper..."
+
+#
+# The existence of the preferences dictionary is a relative latecomer
+# to the application. The various configurable parameters are already
+# implemented as global variables (for the most part). Until some
+# future refactoring changes all the code to read from the preferences
+# dict, we'll just use this function to set the variables based on what
+# was loaded into the preferences dictionary at this point.
+#
+proc ApplyDebugProtocol {enabled} {
+	if {$enabled} {
+		::gmaproto::set_debug ::DEBUGp
+	} else {
+		::gmaproto::set_debug {}
+	}
+}
+proc ApplyPreferences {data} {
+	global animatePlacement blur_all blur_pct DEBUG_level debug_protocol
+	global dark_mode IThost ImageFormat ITpassword ITport
+	global GuideLineOffset GuideLines MajorGuideLines MajorGuideLineOffset
+	global ModuleID MasterClient SuppressChat ChatTranscript local_user
+	global OptPreload ButtonSize ChatHistoryLimit CURLpath CURLserver
+	global CURLproxy SCPproxy SERVER_MKDIRpath NCpath SCPpath SCPdest SCPserver
+	global SSHpath UpdateURL CurrentProfileName
+
+	set majox 0
+	set mamoy 0
+	set minox 0
+	set minoy 0
+	set username {}
+	set current_profile {}
+	set servers {}
+
+	gmautil::dassign $data \
+		animate      animatePlacement \
+		button_size  ButtonSize \
+		curl_path    CURLpath \
+		dark         dark_mode \
+		debug_level  DEBUG_level \
+		debug_proto  debug_protocol \
+		{guide_lines major interval} MajorGuideLines \
+		{guide_lines major offsets x} majox \
+		{guide_lines major offsets y} majoy \
+		{guide_lines minor interval} GuideLines \
+		{guide_lines minor offsets x} minox \
+		{guide_lines minor offsets y} minoy \
+		image_format ImageFormat \
+		keep_tools   MasterClient \
+		preload      OptPreload \
+		profiles     servers \
+		current_profile CurrentProfileName
+
+	if {$CurrentProfileName ne {}} {
+		if {[set idx [::gmaprofile::find_server_index $data $CurrentProfileName]] >= 0} {
+			gmautil::dassign [lindex $servers $idx] \
+				host            IThost \
+				port            ITport \
+				username	username  \
+				password        ITpassword \
+				curl_proxy 	CURLproxy \
+				blur_all 	blur_all \
+				blur_pct	blur_pct  \
+				suppress_chat   SuppressChat \
+				chat_limit 	ChatHistoryLimit \
+				chat_log 	ChatTranscript \
+				curl_server 	CURLserver \
+				update_url 	UpdateURL \
+				module_id       ModuleID \
+				server_mkdir 	SERVER_MKDIRpath \
+				nc_path 	NCpath \
+				scp_path 	SCPpath \
+				scp_dest 	SCPdest \
+				scp_server 	SCPserver \
+				scp_proxy 	SCPproxy \
+				ssh_path        SSHpath
+		} else {
+			set CurrentProfileName {}
+		}
+	}
+		
+	set blur_pct [expr max(0, min(100, $blur_pct))]
+	ApplyDebugProtocol $debug_protocol
+	if {$ImageFormat ne {gif} && $ImageFormat ne {png}} {
+		set ImageFormat gif
+	}
+	set GuideLineOffset [list $minox $minoy]
+	set MajorGuideLineOffset [list $majox $majoy]
+	if {$username ne {}} {
+		set local_user $username
+	}
+	UpdateConnectionMenu [::gmaprofile::list_server_names $data]
+}
+proc UpdateConnectionMenu {names} {
+	global connmenuidx
+	set mm .toolbar2.menu.main_menu.play
+	$mm.servers delete 0 end
+	set idx 0
+	foreach name $names {
+		$mm.servers add command -command "ConnectToServerByIdx $idx" -label $name
+		incr idx
+	}
+	if {[llength $names] > 0} {
+		if {[::gmautil::version_compare [info patchlevel] 8.7] >= 0} {
+			$mm entryconfigure $connmenuidx -state normal
+		}
+	} else {
+		if {[::gmautil::version_compare [info patchlevel] 8.7] >= 0} {
+			$mm entryconfigure $connmenuidx -state disabled
+		}
+	}
+}
+
+set PreferencesData {}
+set CurrentProfileName {}
+proc editPreferences {} {
+	global PreferencesData preferences_path
+	set PreferencesData [::gmaprofile::editor .preferences $PreferencesData]
+	::gmaprofile::save $preferences_path $PreferencesData
+	ApplyPreferences $PreferencesData
+	if {[tk_messageBox -type yesno -default no -icon warning -title "Restart Mapper?"\
+		-message "Some preferences will only take effect when the mapper is restarted. Do you wish to go ahead and restart the mapper now? (If you do, it will be started with the same command-line arguments as were used to start this instance.)"\
+	]} {
+		global argv0
+		global argv
+		foreach i {wish wish8.6 wish8.7} {
+			if {![catch {exec $i $argv0 {*}$argv &} err]} {
+				exit 0
+			}
+		}
+		tk_messageBox -type ok -icon error -title "Unable to restart" -message "Sorry, we were unable to relaunch the mapper. If you want to restart it, you need to manually exit and restart the mapper." -detail $err
+		return
+	}
+}
+
+#
+# Load preferences from disk if possible
+#
+if {[file exists $preferences_path]} {
+	if [catch {
+		set PreferencesData [::gmaprofile::load $preferences_path]
+		ApplyPreferences $PreferencesData
+	} err] {
+		tk_messageBox -type ok -icon error -title "Unable to load preferences" -message "The preferences settings could not be loaded from \"$preferences_path\"." -detail $err
+		set PreferencesData [::gmaprofile::default_preferences]
+		set CurrentProfileName {}
+	}
+} else {
+	# give PreferencesData a reasonable default but don't load it up.
+	# This enables us to use the preferences editor on that variable later.
+	set PreferencesData [::gmaprofile::default_preferences]
+	set CurrentProfileName {}
+}
+
 #
 # Runtime Argument Processing
+# These may override what we just read from the preferences file
 #
 report_progress "parsing configuration and command-line arguments"
 proc usage {} {
@@ -1074,7 +1305,10 @@ proc getarg {opt} {
 	usage
 }
 
-if {[file exists $default_config]} {
+#
+# Load from mapper.conf ONLY if we didn't already find a new-style preferences file first
+#
+if {$PreferencesData eq {} && [file exists $default_config]} {
 	set argc [expr $argc + 2]
 	set argv [linsert $argv 0 --config $default_config]
 }
@@ -1130,7 +1364,7 @@ for {set argi 0} {$argi < $argc} {incr argi} {
                 lappend OptAddCharacters $charToAdd
 			}
 		-D - --debug  { incr DEBUG_level }
-		--debug-protocol { ::gmaproto::set_debug ::DEBUGp}
+		--debug-protocol { ApplyDebugProtocol true }
 		-d - --dark {set dark_mode 1}
 		--help { usage }
 		-h - --host { 
@@ -1489,7 +1723,7 @@ foreach icon_name {
 set canvas [canvas .c -height $canh -width $canw -scrollregion [list 0 0 $cansw $cansh] -xscrollcommand {.xs set} -yscrollcommand {.ys set}]
 
 grid [frame .toolbar] -sticky ew
-grid [frame .toolbar2] -sticky ew
+grid .toolbar2 -sticky ew
 grid .c [scrollbar .ys -orient vertical -command {battleGridScroller .c yview}] -sticky news
 grid [scrollbar .xs -orient horizontal -command {battleGridScroller .c xview}]  -sticky  ew
 label .c.distanceLabel -textvariable DistanceLabelText
@@ -1610,75 +1844,12 @@ grid \
 	 [button .toolbar.save -image $icon_save -command savefile] \
 	 [button .toolbar.exit -image $icon_exit -command exitchk] 
 
-grid [menubutton .toolbar2.menu -image $icon_menu -relief raised -menu .toolbar2.menu.main_menu] -row 0 -column 0 -sticky w
+grid $toolbar2_menu -row 0 -column 0 -sticky w
+$toolbar2_menu configure -image $icon_menu
 grid [label   .toolbar2.clock -anchor w -font {Helvetica 18} -textvariable ClockDisplay]         -row 0 -column 1 -sticky we 
 grid [ttk::progressbar .toolbar2.progbar -orient horizontal -length 200 -variable ClockProgress] -row 0 -column 2 -sticky e
 grid columnconfigure .toolbar2 1 -weight 2
 grid forget .toolbar2.progbar
-
-set mm .toolbar2.menu.main_menu
-tooltip::tooltip .toolbar2.menu "Main Application Menu"
-menu $mm
-$mm add cascade -menu $mm.file -label File
-$mm add cascade -menu $mm.edit -label Edit
-$mm add cascade -menu $mm.view -label View
-$mm add cascade -menu $mm.play -label Play
-$mm add cascade -menu $mm.help -label Help
-menu $mm.file
-$mm.file add command -command {loadfile {}} -label "Load Map File..."
-$mm.file add command -command {loadfile {} -merge} -label "Merge Map File..."
-$mm.file add command -command savefile -label "Save Map File..."
-$mm.file add separator
-$mm.file add command -command exitchk -label Exit
-menu $mm.edit
-$mm.edit add command -command playtool -label "Normal Play Mode"
-$mm.edit add separator
-$mm.edit add command -command {cleargrid; ::gmaproto::clear E*} -label "Clear All Map Elements"
-$mm.edit add command -command {clearplayers monster; ::gmaproto::clear M*} -label "Clear All Monsters"
-$mm.edit add command -command {clearplayers player; ::gmaproto::clear P*} -label "Clear All Players"
-$mm.edit add command -command {clearplayers *; ::gmaproto::clear P*; ::gmaproto::clear M*} -label "Clear All Creatures"
-$mm.edit add command -command {cleargrid; clearplayers *; ::gmaproto::clear *} -label "Clear All Objects"
-$mm.edit add separator
-$mm.edit add command -command linetool -label "Draw Lines"
-$mm.edit add command -command recttool -label "Draw Rectangles"
-$mm.edit add command -command polytool -label "Draw Polygons"
-$mm.edit add command -command circtool -label "Draw Circles/Ellipses"
-$mm.edit add command -command arctool  -label "Draw Arcs"
-$mm.edit add command -command texttool -label "Add Text..."
-$mm.edit add command -command killtool -label "Remove Objects"
-$mm.edit add command -command movetool -label "Move Objects"
-$mm.edit add command -command stamptool -label "Stamp Objects"
-$mm.edit add separator
-$mm.edit add command -command toggleNoFill -label "Toggle Fill/No-Fill"
-$mm.edit add command -command {colorpick fill} -label "Choose Fill Color..."
-$mm.edit add command -command {colorpick line} -label "Choose Outline Color..."
-$mm.edit add separator
-$mm.edit add command -command gridsnap -label "Cycle Grid Snap"
-$mm.edit add command -command setwidth -label "Cycle Line Thickness"
-$mm.edit add separator
-$mm.edit add command -command {unloadfile {}} -label "Remove Elements from File..."
-menu $mm.view
-$mm.view add command -command {toolBarState 0} -label "Hide Toolbar"
-$mm.view add command -command {toggleGridEnable} -label "Toggle Grid"
-$mm.view add command -command {toggleShowHealthStats} -label "Toggle Health Stats"
-$mm.view add separator
-$mm.view add command -command {zoomInBy 2} -label "Zoom In"
-$mm.view add command -command {zoomInBy 0.5} -label "Zoom Out"
-$mm.view add command -command {resetZoom} -label "Restore Zoom"
-$mm.view add separator
-$mm.view add command -command {FindNearby} -label "Scroll to Visible Objects"
-$mm.view add command -command {SyncView} -label "Scroll Others' Views to Match Mine"
-$mm.view add command -command {refreshScreen} -label "Refresh Display"
-menu $mm.play
-$mm.play add command -command {togglecombat} -label "Toggle Combat Mode"
-$mm.play add command -command {aoetool} -label "Indicate Area of Effect"
-$mm.play add command -command {rulertool} -label "Measure Distance Along Line(s)"
-$mm.play add command -command {DisplayChatMessage {}} -label "Show Chat/Die-roll Window"
-$mm.play add command -command {display_initiative_clock} -label "Show Initiative Clock"
-$mm.play add separator
-$mm.play add command -command {ClearSelection} -label "Deselect All"
-menu $mm.help
-$mm.help add command -command {aboutMapper} -label "About Mapper..."
 
 proc configureChatCapability {} {
 	global icon_blank IThost
@@ -2481,7 +2652,7 @@ proc modifiedflag {file state} {
 
 proc refresh_title {} {
 	global OBJ_FILE OBJ_MODIFIED TX_QUEUE_STATUS ModuleID
-	global IThost ITport local_user
+	global IThost ITport local_user CurrentProfileName
 
 	if {$ModuleID ne {}} {
 		set tag "\[$ModuleID\] "
@@ -2493,6 +2664,10 @@ proc refresh_title {} {
 		set host "\[$local_user@$IThost:$ITport\]"
 	} else {
 		set host "\[offline\]"
+	}
+
+	if {$CurrentProfileName ne {}} {
+		set host "${CurrentProfileName}(${host})"
 	}
 
 	if {$OBJ_MODIFIED} {
@@ -10690,7 +10865,25 @@ if {![::gmaproto::is_ready] && $IThost ne {}} {
     after 5000 {report_progress {}}
 }
 
-# @[00]@| GMA-Mapper 4.3.4
+proc ConnectToServerByIdx {idx} {
+	global PreferencesData
+	global preferences_path
+	if {[catch {
+		set newdata [::gmaprofile::set_current_profile $PreferencesData $idx]
+	}]} {
+		tk_messageBox -type ok -icon error -title "Unable to Connect" -message "Unable to find the requested server profile."
+		return
+	}
+	set PreferencesData $newdata
+	::gmaprofile::save $preferences_path $newdata
+	ApplyPreferences $newdata
+	catch {::gmaproto::hangup}
+	WaitForConnectToServer
+}
+
+
+
+# @[00]@| GMA-Mapper 4.4.0-alpha.0
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

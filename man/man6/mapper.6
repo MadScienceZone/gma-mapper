@@ -1,8 +1,7 @@
 '\" t
-'\" *** 402 ***
 '\" <<ital-is-var>>
 '\" <<bold-is-fixed>>
-.TH MAPPER 6 "GMA-Mapper 4.3.4" 16-Mar-2023 "Games" \" @@mp@@
+.TH MAPPER 6 "GMA-Mapper 4.4.0-alpha.0" 08-Apr-2023 "Games" \" @@mp@@
 .SH NAME
 mapper \- GMA battle grid map
 .SH SYNOPSIS
@@ -238,6 +237,43 @@ be loaded via interactive commands or upon request from a control service (see t
 option.
 .LP
 See notes at the bottom of this manpage for installation requirements.
+.SH CONFIGURATION
+.LP
+Starting with version 4.4, the mapper now uses an integrated preferences editor for
+its configuration. This eliminates the necessity of controlling the mapper via command-line
+options and/or configuration files, although those may still also be used.
+.LP
+Selecting
+.B Edit 
+.B > 
+.B Preferences...
+from the menu calls up the preference editor window. There you can enter global
+preference settings as well as server-specific ones. In the latter case, multiple
+server profiles may be created. Selecting one of these profiles in the list will make it
+the current profile. Every time the mapper is started, that server profile will be loaded
+and a connection opened to the server named in it.
+.LP
+If you wish to simply select a different server profile as the current one and connect to it,
+access the
+.B Play
+.B >
+.B "Connect to"
+menu and choose the desired server profile.
+.LP
+Some preferences may not take effect until the mapper is restarted. When leaving the
+editor window, you will be given the opportunity to restart the mapper if you desire.
+.LP
+Once the editor window is used, a preferences data file will be created as
+.BR "~/.gma/mapper/preferences.json" .
+If that file exists, it will always be loaded when the mapper starts. In this case,
+the mapper will not load the
+.B "~/.gma/mapper/mapper.conf"
+file anymore unless explicitly requested via command-line option.
+.LP
+If any command-line options are given, they will override the settings loaded at program start-up
+from the
+.B preferences.json
+file.
 .SH "HELPER PROGRAMS"
 .LP
 The
@@ -1671,12 +1707,18 @@ See the detailed installation and usage tutorials in the
 .SH FILES
 '\" <<list>>
 .TP
+.B ~/.gma/mapper/preferences.json
+Preferences data storage file, normally edited via the in-application
+preferences editor window.
+.TP
 .B ~/.gma/mapper/mapper.conf
 Default configuration file read if no explicit
 .B \-C
 or
 .B \-\-config
-option is given.
+option is given and no 
+.B preferences.json
+file was read.
 .TP
 .B ~/.gma/mapper/style.conf
 Default custom style configuration file read if no explicit
@@ -1723,5 +1765,9 @@ but this never really made sense, as it didn't really mean the mapper
 was in any sort of controlling or leadership role. It only meant it would
 refuse to turn off its own toolbar if asked to do so. The new name is
 more descriptive of the actual function.
+.LP
+Some of the menu behavior required by the mapper client has been shown not to
+work with Tcl/Tk version 8.6, so the mapper avoids using those features when
+the Tcl/Tk version is less than 8.7.
 .SH COPYRIGHT
 Part of the GMA software suite, copyright \(co 1992\-2023 by Steven L. Willoughby, Aloha, Oregon, USA. All Rights Reserved. Distributed under BSD-3-Clause License. \"@m(c)@
