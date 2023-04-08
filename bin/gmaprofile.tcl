@@ -70,6 +70,7 @@ namespace eval ::gmaprofile {
 			scp_dest s
 			scp_server s
 			scp_proxy s
+			ssh_path s
 		    }
 	    	}
 	}
@@ -114,6 +115,7 @@ namespace eval ::gmaprofile {
 			scp_dest {} \
 			scp_server {} \
 			scp_proxy {} \
+			ssh_path {} \
 		]
 	}
 	proc _add_new {w} {
@@ -263,7 +265,7 @@ namespace eval ::gmaprofile {
 		variable _profile
 		global s_hostname s_port s_user s_pass s_curl_proxy s_blur_all
 		global s_blur_hp s_suppress_chat s_chat_limit s_chat_log s_curl_server
-		global s_update_url s_module_id s_server_mkdir s_nc_path s_scp_path
+		global s_update_url s_module_id s_server_mkdir s_nc_path s_scp_path s_ssh_path
 		global s_scp_dest s_scp_server s_scp_proxy
 		dict set _profile current_profile $servername
 		if {[catch {scan $s_blur_hp "%d%%" blurpct} err]} {
@@ -290,6 +292,7 @@ namespace eval ::gmaprofile {
 			scp_dest     $s_scp_dest \
 			scp_server   $s_scp_server \
 			scp_proxy    $s_scp_proxy \
+			ssh_path     $s_ssh_path \
 		]
 		
 		set existing_profiles [dict get $_profile profiles]
@@ -335,7 +338,7 @@ namespace eval ::gmaprofile {
 			}
 			foreach f {hostname port user pass phost 
 				blurhp nochat chatlim chattx url upd mod
-				gmmkd gmncp gmscp gmscpp gmscph gmscpx
+				gmmkd gmncp gmscp gmscpp gmscph gmscpx gmsshp
 			} {
 				$w.n.p.settings.$f configure -state disabled
 			}
@@ -376,6 +379,7 @@ namespace eval ::gmaprofile {
 				gmscpp   scp_dest     s_scp_dest
 				gmscph   scp_server   s_scp_server
 				gmscpx   scp_proxy    s_scp_proxy
+				gmsshp   ssh_path     s_ssh_path
 			} {
 				global $var
 				$w.n.p.settings.$fld configure -state normal
@@ -439,6 +443,7 @@ namespace eval ::gmaprofile {
 		_imgfmt $image_format
 
 		toplevel $w
+		wm title $w "Mapper Preferences"
 		ttk::notebook $w.n
 		frame $w.n.a
 		frame $w.n.d
@@ -537,7 +542,12 @@ namespace eval ::gmaprofile {
 		     [ttk::label $s.gmscpxlbl -text "scp Proxy:"] \
 		     [ttk::entry $s.gmscpx -textvariable s_scp_proxy] \
 			-sticky we -pady 5
-		grid [ttk::checkbutton $s.blurall -text "Blur HP for all creatures" -variable s_blur_all] - - -sticky w
+
+		grid [ttk::checkbutton $s.blurall -text "Blur HP for all creatures" -variable s_blur_all] - - \
+		     [ttk::label $s.gmsshplbl -text "ssh Path:"] \
+		     [ttk::entry $s.gmsshp -textvariable s_ssh_path] \
+			-sticky w
+
 		grid [ttk::label $s.blurlbl -text "Blur HP to"] \
 		     [ttk::spinbox $s.blurhp -from 0 -to 100 -increment 1 -textvariable s_blur_hp -width 5 -format "%.0f%%"] \
 		     [ttk::label $s.blurhelp -text "(0% to not blur at all)"] -sticky w
@@ -570,8 +580,8 @@ namespace eval ::gmaprofile {
 		}
 
 		pack $w.n
-		pack [button $w.can -text Cancel -command "::gmaprofile::_cancel; destroy $w"]
-		pack [button $w.ok -text Save -command "::gmaprofile::_save_server $w; ::gmaprofile::_save; destroy $w"]
+		pack [button $w.can -text Cancel -command "::gmaprofile::_cancel; destroy $w"] -side left
+		pack [button $w.ok -text Save -command "::gmaprofile::_save_server $w; ::gmaprofile::_save; destroy $w"] -side right
 
 		tkwait window $w
 		return $::gmaprofile::_profile
