@@ -78,7 +78,7 @@ namespace eval ::gmaprofile {
 		return [dict create \
 			animate         false\
 			button_size     small\
-			curl_path       /usr/bin/curl\
+			curl_path       [::gmautil::searchInPath curl]\
 			current_profile offline\
 			dark            false\
 			debug_level     0\
@@ -110,19 +110,19 @@ namespace eval ::gmaprofile {
 			update_url {} \
 			module_id {} \
 			server_mkdir {} \
-			nc_path {} \
-			scp_path {} \
+			nc_path [::gmautil::searchInPath nc] \
+			scp_path [::gmautil::searchInPath scp] \
 			scp_dest {} \
 			scp_server {} \
 			scp_proxy {} \
-			ssh_path {} \
+			ssh_path [::gmautil::searchInPath ssh] \
 		]
 	}
 	proc _add_new {w} {
 		variable _profile
-		if {[::getstring::tk_getString .new_profile_name newname {Name of new server profile}] && $newname ne {}} {
+		if {[::getstring::tk_getString $w.new_profile_name newname {Name of new server profile}] && $newname ne {}} {
 			if {[find_server_index $_profile $newname] >= 0} {
-				tk_messageBox -type ok -icon error -title "Duplicate name" -message "You tried to add a server called \"$newname\" but that name already exists in the profile set."
+				tk_messageBox -type ok -icon error -title "Duplicate name" -message "You tried to add a server called \"$newname\" but that name already exists in the profile set." -parent $w
 				return
 			}
 			$w.n.p.servers insert end $newname
@@ -137,14 +137,14 @@ namespace eval ::gmaprofile {
 		variable _profile
 		_save_server $w
 		if {$currently_editing_index < 0} {
-			tk_messageBox -type ok -icon error -title "No current selection" -message "You can't make a copy of a profile without first selecting the profile to copy from."
+			tk_messageBox -type ok -icon error -title "No current selection" -message "You can't make a copy of a profile without first selecting the profile to copy from." -parent $w
 			return
 		}
 		set serverdata [lindex [dict get $_profile profiles] $currently_editing_index]
 		set servername [dict get $serverdata name]
-		if {[::getstring::tk_getString .new_profile_name newname "Name of new server profile (copy of $servername)"] && $newname ne {}} {
+		if {[::getstring::tk_getString $w.new_profile_name newname "Name of new server profile (copy of $servername)"] && $newname ne {}} {
 			if {[find_server_index $_profile $newname] >= 0} {
-				tk_messageBox -type ok -icon error -title "Duplicate name" -message "You tried to add a server called \"$newname\" but that name already exists in the profile set."
+				tk_messageBox -type ok -icon error -title "Duplicate name" -message "You tried to add a server called \"$newname\" but that name already exists in the profile set." -parent $w
 				return
 			}
 			$w.n.p.servers insert end $newname
@@ -159,12 +159,12 @@ namespace eval ::gmaprofile {
 		variable currently_editing_index
 		variable _profile
 		if {$currently_editing_index < 0} {
-			tk_messageBox -type ok -icon error -title "No current selection" -message "You can't delete a profile without first selecting it."
+			tk_messageBox -type ok -icon error -title "No current selection" -message "You can't delete a profile without first selecting it." -parent $w
 			return
 		}
 		set serverdata [lindex [dict get $_profile profiles] $currently_editing_index]
 		set servername [dict get $serverdata name]
-		if {! [tk_messageBox -type yesno -default no -icon warning -title "Confirm Deletion" -message "Are you SURE you want to delete the server profile \"$servername\"? This operation cannot be undone."]} {
+		if {! [tk_messageBox -type yesno -default no -icon warning -title "Confirm Deletion" -message "Are you SURE you want to delete the server profile \"$servername\"? This operation cannot be undone." -parent $w]} {
 			return
 		}
 		dict set _profile profiles [lreplace [dict get $_profile profiles] $currently_editing_index $currently_editing_index]
@@ -350,7 +350,7 @@ namespace eval ::gmaprofile {
 			set servername [$w.n.p.servers get [lindex $serveridx 0]]
 			dict set _profile current_profile $servername
 			if {[set si [find_server_index $_profile $servername]] < 0} {
-				tk_messageBox -type ok -icon error -title "No such server" -message "You tried to select a server called \"$servername\" but no such entry exists in the profile set."
+				tk_messageBox -type ok -icon error -title "No such server" -message "You tried to select a server called \"$servername\" but no such entry exists in the profile set." -parent $w
 				_select_server $w {}
 				return
 			}
