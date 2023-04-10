@@ -1205,9 +1205,31 @@ proc editPreferences {} {
 	]} {
 		global argv0
 		global argv
-		foreach i {wish wish8.6 wish8.7} {
-			if {![catch {exec $i $argv0 {*}$argv &} err]} {
-				exit 0
+		global env
+		set searchlist {}
+		if {[info exists env(GMA_WISH)]} {
+			lappend searchlist $env(GMA_WISH)
+		}
+		lappend searchlist wish8.7 wish8.6 wish -
+
+		foreach i $searchlist {
+			if {$i eq {-}} {
+				DEBUG 1 "Trying to run $argv0 $argv"
+				puts "Trying to run $argv0 $argv"
+				if {![catch {exec $argv0 {*}$argv &} err]} {
+					exit 0
+				}
+			} else {
+				if {[set cmd [::gmautil::searchInPath $i]] eq {}} {
+					DEBUG 1 "Skipping $i; not found in \$PATH"
+					puts "Skipping $i; not found in \$PATH"
+					continue
+				}
+				DEBUG 1 "Trying to run $cmd $argv0 $argv"
+				puts "Trying to run $cmd $argv0 $argv"
+				if {![catch {exec $cmd $argv0 {*}$argv &} err]} {
+					exit 0
+				}
 			}
 		}
 		tk_messageBox -type ok -icon error -title "Unable to restart" -message "Sorry, we were unable to relaunch the mapper. If you want to restart it, you need to manually exit and restart the mapper." -detail $err
@@ -1410,7 +1432,7 @@ for {set argi 0} {$argi < $argc} {incr argi} {
 		-n - --no-chat    { set SuppressChat 1 }
 		-S - --select     { 
 			set CurrentProfileName [getarg -S]
-			ApplyPreferences $PreferencesData -override
+			ApplyPreferences $PreferencesData
 		}
 		-s - --style      { LoadCustomStyle [getarg -s] }
 		-t - --transcript { set ChatTranscript [getarg -t] }
@@ -10886,10 +10908,15 @@ proc ConnectToServerByIdx {idx} {
 		return
 	}
 	set PreferencesData $newdata
-	::gmaprofile::save $preferences_path $newdata
-	ApplyPreferences $newdata -override
-	catch {::gmaproto::hangup}
+	#::gmaprofile::save $preferences_path $newdata
+	ApplyPreferences $newdata
+	global IThost
+	DEBUG 0 "set server $idx; prefs not $newdata; host is $IThost"
+	::gmaproto::hangup
+	DEBUG 0 "waiting for connect"
 	WaitForConnectToServer
+	DEBUG 0 "done"
+	refresh_title
 }
 
 
