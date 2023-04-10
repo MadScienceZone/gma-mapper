@@ -14,7 +14,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.4.0-alpha.1}     ;# @@##@@
+set GMAMapperVersion {4.4.0-alpha.2}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
 set GMAMapperProtocol {402}         ;# @@##@@
 set GMAVersionNumber {5.2}            ;# @@##@@
@@ -10911,11 +10911,8 @@ proc ConnectToServerByIdx {idx} {
 	#::gmaprofile::save $preferences_path $newdata
 	ApplyPreferences $newdata
 	global IThost
-	DEBUG 0 "set server $idx; prefs not $newdata; host is $IThost"
 	::gmaproto::hangup
-	DEBUG 0 "waiting for connect"
 	WaitForConnectToServer
-	DEBUG 0 "done"
 	refresh_title
 }
 
