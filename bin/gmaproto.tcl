@@ -231,14 +231,17 @@ proc ::gmaproto::dial {host port user pass proxy proxyport proxyuser proxypass c
 }
 
 proc ::gmaproto::hangup {} {
+	::gmaproto::DEBUG "hangup"
 	set ::gmaproto::host {}
 	::gmaproto::redial
 }
 
-# we can all redial anytime we find we want to send something and we have no socket
+# we can call redial anytime we find we want to send something and we have no socket
 proc ::gmaproto::redial {} {
+	::gmaproto::DEBUG "redial"
 	set ::gmaproto::recv_buffer {}
 	if {$::gmaproto::host eq {}} {
+		::gmaproto::DEBUG "hanging up ($::gmaproto::sock)"
 		catch {close $::gmaproto::sock}
 		set ::gmaproto::sock {}
 		set ::gmaproto::pending_login true
