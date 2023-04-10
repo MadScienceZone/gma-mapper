@@ -528,3 +528,15 @@ proc ::gmautil::dassign {dictval args} {
     }
 }
 
+# Search for a command in the user's PATH
+proc ::gmautil::searchInPath {cmd} {
+	global env
+	if {[info exists env(PATH)]} {
+		foreach dir [split $env(PATH) :] {
+			if {[file executable [file join $dir $cmd]]} {
+				return [file join $dir $cmd]
+			}
+		}
+	}
+	return ""
+}
