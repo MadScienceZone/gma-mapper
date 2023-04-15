@@ -7731,7 +7731,7 @@ proc NudgeObject {w dx dy} {
 			lappend new_cobj [dict create X [expr $xx + $dx] Y [expr $yy + $dy]]
 		}
 		$w coords obj$MO_last_obj $new_coords
-		dict set OBJdata($MO_last_obj) Points [lrange $new_cobj 2 end]
+		dict set OBJdata($MO_last_obj) Points [lrange $new_cobj 1 end]
 		SendObjChanges $MO_last_obj {X Y Points}
 	} else {
 		set ClockDisplay "Object $MO_last_obj does not exist anymore"
