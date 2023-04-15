@@ -7729,7 +7729,6 @@ proc NudgeObject {w dx dy} {
 		foreach {xx yy} [$w coords obj$MO_last_obj] {
 			lappend new_coords [expr $xx + $dx] [expr $yy + $dy]
 			lappend new_cobj [dict create X [expr $xx + $dx] Y [expr $yy + $dy]]
-			DEBUG 3 "    for ($xx,$yy), new_coords=$new_coords, new_cobj=$new_cobj"
 		}
 		$w coords obj$MO_last_obj $new_coords
 		dict set OBJdata($MO_last_obj) Points [lrange $new_cobj 1 end]
