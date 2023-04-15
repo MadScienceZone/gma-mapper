@@ -5457,6 +5457,7 @@ proc RenderSomeone {w id} {
 	global MOBdata ThreatLineWidth iscale SelectLineWidth ThreatLineHatchWidth ReachLineColor
 	global HealthBarWidth HealthBarFrameWidth HealthBarConditionFrameWidth
 	global ShowHealthStats
+	set lower_neighbors {}
 
 	#
 	# find out where everyone is
@@ -5703,7 +5704,19 @@ proc RenderSomeone {w id} {
 				break
 			}
 		}
-		$w create window [expr $x*$iscale] [expr $y*$iscale] -anchor $nametag_anchor -window $nametag_w -tags "M#$id MF#$id MT#$id allMOB"
+		# notify people below me too
+		set look_y [expr $y+$mob_size]
+		for {set look_x $x} {$look_x < [expr $x+$mob_size]} {set look_x [expr $look_x + 1]} {
+			if {[info exists WhereIsMOB($look_x,$look_y)]} {
+				lappend lower_neighbors {*}$WhereIsMOB($look_x,$look_y)
+			}
+		}
+
+		if {[dict get $MOBdata($id) Killed]} {
+			$w create text [expr $x*$iscale] [expr $y*$iscale] -text $mob_name -anchor nw -font [FontBySize [dict get $MOBdata($id) Size]] -fill $textcolor -tags "M#$id MF#$id MT#$id allMOB"
+		} else {
+			$w create window [expr $x*$iscale] [expr $y*$iscale] -anchor $nametag_anchor -window $nametag_w -tags "M#$id MF#$id MT#$id allMOB"
+		}
 	} else {
 		DEBUG 3 "No $image_pfx:$zoom found in TILE_SET"
 		$w create oval [expr $x*$iscale] [expr $y*$iscale] [expr ($x+$mob_size)*$iscale] [expr ($y+$mob_size)*$iscale] -fill $fillcolor -tags "mob MF#$id M#$id MN#$id allMOB"
@@ -6061,6 +6074,11 @@ proc RenderSomeone {w id} {
 					}
 				}
 			}
+		}
+	}
+	if {[llength $lower_neighbors] > 0} {
+		foreach neighbor [lsort -unique $lower_neighbors] {
+			RenderSomeone $w $neighbor
 		}
 	}
 }
