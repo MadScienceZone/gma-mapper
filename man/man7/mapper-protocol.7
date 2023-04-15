@@ -1,5 +1,5 @@
 '\" t
-'\" *** 402 ***
+'\" *** 403 ***
 '\" <<ital-is-var>>
 '\" <<bold-is-fixed>>
 .TH MAPPER-PROTOCOL 7 "GMA-Mapper 4.3.4" 16-Mar-2023 "Games" \" @@mp@@
@@ -75,7 +75,7 @@ MAY
 be implemented to wait synchronously for a server
 response during the authentication negotiation stage.
 .LP
-This describes protocol version 402. These notes are intended to be 
+This describes protocol version 403. These notes are intended to be 
 detailed enough to implement a client from and should be considered
 the definitive standard reference to the protocol.
 .LP
@@ -179,6 +179,7 @@ since all communications are asynchronous.
 '\"  \z{AV}     &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Scroll clients' views\\
 '\"  \z{AI}     &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Add image to client's known set\\
 '\"  \z{AI?}    &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Ask for definition of image\\
+\"   \z{AI/}    &C$\rightarrow$S    &---        &yes&\acronym{JSON}&Filter saved image definitions\\
 '\"  \z{CC}     &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Clear the chat history\\
 '\"  \z{CLR}    &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Remove objects from client\\
 '\"  \z{CLR@}   &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Remove elements from a map file\\
@@ -188,10 +189,12 @@ since all communications are asynchronous.
 '\"  \z{D}      &C$\rightarrow$S    &\z{ROLL}   &no &\acronym{JSON}&Initiate a die roll\\
 '\"  \z{DD}     &C$\leftarrow$S     &\z{DD=}    &no &\acronym{JSON}&Store new presets for user\\
 '\"  \z{DD+}    &C$\rightarrow$S    &\z{DD=}    &no &\acronym{JSON}&Add presets to user's set\\
+'\"  \z{DD/}    &C$\rightarrow$S    &\z{DD=}    &N/A&\acronym{JSON}&Filter user's presets\\
 '\"  \z{DD=}    &C$\leftarrow$S     &---        &N/A&\acronym{JSON}&Receive user's presets\\
 '\"  \z{DENIED} &C$\leftarrow$S     &---        &N/A&\acronym{JSON}&Server denies access\\
 '\"  \z{DR}     &C$\rightarrow$S    &\z{DD=}    &no &none          &Request user's presets\\
 '\"  \z{DSM}    &C$\leftrightarrow$S&---        &yes&\acronym{JSON}&Define creature status marker\\
+'\"  \z{ECHO}   &C$\leftrightarrow$S&\z{ECHO}   &no &\acronym{JSON}&Send data for server to echo back\\
 '\"  \z{GRANTED}&C$\leftarrow$S     &---        &N/A&\acronym{JSON}&Server grants access\\
 '\"  \z{I}      &C$\leftrightarrow$S&---        &yes&\acronym{JSON}&Indicate turn in combat\\
 '\"  \z{IL}     &C$\leftrightarrow$S&---        &yes&\acronym{JSON}&Update the initiative list\\
@@ -206,14 +209,14 @@ since all communications are asynchronous.
 '\"  \z{LS-TILE}&C$\leftrightarrow$S&---        &no &\acronym{JSON}&Add a graphic tile to the map\\
 '\"  \z{MARCO}  &C$\leftarrow$S     &\z{POLO}   &N/A&none          &Check if client is alive\\
 '\"  \z{MARK}   &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Visually mark a spot\\
-'\"  \z{POLO}   &C$\rightarrow$S    &---        &no &none          &Acknowledge server's ping\\
-'\"  \z{PRIV}   &C$\leftarrow$S     &---        &N/A&\acronym{JSON}&Privileged command denied\\\bottomrule
 '\" \end{tabular}
 '\" \caption{Summary of Client/Server Messages}\label{tbl:mapper:6:messages}
 '\"\end{table}
 '\"\begin{table}
 '\" \begin{tabular}{lcllll}\toprule
 '\"  {\bfseries Command}&{\bfseries C$\leftrightarrow$S}&{\bfseries Reply}&{\bfseries Priv}&{\bfseries Data}&{\bfseries Description}\\\midrule
+'\"  \z{POLO}   &C$\rightarrow$S    &---        &no &none          &Acknowledge server's ping\\
+'\"  \z{PRIV}   &C$\leftarrow$S     &---        &N/A&\acronym{JSON}&Privileged command denied\\\bottomrule
 '\"  \z{PROGRESS}&C$\leftrightarrow$S&---       &no &\acronym{JSON}&Indicate progress on task\\
 '\"  \z{PROTOCOL}&C$\leftarrow$S    &---        &N/A&int           &Signal protocol version in use\\
 '\"  \z{PS}     &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Place a creature token\\
@@ -255,7 +258,9 @@ CombatMode	CO	C\[<>]S	\fR\(em\fP	yes	JSON	Turn on/off combat mode
 Comment	//	C\[<>]S	\fR\(em\fP	no	any	Human-readable comment
 DefineDicePresets	DD	C\[->]S	DD=	no	JSON	Store new presets for user
 Denied	DENIED	C\[<-]S	\fR\(em\fP	N/A	JSON	Server denies access
+Echo	ECHO	C\[<>]S	ECHO	no	JSON	Send data for server to echo back to client
 FilterDicePresets	DD/	C\[->]S	DD=	no	JSON	Remove some presets for user
+FilterImages	AI/	C\[->]S	\fR\(em\fP	yes	JSON	Filter saved image definitions
 Granted	GRANTED	C\[<-]S	\fR\(em\fP	N/A	JSON	Server grants access
 LoadArcObject	LS-ARC	C\[<>]S	\fR\(em\fP	no	JSON	Add an arc to the map
 LoadCircleObject	LS-CIRC	C\[<>]S	\fR\(em\fP	no	JSON	Add an ellipse to the map
@@ -535,6 +540,28 @@ The requested magnification factor for the image.
 .\" <</>>
 .RE
 .\" <</>>
+.TP
+.B AI/
+Filters (removes) all the saved image definitions held in the server's database
+whose names match a regular expression.
+The payload is a JSON object with the following fields:
+'\" <<list>>
+.RS
+.TP
+.B Filter
+The regular expression used to select which image names will be removed.
+.TP
+'\" <</ital-is-var>>
+.BI "KeepMatching " (bool)
+'\" <<ital-is-var>>
+If true, only those images whose names match the
+.B Filter
+expression will be kept; the others will be removed. Otherwise,
+the opposite is done: images whose names match
+.B Filter
+will be removed.
+.RE
+'\" <</>>
 .TP
 .B ALLOW
 The client MAY send this command to the server after logging in. This tells
@@ -1924,6 +1951,19 @@ respond with a valid
 .B AUTH
 command before any of its commands to the server will be accepted. The server will also
 refuse to send the client any map updates until it has successfully authenticated.
+.TP
+.BI ServerStarted " (RFC 3339-formatted datetime string with sub-second precision)"
+The absolute wall-clock time that the server was started.
+.TP
+.BI ServerActive " (RFC 3339-formatted datetime string with sub-second precision)"
+The abolute wall-clock time of the server's last
+.B MARCO
+ping signal was sent. If this was long ago (more than a minute or two with out-of-the-box
+server configuration), it is an indicator that the server's main event loop is deadlocked.
+.TP
+.BI ServerTime " (RFC 3339-formatted datetime string with sub-second precision)"
+The current wall-clock time on the server. This provides an accurate point of reference
+to determine how long ago the other server time values occurred.
 '\" <</>>
 .RE
 .TP
@@ -2454,8 +2494,14 @@ Steve Willoughby / steve@madscience.zone;
 John Mechalas (elevation and movement modes).
 .SH HISTORY
 .LP
-This document defines map protocol version 402,
-which improved the 
+This document defines map protocol version 403,
+which introduced the
+.B AI/
+server message and additional fields to the
+.B OK
+message.
+.LP
+Protocol version 402 improved the 
 .B ROLL
 server message by adding support for blind rolls to the GM.
 .LP

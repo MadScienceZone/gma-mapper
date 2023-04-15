@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___          ___       _______         ___ #
-# (  ____ \(       )(  ___  ) Game         /   )        /   )     (  __   )       (  _ #
-# | (    \/| () () || (   ) | Master's    / /) |       / /) |     | (  )  |       | (  #
-# | |      | || || || (___) | Assistant  / (_) (_     / (_) (_    | | /   | _____ | (_ #
-# | | ____ | |(_)| ||  ___  |           (____   _)   (____   _)   | (/ /) |(_____)|  _ #
-# | | \_  )| |   | || (   ) |                ) (          ) (     |   / | |       | (  #
-# | (___) || )   ( || )   ( | Mapper         | |   _      | |   _ |  (__) |       | )  #
-# (_______)|/     \||/     \| Client         (_)  (_)     (_)  (_)(_______)       |/   #
+#  _______  _______  _______                ___          ___                           #
+# (  ____ \(       )(  ___  ) Game         /   )        /   )                          #
+# | (    \/| () () || (   ) | Master's    / /) |       / /) |                          #
+# | |      | || || || (___) | Assistant  / (_) (_     / (_) (_                         #
+# | | ____ | |(_)| ||  ___  |           (____   _)   (____   _)                        #
+# | | \_  )| |   | || (   ) |                ) (          ) (                          #
+# | (___) || )   ( || )   ( | Mapper         | |   _      | |                          #
+# (_______)|/     \||/     \| Client         (_)  (_)     (_)                          #
 #                                                                                      #
 ########################################################################################
 #
@@ -57,9 +57,9 @@ package require base64 2.4.2
 package require uuid 1.0.1
 
 namespace eval ::gmaproto {
-	variable protocol 402
+	variable protocol 403
 	variable min_protocol 333
-	variable max_protocol 402
+	variable max_protocol 403
 	variable max_max_protocol 499
 	variable debug_f {}
 	variable legacy false
@@ -159,7 +159,7 @@ namespace eval ::gmaproto {
 		OA      {ObjID s NewAttrs d}
 		OA+     {ObjID s AttrName s Values l}
 		OA-     {ObjID s AttrName s Values l}
-		OK      {Protocol i Challenge b}
+		OK      {Protocol i Challenge b ServerStarted s ServerActive s ServerTime s}
 		PRIV    {Command s Reason s}
 		POLO    {}
 		PROGRESS {OperationID s Title s Value i MaxValue i IsDone ?}
@@ -2122,7 +2122,7 @@ proc ::gmaproto::GMATypeToProtocolCommand {gt} {
 	}
 	return $gt
 }
-# @[00]@| GMA-Mapper 4.4.0-alpha.1
+# @[00]@| GMA-Mapper 4.4
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
