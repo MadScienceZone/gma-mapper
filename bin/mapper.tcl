@@ -14,7 +14,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.4.0-alpha.2}     ;# @@##@@
+set GMAMapperVersion {4.4.0-beta.1}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
 set GMAMapperProtocol {402}         ;# @@##@@
 set GMAVersionNumber {5.2}            ;# @@##@@
@@ -1432,7 +1432,7 @@ for {set argi 0} {$argi < $argc} {incr argi} {
 		-n - --no-chat    { set SuppressChat 1 }
 		-S - --select     { 
 			set CurrentProfileName [getarg -S]
-			ApplyPreferences $PreferencesData
+			ApplyPreferences $PreferencesData -override
 		}
 		-s - --style      { LoadCustomStyle [getarg -s] }
 		-t - --transcript { set ChatTranscript [getarg -t] }
