@@ -3,13 +3,28 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.3.4               <!-- @@##@@ -->
- * Effective Date: 16-Mar-2023               <!-- @@##@@ -->
+ * This Package Version: 4.4               <!-- @@##@@ -->
+ * Effective Date: 15-Apr-2023               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 5.3-alpha.0 <!-- @@##@@ -->
+ * GMA Core API Library Version: 5.3 <!-- @@##@@ -->
  * GMA Mapper File Format: 20	     <!-- @@##@@ -->
- * GMA Mapper Protocol: 402        <!-- @@##@@ -->
+ * GMA Mapper Protocol: 403        <!-- @@##@@ -->
+
+# 4.4
+## Enhancements
+ * Created in-app preferences editor.
+    * Server profile selected in editor is the default for subsequent uses of the mapper.
+    * If the preference editor was used, the mapper will use that at startup and **NOT** the old default behavior of reading from the `mapper.conf` file.
+    * If a config file is named with the `--config` option, that will be read in after the new preference data are loaded, possibly overriding those values with the named config file's contents.
+    * A runtime menu option allows *ad-hoc* selection of a mapper server profile to connect to (may not set all other preferences).
+    * A command line option `--select` *profilename* selects that server profile saved from the preferences editor to be used for this invocation of the mapper without affecting the default profile used by other invocations.
+ * Supports protocol 403 (although it isn't directly affected by the difference between 402 and 403.
+ * Moves nameplate for dead creatures to the bottom of the display to avoid overcrowding the map.
+ * Moves nameplates out the the way of nearby creatures better.
+    
+## Changes
+ * Moved mapper client/server protocol spec out of `mapper`(6) and into its own manpage, `mapper-protocol`(7).
 
 # 4.3.4
 ## Fixes
