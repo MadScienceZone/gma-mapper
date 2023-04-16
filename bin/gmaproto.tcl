@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___       ______         ___               #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \       /   )              #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \     / /) |              #
-# | |      | || || || (___) | Assistant  / (_) (_       ___) /    / (_) (_             #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ (    (____   _)            #
-# | | \_  )| |   | || (   ) |                ) (           ) \        ) (              #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  / _      | |              #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/ (_)     (_)              #
+#  _______  _______  _______                ___          ___                           #
+# (  ____ \(       )(  ___  ) Game         /   )        /   )                          #
+# | (    \/| () () || (   ) | Master's    / /) |       / /) |                          #
+# | |      | || || || (___) | Assistant  / (_) (_     / (_) (_                         #
+# | | ____ | |(_)| ||  ___  |           (____   _)   (____   _)                        #
+# | | \_  )| |   | || (   ) |                ) (          ) (                          #
+# | (___) || )   ( || )   ( | Mapper         | |   _      | |                          #
+# (_______)|/     \||/     \| Client         (_)  (_)     (_)                          #
 #                                                                                      #
 ########################################################################################
 #
@@ -57,9 +57,9 @@ package require base64 2.4.2
 package require uuid 1.0.1
 
 namespace eval ::gmaproto {
-	variable protocol 402
+	variable protocol 403
 	variable min_protocol 333
-	variable max_protocol 402
+	variable max_protocol 403
 	variable max_max_protocol 499
 	variable debug_f {}
 	variable legacy false
@@ -159,7 +159,7 @@ namespace eval ::gmaproto {
 		OA      {ObjID s NewAttrs d}
 		OA+     {ObjID s AttrName s Values l}
 		OA-     {ObjID s AttrName s Values l}
-		OK      {Protocol i Challenge b}
+		OK      {Protocol i Challenge b ServerStarted s ServerActive s ServerTime s}
 		PRIV    {Command s Reason s}
 		POLO    {}
 		PROGRESS {OperationID s Title s Value i MaxValue i IsDone ?}
@@ -230,9 +230,23 @@ proc ::gmaproto::dial {host port user pass proxy proxyport proxyuser proxypass c
 	::gmaproto::redial
 }
 
-# we can all redial anytime we find we want to send something and we have no socket
+proc ::gmaproto::hangup {} {
+	::gmaproto::DEBUG "hangup"
+	set ::gmaproto::host {}
+	::gmaproto::redial
+}
+
+# we can call redial anytime we find we want to send something and we have no socket
 proc ::gmaproto::redial {} {
+	::gmaproto::DEBUG "redial"
 	set ::gmaproto::recv_buffer {}
+	if {$::gmaproto::host eq {}} {
+		::gmaproto::DEBUG "hanging up ($::gmaproto::sock)"
+		catch {close $::gmaproto::sock}
+		set ::gmaproto::sock {}
+		set ::gmaproto::pending_login true
+		return
+	}
 
 	::gmaproto::DEBUG "attempting to connect to ${::gmaproto::host}:${::gmaproto::port}"
 	if {$::gmaproto::sock ne {}} {
@@ -1758,15 +1772,15 @@ proc ::gmaproto::_repackage_legacy_packet {cmd params} {
 		}
 		CONN. {
 			# CONN. count checksum
-			puts "conn."
+			#puts "conn."
 			::gmautil::rdist 1 2 CONN. $params l cs
-			puts "conn. $l $cs from $params"
+			#puts "conn. $l $cs from $params"
 			set sdata [::gmaproto::_end_stream CONN $l $cs] 
 			set clist {}
 			foreach c [dict get $sdata Data] {
-				puts $c
+				#puts $c
 				lassign $c i who a u c au po
-				puts $i
+				#puts $i
 				lappend clist "{\"Addr\":[json::write string $a],\"User\":[json::write string $u],\"Client\":[json::write string $c],\"LastPolo\":$po,\"IsAuthenticated\":[::gmaproto::json_bool $au],\"IsMe\":[::gmaproto::json_bool [expr {$who} eq {{you}}]]}"
 			}
 
@@ -2108,7 +2122,7 @@ proc ::gmaproto::GMATypeToProtocolCommand {gt} {
 	}
 	return $gt
 }
-# @[00]@| GMA-Mapper 4.3.4
+# @[00]@| GMA-Mapper 4.4
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

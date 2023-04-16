@@ -1,18 +1,18 @@
 ########################################################################################
-#  _______  _______  _______                ___       ______         ___               #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \       /   )              #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \     / /) |              #
-# | |      | || || || (___) | Assistant  / (_) (_       ___) /    / (_) (_             #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ (    (____   _)            #
-# | | \_  )| |   | || (   ) |                ) (           ) \        ) (              #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  / _      | |              #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/ (_)     (_)              #
+#  _______  _______  _______                ___          ___                           #
+# (  ____ \(       )(  ___  ) Game         /   )        /   )                          #
+# | (    \/| () () || (   ) | Master's    / /) |       / /) |                          #
+# | |      | || || || (___) | Assistant  / (_) (_     / (_) (_                         #
+# | | ____ | |(_)| ||  ___  |           (____   _)   (____   _)                        #
+# | | \_  )| |   | || (   ) |                ) (          ) (                          #
+# | (___) || )   ( || )   ( | Mapper         | |   _      | |                          #
+# (_______)|/     \||/     \| Client         (_)  (_)     (_)                          #
 #                                                                                      #
 ########################################################################################
 # version 1.0, 17 July 2020.
 # Steve Willoughby <steve@madscience.zone>
 #
-# @[00]@| GMA-Mapper 4.3.4
+# @[00]@| GMA-Mapper 4.4
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
@@ -528,3 +528,15 @@ proc ::gmautil::dassign {dictval args} {
     }
 }
 
+# Search for a command in the user's PATH
+proc ::gmautil::searchInPath {cmd} {
+	global env
+	if {[info exists env(PATH)]} {
+		foreach dir [split $env(PATH) :] {
+			if {[file executable [file join $dir $cmd]]} {
+				return [file join $dir $cmd]
+			}
+		}
+	}
+	return ""
+}
