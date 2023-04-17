@@ -21,6 +21,8 @@ namespace eval ::gmaprofile {
 	variable _profile {}
 	variable _profile_backup {}
 	variable currently_editing_index -1
+	variable font_catalog
+	variable font_repository
 	variable _file_format {
 		GMA_Mapper_preferences_version i
 		animate ?
@@ -74,6 +76,7 @@ namespace eval ::gmaprofile {
 		    }
 	    	}
 	}
+
 	proc default_preferences {} {
 		return [dict create \
 			animate         false\
@@ -482,9 +485,19 @@ namespace eval ::gmaprofile {
 	        grid [button $st.f.add -text {Add New...} -command "::gmaprofile::_add_new_font $w"] -sticky nw -column 2 -row 0
 		grid ^ ^ [button $st.f.copy -text Copy -state disabled -command "::gmaprofile::_copy_selected_font $w"] -sticky nw
 		grid ^ ^ [button $st.f.del -text Delete -state disabled -foreground red -command "::gmaprofile::_delete_selected_font $w"] -sticky sw
-		tk fontchooser configure -parent $w 
+		tk fontchooser configure -parent $w -title "Choose Font" -command "::gmaprofile::_new_font_chosen $w"
 		catch {tk fontchooser hide}
 		grid [button $st.f.choose -text "Show Font Chooser" -command "::gmaprofile::_toggle_chooser $w"]
+		_chooser_visibility $w
+		bind $w <<TkFontchooserVisibility>> [list ::gmaprofile::_chooser_visibility $w]
+		bind $w <<TkFontchooserFontChanged>> {}
+		set default_font_d [tk_font_to_dict TkDefaultFont]
+		set default_font_f [define_font $default_font_d]
+		grid [label $st.f.name -text ""]
+		grid [label $st.f.sample -text ""]
+		_describe_font $st.f.name $default_font_d
+		_display_pangram $st.f.sample $default_font_f
+		$st.f.fonts insert end default
 
 		#
 		# |default
@@ -636,13 +649,88 @@ namespace eval ::gmaprofile {
 		return $::gmaprofile::_profile
 	}
 
+	proc _chooser_visibility {w} {
+		if {[tk fontchooser configure -visible]} {
+			$w.n.s.n.f.choose configure -text "Hide Font Chooser"
+		} else {
+			$w.n.s.n.f.choose configure -text "Show Font Chooser"
+		}
+	}
+
 	proc _toggle_chooser {w} {
 		if {[tk fontchooser configure -visible]} {
 			tk fontchooser hide
-			$w.n.s.n.f.choose configure -text "Show Font Chooser"
 		} else {
 			tk fontchooser show
-			$w.n.s.n.f.choose configure -text "Hide Font Chooser"
 		}
+	}
+
+	proc _new_font_chosen {w newfont} {
+		if {[llength $newfont] < 2} {
+			puts "Can't understand font \"$newfont\""
+			return
+		}
+		set fontdict [dict create Family [lindex $newfont 0] \
+			                  Size   [lindex $newfont 1] \
+					  Weight [expr [lsearch -exact [lrange $newfont 2 end] bold] >= 0 ? 1 : 0] \
+					  Slant  [expr [lsearch -exact [lrange $newfont 2 end] italic] >= 0 ? 1 : 0] \
+					  Overstrike [expr [lsearch -exact [lrange $newfont 2 end] overstrike] >= 0 ? 1 : 0] \
+					  Underline  [expr [lsearch -exact [lrange $newfont 2 end] underline] >= 0 ? 1 : 0] \
+		]
+		puts $fontdict
+	}
+	proc _describe_font {w d} {
+		set desc "[dict get $d Family] [dict get $d Size]"
+		if {[dict get $d Weight] > 0} {append desc ", bold"}
+		if {[dict get $d Slant] > 0}  {append desc ", italic"}
+		if {[dict get $d Overstrike]}  {append desc ", overstrike"}
+		if {[dict get $d Underline]}  {append desc ", underline"}
+		$w configure -text "$desc ([_font_name_hash $d])"
+	}
+
+	proc _display_pangram {w fnt} {
+		set pangram_list [list \
+			"Waltz, bad nymph, for quick jigs vex" \
+			"Glib jocks quiz nymph to vex dwarf." \
+			"Sphinx of black quartz, judge my vow." \
+			"How quickly daft jumping zebras vex!" \
+			"The five boxing wizards jump quickly." \
+			"Jackdaws love my big sphinx of quartz." \
+			"Pack my box with five dozen liquor jugs." \
+		]
+
+		$w configure -text "[lindex $pangram_list [expr [clock clicks] % [llength $pangram_list]]]; 0,123,456,789 +-*/ [](){}?!" -font $fnt
+	}
+	proc _font_name_hash {d} {
+		# derive a unique but deterministic name for a font based on its properties.
+		return "Ft_[::md5::md5 -hex $d]"
+	}
+	proc tk_font_to_dict {font} {
+		return [dict create \
+			Family     [font configure $font -family] \
+			Size       [font configure $font -size] \
+			Weight     [expr {[font configure $font -weight]} eq {{bold}}  ? 1 : 0] \
+			Slant      [expr {[font configure $font -slant]} eq {{italic}} ? 1 : 0] \
+			Overstrike [font configure $font -overstrike] \
+			Underline  [font configure $font -underline] \
+		]
+	}
+
+	proc define_font {d} {
+		# define a Tk font from the given dictionary and return its name. If that font
+		# already exists, just return the name.
+		set weights [list normal bold]
+		set slants  [list roman italic]
+		variable font_repository
+		set f [_font_name_hash $d]
+		if {! [info exists font_repository($f)]} {
+			font create $f -family [dict get $d Family] -size [dict get $d Size] \
+				-weight [lindex $weights [dict get $d Weight]] \
+				-slant  [lindex $slants  [dict get $d Slant]] \
+				-overstrike [dict get $d Overstrike] \
+				-underline [dict get $d Underline]
+			set font_repository($f) [list $d]
+		}
+		return $f
 	}
 }
