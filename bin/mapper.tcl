@@ -2998,7 +2998,7 @@ proc texttool {} {
 	set OBJ_MODE text
 	DEBUG 3 "Selected text mode"
 	set ClockDisplay $CurrentTextString
-	catch {tk fontchooser configure -font [lindex $CURRENT_FONT 0] -command [list SelectFont $canvas]}
+	catch {tk fontchooser configure -parent . -font [lindex $CURRENT_FONT 0] -command [list SelectFont $canvas]}
 	bind . <<TkFontchooserFontChanged>> [list SelectFont $canvas]
 }
 

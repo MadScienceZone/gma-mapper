@@ -465,9 +465,45 @@ namespace eval ::gmaprofile {
 		frame $w.n.p
 		$w.n add $w.n.a -state normal -sticky nsew -text Appearance
 		$w.n add $w.n.p -state normal -sticky news -text Servers
-		$w.n add $w.n.s -state disabled -sticky news -text Styles
+		$w.n add $w.n.s -state normal -sticky news -text Styles
 		$w.n add $w.n.t -state normal -sticky nsew -text Tools
 		$w.n add $w.n.d -state normal -sticky nsew -text Diagnostics
+
+		ttk::notebook $w.n.s.n
+		set st $w.n.s.n
+		frame $st.f
+		frame $st.e
+		$st add $st.f -state normal -sticky news -text Fonts
+		$st add $st.e -state disabled -sticky news -text Elements
+		grid [listbox $st.f.fonts -yscrollcommand "$st.f.scroll set" -selectmode browse\
+			-selectforeground white -selectbackground blue\
+			] -sticky news
+		grid [scrollbar $st.f.scroll -orient vertical -command "$st.f.fonts yview"] -column 1 -row 0 -sticky nsw 
+	        grid [button $st.f.add -text {Add New...} -command "::gmaprofile::_add_new_font $w"] -sticky nw -column 2 -row 0
+		grid ^ ^ [button $st.f.copy -text Copy -state disabled -command "::gmaprofile::_copy_selected_font $w"] -sticky nw
+		grid ^ ^ [button $st.f.del -text Delete -state disabled -foreground red -command "::gmaprofile::_delete_selected_font $w"] -sticky sw
+		tk fontchooser configure -parent $w 
+		catch {tk fontchooser hide}
+		grid [button $st.f.choose -text "Show Font Chooser" -command "::gmaprofile::_toggle_chooser $w"]
+
+		#
+		# |default
+		# |name1
+		# |name2
+		#
+		# [Show/hide font chooser]
+		#
+		#
+		#
+
+
+
+# tk fontchooser hide|show
+# tk fontchooser configure -parent . -font -command
+# bind . <<TkFontchooserFontChanged>> [list SelectFont $canvas]
+#
+		# 
+		grid $w.n.s.n -sticky news
 
 		menu $w.n.a.m_bsize
 		$w.n.a.m_bsize add command -label small -command {::gmaprofile::_bsize small}
@@ -598,5 +634,15 @@ namespace eval ::gmaprofile {
 
 		tkwait window $w
 		return $::gmaprofile::_profile
+	}
+
+	proc _toggle_chooser {w} {
+		if {[tk fontchooser configure -visible]} {
+			tk fontchooser hide
+			$w.n.s.n.f.choose configure -text "Show Font Chooser"
+		} else {
+			tk fontchooser show
+			$w.n.s.n.f.choose configure -text "Hide Font Chooser"
+		}
 	}
 }
