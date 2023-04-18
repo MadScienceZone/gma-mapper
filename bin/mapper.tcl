@@ -601,7 +601,7 @@ proc default_style_data {} {
 		fg_error	red
 		overstrike_discarded 1
 		fmt_error	{ERROR: %s}
-		fmt_notice	{[%s]}
+		fmt_notice	{[%s] }
 		fmt_best		{ best of %s}
 		fmt_worst	{ worst of %s}
 		fmt_critlabel	{Confirm: }

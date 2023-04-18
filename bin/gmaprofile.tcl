@@ -18,9 +18,11 @@ package require getstring
 
 namespace eval ::gmaprofile {
 	namespace export editor
+	variable lockout_select_fbn false
 	variable _profile {}
 	variable _profile_backup {}
 	variable currently_editing_index -1
+#	variable currently_editing_font_index -1
 	variable font_catalog
 	variable font_repository
 	variable _file_format {
@@ -75,7 +77,9 @@ namespace eval ::gmaprofile {
 			ssh_path s
 		    }
 	    	}
+		fonts {D {family s size f weight i slant i overstrike ? underline ?}}
 	}
+	variable _file_format_font {family s size f weight i slant i overstrike ?  underline ?}
 
 	proc default_preferences {} {
 		return [dict create \
@@ -93,8 +97,130 @@ namespace eval ::gmaprofile {
 			image_format png\
 			keep_tools   false\
 			preload      false\
-			profiles [list [empty_server_profile offline]]\
+			profiles     [list [empty_server_profile offline]]\
+			fonts        [default_fonts]\
 		]
+	}
+	proc _add_new_font {w} {
+		#
+		# _add_new_font profilewindow
+		#
+		# Add and select new default font
+		#
+		variable _profile
+		if {[::getstring::tk_getString $w.new_font_name newname {Name of new font}] && $newname ne {}} {
+			if {[dict exists $_profile fonts $newname]} {
+				tk_messageBox -type ok -icon error -title "Duplicate name" -message "You tried to add a font called \"$newname\" but that name already exists in the font set." -parent $w
+				return
+			}
+			$w.n.s.n.f.fonts insert end $newname
+			dict set _profile fonts $newname [tk_font_to_dict TkDefaultFont]
+			$w.n.s.n.f.fonts selection clear 0 end
+			$w.n.s.n.f.fonts selection set end
+			_select_font_by_name $w.n.s.n $newname
+		}
+	}
+	proc _selected_font_name {lb} {
+		if {[llength [set sel [$lb curselection]]] == 0} {
+			return {}
+		}
+		return [$lb get [lindex $sel 0]]
+	}
+	proc _copy_selected_font {w} {
+		variable _profile
+		set st $w.n.s.n
+		set lb $st.f.fonts
+
+		if {[set srcfont [_selected_font_name $lb]] eq {}} {
+			tk_messageBox -type ok -icon error -title "No current selection" -message "You can't make a copy of a font without first selecting the font to copy from." -parent $w
+			return
+		}
+		set srcdata [dict get $_profile fonts $srcfont]
+		if {[::getstring::tk_getString $w.new_font_name newname "Name of new font (copy of $srcfont)"] && $newname ne {}} {
+			if {[dict exists $_profile fonts $newname]} {
+				tk_messageBox -type ok -icon error -title "Duplicate name" -message "You tried to add a font called \"$newname\" but that name already exists in the font set." -parent $w
+				return
+			}
+			$lb insert end $newname
+			dict set _profile fonts $newname $srcdata
+			$lb selection clear 0 end
+			$lb selection set end
+			_select_font_by_name $st $newname
+		}
+	}
+	proc _delete_selected_font {w} {
+		variable _profile
+		set st $w.n.s.n
+		set lb $st.f.fonts
+
+		if {[set srcfont [_selected_font_name $lb]] eq {}} {
+			tk_messageBox -type ok -icon error -title "No current selection" -message "You can't delete a font without first selecting which one you want to delete." -parent $w
+			return
+		}
+		if {![dict exists $_profile fonts $srcfont]} {
+			tk_messageBox -type ok -icon error -title "No such font name" -message "You tried to delete a font called \"$srcfont\" but that name does not exist in the font set." -parent $w
+			return
+		}
+		# TODO check if it's in use
+		if {! [tk_messageBox -type yesno -default no -icon warning -title "Confirm Deletion" -message "Are you SURE you want to delete the font \"$srcfont\"? This operation cannot be undone." -parent $w]} {
+			return
+		}
+		if {[llength [set idx [$lb curselection]]] == 0} {
+			tk_messageBox -type ok -icon error -title "Unable to delete" -message "An error prevented the deletion of the font \"$srcfont\"." -detail "Unable to find the listbox's current selection." -parent $w
+			return
+		}
+		$lb delete [lindex $idx 0]
+		$lb selection clear 0 end
+		_select_font_by_name $st {}
+		dict unset _profile fonts $srcfont
+	}
+	proc _select_font_by_name {st name} {
+		puts "sfbn $st $name"
+		::DEBUG 0 "_select_font_by_name $st $name"
+#		variable currently_editing_font_index
+
+		if {$name eq {}} {
+#			if {$currently_editing_font_index >= 0} {
+#				# we actually had one selected, but lost focus, so let's put the selection
+#				# back where it should be.
+#				puts "restoring $currently_editing_font_index"
+#				$st.f.fonts selection clear 0 end
+#				$st.f.fonts selection set $currently_editing_font_index
+#				set lockout_select_fbn false
+#				return
+#			}
+			# TODO take down sample displays
+			$st.f.copy configure -state disabled -text "Copy"
+			$st.f.del configure -state disabled -text "Delete"
+			_describe_font $st.f.name {}
+			_display_pangram $st.f.sample {}
+
+			puts "clearing selection"
+			$st.f.fonts selection clear 0 end
+		} else {
+			variable _profile
+#			set currently_editing_font_index [lsearch -exact [$st.f.fonts get 0 end] $name]
+#			if {$currently_editing_font_index < 0} {
+#				tk_messageBox -type ok -icon error -title "No such font" -message "You tried to select a font called \"$name\" but no such font entry exists." -parent $st
+#				_select_font_by_name $st {}
+#				set lockout_select_fbn false
+#				return
+#			}
+			# update buttons
+			$st.f.copy configure -state normal -text "Copy $name"
+			$st.f.del configure -state normal -text "Delete $name"
+			# show sample displays
+			_describe_font $st.f.name [set fontd [dict get $_profile fonts $name]]
+			_display_pangram $st.f.sample [define_font $fontd]
+			# TODO update style displays
+		}
+	}
+	proc _select_font_by_idx {st idx} {
+		if {$idx eq {}} {
+			_select_font_by_name $st {}
+		} else {
+			_select_font_by_name $st [$st.f.fonts get $idx]
+		}
 	}
 	proc empty_server_profile {name} {
 		return [dict create \
@@ -196,6 +322,10 @@ namespace eval ::gmaprofile {
 		set f [open $filename r]
 		set data [::gmaproto::_construct [json::json2dict [read $f]] $_file_format]
 		close $f
+		if {![dict exists $data fonts] || [dict size [dict get $data fonts]] == 0} {
+			puts "** Preferences data is missing font list; setting to default **"
+			dict set data fonts [default_fonts]
+		}
 		return $data
 	}
 	# ::gmaproto::_construct input types	types={fieldname s|i|f|?|b|a types|o types|d|l}	-> dict
@@ -329,11 +459,11 @@ namespace eval ::gmaprofile {
 		_save_server $w
 		if {[llength $serveridx] == 0} {
 			# if we just lost focus but didn't select anything, re-select the current entry.
-			if {$currently_editing_index >= 0} {
-				$w.n.p.servers selection clear 0 end
-				$w.n.p.servers selection set $currently_editing_index
-				return
-			}
+			#if {$currently_editing_index >= 0} {
+			#	$w.n.p.servers selection clear 0 end
+			#	$w.n.p.servers selection set $currently_editing_index
+			#	return
+			#}
 
 			# disable everything
 			foreach f {copy del} {
@@ -480,6 +610,7 @@ namespace eval ::gmaprofile {
 		$st add $st.e -state disabled -sticky news -text Elements
 		grid [listbox $st.f.fonts -yscrollcommand "$st.f.scroll set" -selectmode browse\
 			-selectforeground white -selectbackground blue\
+			-exportselection false\
 			] -sticky news
 		grid [scrollbar $st.f.scroll -orient vertical -command "$st.f.fonts yview"] -column 1 -row 0 -sticky nsw 
 	        grid [button $st.f.add -text {Add New...} -command "::gmaprofile::_add_new_font $w"] -sticky nw -column 2 -row 0
@@ -487,27 +618,23 @@ namespace eval ::gmaprofile {
 		grid ^ ^ [button $st.f.del -text Delete -state disabled -foreground red -command "::gmaprofile::_delete_selected_font $w"] -sticky sw
 		tk fontchooser configure -parent $w -title "Choose Font" -command "::gmaprofile::_new_font_chosen $w"
 		catch {tk fontchooser hide}
-		grid [button $st.f.choose -text "Show Font Chooser" -command "::gmaprofile::_toggle_chooser $w"]
+		grid [button $st.f.choose -text "Show Font Chooser" -command "::gmaprofile::_toggle_chooser $w"] - - -sticky nws
 		_chooser_visibility $w
 		bind $w <<TkFontchooserVisibility>> [list ::gmaprofile::_chooser_visibility $w]
 		bind $w <<TkFontchooserFontChanged>> {}
-		set default_font_d [tk_font_to_dict TkDefaultFont]
-		set default_font_f [define_font $default_font_d]
-		grid [label $st.f.name -text ""]
-		grid [label $st.f.sample -text ""]
-		_describe_font $st.f.name $default_font_d
-		_display_pangram $st.f.sample $default_font_f
-		$st.f.fonts insert end default
+		bind $st.f.fonts <<ListboxSelect>> "::gmaprofile::_select_font_by_idx $st \[%W curselection\]"
+		grid [label $st.f.name -text ""] - - - -sticky w
+		grid [label $st.f.sample -text ""] - - - -sticky w
+		_select_font_by_name $st {}
+		foreach font [dict keys [dict get $_profile fonts]] {
+			$st.f.fonts insert end $font
+		}
+#		set default_font_d [tk_font_to_dict TkDefaultFont]	;#XXX
+#		set default_font_f [define_font $default_font_d]	;#XXX
+#		_describe_font $st.f.name $default_font_d	;#XXX
+#		_display_pangram $st.f.sample $default_font_f	;#XXX
+#		$st.f.fonts insert end default	;#XXX
 
-		#
-		# |default
-		# |name1
-		# |name2
-		#
-		# [Show/hide font chooser]
-		#
-		#
-		#
 
 
 
@@ -562,6 +689,7 @@ namespace eval ::gmaprofile {
 
 		grid [listbox $w.n.p.servers -yscrollcommand "$w.n.p.scroll set" -selectmode browse\
 			-selectforeground white -selectbackground blue\
+			-exportselection false\
 			] -sticky news
 		grid [scrollbar $w.n.p.scroll -orient vertical -command "$w.n.p.servers yview"] -column 1 -row 0 -sticky nsw 
 	        grid [button $w.n.p.add -text {Add New...} -command "::gmaprofile::_add_new $w"] -sticky nw -column 2 -row 0
@@ -634,7 +762,7 @@ namespace eval ::gmaprofile {
 		_select_server $w {}
 		foreach profile [list_server_names $_profile] {
 			$w.n.p.servers insert end $profile
-			if {$current_profile eq $profile} {
+			if {$current_profile eq $profile || $current_profile eq {}} {
 				_select_server $w end
 				$w.n.p.servers selection set end
 				set currently_editing_index [expr [$w.n.p.servers index end] - 1]
@@ -670,25 +798,33 @@ namespace eval ::gmaprofile {
 			puts "Can't understand font \"$newfont\""
 			return
 		}
-		set fontdict [dict create Family [lindex $newfont 0] \
-			                  Size   [lindex $newfont 1] \
-					  Weight [expr [lsearch -exact [lrange $newfont 2 end] bold] >= 0 ? 1 : 0] \
-					  Slant  [expr [lsearch -exact [lrange $newfont 2 end] italic] >= 0 ? 1 : 0] \
-					  Overstrike [expr [lsearch -exact [lrange $newfont 2 end] overstrike] >= 0 ? 1 : 0] \
-					  Underline  [expr [lsearch -exact [lrange $newfont 2 end] underline] >= 0 ? 1 : 0] \
+		set fontdict [dict create family [lindex $newfont 0] \
+			                  size   [lindex $newfont 1] \
+					  weight [expr [lsearch -exact [lrange $newfont 2 end] bold] >= 0 ? 1 : 0] \
+					  slant  [expr [lsearch -exact [lrange $newfont 2 end] italic] >= 0 ? 1 : 0] \
+					  overstrike [expr [lsearch -exact [lrange $newfont 2 end] overstrike] >= 0 ? 1 : 0] \
+					  underline  [expr [lsearch -exact [lrange $newfont 2 end] underline] >= 0 ? 1 : 0] \
 		]
 		puts $fontdict
 	}
 	proc _describe_font {w d} {
-		set desc "[dict get $d Family] [dict get $d Size]"
-		if {[dict get $d Weight] > 0} {append desc ", bold"}
-		if {[dict get $d Slant] > 0}  {append desc ", italic"}
-		if {[dict get $d Overstrike]}  {append desc ", overstrike"}
-		if {[dict get $d Underline]}  {append desc ", underline"}
-		$w configure -text "$desc ([_font_name_hash $d])"
+		if {$d eq {}} {
+			$w configure -text ""
+			return
+		}
+		set desc "[dict get $d family] [dict get $d size]"
+		if {[dict get $d weight] > 0} {append desc ", bold"}
+		if {[dict get $d slant] > 0}  {append desc ", italic"}
+		if {[dict get $d overstrike]}  {append desc ", overstrike"}
+		if {[dict get $d underline]}  {append desc ", underline"}
+		$w configure -text "$desc: "
 	}
 
 	proc _display_pangram {w fnt} {
+		if {$fnt eq {}} {
+			$w configure -text ""
+			return
+		}
 		set pangram_list [list \
 			"Waltz, bad nymph, for quick jigs vex" \
 			"Glib jocks quiz nymph to vex dwarf." \
@@ -707,12 +843,12 @@ namespace eval ::gmaprofile {
 	}
 	proc tk_font_to_dict {font} {
 		return [dict create \
-			Family     [font configure $font -family] \
-			Size       [font configure $font -size] \
-			Weight     [expr {[font configure $font -weight]} eq {{bold}}  ? 1 : 0] \
-			Slant      [expr {[font configure $font -slant]} eq {{italic}} ? 1 : 0] \
-			Overstrike [font configure $font -overstrike] \
-			Underline  [font configure $font -underline] \
+			family     [font configure $font -family] \
+			size       [font configure $font -size] \
+			weight     [expr {[font configure $font -weight]} eq {{bold}}  ? 1 : 0] \
+			slant      [expr {[font configure $font -slant]} eq {{italic}} ? 1 : 0] \
+			overstrike [font configure $font -overstrike] \
+			underline  [font configure $font -underline] \
 		]
 	}
 
@@ -724,13 +860,30 @@ namespace eval ::gmaprofile {
 		variable font_repository
 		set f [_font_name_hash $d]
 		if {! [info exists font_repository($f)]} {
-			font create $f -family [dict get $d Family] -size [dict get $d Size] \
-				-weight [lindex $weights [dict get $d Weight]] \
-				-slant  [lindex $slants  [dict get $d Slant]] \
-				-overstrike [dict get $d Overstrike] \
-				-underline [dict get $d Underline]
+			font create $f -family [dict get $d family] -size [dict get $d size] \
+				-weight [lindex $weights [dict get $d weight]] \
+				-slant  [lindex $slants  [dict get $d slant]] \
+				-overstrike [dict get $d overstrike] \
+				-underline [dict get $d underline]
 			set font_repository($f) [list $d]
 		}
 		return $f
+	}
+	# The default set of fonts
+	proc default_fonts {} {
+		return [dict create \
+			Tf16 [dict create family Helvetica size 16 weight 1 slant 0 overstrike false underline false] \
+			Tf14 [dict create family Helvetica size 14 weight 1 slant 0 overstrike false underline false] \
+			Tf12 [dict create family Helvetica size 12 weight 1 slant 0 overstrike false underline false] \
+			Tf10 [dict create family Helvetica size 10 weight 1 slant 0 overstrike false underline false] \
+			Tf8  [dict create family Helvetica size  8 weight 1 slant 0 overstrike false underline false] \
+			Hf14 [dict create family Helvetica size 14 weight 0 slant 0 overstrike false underline false] \
+			Hf12 [dict create family Helvetica size 12 weight 0 slant 0 overstrike false underline false] \
+			Hf10 [dict create family Helvetica size 10 weight 0 slant 0 overstrike false underline false] \
+			If12 [dict create family Times     size 12 weight 0 slant 1 overstrike false underline false] \
+			If10 [dict create family Times     size 10 weight 0 slant 1 overstrike false underline false] \
+			Nf12 [dict create family Times     size 12 weight 0 slant 0 overstrike false underline false] \
+			Nf10 [dict create family Times     size 10 weight 0 slant 0 overstrike false underline false] \
+		]
 	}
 }
