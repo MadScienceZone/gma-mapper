@@ -175,8 +175,6 @@ namespace eval ::gmaprofile {
 		dict unset _profile fonts $srcfont
 	}
 	proc _select_font_by_name {st name} {
-		puts "sfbn $st $name"
-		::DEBUG 0 "_select_font_by_name $st $name"
 #		variable currently_editing_font_index
 
 		if {$name eq {}} {
@@ -624,7 +622,7 @@ namespace eval ::gmaprofile {
 		bind $w <<TkFontchooserFontChanged>> {}
 		bind $st.f.fonts <<ListboxSelect>> "::gmaprofile::_select_font_by_idx $st \[%W curselection\]"
 		grid [label $st.f.name -text ""] - - - -sticky w
-		grid [label $st.f.sample -text ""] - - - -sticky w
+		grid [label $st.f.sample -text ""] - - - - -sticky w
 		_select_font_by_name $st {}
 		foreach font [dict keys [dict get $_profile fonts]] {
 			$st.f.fonts insert end $font
@@ -644,6 +642,10 @@ namespace eval ::gmaprofile {
 #
 		# 
 		grid $w.n.s.n -sticky news
+		grid columnconfigure $w.n.s.n 0 -weight 0
+		grid columnconfigure $w.n.s.n 3 -weight 2
+		grid columnconfigure $w.n.s 0 -weight 2
+		grid columnconfigure $w.n 0 -weight 2
 
 		menu $w.n.a.m_bsize
 		$w.n.a.m_bsize add command -label small -command {::gmaprofile::_bsize small}
