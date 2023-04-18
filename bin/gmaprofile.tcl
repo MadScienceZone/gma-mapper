@@ -794,18 +794,26 @@ namespace eval ::gmaprofile {
 	}
 
 	proc _new_font_chosen {w newfont} {
+		variable _profile
 		if {[llength $newfont] < 2} {
 			puts "Can't understand font \"$newfont\""
+			tk_messageBox -type ok -icon error -title "Invalid Font Data" -message "You selected a new font, but I am unable to understand what it means." -parent $w
 			return
 		}
-		set fontdict [dict create family [lindex $newfont 0] \
-			                  size   [lindex $newfont 1] \
-					  weight [expr [lsearch -exact [lrange $newfont 2 end] bold] >= 0 ? 1 : 0] \
-					  slant  [expr [lsearch -exact [lrange $newfont 2 end] italic] >= 0 ? 1 : 0] \
-					  overstrike [expr [lsearch -exact [lrange $newfont 2 end] overstrike] >= 0 ? 1 : 0] \
-					  underline  [expr [lsearch -exact [lrange $newfont 2 end] underline] >= 0 ? 1 : 0] \
+		if {[set newfontname [_selected_font_name $w.n.s.n.f.fonts]] eq {}} {
+			tk_messageBox -type ok -icon error -title "No Font Selected" -message "You selected a new font, but did not select which font that was supposed to modify." -parent $w
+			return
+		}
+		set fontd [dict create family [lindex $newfont 0] \
+			  size   [lindex $newfont 1] \
+			  weight [expr [lsearch -exact [lrange $newfont 2 end] bold] >= 0 ? 1 : 0] \
+			  slant  [expr [lsearch -exact [lrange $newfont 2 end] italic] >= 0 ? 1 : 0] \
+			  overstrike [expr [lsearch -exact [lrange $newfont 2 end] overstrike] >= 0 ? 1 : 0] \
+			  underline  [expr [lsearch -exact [lrange $newfont 2 end] underline] >= 0 ? 1 : 0] \
 		]
-		puts $fontdict
+		dict set _profile fonts $newfontname $fontd
+		_describe_font $w.n.s.n.f.name $fontd
+		_display_pangram $w.n.s.n.f.sample [define_font $fontd]
 	}
 	proc _describe_font {w d} {
 		if {$d eq {}} {
