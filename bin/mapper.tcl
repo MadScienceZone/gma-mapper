@@ -729,7 +729,7 @@ if {$tcl_platform(os) eq "Darwin"} {
 
 set ICON_DIR [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end-1 end lib MadScienceZone GMA Mapper icons]]]
 set BIN_DIR [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end end]]]
-foreach module {scrolledframe ustar gmaclock gmautil gmaprofile gmaproto gmafile} {
+foreach module {scrolledframe ustar gmaclock gmacolors gmautil gmaprofile gmaproto gmafile} {
 	source [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end end $module.tcl]]]
 }
 
@@ -997,6 +997,7 @@ proc editPreferences {} {
 if {[file exists $preferences_path]} {
 	if [catch {
 		set PreferencesData [::gmaprofile::load $preferences_path]
+		::gmaprofile::fix_missing_dieroll_styles PreferencesData
 		ApplyPreferences $PreferencesData
 	} err] {
 		tk_messageBox -type ok -icon error -title "Unable to load preferences" -message "The preferences settings could not be loaded from \"$preferences_path\"." -detail $err
@@ -9022,7 +9023,6 @@ proc DisplayChatMessage {d args} {
 				underline  -underline  ?
 				offset     -offset     i
 			} {
-						
 				set v [dict get $_preferences styles dierolls components $tag $k]
 				switch -exact $type {
 					s {
