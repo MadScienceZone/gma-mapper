@@ -11,6 +11,17 @@
 ########################################################################################
 # Profile editor
 
+#
+# |style1|^|  Font:       |____________[]|   (Dark Mode:)
+# |style2| |  Color:      []                 Color:      []
+# |style3| |  Background: []                 Background: []
+# |...   |v|  Format:     |~(%s)~________|   (leading/trailing ~ for spaces)
+#
+# Preview:      |__________________________________________|
+# (Dark Mode:)  |__________________________________________|
+#
+# Description of what the style is for
+#
 package provide gmaprofile 1.0
 package require json 1.3.3
 package require json::write 1.0.3
@@ -78,8 +89,30 @@ namespace eval ::gmaprofile {
 		    }
 	    	}
 		fonts {D {family s size f weight i slant i overstrike ? underline ?}}
+		styles {o {
+			dialogs {o {
+				heading_fg     {o {dark s light s}}
+				normal_fg      {o {dark s light s}}
+				normal_bg      {o {dark s light s}}
+				highlight_fg   {o {dark s light s}}
+				odd_bg         {o {dark s light s}}
+				even_bg        {o {dark s light s}}
+			}}
+			dierolls {o {
+				compact_recents ?
+				components {D {
+					fg {o {dark s light s}}
+					bg {o {dark s light s}}
+					font s
+					format s
+					overstrike ?
+					underline ?
+					offset i
+				}}
+			}}
+		}}
 	}
-	variable _file_format_font {family s size f weight i slant i overstrike ?  underline ?}
+#	variable _file_format_font {family s size f weight i slant i overstrike ?  underline ?}
 
 	proc default_preferences {} {
 		return [dict create \
@@ -99,6 +132,7 @@ namespace eval ::gmaprofile {
 			preload      false\
 			profiles     [list [empty_server_profile offline]]\
 			fonts        [default_fonts]\
+			styles       [default_styles]\
 		]
 	}
 	proc _add_new_font {w} {
@@ -603,9 +637,38 @@ namespace eval ::gmaprofile {
 		ttk::notebook $w.n.s.n
 		set st $w.n.s.n
 		frame $st.f
-		frame $st.e
+		frame $st.d
+		frame $st.r
 		$st add $st.f -state normal -sticky news -text Fonts
-		$st add $st.e -state disabled -sticky news -text Elements
+		$st add $st.d -state normal -sticky news -text Dialogs
+		$st add $st.r -state disabled -sticky news -text {Die Rolls/Chat}
+
+		grid x [label $st.d.tl -text {Light Mode}] [label $st.d.td -text {Dark Mode}]
+		set row 1
+		foreach {wp name fld} {
+			hfg {Heading color}          heading_fg
+			nfg {Normal text color}      normal_fg
+			nbg {Normal text background} normal_bg
+			ifg {Highlighted text color} highlight_fg
+			obg {Odd-row background}     odd_bg
+			ebg {Even-row background}    even_bg
+		} {
+			grid configure [label $st.d.l$wp -text "$name:"] -column 0 -row $row -padx 5 -sticky w
+			set col 1
+			foreach theme {light dark} {
+				set color [dict get $_profile styles dialogs $fld $theme]
+				grid configure [button $st.d.$wp$theme -bg $color -text $color \
+					-command "::gmaprofile::_set_dialog_color [list $st $st.d.$wp$theme $theme $name $fld]"]\
+					-column $col -row $row -padx 1 -pady 1 -sticky we
+				incr col
+			}
+			incr row
+		}
+
+		grid [label $st.d.exll -text "Light Mode Example:"] [text $st.d.extl -height 6] - - -sticky news
+		grid [label $st.d.exld -text "Dark Mode Example:"]  [text $st.d.extd -height 6] - - -sticky news
+		_refresh_dialog_examples $st
+
 		grid [listbox $st.f.fonts -yscrollcommand "$st.f.scroll set" -selectmode browse\
 			-selectforeground white -selectbackground blue\
 			-exportselection false\
@@ -896,4 +959,237 @@ namespace eval ::gmaprofile {
 			Nf10 [dict create family Times     size 10 weight 0 slant 0 overstrike false underline false] \
 		]
 	}
+	proc _refresh_dialog_examples {st} {
+		variable _profile
+		foreach {w theme} {extl light extd dark} {
+			$st.d.$w configure \
+				-foreground [dict get $_profile styles dialogs normal_fg $theme]\
+				-background [dict get $_profile styles dialogs normal_bg $theme]
+
+			$st.d.$w configure -state normal
+			$st.d.$w tag configure heading   -foreground [dict get $_profile styles dialogs heading_fg $theme]
+			$st.d.$w tag configure highlight -foreground [dict get $_profile styles dialogs highlight_fg $theme]
+			$st.d.$w tag configure odd       -background [dict get $_profile styles dialogs odd_bg $theme]
+			$st.d.$w tag configure even      -background [dict get $_profile styles dialogs even_bg $theme]
+			$st.d.$w delete 1.0 end
+			$st.d.$w insert end "Example Heading\n" heading \
+				            "Odd-numbered row: normal, " odd "highlighted\n" {odd highlight} \
+				            "Even-numbered row: normal, " even "highlighted\n" {even highlight} \
+				            "Odd-numbered row: normal, " odd "highlighted\n" {odd highlight}  \
+				            "Even-numbered row: normal, " even "highlighted\n" {even highlight} 
+			$st.d.$w configure -state disabled
+		}
+	}
+	proc _set_dialog_color {st btn theme style key} {
+		variable _profile
+		if {[set chosencolor [tk_chooseColor -initialcolor [dict get $_profile styles dialogs $key $theme] -parent $btn -title "Choose color for $style ($theme mode)"]] ne {}} {
+			dict set _profile styles dialogs $key $theme $chosencolor
+			$btn configure -bg $chosencolor -text $chosencolor
+		}
+		_refresh_dialog_examples $st
+	}
+
+	#TODO name translations
+	# OLD display_styles	NEW dictionary keys in _preferences
+	#
+	# bg_dialog		dialogs normal_bg dark|light
+	# fg_dialog_heading	dialogs heading_fg dark|light
+	# fg_dialog_normal	dialogs normal_fg dark|light
+	# fg_dialog_highlight	dialogs highlight_fg dark|light
+	# bg_list_even		dialogs even_bg dark|light
+	# bg_list_odd		dialogs odd_bg dark|light
+	# font_*		dierolls components * font
+	# fg_*			dierolls components * fg dark|light
+	# bg_*			dierolls components * bg dark|light
+	# fmt_*			dierolls components * format
+	# overstrike_*		dierolls components * overstrike
+	# underline_*		dierolls components * underline
+	# offset_*		dierolls components * offset
+	#   (includes normal, system, etc) in chat channel
+	# overstrike_discarded  dierolls overstrike_discarded
+	# collapse_descriptions dierolls compact_recents
+	#
+	# Note: an empty color value means to use the prevailing dialog/window styling
+	proc default_styles {} {
+		return [dict create \
+			dialogs [dict create \
+				heading_fg   [dict create dark cyan   light blue] \
+				normal_fg    [dict create dark white  light black] \
+				normal_bg    [dict create dark black  light white] \
+				highlight_fg [dict create dark yellow light red] \
+				odd_bg       [dict create dark black  light white] \
+				even_bg      [dict create dark blue   light #bbbbff] \
+			]\
+			dierolls [dict create \
+				compact_recents false \
+				overstrike_discarded true \
+				components [dict create \
+					best      [dict create fg [dict create dark #aaaaaa light #888888] bg [dict create dark {} light {}] font If12 format { best of %s} overstrike false underline false offset 0]\
+					bonus     [dict create fg [dict create dark #fffb00 light #f05b00] bg [dict create dark {} light {}] font Hf12 format {} overstrike false underline false offset 0]\
+					comment   [dict create fg [dict create dark #fffb00 light #f05b00] bg [dict create dark {} light {}] font If12 format {} overstrike false underline false offset 0]\
+					critlabel [dict create fg [dict create dark #fffb00 light #f05b00] bg [dict create dark {} light {}] font If12 format {Confirm: } overstrike false underline false offset 0]\
+					critspec  [dict create fg [dict create dark #fffb00 light #f05b00] bg [dict create dark {} light {}] font If12 format {} overstrike false underline false offset 0]\
+					dc        [dict create fg [dict create dark #aaaaaa light #888888] bg [dict create dark {} light {}] font If12 format {DC %s: } overstrike false underline false offset 0]\
+					diebonus  [dict create fg [dict create dark red light red] bg [dict create dark {} light {}] font If12 format {} overstrike false underline false offset 0]\
+					diespec   [dict create fg [dict create dark {} light {}] bg [dict create dark {} light {}] font Hf12 format {} overstrike false underline false offset 0]\
+					discarded [dict create fg [dict create dark #aaaaaa light #888888] bg [dict create dark {} light {}] font Hf12 format {{%s}} overstrike false underline false offset 0]\
+					error     [dict create fg [dict create dark red light red] bg [dict create dark {} light {}] font Hf12 format {ERROR: %s} overstrike false underline false offset 0]\
+					exceeded  [dict create fg [dict create dark #00fa92 light green] bg [dict create dark {} light {}] font If12 format {exceeded DC by %s} overstrike false underline false offset 0]\
+					fail      [dict create fg [dict create dark red light red] bg [dict create dark {} light {}] font Tf12 format {(%s) } overstrike false underline false offset 0]\
+					from      [dict create fg [dict create dark cyan light blue] bg [dict create dark {} light {}] font Hf12 format {} overstrike false underline false offset 0]\
+					fullmax   [dict create fg [dict create dark red light red] bg [dict create dark {} light {}] font Tf12 format {maximized} overstrike false underline false offset 0]\
+					fullresult [dict create fg [dict create dark blue light #ffffff] bg [dict create dark {} light blue] font Tf16 format {} overstrike false underline false offset 0]\
+					iteration [dict create fg [dict create dark #aaaaaa light #888888] bg [dict create dark {} light {}] font If12 format { (roll #%s)} overstrike false underline false offset 0]\
+					label     [dict create fg [dict create dark cyan light blue] bg [dict create dark {} light {}] font If12 format { %s} overstrike false underline false offset 0]\
+					max       [dict create fg [dict create dark #aaaaaa light #888888] bg [dict create dark {} light {}] font If12 format {max %s} overstrike false underline false offset 0]\
+					maximized [dict create fg [dict create dark red light red] bg [dict create dark {} light {}] font Tf12 format {>} overstrike false underline false offset 0]\
+					maxroll   [dict create fg [dict create dark red light red] bg [dict create dark {} light {}] font Tf12 format {{%s}} overstrike false underline false offset 0]\
+					met       [dict create fg [dict create dark #00fa92 light green] bg [dict create dark {} light {}] font If12 format {successful} overstrike false underline false offset 0]\
+					min       [dict create fg [dict create dark #aaaaaa light #888888] bg [dict create dark {} light {}] font If12 format {min %s} overstrike false underline false offset 0]\
+					moddelim  [dict create fg [dict create dark #fffb00 light #f05b00] bg [dict create dark {} light {}] font Hf12 format { | } overstrike false underline false offset 0]\
+					normal    [dict create fg [dict create dark {} light {}] bg [dict create dark {} light {}] font Hf12 format {} overstrike false underline false offset 0]\
+					notice    [dict create fg [dict create dark yellow light red] bg [dict create dark {} light {}] font If12 format {[%s] } overstrike false underline false offset 0]\
+					operator  [dict create fg [dict create dark {} light {}] bg [dict create dark {} light {}] font Hf12 format {} overstrike false underline false offset 0]\
+					repeat    [dict create fg [dict create dark #aaaaaa light #888888] bg [dict create dark {} light {}] font If12 format {repeat %s} overstrike false underline false offset 0]\
+					result    [dict create fg [dict create dark {} light {}] bg [dict create dark {} light {}] font Hf14 format {} overstrike false underline false offset 0]\
+					roll      [dict create fg [dict create dark #00fa92 light green] bg [dict create dark {} light {}] font Hf12 format {{%s}} overstrike false underline false offset 0]\
+					separator [dict create fg [dict create dark {} light {}] bg [dict create dark {} light {}] font Hf12 format {=} overstrike false underline false offset 0]\
+					sf        [dict create fg [dict create dark #aaaaaa light #888888] bg [dict create dark {} light {}] font If12 format {} overstrike false underline false offset 0]\
+					short     [dict create fg [dict create dark red light red] bg [dict create dark {} light {}] font If12 format {missed DC by %s} overstrike false underline false offset 0]\
+					subtotal  [dict create fg [dict create dark #00fa92 light green] bg [dict create dark {} light {}] font Hf12 format {(%s)} overstrike false underline false offset 0]\
+					success   [dict create fg [dict create dark #00fa92 light green] bg [dict create dark {} light {}] font Tf12 format {(%s) } overstrike false underline false offset 0]\
+					system    [dict create fg [dict create dark cyan light blue] bg [dict create dark {} light {}] font If10 format {} overstrike false underline false offset 0]\
+					title     [dict create fg [dict create dark #aaaaaa light #ffffff] bg [dict create dark #000044 light #c7c0ae] font Hf12 format {} overstrike false underline false offset 0]\
+					to        [dict create fg [dict create dark red light red] bg [dict create dark {} light {}] font If12 format {} overstrike false underline false offset 0]\
+					until     [dict create fg [dict create dark #aaaaaa light #888888] bg [dict create dark {} light {}] font If12 format {} overstrike false underline false offset 0]\
+					worst     [dict create fg [dict create dark #aaaaaa light #888888] bg [dict create dark {} light {}] font If12 format { worst of %s} overstrike false underline false offset 0]\
+				]\
+			]\
+		]
+	}
+	proc default_dieroll_style {} {
+		return [dict create \
+			fg [dict create dark {} light {}] \
+			bg [dict create dark {} light {}] \
+			font [define_font [tk_font_to_dict TkDefaultFont]]\
+			format {} \
+			overstrike false \
+			underline false \
+			offset 0]
+	}
+
+
+	#
+	# Styles
+	#
+	# Dialogs__________________________
+	#                       Lt Dk
+	# Heading color:        [] []
+	# Normal text color:    [] []
+	# Highlight color:      [] []
+	# Odd-row background:   [] []
+	# Even-row background:  [] []
+	# 
+	# Dialog Heading
+	# Odd row: normal, highlighted
+	# Even row: normal, highlighted
+	#
+	#
+	#
+	#
+	# Die Rolls_________________________
+	# |style1|^|  <Description>
+	# |style2| |  []Text color:        [] []       Sample
+	# |style3| |  []Background color:  [] []
+	# |style4| |  []Font:              [menu]
+	# |style5| |  []Display Format:    [_________] (Use _ for leading/trailing spaces; blank for default format)
+	# |style6| |  []Overstrike
+	# |style7| |  []Underline
+	# |style7| |  []Raise (Lower) text by: [___^] from baseline
+	# |style7| |
+	# |style7| |  [Restore Default Settings]
+	# |______|v|
+	#
+	# [] use more compact layout for recent die rolls
+	# [] overstrike discarded dice
+	#
+	# Die-roll title: ...
+	#
+#	variable _global_styles [dict create \
+#		bg_dialog             [dict create description {Background color for UI dialogs}]\
+#		fg_dialog_highlight   [dict create description {Highlight color for UI dialogs}]\
+#		fg_dialog_normal      [dict create description {Normal color for UI dialogs}]\
+#		fg_dialog_heading     [dict create description {Heading color for UI dialogs}]\
+#		fg_title              [dict create description {Die-roll title text color}]\
+#		font_title            [dict create description {Die-roll title font name}]\
+#		bg_list_even          [dict create description {Background color for even-numbered rows in lists}]\
+#		bg_list_odd           [dict create description {Background color for odd-numbered rows in lists}]\
+#	]
+#	proc default_global_styles {} {
+#		return [dict create \
+#			bg_dialog             [dict create dark 
+#			fg_dialog_highlight   [dict create 
+#			fg_dialog_normal      [dict create 
+#			fg_dialog_heading     [dict create 
+#			fg_title              [dict create 
+#			font_title            [dict create 
+#			bg_list_even          [dict create 
+#			bg_list_odd           [dict create 
+#
+#	
+#
+#		collapse_descriptions {bool: use more compact layout for recent die rolls}
+#
+#
+#	}
+#
+#	foreach 
+#		best
+#		bonus
+#		comment
+#		constant
+#		critlabel
+#		critspec
+#		dc
+#		diebonus
+#		diespec
+#		discarded
+#		exceeded
+#		fail
+#		from
+#		fullmax
+#		fullresult
+#		iteration
+#		label
+#		max
+#		maximized
+#		maxroll
+#		met
+#		min
+#		moddelim
+#		normal
+#		operator
+#		repeat
+#		result
+#		roll
+#		separator
+#		short
+#		sf
+#		success
+#		title
+#		to
+#		until
+#		worst
+#		system
+#		subtotal
+#		error
+#		notice
+#		
+#		fmt_*
+#		fg_*
+#		bg_*
+#		overstrike_*
+#		underline_*
+#		font_*
+#		offset_*
 }
