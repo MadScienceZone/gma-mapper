@@ -14,7 +14,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.4}     ;# @@##@@
+set GMAMapperVersion {4.4.1-alpha.0}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
 set GMAMapperProtocol {403}         ;# @@##@@
 set GMAVersionNumber {5.2}            ;# @@##@@
@@ -66,8 +66,6 @@ set UpdateURL {}
 set NCpath /usr/bin/nc
 set SERVER_MKDIRpath /bin/mkdir
 set ModuleID {}
-set __generate_style_config {}
-set __generate_config {}
 set UpgradeNotice false
 #
 # Cache files newer than this many days are used without any further
@@ -265,6 +263,7 @@ proc report_progress {msg} {
 
 report_progress "Starting up..."
 set dark_mode 0
+set colortheme light
 set SuppressChat 0
 set PeerList {}
 # Files we reference in various places
@@ -278,7 +277,7 @@ set path_cache        [file normalize [file join ~ .gma mapper cache]]
 set path_tmp          [file normalize [file join ~ .gma mapper tmp]]
 set preferences_path  [file normalize [file join ~ .gma mapper preferences.json]]
 set default_config    [file normalize [file join ~ .gma mapper mapper.conf]]
-set default_style_cfg [file normalize [file join ~ .gma mapper style.conf]]
+#set default_style_cfg [file normalize [file join ~ .gma mapper style.conf]]
 set path_install_base [file normalize [file join ~ .gma mapper]]
 
 if [catch {set local_user $::tcl_platform(user)}] {set local_user __unknown__}
@@ -438,7 +437,7 @@ proc DEBUGp {msg} {
 	DEBUG protocol $msg -custom [list white [::tk::Darken white 40]]
 }
 proc DEBUG {level msg args} {
-	global DEBUG_level DEBUG_file path_DEBUG_file dark_mode
+	global DEBUG_level DEBUG_file path_DEBUG_file dark_mode colortheme
 
 	if {[set i [lsearch -exact $args -custom]] >= 0} {
 		if {$i+1 < [llength $args]} {
@@ -547,186 +546,7 @@ proc FontBySize {creature_size} {
 	}
 }
 
-proc default_style_data {} {
-	global dark_mode
 
-	set default_styles {
-		font_best       If12
-		font_bonus      Hf12
-		font_constant   Hf12
-		font_critlabel  If12
-		font_critspec   If12
-		font_dc			If12
-		font_diebonus   If12
-		font_diespec    Hf12
-		font_discarded  Hf12
-		font_exceeded	If12
-		font_fail       Tf12
-		font_from       Hf12
-		font_fullmax    Tf12
-		font_fullresult Tf16
-		font_iteration	If12
-		font_label      If12
-		font_max		If12
-		font_maximized  Tf12
-		font_maxroll    Tf12
-		font_met     	If12
-		font_min		If12
-		font_moddelim   Hf12
-		font_normal     Hf12
-		font_operator   Hf12
-		font_repeat     If12
-		font_result     Hf14
-		font_roll       Hf12
-		font_subtotal   Hf12
-		font_separator  Hf12
-		font_short   	If12
-		font_sf         If12
-		font_system     If10
-		font_success    Tf12
-		font_title      Hf12
-		font_to         If12
-		font_until		If12
-		font_worst      If12
-		font_comment	If12
-		font_error	Hf12
-		font_notice	If12
-		fg_diebonus     red
-		fg_fail         red
-		fg_fullmax      red
-		fg_maximized    red
-		fg_maxroll      red
-		fg_short        red
-		fg_to           red
-		fg_error	red
-		overstrike_discarded 1
-		fmt_error	{ERROR: %s}
-		fmt_notice	{[%s]}
-		fmt_best		{ best of %s}
-		fmt_worst	{ worst of %s}
-		fmt_critlabel	{Confirm: }
-		fmt_dc			{DC %s: }
-		fmt_discarded	{{%s}}
-		fmt_exceeded	{exceeded DC by %s}
-		fmt_fail        {(%s) }
-		fmt_fullmax		maximized
-		fmt_fullresult	{%s}
-		fmt_iteration	{ (roll #%s)}
-		fmt_label		{ %s}
-		fmt_max			{max %s}
-		fmt_maximized	>
-		fmt_maxroll		{{%s}}
-		fmt_met			successful
-		fmt_min			{min %s}
-		fmt_moddelim	{ | }
-		fmt_repeat		{repeat %s}
-		fmt_roll		{{%s}}
-		fmt_subtotal    {(%s)}
-		fmt_separator	=
-		fmt_success     {(%s) }
-		fmt_short		{missed DC by %s}
-		fmt_title		{%s}
-		collapse_descriptions 0
-	}
-	if $dark_mode {
-		append default_styles {
-			bg_dialog black
-			fg_dialog_heading cyan
-			fg_dialog_normal white
-			fg_dialog_highlight yellow
-			fg_best       #aaaaaa
-			fg_bonus      #fffb00
-			fg_comment    #fffb00
-			fg_critlabel  #fffb00
-			fg_critspec   #fffb00
-			fg_dc         #aaaaaa
-			fg_discarded  #aaaaaa
-			fg_exceeded   #00fa92
-			fg_from       cyan
-			fg_iteration  #aaaaaa
-			fg_label      cyan
-			fg_max        #aaaaaa
-			fg_met		  #00fa92
-			fg_min        #aaaaaa
-			fg_moddelim   #fffb00
-			fg_repeat     #aaaaaa
-			fg_roll       #00fa92
-			fg_subtotal   #00fa92
-			fg_notice	yellow
-			fg_sf         #aaaaaa
-			fg_success    #00fa92
-			fg_system     cyan
-			fg_until      #aaaaaa
-			fg_worst      #aaaaaa
-			bg_fullresult blue
-			fg_title      #aaaaaa
-			bg_title      #000044
-		}
-	} else {
-		append default_styles {
-			bg_dialog white
-			fg_dialog_heading blue
-			fg_dialog_normal black
-			fg_dialog_highlight red
-			bg_fullresult blue
-			fg_fullresult #ffffff
-			fg_best       #888888
-			fg_bonus      #f05b00
-			fg_comment    #f05b00
-			fg_critlabel  #f05b00
-			fg_critspec   #f05b00
-			fg_dc         #888888
-			fg_discarded  #888888
-			fg_exceeded   green
-			fg_from       blue
-			fg_iteration  #888888
-			fg_label      blue
-			fg_notice     red
-			fg_max        #888888
-			fg_met        green
-			fg_min        #888888
-			fg_moddelim   #f05b00
-			fg_repeat     #888888
-			fg_roll       green
-			fg_subtotal   green
-			fg_sf         #888888
-			fg_success    green
-			fg_system     blue
-			fg_until      #888888
-			fg_worst      #888888
-			fg_title      #ffffff
-			bg_title      #c7c0ae
-		}
-	}
-	return $default_styles
-}
-
-
-proc LoadDefaultStyles {} {
-	global display_styles dark_mode default_style_cfg
-
-	if {$default_style_cfg ne {} && [file exists $default_style_cfg]} {
-		LoadCustomStyle $default_style_cfg
-	}
-
-	#
-	# Load up the default settings if they haven't already been
-	# set by custom settings loaded previously
-	#
-	set default_styles [default_style_data]
-
-	foreach {key value} $default_styles {
-		if {! [info exists display_styles($key)]} {
-			if {[string range $key 0 4] eq {font_}
-			&&  [info exists display_styles(default_font)]} {
-				set value $display_styles(default_font)
-			}
-			set display_styles($key) $value
-		}
-	}
-}
-
-# IThost ITport 
 set ChatHistory {}
 set ChatHistoryFile {}
 set ChatHistoryFileHandle {}
@@ -892,73 +712,6 @@ proc ChatHistoryAppend {event} {
 	}
 }
 
-proc LoadCustomStyle {filename} {
-	# Load up styles from specified file
-	# sections <h> -> list of all section names
-	# keys <h> <s> -> liset of all keys in section <s>
-	# get <h> <s> -> list of k,v pairs from section <s>
-	# exists <h> <s> [<k>] -> does <s> (and key <k>) exist?
-	# value <h> <s> <k> [<default>] -> value
-	# 
-	# [mapper]
-	# dierolls=DIEROLLSTYLE
-	# fonts=FONTS
-	#
-	# [DIEROLLSTYLE]
-	# stylesetting=value
-	#
-	# [FONTS]
-	# name=def
-	# 
-	global display_styles default_style_cfg
-	set default_style_cfg {}	; # prevent loading the default one since we're loading this one
-
-	if [catch {
-		array unset fontdefs 
-		set stylefile [::ini::open $filename r]
-		if [::ini::exists $stylefile mapper] {
-			if [::ini::exists $stylefile mapper fonts] {
-				set f_style [::ini::value $stylefile mapper fonts]
-				if [::ini::exists $stylefile $f_style] {
-					foreach {fontname fontdef} [::ini::get $stylefile $f_style] {
-						set fontdefs($fontname) 1
-						font create CustomFont__$fontname {*}$fontdef
-					}
-				} else {
-					say "Your style configuration file $filename asked for font definition set $f_style but that doesn't seem to exist."
-				}
-			} else {
-				DEBUG 1 "Style file $filename does not define fonts for the mapper. (ignored)"
-			}
-						
-			if [::ini::exists $stylefile mapper dierolls] {
-				set dr_style [::ini::value $stylefile mapper dierolls]
-				if [::ini::exists $stylefile $dr_style] {
-					foreach {key value} [::ini::get $stylefile $dr_style] {
-						if {[string range $key 0 4] eq {font_} || $key eq {default_font}} {
-							if {! [info exists fontdefs($value)]} {
-								say "Your style configuration file $filename asked for font $value but you didn't define one with that name."
-							}
-							set value CustomFont__$value
-						} elseif {[string range $key 0 3] eq {fmt_}} {
-							set value [string trim [string trim $value] |]
-						}
-						set display_styles($key) $value
-					}
-				} else {
-					say "Your style configuration file $filename asked for die roll style $dr_style but that does not seem to exist in the file."
-				}
-			} else {
-				DEBUG 1 "No dierolls setting in \[mapper\] stanza of $filename (ignored)"
-			}
-		} else {
-			say "Your style configuration file does not define any settings for the mapper program."
-		}
-		::ini::close $stylefile
-	} err] {
-		say "Unable to load styles from $filename: $err"
-	}
-}
 #
 # Generate a new unique ID for an object.
 #
@@ -976,7 +729,7 @@ if {$tcl_platform(os) eq "Darwin"} {
 
 set ICON_DIR [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end-1 end lib MadScienceZone GMA Mapper icons]]]
 set BIN_DIR [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end end]]]
-foreach module {scrolledframe ustar gmaclock gmautil gmaprofile gmaproto gmafile} {
+foreach module {scrolledframe ustar gmaclock gmacolors gmautil gmaprofile gmaproto gmafile} {
 	source [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end end $module.tcl]]]
 }
 
@@ -1099,8 +852,9 @@ proc ApplyPreferences {data args} {
 	global ModuleID MasterClient SuppressChat ChatTranscript local_user
 	global OptPreload ButtonSize ChatHistoryLimit CURLpath CURLserver
 	global CURLproxy SCPproxy SERVER_MKDIRpath NCpath SCPpath SCPdest SCPserver
-	global SSHpath UpdateURL CurrentProfileName
+	global SSHpath UpdateURL CurrentProfileName _preferences
 
+	set _preferences $data
 	set majox 0
 	set mamoy 0
 	set minox 0
@@ -1243,6 +997,8 @@ proc editPreferences {} {
 if {[file exists $preferences_path]} {
 	if [catch {
 		set PreferencesData [::gmaprofile::load $preferences_path]
+		::gmaprofile::fix_missing_dieroll_styles PreferencesData
+		::gmaprofile::fix_missing_dialog_styles PreferencesData
 		ApplyPreferences $PreferencesData
 	} err] {
 		tk_messageBox -type ok -icon error -title "Unable to load preferences" -message "The preferences settings could not be loaded from \"$preferences_path\"." -detail $err
@@ -1271,10 +1027,9 @@ proc usage {} {
 	puts $stderr "Usage: $argv0 \[-display name\] \[-geometry value\] \[other wish options...\] -- \[--help]"
 	puts $stderr {        [-A] [-a] [-B] [-b pct] [-C file] [-c name[:color]] [-D] [-d] [-f fmt]}
 	puts $stderr {        [-G n[+x[:y]]] [-g n[+x[:y]]] [-h hostname] [-k] [-l] [-M moduleID]}
-	puts $stderr {        [-n] [-P pass] [-p port] [-S profile] [-s stylefile] [-t transcriptfile] [-u name]}
+	puts $stderr {        [-n] [-P pass] [-p port] [-S profile] [-t transcriptfile] [-u name]}
 	puts $stderr {        [-x proxyurl] [-X proxyhost] [--button-size size] [--chat-history n]}
 	puts $stderr {        [--curl-path path] [--curl-url-base url] [--dark] [--debug-protocol]}
-	puts $stderr {        [--generate-config path] [--generate-style-config path]}
 	puts $stderr {        [--mkdir-path path] [--nc-path path] [--no-animate] [--no-blur-all] [--scp-dest dir]}
 	puts $stderr {        [--scp-path path] [--scp-server hostname] [--ssh-path path] [--update-url url]}
 	puts $stderr {Each option and its argument must appear in separate CLI parameters (words).}
@@ -1301,7 +1056,6 @@ proc usage {} {
 	puts $stderr {   -P, --password:    Password to log in to the map service}
 	puts $stderr {   -p, --port:        Port for initiative tracker [2323]}
 	puts $stderr {   -S, --select:      Select server profile (but don't make it the default)}
-	puts $stderr {   -s, --style:       Read style settings from specified file}
 	puts $stderr {   -t, --transcript:  Specify file to record a transcript of chat messages and die rolls.}
 	puts $stderr {   -u, --username:    Set the name you go by on your game server}
 	puts $stderr {   -x, --proxy-url:   Proxy url for retrieving image data (usually like -x http://proxy.example.com:8080)}
@@ -1310,8 +1064,6 @@ proc usage {} {
 	puts $stderr "   --chat-history:   number of chat messages to retain between sessions \[$ChatHistoryLimit\]"
 	puts $stderr "   --curl-path:      pathname of curl command to invoke \[$CURLpath\]"
 	puts $stderr "   --curl-url-base:  base URL for stored data \[$CURLserver\]"
-	puts $stderr "   --generate-config: append example mapper.conf file to specified pathname."
-	puts $stderr "   --generate-style-config: append example style.conf file to specified pathname."
 	puts $stderr "   --mkdir-path:     pathname of server-side mkdir command \[$SERVER_MKDIRpath\]"
 	puts $stderr "   --nc-path:        pathname of nc command to invoke \[$NCpath\]"
 	puts $stderr "   --scp-dest:       server-side top-level storage directory \[$SCPdest\]"
@@ -1393,7 +1145,7 @@ for {set argi 0} {$argi < $argc} {incr argi} {
 			}
 		-D - --debug  { incr DEBUG_level }
 		--debug-protocol { ApplyDebugProtocol true }
-		-d - --dark {set dark_mode 1}
+		-d - --dark {set dark_mode 1; set colortheme dark}
 		--help { usage }
 		-h - --host { 
 			set IThost [getarg -h] 
@@ -1434,7 +1186,7 @@ for {set argi 0} {$argi < $argc} {incr argi} {
 			set CurrentProfileName [getarg -S]
 			ApplyPreferences $PreferencesData -override
 		}
-		-s - --style      { LoadCustomStyle [getarg -s] }
+		-s - --style      { puts "The --style option is deprecated." }
 		-t - --transcript { set ChatTranscript [getarg -t] }
 		-u - --username   { set local_user [getarg -u] }
 		-x - --proxy-url  { set CURLproxy [getarg -x] }
@@ -1450,8 +1202,8 @@ for {set argi 0} {$argi < $argc} {incr argi} {
 		--scp-dest 		  { set SCPdest [getarg --scp-dest] }
 		--scp-server 	  { set SCPserver [getarg --scp-server] }
 		--ssh-path   	  { set SSHpath [getarg --ssh-path] }
-		--generate-style-config { set __generate_style_config [getarg --generate-style-config] }
-		--generate-config       { set __generate_config [getarg --generate-config] }
+		--generate-style-config { puts "The --generate-style-config option is deprecated." }
+		--generate-config       { puts "The --generate-config option is deprecated." }
 		--update-url      { set UpdateURL [getarg --update-url] }
 		--upgrade-notice  { set UpgradeNotice true }
 		default {
@@ -2998,7 +2750,7 @@ proc texttool {} {
 	set OBJ_MODE text
 	DEBUG 3 "Selected text mode"
 	set ClockDisplay $CurrentTextString
-	catch {tk fontchooser configure -font [lindex $CURRENT_FONT 0] -command [list SelectFont $canvas]}
+	catch {tk fontchooser configure -parent . -font [lindex $CURRENT_FONT 0] -command [list SelectFont $canvas]}
 	bind . <<TkFontchooserFontChanged>> [list SelectFont $canvas]
 }
 
@@ -6535,19 +6287,19 @@ proc FeetToPixels {ft} {
 proc DistanceFromGrid {x y z_ft} {
 	global MOBdata canvas
 	global iscale
-	global display_styles
+	global _preferences colortheme
 	lassign [ScreenXYToGridXY $x $y -exact] Gx Gy
 
 	create_dialog .dfg
 	wm title .dfg "Distance from grid point [LetterLabel $Gx]$Gy"
-	grid [text .dfg.list -background $display_styles(bg_dialog) -yscrollcommand {.dfg.sb set}] \
+	grid [text .dfg.list -background [dict get $_preferences styles dialogs normal_bg $colortheme] -yscrollcommand {.dfg.sb set}] \
 	     [scrollbar .dfg.sb -orient vertical -command {.dfg.list yview}] -sticky news
 	grid [button .dfg.ok -text OK -command "$canvas delete distanceTracer; destroy .dfg"]
 	grid columnconfigure .dfg 0 -weight 1
 	grid rowconfigure .dfg 0 -weight 1
-	.dfg.list tag configure key -foreground $display_styles(fg_dialog_highlight)
-	.dfg.list tag configure normal -foreground $display_styles(fg_dialog_normal)
-	.dfg.list tag configure title -foreground $display_styles(fg_dialog_heading)
+	.dfg.list tag configure key    -foreground [dict get $_preferences styles dialogs highlight_fg $colortheme]
+	.dfg.list tag configure normal -foreground [dict get $_preferences styles dialogs normal_fg $colortheme]
+	.dfg.list tag configure title  -foreground [dict get $_preferences styles dialogs heading_fg $colortheme]
 	set namelen [string length "TARGET"]
 
 	foreach target [array names MOBdata] {
@@ -6582,7 +6334,7 @@ proc SortByValue {arrname i j} {
 proc DistanceFromMob {MobID} {
 	global MOBdata canvas
 	global iscale
-	global display_styles
+	global _preferences colortheme
 	lassign [MOBCenterPoint $MobID] MobX MobY MobR
 	set Cx [expr int($MobX/$iscale)]
 	set Cy [expr int($MobY/$iscale)]
@@ -6594,14 +6346,14 @@ proc DistanceFromMob {MobID} {
 
 	create_dialog .dfg
 	wm title .dfg "Distance from [dict get $MOBdata($MobID) Name]"
-	grid [text .dfg.list -background $display_styles(bg_dialog) -yscrollcommand {.dfg.sb set}] \
+	grid [text .dfg.list -background [dict get $_preferences styles dialogs normal_bg $colortheme] -yscrollcommand {.dfg.sb set}] \
 	     [scrollbar .dfg.sb -orient vertical -command {.dfg.list yview}] -sticky news
 	grid [button .dfg.ok -text OK -command "$canvas delete distanceTracer; destroy .dfg"]
 	grid columnconfigure .dfg 0 -weight 1
 	grid rowconfigure .dfg 0 -weight 1
-	.dfg.list tag configure key -foreground $display_styles(fg_dialog_highlight)
-	.dfg.list tag configure normal -foreground $display_styles(fg_dialog_normal)
-	.dfg.list tag configure title -foreground $display_styles(fg_dialog_heading)
+	.dfg.list tag configure key -foreground    [dict get $_preferences styles dialogs highlight_fg $colortheme]
+	.dfg.list tag configure normal -foreground [dict get $_preferences styles dialogs normal_fg $colortheme]
+	.dfg.list tag configure title -foreground  [dict get $_preferences styles dialogs heading_fg $colortheme]
 	set namelen [string length "TARGET"]
 
 	foreach target [array names MOBdata] {
@@ -8773,13 +8525,14 @@ proc update_chat_to {} {
 proc RefreshPeerList {} {::gmaproto::query_peers}
 		
 proc format_with_style {value format} {
-	global display_styles
+	global _preferences
 
-	if [info exists display_styles(fmt_$format)] {
+	if {[dict exists $_preferences styles dierolls components $format format]
+	&&  [set fmt [dict get $_preferences styles dierolls components $format format]] ne {}} {
 		if [catch {
-			set value [format $display_styles(fmt_$format) $value]
+			set value [format $fmt $value]
 		} err] {
-			DEBUG 0 "style formatting error (using fmt_$format=$display_styles(fmt_$format)): $err"
+			DEBUG 0 "style formatting error (using $format format=$fmt): $err"
 		}
 	}
 	DEBUG 3 "format_with_style($value, $format) -> $value"
@@ -8828,7 +8581,7 @@ proc DisplayDieRoll {d} {
 	}
 	ChatAttribution $w.1.text $from $recipientlist [dict get $d ToAll] [dict get $d ToGM]
 	if {$title != {}} {
-		global display_styles
+		global _preferences colortheme
 		if [catch {
 			foreach title_block [split $title "\u2016"] {
 				set title_parts [split $title_block "\u2261"]
@@ -8838,7 +8591,7 @@ proc DisplayDieRoll {d} {
 						error "bug - uncaught empty title string"
 					}
 					1 {
-						set title_fg $display_styles(fg_title)
+						set title_fg [dict get $_preferences styles dierolls components title fg $colortheme]
 						set title_bg [::tk::Darken $title_fg 40]
 					}
 					2 {
@@ -8852,7 +8605,7 @@ proc DisplayDieRoll {d} {
 				}
 
 				set wt $w.1.text.[incr drd_id]
-				label $wt -padx 2 -pady 2 -relief groove -foreground $title_fg -background $title_bg -font $display_styles(font_title) -borderwidth 2 -text [lindex $title_parts 0]
+				label $wt -padx 2 -pady 2 -relief groove -foreground $title_fg -background $title_bg -font [dict get $_preferences styles dierolls components title font] -borderwidth 2 -text [lindex $title_parts 0]
 				$w.1.text window create end -align bottom -window $wt -padx 2
 			}
 		} err] {
@@ -8979,20 +8732,20 @@ proc cleanupDieRollSpec {spec} {
 		
 proc _render_die_roller {w width height type args} {
 	global dice_preset_data recent_die_rolls icon_delete icon_die16
-	global dark_mode last_known_size display_styles
+	global dark_mode last_known_size _preferences colortheme
 
 	if {$width <= 0} {
 		set width $last_known_size($type,width)
 	}
 
 	set row_bg {}
-	if [info exists display_styles(bg_list_even)] {
-		set row_bg [list [list -bg $display_styles(bg_list_even)]]
+	if {[set b [dict get $_preferences styles dialogs even_bg $colortheme]] ne {}} {
+		set row_bg [list [list -bg $b]]
 	} else {
 		set row_bg [list {}]
 	}
-	if [info exists display_styles(bg_list_odd)] {
-		lappend row_bg [list -bg $display_styles(bg_list_odd)]
+	if {[set b [dict get $_preferences styles dialogs odd_bg $colortheme]] ne {}} {
+		lappend row_bg [list -bg $b]
 	} else {
 		lappend row_bg {}
 	}
@@ -9020,7 +8773,7 @@ proc _render_die_roller {w width height type args} {
 					pack configure $w.$i.spec -expand 0 -fill none
 				}
 			}
-			if {$display_styles(collapse_descriptions)} {
+			if {[dict get $_preferences styles dierolls compact_recents]} {
 				update
 				for {set i 0} {$i < [llength $recent_die_rolls] && $i < 10} {incr i} {
 					set needed_width [expr [winfo width $w.$i.spec] + [winfo width $w.$i.roll] + [winfo width $w.$i.extra] + [winfo width $w.$i.plus]]
@@ -9081,7 +8834,7 @@ proc _render_die_roller {w width height type args} {
 				bind $w.preset$i.extra <FocusOut> "_collapse_extra $w.preset$i.extra -1"
 				incr i
 			}
-			if {$display_styles(collapse_descriptions)} {
+			if {[dict get $_preferences styles dierolls compact_recents]} {
 				update
 				set i 0
 				foreach preset_name [lsort -dictionary [array names dice_preset_data]] {
@@ -9135,7 +8888,8 @@ proc DisplayChatMessage {d args} {
 	global dark_mode SuppressChat CHAT_TO CHAT_text check_select_color
 	global icon_die16 icon_info20 icon_arrow_refresh check_menu_color
 	global icon_delete icon_add icon_open icon_save ChatTranscript
-	global last_known_size display_styles CHAT_blind global_bg_color IThost
+	global last_known_size CHAT_blind global_bg_color IThost
+	global _preferences colortheme
 
 	if {$d ne {}} {
 		::gmautil::dassign $d Sender from Recipients recipientlist Text message
@@ -9253,17 +9007,39 @@ proc DisplayChatMessage {d args} {
 		RefreshPeerList		;# ask for an update as well
 
 		foreach tag {
-			best bonus comment constant critlabel critspec dc diebonus diespec discarded
+			best bonus constant critlabel critspec dc diebonus diespec discarded
 			exceeded fail from fullmax fullresult iteration label max maximized maxroll 
 			met min moddelim normal operator repeat result roll separator short sf success 
 			title to until worst system subtotal error notice
 		} {
-			set options {}
-			foreach {stylekey optkey} "fg_$tag -foreground bg_$tag -background overstrike_$tag -overstrike font_$tag -font underline_$tag -underline offset_$tag -offset" {
-				if [info exists display_styles($stylekey)] {
-					lappend options $optkey $display_styles($stylekey)
-				}
+			if {![dict exists $_preferences styles dierolls components $tag]} {
+				DEBUG 0 "Preferences profile is missing a definition for $tag; using default"
+				dict set _preferences styles dierolls components $tag [::gmaprofile::default_dieroll_style]
 			}
+			set options {}
+			$wc.1.text tag delete $tag
+			foreach {k o t} {
+				fg         -foreground c
+				bg         -background c
+				overstrike -overstrike ?
+				underline  -underline  ?
+				offset     -offset     i
+				font       -font       f
+			} {
+				set v [dict get $_preferences styles dierolls components $tag $k]
+				switch -exact $t {
+					c {
+						if {$v eq {}} continue
+						set v [dict get $v $colortheme]
+						if {$v eq {}} continue
+					}
+					f { set v [::gmaprofile::lookup_font $_preferences $v] }
+					? { if {$v eq {} || !$v} continue }
+					i { if {$v == 0} continue }
+				}
+				lappend options $o $v
+			}
+
 			$wc.1.text tag configure $tag {*}$options
 			DEBUG 3 "Configure tag $tag as $options"
 		}
@@ -10415,11 +10191,11 @@ if {! $dark_mode } {
 		if $dark_mode {
 			.toolbar2.clock configure -foreground white
 			refreshScreen
+			set colortheme dark
+		} else {
+			set colortheme light
 		}
-		LoadDefaultStyles
 	}
-} else {
-	LoadDefaultStyles
 }
 
 report_progress "Drawing battle grid"
@@ -10498,154 +10274,6 @@ proc SelectFont {canvas args} {
 		dict set OBJdata($CURRENT_TEXT_WIDGET) Font [TkFontToGMAFont $font]
 		DEBUG 3 "OBJ $CURRENT_TEXT_WIDGET font = [dict get $OBJdata($CURRENT_TEXT_WIDGET) Font]"
 	}
-}
-
-
-#
-# functions that perform one-time operations and then exit
-#
-# --generate-style-config: output to the specified file a full
-#                          list of configuration options and their
-#                          current values for styles
-#
-if {$__generate_style_config ne {}} {
-	set f [open $__generate_style_config a]
-	array set def_settings [default_style_data]
-	puts $f {
-;------------------------------------------------------------------------------
-; The following settings were automatically generated by the mapper client.
-; This shows the full set of possible style configurations currently supported
-; for this client, with the values that are built-in to the mapper client.
-; You can delete any of these you don't want to change, so you get the built-
-; in values by default. (That way if the built-in values change, you'll get
-; the current ones instead of these.)
-;------------------------------------------------------------------------------
-[mapper]
-dierolls=mapper_default_die_rolls
-fonts=mapper_default_fonts
-
-[mapper_default_fonts]
-Tf16=-family Helvetica -size 16 -weight bold
-Tf14=-family Helvetica -size 14 -weight bold
-Tf12=-family Helvetica -size 12 -weight bold
-Tf10=-family Helvetica -size 10 -weight bold
-Tf8 =-family Helvetica -size  8 -weight bold
-Hf14=-family Helvetica -size 14
-Hf12=-family Helvetica -size 12
-Hf10=-family Helvetica -size 10
-If12=-family Times     -size 12 -slant italic
-If10=-family Times     -size 10 -slant italic
-Nf10=-family Times     -size 10
-Nf12=-family Times     -size 12
-
-[mapper_default_die_rolls]
-collapse_descriptions = 0
-;default_font= XXX set this to a font if you want it to be the default for all styles XXX
-;bg_list_even= XXX set this to a color for even-numbered list rows
-;bg_list_odd= XXX set this to a color for odd-numbered list rows}
-	array unset elements
-	array set def {
-		font {}
-		fg   {}
-		bg   {}
-		overstrike 0
-		underline 0
-		fmt  %s
-	}
-
-	foreach name [array names def_settings] {
-		if {[set index [string first _ $name]] >= 0} {
-			set elements([string range $name $index+1 end]) 1
-		}
-	}
-	foreach name [lsort [array names elements]] {
-		foreach style [lsort [array names def]] {
-			if {[info exists "def_settings(${style}_${name})"]} {
-				set v $def_settings(${style}_${name})
-				if {$style eq {fmt}} {
-					if {[string range $v 0 0] eq { }} {
-						set v "|$v"
-					}
-					if {[string range $v end end] eq { }} {
-						set v "$v|"
-					}
-				}
-				puts $f "${style}_${name}=$v"
-			} elseif {$def($style) eq {}} {
-				puts $f ";${style}_${name}= XXX SYSTEM DEFAULT VALUE XXX"
-			} else {
-				puts $f "${style}_${name}=$def($style)"
-			}
-		}
-	}
-	puts $f {;------------------------------------------------------------------------------
-; End of default generated values
-;------------------------------------------------------------------------------}
-	close $f
-	exit 0
-}
-#
-# --generate-config:       output to the specified file a full
-#                          list of configuration options and their
-#                          current values
-#
-if {$__generate_config ne {}} {
-	set f [open $__generate_config a]
-	puts $f {
-#------------------------------------------------------------------------------
-# The following settings were automatically generated by the mapper client.
-# This shows the full set of possible mapper configurations currently supported
-# for this client, with the values that are built-in to the mapper client.
-# You can delete any of these you don't want to change, so you get the built-
-# in values by default. (That way if the built-in values change, you'll get
-# the current ones instead of these.)
-# 
-# Commented-out options are off by default. Un-comment them to enable them.
-#------------------------------------------------------------------------------
-no-animate
-#animate
-#blur-all
-no-blur-all
-#blur-hp=PERCENT
-#character=NAME[:COLOR]  (you should never enable this)
-#set this to the maximum number of chat/die roll messages you want to retain
-chat-history=500
-#enable more of these to increase debugging output
-#debug
-#debug
-#debug
-#debug
-#debug
-#debug
-#dark
-#host=YOUR_GAME_SERVER_HOSTNAME
-#port=2323
-#guide=INTERVAL[+OFFSET[:YOFFSET]]
-#major=INTERVAL[+OFFSET[:YOFFSET]]
-#module=CODE
-#keep-tools
-#no-chat
-#style=~/.gma/mapper/style.conf
-#transcript=PATHNAME
-#username=MYNAME
-#proxy-url=CURL-PROXY-URL
-#proxy-host=SSH-PROXY-HOST
-#preload
-#curl-path=PATH
-#curl-url-base=YOUR_GAME_SERVER_URL
-#mkdir-path=PATH
-#nc-path=PATH
-#scp-path=PATH
-#scp-dest=YOUR_GAME_SERVER_DIR
-#scp-server=YOUR_GAME_SERVER
-#ssh-path=PATH
-#update-url=YOUR_GAME_SERVER_UPGRADE_URL
-#------------------------------------------------------------------------------
-# End of default generated values
-#------------------------------------------------------------------------------
-}
-	close $f
-	exit 0
 }
 
 
