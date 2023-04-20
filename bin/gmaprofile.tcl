@@ -26,6 +26,29 @@ namespace eval ::gmaprofile {
 	variable currently_editing_index -1
 	variable font_catalog
 	variable font_repository
+	variable _default_color_table
+	array set _default_color_table {
+		fg,light           #000000
+		normal_fg,light    #000000
+		bg,light           #cccccc
+		normal_bg,light    #cccccc
+		fg,dark            #aaaaaa
+		normal_fg,dark     #aaaaaa
+		bg,dark            #232323
+		normal_bg,dark     #232323
+		check_select,light #000000
+		check_select,dark  #ffffff
+		check_menu,light   #000000
+		check_menu,dark    #ffffff
+		bright_fg,light    #000000
+		bright_fg,dark     #ffffff
+		grid,light         blue
+		grid,dark          #aaaaaa
+		grid_minor,light   #b00b03
+		grid_minor,dark    #b00b03
+		grid_major,light   #345f12
+		grid_major,dark    #345f12
+	}
 	variable _file_format {
 		GMA_Mapper_preferences_version i
 		animate ?
@@ -87,6 +110,12 @@ namespace eval ::gmaprofile {
 				highlight_fg   {o {dark s light s}}
 				odd_bg         {o {dark s light s}}
 				even_bg        {o {dark s light s}}
+				check_select   {o {dark s light s}}
+				check_menu     {o {dark s light s}}
+				bright_fg      {o {dark s light s}}
+				grid           {o {dark s light s}}
+				grid_minor     {o {dark s light s}}
+				grid_major     {o {dark s light s}}
 			}}
 			dierolls {o {
 				compact_recents ?
@@ -285,7 +314,6 @@ namespace eval ::gmaprofile {
 			_describe_font $st.f.name {}
 			_display_pangram $st.f.sample {}
 
-			puts "clearing selection"
 			$st.f.fonts selection clear 0 end
 		} else {
 			variable _profile
@@ -689,9 +717,11 @@ namespace eval ::gmaprofile {
 		frame $st.f
 		frame $st.d
 		frame $st.r
+		frame $st.c
 		$st add $st.f -state normal -sticky news -text Fonts
 		$st add $st.d -state normal -sticky news -text Dialogs
 		$st add $st.r -state normal -sticky news -text {Die Rolls/Chat}
+		$st add $st.c -state normal -sticky news -text Colors
 
 		grid x [label $st.d.tl -text {Light Mode}] [label $st.d.td -text {Dark Mode}]
 		set row 1
@@ -712,6 +742,9 @@ namespace eval ::gmaprofile {
 					-column $col -row $row -padx 1 -pady 1 -sticky we
 				incr col
 			}
+			grid configure [button $st.d.${wp}reset -text "Reset to Default" \
+				-command "::gmaprofile::_reset_default_dialog_color [list $st $st.d.$wp $fld]"]\
+				-column 3 -row $row -padx 5 -pady 1 -sticky we
 			incr row
 		}
 		
@@ -719,6 +752,31 @@ namespace eval ::gmaprofile {
 		grid [label $st.d.exld -text "Dark Mode Example:"]  [text $st.d.extd -height 13] - - -sticky news
 		_refresh_dialog_examples $st
 
+
+		grid x [label $st.c.tl -text {Light Mode}] [label $st.c.td -text {Dark Mode}]
+		set row 1
+		foreach {wp name fld} {
+			grid {Normal 5' grid color}   grid
+			gmin {Minor guide grid color} grid_minor
+			gmaj {Major guide grid color} grid_major
+			chkm {Check menu color}       check_menu
+			chks {Checkbox select color}  check_select
+		} {
+			grid configure [label $st.c.l$wp -text "$name:"] -column 0 -row $row -padx 5 -sticky w
+			set col 1
+			foreach theme {light dark} {
+				set color [dict get $_profile styles dialogs $fld $theme]
+				grid configure [button $st.c.$wp$theme -bg $color -text $color \
+					-command "::gmaprofile::_set_dialog_color [list $st $st.c.$wp$theme $theme $name $fld]"]\
+					-column $col -row $row -padx 1 -pady 1 -sticky we
+				incr col
+			}
+			grid configure [button $st.c.${wp}reset -text "Reset to Default" \
+				-command "::gmaprofile::_reset_default_dialog_color [list $st $st.c.$wp $fld]"]\
+				-column 3 -row $row -padx 5 -pady 1 -sticky we
+			incr row
+		}
+		
 		grid [listbox $st.r.styles -yscrollcommand "$st.r.scroll set" -selectmode browse\
 			-selectforeground white -selectbackground blue\
 			-exportselection false\
@@ -1084,6 +1142,16 @@ namespace eval ::gmaprofile {
 			$st.d.$w configure -state disabled
 		}
 	}
+	proc _reset_default_dialog_color {st btn key} {
+		variable _profile
+		set d [default_styles]
+		dict set _profile styles dialogs $key light [set lt [dict get $d dialogs $key light]]
+		dict set _profile styles dialogs $key dark [set dk [dict get $d dialogs $key dark]]
+		${btn}light configure -bg $lt -text [::gmacolors::rgb_name $lt]
+		${btn}dark configure -bg $dk -text [::gmacolors::rgb_name $dk]
+		_refresh_dialog_examples $st
+		_refresh_dieroller_examples $st
+	}
 	proc _set_dialog_color {st btn theme style key} {
 		variable _profile
 		if {[set chosencolor [tk_chooseColor -initialcolor [dict get $_profile styles dialogs $key $theme] -parent $btn -title "Choose color for $style ($theme mode)"]] ne {}} {
@@ -1117,14 +1185,20 @@ namespace eval ::gmaprofile {
 	# Note: an empty color value means to use the prevailing dialog/window styling
 	proc default_styles {} {
 		return [dict create \
-			dialogs [dict create \
-				heading_fg   [dict create dark cyan   light blue] \
-				normal_fg    [dict create dark [default_color fg dark] light [default_color fg light]] \
-				normal_bg    [dict create dark [default_color bg dark] light [default_color bg light]] \
-				highlight_fg [dict create dark yellow light red] \
-				odd_bg       [dict create dark black  light white] \
-				even_bg      [dict create dark blue   light #bbbbff] \
-			]\
+		  dialogs [dict create \
+		    heading_fg   [dict create dark cyan   light blue] \
+		    normal_fg    [dict create dark [default_color fg dark] light [default_color fg light]] \
+		    normal_bg    [dict create dark [default_color bg dark] light [default_color bg light]] \
+		    highlight_fg [dict create dark yellow light red] \
+		    odd_bg       [dict create dark black  light white] \
+		    even_bg      [dict create dark blue   light #bbbbff] \
+		    grid         [dict create dark [default_color grid dark] light [default_color grid light]] \
+		    grid_minor   [dict create dark [default_color grid_minor dark] light [default_color grid_minor light]] \
+		    grid_major   [dict create dark [default_color grid_major dark] light [default_color grid_major light]] \
+		    check_select [dict create dark [default_color check_select dark] light [default_color check_select light]] \
+		    check_menu   [dict create dark [default_color check_menu dark] light [default_color check_menu light]] \
+		    bright_fg    [dict create dark [default_color bright_fg dark]  light [default_color bright_fg light]] \
+		  ]\
 			dierolls [dict create \
 				compact_recents false \
 				components [dict create \
@@ -1237,12 +1311,21 @@ namespace eval ::gmaprofile {
 	}
 	# TODO use this everywhere
 	proc default_color {key theme} {
-		if {$theme eq {light}} {
-			if {$key eq {fg}} {return #000000} else {return #cccccc}
-		} else {
-			if {$key eq {fg}} {return #aaaaaa} else {return #232323}
-		}
+		variable _default_color_table
+		return $_default_color_table($key,$theme)
 	}
+	proc preferred_color {prefdata key theme} {
+		if {$key eq {fg}} {
+			set key normal_fg
+		} elseif {$key eq {bg}} {
+			set key normal_bg
+		}
+		if {![dict exists $prefdata styles dialogs $key $theme]} {
+			return [default_color $key $theme]
+		}
+		return [dict get $prefdata styles dialogs $key $theme]
+	}
+
 	proc _enable_style {st enabled buttons} {
 		variable _profile
 		if {[set stylename [_selected_dieroll_style_name $st.r.styles]] eq {}} {
