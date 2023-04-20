@@ -737,7 +737,7 @@ namespace eval ::gmaprofile {
 			set col 1
 			foreach theme {light dark} {
 				set color [dict get $_profile styles dialogs $fld $theme]
-				grid configure [button $st.d.$wp$theme -bg $color -text $color \
+				grid configure [button $st.d.$wp$theme -bg $color -text [::gmacolors::rgb_name $color] \
 					-command "::gmaprofile::_set_dialog_color [list $st $st.d.$wp$theme $theme $name $fld]"]\
 					-column $col -row $row -padx 1 -pady 1 -sticky we
 				incr col
@@ -766,7 +766,7 @@ namespace eval ::gmaprofile {
 			set col 1
 			foreach theme {light dark} {
 				set color [dict get $_profile styles dialogs $fld $theme]
-				grid configure [button $st.c.$wp$theme -bg $color -text $color \
+				grid configure [button $st.c.$wp$theme -bg $color -text [::gmacolors::rgb_name $color] \
 					-command "::gmaprofile::_set_dialog_color [list $st $st.c.$wp$theme $theme $name $fld]"]\
 					-column $col -row $row -padx 1 -pady 1 -sticky we
 				incr col
@@ -1190,7 +1190,7 @@ namespace eval ::gmaprofile {
 		    normal_fg    [dict create dark [default_color fg dark] light [default_color fg light]] \
 		    normal_bg    [dict create dark [default_color bg dark] light [default_color bg light]] \
 		    highlight_fg [dict create dark yellow light red] \
-		    odd_bg       [dict create dark black  light white] \
+		    odd_bg       [dict create dark [default_color bg dark] light [default_color bg light]] \
 		    even_bg      [dict create dark blue   light #bbbbff] \
 		    grid         [dict create dark [default_color grid dark] light [default_color grid light]] \
 		    grid_minor   [dict create dark [default_color grid_minor dark] light [default_color grid_minor light]] \
