@@ -14,7 +14,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.4}     ;# @@##@@
+set GMAMapperVersion {4.4.1-alpha.0}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
 set GMAMapperProtocol {403}         ;# @@##@@
 set GMAVersionNumber {5.2}            ;# @@##@@
@@ -998,6 +998,7 @@ if {[file exists $preferences_path]} {
 	if [catch {
 		set PreferencesData [::gmaprofile::load $preferences_path]
 		::gmaprofile::fix_missing_dieroll_styles PreferencesData
+		::gmaprofile::fix_missing_dialog_styles PreferencesData
 		ApplyPreferences $PreferencesData
 	} err] {
 		tk_messageBox -type ok -icon error -title "Unable to load preferences" -message "The preferences settings could not be loaded from \"$preferences_path\"." -detail $err
@@ -9006,7 +9007,7 @@ proc DisplayChatMessage {d args} {
 		RefreshPeerList		;# ask for an update as well
 
 		foreach tag {
-			best bonus comment constant critlabel critspec dc diebonus diespec discarded
+			best bonus constant critlabel critspec dc diebonus diespec discarded
 			exceeded fail from fullmax fullresult iteration label max maximized maxroll 
 			met min moddelim normal operator repeat result roll separator short sf success 
 			title to until worst system subtotal error notice
@@ -9016,20 +9017,23 @@ proc DisplayChatMessage {d args} {
 				dict set _preferences styles dierolls components $tag [::gmaprofile::default_dieroll_style]
 			}
 			set options {}
+			$wc.1.text tag delete $tag
 			foreach {k o t} {
 				fg         -foreground c
 				bg         -background c
 				overstrike -overstrike ?
 				underline  -underline  ?
 				offset     -offset     i
+				font       -font       f
 			} {
 				set v [dict get $_preferences styles dierolls components $tag $k]
-				switch -exact $type {
-					s {
+				switch -exact $t {
+					c {
 						if {$v eq {}} continue
 						set v [dict get $v $colortheme]
 						if {$v eq {}} continue
 					}
+					f { set v [::gmaprofile::lookup_font $_preferences $v] }
 					? { if {$v eq {} || !$v} continue }
 					i { if {$v == 0} continue }
 				}

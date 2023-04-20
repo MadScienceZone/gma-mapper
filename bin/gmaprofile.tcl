@@ -19,11 +19,11 @@ package require getstring
 
 namespace eval ::gmaprofile {
 	namespace export editor
+	variable _fontid 0
 	variable lockout_select_fbn false
 	variable _profile {}
 	variable _profile_backup {}
 	variable currently_editing_index -1
-#	variable currently_editing_font_index -1
 	variable font_catalog
 	variable font_repository
 	variable _file_format {
@@ -151,11 +151,24 @@ namespace eval ::gmaprofile {
 		dict for {stylename styledata} [dict get $dprof dierolls components] {
 			if {![dict exists $prof styles dierolls components $stylename]} {
 				::DEBUG 0 "Preferences missing die-roll style \"$stylename\"; using default"
-				dict set prof styles dierolls components $stylename [dict get $dprof dierolls components $stylename]
+				dict set prof styles dierolls components $stylename $styledata
 			}
+		}
+		if {![dict exists $prof styles dierolls compact_recents]} {
+			dict set prof styles dierolls compact_recents false
 		}
 	}
 
+	proc fix_missing_dialog_styles {pvar} {
+		upvar $pvar prof
+		set dprof [default_styles]
+		dict for {stylename styledata} [dict get $dprof dialogs] {
+			if {![dict exists $prof styles dialogs $stylename]} {
+				::DEBUG 0 "Preferences missing dialog style \"$stylename\"; using default"
+				dict set prof styles dialogs $stylename $styledata
+			}
+		}
+	}
 	proc default_preferences {} {
 		return [dict create \
 			animate         false\
@@ -202,6 +215,12 @@ namespace eval ::gmaprofile {
 		}
 		return [$lb get [lindex $sel 0]]
 	}
+	proc _selected_dieroll_style_name {lb} {
+		if {[llength [set sel [$lb curselection]]] == 0} {
+			return {}
+		}
+		return [$lb get [lindex $sel 0]]
+	}
 	proc _copy_selected_font {w} {
 		variable _profile
 		set st $w.n.s.n
@@ -237,7 +256,16 @@ namespace eval ::gmaprofile {
 			tk_messageBox -type ok -icon error -title "No such font name" -message "You tried to delete a font called \"$srcfont\" but that name does not exist in the font set." -parent $w
 			return
 		}
-		# TODO check if it's in use
+		set references {}
+		dict for {stylename styledata} [dict get $_profile styles dierolls components] {
+			if {[dict get $styledata font] eq $srcfont} {
+				lappend references $stylename
+			}
+		}
+		if {[llength $references] > 0} {
+			tk_messageBox -type ok -icon error -title "Font in use!" -message "You cannot delete font \"$srcfont\" because it is referenced by one or more dieroll styles." -detail [join $references {, }] -parent $w
+			return
+		}
 		if {! [tk_messageBox -type yesno -default no -icon warning -title "Confirm Deletion" -message "Are you SURE you want to delete the font \"$srcfont\"? This operation cannot be undone." -parent $w]} {
 			return
 		}
@@ -251,19 +279,7 @@ namespace eval ::gmaprofile {
 		dict unset _profile fonts $srcfont
 	}
 	proc _select_font_by_name {st name} {
-#		variable currently_editing_font_index
-
 		if {$name eq {}} {
-#			if {$currently_editing_font_index >= 0} {
-#				# we actually had one selected, but lost focus, so let's put the selection
-#				# back where it should be.
-#				puts "restoring $currently_editing_font_index"
-#				$st.f.fonts selection clear 0 end
-#				$st.f.fonts selection set $currently_editing_font_index
-#				set lockout_select_fbn false
-#				return
-#			}
-			# TODO take down sample displays
 			$st.f.copy configure -state disabled -text "Copy"
 			$st.f.del configure -state disabled -text "Delete"
 			_describe_font $st.f.name {}
@@ -273,20 +289,12 @@ namespace eval ::gmaprofile {
 			$st.f.fonts selection clear 0 end
 		} else {
 			variable _profile
-#			set currently_editing_font_index [lsearch -exact [$st.f.fonts get 0 end] $name]
-#			if {$currently_editing_font_index < 0} {
-#				tk_messageBox -type ok -icon error -title "No such font" -message "You tried to select a font called \"$name\" but no such font entry exists." -parent $st
-#				_select_font_by_name $st {}
-#				set lockout_select_fbn false
-#				return
-#			}
 			# update buttons
 			$st.f.copy configure -state normal -text "Copy $name"
 			$st.f.del configure -state normal -text "Delete $name"
 			# show sample displays
 			_describe_font $st.f.name [set fontd [dict get $_profile fonts $name]]
 			_display_pangram $st.f.sample [define_font $fontd]
-			# TODO update style displays
 		}
 	}
 	proc _select_font_by_idx {st idx} {
@@ -707,8 +715,8 @@ namespace eval ::gmaprofile {
 			incr row
 		}
 		
-		grid [label $st.d.exll -text "Light Mode Example:"] [text $st.d.extl -height 6] - - -sticky news
-		grid [label $st.d.exld -text "Dark Mode Example:"]  [text $st.d.extd -height 6] - - -sticky news
+		grid [label $st.d.exll -text "Light Mode Example:"] [text $st.d.extl -height 13] - - -sticky news
+		grid [label $st.d.exld -text "Dark Mode Example:"]  [text $st.d.extd -height 13] - - -sticky news
 		_refresh_dialog_examples $st
 
 		grid [listbox $st.r.styles -yscrollcommand "$st.r.scroll set" -selectmode browse\
@@ -716,26 +724,60 @@ namespace eval ::gmaprofile {
 			-exportselection false\
 			] -sticky news
 		grid [scrollbar $st.r.scroll -orient vertical -command "$st.r.styles yview"] -column 1 -row 0 -sticky nsw
-		grid [text $st.r.description -relief flat -height 3 -wrap word -font TkDefaultFont] -sticky news -column 2 -row 0 -columnspan 3
+		grid [text $st.r.description -relief flat -height 3 -wrap word -font TkDefaultFont] -sticky news -column 2 -row 0 -columnspan 4
+		grid ^ ^ x [label $st.r.tl -text {Light Mode}] [label $st.r.td -text {Dark Mode}]
 		grid ^ ^ [ttk::checkbutton $st.r.fgen -text "Text color:" -variable PEsFGen \
-			                              -command "::gmaprofile::_enable_style XXX"] \
-			 [button $st.r.fglt -command "::gmaprofile::_set_style_color fglt light"] \
-			 [button $st.r.fgdk -command "::gmaprofile::_set_style_color fgdk dark"]
+			      -command "::gmaprofile::_enable_style $st \$PEsFGen {fglt fg light fgdk fg dark}"] \
+			 [button $st.r.fglt -command "::gmaprofile::_set_style_color $st fglt fg light"] \
+			 [button $st.r.fgdk -command "::gmaprofile::_set_style_color $st fgdk fg ark"] \
+			 [label $st.r.ltex -text {Sample (light mode)}] -sticky w
 		grid ^ ^ [ttk::checkbutton $st.r.bgen -text "Background color:" -variable PEsBGen \
-			                              -command "::gmaprofile::_enable_style XXX"] \
-			 [button $st.r.bglt -command "::gmaprofile::_set_style_color bglt light"] \
-			 [button $st.r.bgdk -command "::gmaprofile::_set_style_color bgdk dark"]
-#	 	grid ^ ^ [ttk::checkbutton $st.r.ften -text "Font:" -variable PEsFTen \
-#			                              -command "::gmaprofile::_enable_style XXX"] 
-			 #[button $st.r.ft -command "::gmaprofile::_set_style_font"] - 
+			      -command "::gmaprofile::_enable_style $st \$PEsBGen {bglt bg light bgdk bg dark}"] \
+			 [button $st.r.bglt -command "::gmaprofile::_set_style_color $st bglt bg light"] \
+			 [button $st.r.bgdk -command "::gmaprofile::_set_style_color $st bgdk bg dark"] \
+			 [label $st.r.dkex -text {Sample (dark mode)}] -sticky w
+		grid configure $st.r.fglt -sticky we
+		grid configure $st.r.fgdk -sticky we
+		grid configure $st.r.bglt -sticky we
+		grid configure $st.r.bgdk -sticky we
+
+		menu $st.r.ftmenu -postcommand "::gmaprofile::_update_font_menu $st $st.r.ftmenu PEsFT"
+		_update_font_menu $st $st.r.ftmenu PEsFT
+	 	grid ^ ^ [label $st.r.ften -text "Font:"] \
+			 [ttk::menubutton $st.r.ft -menu $st.r.ftmenu -textvariable PEsFT] - - - -sticky w
+
+		grid ^ ^ [label $st.r.fmen -text "Display Format:"] \
+			 [entry $st.r.fmfmt -validate key -validatecommand "::gmaprofile::_set_style_format [list $st %W %P]"] - \
+			 [label $st.r.fmlbl -text {(_=leading/trailing space; blank for default format)}] -sticky w
+
+		grid ^ ^ [ttk::checkbutton $st.r.oven -text "Overstrike" -variable PEsOVen \
+			      -command "::gmaprofile::_set_style_overstrike $st \$PEsOVen"] -sticky w
+		grid ^ ^ [ttk::checkbutton $st.r.unen -text "Underline" -variable PEsUNen \
+			      -command "::gmaprofile::_set_style_underscore $st \$PEsUNen"] -sticky w
+		grid ^ ^ [label $st.r.oflbl -text {Raise (Lower) text by:}] \
+		         [ttk::spinbox $st.r.ofamt -validate all \
+			 	-validatecommand "::gmaprofile::_set_style_offset [list $st %W %P]" \
+			 	-command "::gmaprofile::_set_style_offset [list $st $st.r.ofamt -spin]" \
+				-from -100 -to 100 -increment 1 -width 4] -sticky w
+
+		grid ^ ^ [button $st.r.reset -text {Reset to Default Values} -command "::gmaprofile::_reset_style $st"] -sticky w
+		grid [ttk::checkbutton $st.r.compact -text "Use more compact layout for recent die rolls" -variable PEsCRen \
+			-command "::gmaprofile::_set_style_compact $st \$PEsCRen"] - - - - -sticky w
+		global PEsCRen
+		set PEsCRen [::gmaproto::int_bool [dict get $_profile styles dierolls compact_recents]]
+
+		grid rowconfigure $st.r 11 -weight 2
+		grid rowconfigure $st.r 12 -weight 2
 
 		foreach stylename [dict keys [dict get $_profile styles dierolls components]] {
 			$st.r.styles insert end $stylename
 		}
 		bind $st.r.styles <<ListboxSelect>> "::gmaprofile::_select_dieroller_style $st \[%W curselection\]"
 
-		grid [label $st.r.lexl -text "Light mode example:"] - [text $st.r.exl -height 8] - - - -sticky news
-		grid [label $st.r.lexd -text "Dark mode example:"] - [text $st.r.exd -height 8] - - - -sticky news
+		grid [label $st.r.lexl -text "Light mode example:"] - [text $st.r.exl -height 8 -yscrollcommand "$st.r.exls set"] - - - \
+		     [scrollbar $st.r.exls -orient vertical -command "$st.r.exl yview"] -sticky nes
+		grid [label $st.r.lexd -text "Dark mode example:"] - [text $st.r.exd -height 8 -yscrollcommand "$st.r.exds set"] - - - \
+		     [scrollbar $st.r.exds -orient vertical -command "$st.r.exd yview"] -sticky nes
 		grid columnconfigure $st.r 2 -weight 2
 		_select_dieroller_style $st {}
 		_refresh_dieroller_examples $st
@@ -761,20 +803,8 @@ namespace eval ::gmaprofile {
 		foreach font [dict keys [dict get $_profile fonts]] {
 			$st.f.fonts insert end $font
 		}
-#		set default_font_d [tk_font_to_dict TkDefaultFont]	;#XXX
-#		set default_font_f [define_font $default_font_d]	;#XXX
-#		_describe_font $st.f.name $default_font_d	;#XXX
-#		_display_pangram $st.f.sample $default_font_f	;#XXX
-#		$st.f.fonts insert end default	;#XXX
 
 
-
-
-# tk fontchooser hide|show
-# tk fontchooser configure -parent . -font -command
-# bind . <<TkFontchooserFontChanged>> [list SelectFont $canvas]
-#
-		# 
 		grid $w.n.s.n -sticky news
 		grid columnconfigure $w.n.s.n 0 -weight 0
 		grid columnconfigure $w.n.s.n 3 -weight 2
@@ -950,6 +980,7 @@ namespace eval ::gmaprofile {
 		dict set _profile fonts $newfontname $fontd
 		_describe_font $w.n.s.n.f.name $fontd
 		_display_pangram $w.n.s.n.f.sample [define_font $fontd]
+		#_refresh_dialog_examples $w.n.s.n
 	}
 	proc _describe_font {w d} {
 		if {$d eq {}} {
@@ -1063,6 +1094,7 @@ namespace eval ::gmaprofile {
 		_refresh_dieroller_examples $st
 	}
 
+
 	# name translations
 	# OLD display_styles	NEW dictionary keys in _preferences
 	#
@@ -1087,8 +1119,8 @@ namespace eval ::gmaprofile {
 		return [dict create \
 			dialogs [dict create \
 				heading_fg   [dict create dark cyan   light blue] \
-				normal_fg    [dict create dark white  light black] \
-				normal_bg    [dict create dark black  light white] \
+				normal_fg    [dict create dark [default_color fg dark] light [default_color fg light]] \
+				normal_bg    [dict create dark [default_color bg dark] light [default_color bg light]] \
 				highlight_fg [dict create dark yellow light red] \
 				odd_bg       [dict create dark black  light white] \
 				even_bg      [dict create dark blue   light #bbbbff] \
@@ -1143,7 +1175,7 @@ namespace eval ::gmaprofile {
 		return [dict create \
 			fg [dict create dark {} light {}] \
 			bg [dict create dark {} light {}] \
-			font [define_font [tk_font_to_dict TkDefaultFont]]\
+			font [invent_font [tk_font_to_dict TkDefaultFont]]\
 			format {} \
 			overstrike false \
 			underline false \
@@ -1152,6 +1184,7 @@ namespace eval ::gmaprofile {
 	proc _select_dieroller_style {st idx} {
 		variable _description
 		variable _profile
+		global PEsFT
 		$st.r.description configure -state normal
 		$st.r.description delete 1.0 end
 		if {[llength $idx] > 0} {
@@ -1164,10 +1197,19 @@ namespace eval ::gmaprofile {
 				"styles dierolls components $stylename fg light" fgcolor_l \
 				"styles dierolls components $stylename fg dark" fgcolor_d \
 				"styles dierolls components $stylename bg light" bgcolor_l \
-				"styles dierolls components $stylename bg dark" bgcolor_d 
+				"styles dierolls components $stylename bg dark" bgcolor_d \
+				"styles dierolls components $stylename font" PEsFT \
+				"styles dierolls components $stylename format" fmt \
+				"styles dierolls components $stylename overstrike" ov \
+				"styles dierolls components $stylename underline" ul \
+				"styles dierolls components $stylename offset" offamt
 
-			global PEsFGen PEsBGen
+			global PEsFGen PEsBGen PEsOVen PEsUNen
 			set neutral_bg [[winfo parent $st] cget -background]
+			set PEsOVen [::gmaproto::int_bool $ov]
+			set PEsUNen [::gmaproto::int_bool $ul]
+			$st.r.ofamt delete 0 end
+			$st.r.ofamt insert end $offamt
 			if {$fgcolor_l eq {} && $fgcolor_d eq {}} {
 				set PEsFGen 0
 				$st.r.fglt configure -text {} -background $neutral_bg -state disabled
@@ -1188,16 +1230,186 @@ namespace eval ::gmaprofile {
 				$st.r.bgdk configure -text [::gmacolors::rgb_name $bgcolor_d] -bg $bgcolor_d -state normal
 			}
 			$st.r.description configure -state disabled
+			$st.r.fmfmt delete 0 end
+			$st.r.fmfmt insert end [_spaces_to_under $fmt]
 		}
+		_refresh_dieroller_examples $st
+	}
+	# TODO use this everywhere
+	proc default_color {key theme} {
+		if {$theme eq {light}} {
+			if {$key eq {fg}} {return #000000} else {return #cccccc}
+		} else {
+			if {$key eq {fg}} {return #aaaaaa} else {return #232323}
+		}
+	}
+	proc _enable_style {st enabled buttons} {
+		variable _profile
+		if {[set stylename [_selected_dieroll_style_name $st.r.styles]] eq {}} {
+			return
+		}
+		set neutral_bg [[winfo parent $st] cget -background]
+		foreach {b key theme} $buttons {
+			set btn $st.r.$b
+			if {$enabled} {
+				if {[set def [dict get [default_styles] dierolls components $stylename $key $theme]] eq {}} {
+					set def [default_color $key $theme]
+				}
+
+				dict set _profile styles dierolls components $stylename $key $theme $def
+				$btn configure -state normal -background $def -text [::gmacolors::rgb_name $def]
+			} else {
+				dict set _profile styles dierolls components $stylename $key $theme {}
+				$btn configure -background $neutral_bg -text {} -state disabled
+			}
+		}
+		_refresh_dieroller_examples $st
+	}
+	proc _set_style_color {st btnw key theme} {
+		variable _profile
+		set btn $st.r.$btnw
+		if {[set stylename [_selected_dieroll_style_name $st.r.styles]] eq {}} {
+			return
+		}
+		if {[set chosencolor [tk_chooseColor -initialcolor [dict get $_profile styles dierolls components $stylename $key $theme] -parent $btn -title "Choose color for $stylename ($theme mode)"]] ne {}} {
+			dict set _profile styles dierolls components $stylename $key $theme $chosencolor
+			$btn configure -background $chosencolor -text [::gmacolors::rgb_name $chosencolor]
+			_refresh_dieroller_examples $st
+		}
+	}
+	proc _set_style_overstrike {st en} {
+		variable _profile
+
+		if {[set stylename [_selected_dieroll_style_name $st.r.styles]] eq {}} {
+			return
+		}
+		dict set _profile styles dierolls components $stylename overstrike $en
+		_refresh_dieroller_examples $st
+	}
+	proc _set_style_underline {st en} {
+		variable _profile
+
+		if {[set stylename [_selected_dieroll_style_name $st.r.styles]] eq {}} {
+			return
+		}
+		dict set _profile styles dierolls components $stylename underline $en
+		_refresh_dieroller_examples $st
+	}
+
+	proc _update_font_menu {st m var} {
+		variable _profile
+		$m delete 0 end
+		foreach fontname [dict keys [dict get $_profile fonts]] {
+			$m add command -label $fontname -command "::gmaprofile::_set_style_font [list $st $fontname $var]"
+		}
+	}
+	proc _set_style_font {st fontname var} {
+		variable _profile
+		global $var
+		if {[set stylename [_selected_dieroll_style_name $st.r.styles]] eq {}} {
+			set $var {}
+			return
+		}
+		dict set _profile styles dierolls components $stylename font $fontname
+		set $var $fontname
+		_refresh_dieroller_examples $st
+	}
+	proc _under_to_spaces {s} {
+		set s [string trim $s]
+		if {[string index $s 0] eq {_}} {
+			set s [string replace $s 0 0 { }]
+		}
+		if {[string index $s end] eq {_}} {
+			set s [string replace $s end end { }]
+		}
+		return $s
+	}
+	proc _spaces_to_under {s} {
+		if {[string index $s 0] eq { }} {
+			set s [string replace $s 0 0 _]
+		}
+		if {[string index $s end] eq { }} {
+			set s [string replace $s end end _]
+		}
+		return $s
+	}
+	proc _set_style_format {st e fmt} {
+		variable _profile
+		if {[set stylename [_selected_dieroll_style_name $st.r.styles]] ne {}} {
+			dict set _profile styles dierolls components $stylename format [_under_to_spaces $fmt]
+		}
+		_refresh_dieroller_examples $st
+		return 1
+	}
+	proc _reset_style {st} {
+		variable _profile
+		if {[set stylename [_selected_dieroll_style_name $st.r.styles]] ne {}} {
+			dict set _profile styles dierolls components $stylename [dict get [default_styles] dierolls components $stylename]
+			_select_dieroller_style $st [$st.r.styles curselection]
+		}
+	}
+	proc _set_style_offset {st e v} {
+		variable _profile
+
+		set val $v
+		if {$v eq {-spin}} {
+			set val [$e get]
+		}
+		if {[set stylename [_selected_dieroll_style_name $st.r.styles]] ne {}} {
+			if {$val eq {}} {
+				dict set _profile styles dierolls components $stylename offset 0
+				return 1
+			}
+			if {[catch {set val [expr int($val)]} err]} {
+				return 0
+			}
+			dict set _profile styles dierolls components $stylename offset $val
+			_refresh_dieroller_examples $st
+		}
+		if {$v eq {-spin}} {
+			return 0
+		} else {
+			return 1
+		}
+	}
+	proc attempt_format {fmt s} {
+		if {$fmt eq {}} {
+			return $s
+		}
+		if {[catch {set txt [format $fmt $s]}]} {
+			return **ERROR**
+		}
+		return $txt
 	}
 	proc _refresh_dieroller_examples {st} {
 		variable _profile
+		if {[set stylename [_selected_dieroll_style_name $st.r.styles]] ne {}} {
+			if {[set slfg [dict get $_profile styles dierolls components $stylename fg light]] eq {}} {
+				set slfg #000000
+			}
+			if {[set sdfg [dict get $_profile styles dierolls components $stylename fg dark]] eq {}} {
+				set sdfg #aaaaaa
+			}
+			if {[set slbg [dict get $_profile styles dierolls components $stylename bg light]] eq {}} {
+				set slbg #cccccc
+			}
+			if {[set sdbg [dict get $_profile styles dierolls components $stylename bg dark]] eq {}} {
+				set sdbg #232323
+			}
+			set xf [lookup_font $_profile [dict get $_profile styles dierolls components $stylename font]]
+
+			set fmt [dict get $_profile styles dierolls components $stylename format]
+			$st.r.ltex configure -foreground $slfg -background $slbg -font $xf -text "Sample (light mode): [attempt_format $fmt value]"
+			$st.r.dkex configure -foreground $sdfg -background $sdbg -font $xf -text "Sample (dark mode): [attempt_format $fmt value]"
+		}
 		foreach {ww th} {l light d dark} {
 			set drd_id 0
 			$st.r.ex$ww configure -foreground [dict get $_profile styles dialogs normal_fg $th]\
 				              -background [dict get $_profile styles dialogs normal_bg $th]
 			foreach tag [dict keys [dict get $_profile styles dierolls components]] {
 				set options {}
+				$st.r.ex$ww tag delete $tag
+
 				foreach {k o t} {
 					fg         -foreground c
 					bg         -background c
@@ -1218,6 +1430,9 @@ namespace eval ::gmaprofile {
 						i { if {$v == 0} continue }
 					}
 					lappend options $o $v
+				}
+				if {$stylename eq $tag} {
+					lappend options -underline 1
 				}
 				$st.r.ex$ww tag configure $tag {*}$options
 			}
@@ -1273,6 +1488,7 @@ namespace eval ::gmaprofile {
 				- -
 				fullresult  0
 				{}          { }
+				from   {Alice: }
 				fail        fail
 				separator   =
 				diespec     52%
@@ -1281,6 +1497,7 @@ namespace eval ::gmaprofile {
 				fullmax     maximized
 				- -
 				fullresult  1 {} { }
+				from   {Alice: }
 				success     miss
 				separator   =
 				diespec     52%
@@ -1288,6 +1505,7 @@ namespace eval ::gmaprofile {
 				roll        37
 				- -
 				fullresult 14 {} { }
+				from   {Alice: }
 				result     14
 				separator  =
 				diespec    2d10
@@ -1299,6 +1517,7 @@ namespace eval ::gmaprofile {
 				short      4
 				- -
 				fullresult 7 {} { }
+				from   {Alice: }
 				result     7
 				separator  =
 				diespec    2d6
@@ -1315,6 +1534,7 @@ namespace eval ::gmaprofile {
 				exceeded   2
 				- -
 				fullresult 21 {} { }
+				from   {Alice: }
 				result     21
 				separator  =
 				diespec    1d20
@@ -1326,10 +1546,12 @@ namespace eval ::gmaprofile {
 				dc         21
 				met        successful
 				- -
+				from   {Alice: }
 				notice     {roll to GM}
 				diespec    6d6
 				- -
 				fullresult 4 {} { }
+				from   {Alice: }
 				result     4
 				success    triumph
 				separator  =
@@ -1359,13 +1581,18 @@ namespace eval ::gmaprofile {
 				}
 				if {$tag ne {}} {
 					if {[set fmt [dict get $_profile styles dierolls components $tag format]] ne {}} {
-						set text [format $fmt $text]
+						set text [attempt_format $fmt $text]
 					}
 				}
 				$st.r.ex$ww insert end $text $tag
 			}
 			$st.r.ex$ww configure -state disabled
 		}
+	}
+
+	proc _set_style_compact {st en} {
+		variable _profile
+		dict set _profile styles dierolls compact_recents $en
 	}
 
 	#
@@ -1387,3 +1614,4 @@ namespace eval ::gmaprofile {
 	# Die-roll title: ...
 	#
 }
+
