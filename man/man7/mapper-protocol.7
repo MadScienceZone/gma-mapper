@@ -216,7 +216,7 @@ since all communications are asynchronous.
 '\" \begin{tabular}{lcllll}\toprule
 '\"  {\bfseries Command}&{\bfseries C$\leftrightarrow$S}&{\bfseries Reply}&{\bfseries Priv}&{\bfseries Data}&{\bfseries Description}\\\midrule
 '\"  \z{POLO}   &C$\rightarrow$S    &---        &no &none          &Acknowledge server's ping\\
-'\"  \z{PRIV}   &C$\leftarrow$S     &---        &N/A&\acronym{JSON}&Privileged command denied\\\bottomrule
+'\"  \z{PRIV}   &C$\leftarrow$S     &---        &N/A&\acronym{JSON}&Privileged command denied\\
 '\"  \z{PROGRESS}&C$\leftrightarrow$S&---       &no &\acronym{JSON}&Indicate progress on task\\
 '\"  \z{PROTOCOL}&C$\leftarrow$S    &---        &N/A&int           &Signal protocol version in use\\
 '\"  \z{PS}     &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Place a creature token\\
@@ -1943,7 +1943,6 @@ that protocol SHOULD warn their users and SHOULD disconnect since they can't
 guarantee they can actually communicate with the server.
 .TP
 .BI Challenge " (base64-encoded bytes)"
-'\" <<ital-is-var>>
 If present, the
 .B Challenge
 value is a base-64-encoded authentication challenge. A client must successfully
@@ -1952,18 +1951,19 @@ respond with a valid
 command before any of its commands to the server will be accepted. The server will also
 refuse to send the client any map updates until it has successfully authenticated.
 .TP
-.BI ServerStarted " (RFC 3339-formatted datetime string with sub-second precision)"
+.BI ServerStarted " (RFC 3339-formatted datetime string)"
 The absolute wall-clock time that the server was started.
 .TP
-.BI ServerActive " (RFC 3339-formatted datetime string with sub-second precision)"
+.BI ServerActive " (RFC 3339-formatted datetime string)"
 The abolute wall-clock time of the server's last
 .B MARCO
-ping signal was sent. If this was long ago (more than a minute or two with out-of-the-box
+ping signal. If this was long ago (more than a minute or two with out-of-the-box
 server configuration), it is an indicator that the server's main event loop is deadlocked.
 .TP
-.BI ServerTime " (RFC 3339-formatted datetime string with sub-second precision)"
+.BI ServerTime " (RFC 3339-formatted datetime string)"
 The current wall-clock time on the server. This provides an accurate point of reference
 to determine how long ago the other server time values occurred.
+'\" <<ital-is-var>>
 '\" <</>>
 .RE
 .TP
