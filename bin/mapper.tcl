@@ -14,7 +14,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.4.1-alpha.0}     ;# @@##@@
+set GMAMapperVersion {4.4.1-beta.0}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
 set GMAMapperProtocol {403}         ;# @@##@@
 set GMAVersionNumber {5.2}            ;# @@##@@
@@ -846,6 +846,7 @@ proc ApplyDebugProtocol {enabled} {
 	}
 }
 proc ApplyPreferences {data args} {
+	global colortheme
 	global animatePlacement blur_all blur_pct DEBUG_level debug_protocol
 	global dark_mode IThost ImageFormat ITpassword ITport
 	global GuideLineOffset GuideLines MajorGuideLines MajorGuideLineOffset
@@ -915,6 +916,11 @@ proc ApplyPreferences {data args} {
 		}
 	}
 		
+	if {$dark_mode} {
+		set colortheme dark
+	} else {
+		set colortheme light
+	}
 	set blur_pct [expr max(0, min(100, $blur_pct))]
 	ApplyDebugProtocol $debug_protocol
 	if {$ImageFormat ne {gif} && $ImageFormat ne {png}} {
@@ -1231,22 +1237,21 @@ switch -glob -- $ButtonSize {
 # 
 # global color settings
 #
-if {$dark_mode} {
-	tk_setPalette background #232323 
-    option add "*foreground" "#aaaaaa"
-	set check_select_color #232323
-	set check_menu_color #ffffff
-	set global_bg_color #232323
-	ttk::style configure TFrame -background $global_bg_color -foreground #ffffff
-	ttk::style configure TPanedwindow -background $global_bg_color -foreground #ffffff
-	ttk::style configure TLabelframe -background $global_bg_color -foreground #ffffff
-	ttk::style configure TLabelframe.Label -background $global_bg_color -foreground #aaaaaa
-	ttk::style configure TLabel -background $global_bg_color -foreground #ffffff
-} else {
-	set check_select_color #ffffff
-	set check_menu_color #000000	; # XXX foreground
-	set global_bg_color #cccccc
-}
+
+set theme_fg  [::gmaprofile::preferred_color $_preferences normal_fg $colortheme]
+set theme_bg  [::gmaprofile::preferred_color $_preferences normal_bg $colortheme]
+set theme_bfg [::gmaprofile::preferred_color $_preferences bright_fg $colortheme]
+
+tk_setPalette background $theme_bg
+option add "*foreground" $theme_fg
+set global_bg_color      $theme_bg
+set check_select_color   [::gmaprofile::preferred_color $_preferences check_select $colortheme]
+set check_menu_color     [::gmaprofile::preferred_color $_preferences check_menu   $colortheme]
+ttk::style configure TFrame            -background $global_bg_color -foreground $theme_bfg
+ttk::style configure TPanedwindow      -background $global_bg_color -foreground $theme_bfg
+ttk::style configure TLabelframe       -background $global_bg_color -foreground $theme_bfg
+ttk::style configure TLabelframe.Label -background $global_bg_color -foreground $theme_fg
+ttk::style configure TLabel            -background $global_bg_color -foreground $theme_bfg
 
 #
 # tile ID
@@ -1542,13 +1547,10 @@ proc battleGridScroller {w view args} {
 
 proc battleGridLabels {} {
 	global cansw cansh iscale dark_mode
+	global _preferences colortheme
+	set gridcolor [::gmaprofile::preferred_color $_preferences grid $colortheme]
 	lassign [.xs get] xstartfrac xendfrac
 	lassign [.ys get] ystartfrac yendfrac
-	if {$dark_mode} {
-		set gridcolor #aaaaaa
-	} else {
-		set gridcolor blue
-	}
 
 	.c delete {x#label}
 	set startpx [expr int($xstartfrac * $cansw)]
@@ -4269,22 +4271,21 @@ proc send_element {id} {
 
 proc SquareGrid {w xx yy show} {
 	global iscale GuideLines MajorGuideLines GuideLineOffset MajorGuideLineOffset GridEnable dark_mode
+	global _preferences colortheme
 	$w delete grid
 	if {! $GridEnable} {
 		return
 	}
-	if {$dark_mode} {
-		set gridcolor #aaaaaa
-	} else {
-		set gridcolor blue
-	}
+	set gridcolor  [::gmaprofile::preferred_color $_preferences grid $colortheme]
+	set majorcolor [::gmaprofile::preferred_color $_preferences grid_major $colortheme]
+	set minorcolor [::gmaprofile::preferred_color $_preferences grid_minor $colortheme]
 
 	for {set x 0} {($x * $iscale) < $xx} {incr x} {
 		if {$MajorGuideLines > 0 && (($x - [lindex $MajorGuideLineOffset 0]) % $MajorGuideLines) == 0} {
-			set SGfc "#345F12"
+			set SGfc $majorcolor
 			set SGw 3
 		} elseif {$GuideLines > 0 && (($x - [lindex $GuideLineOffset 0]) % $GuideLines) == 0} {
-			set SGfc "#B00B03"
+			set SGfc $minorcolor
 			set SGw  2
 		} else {
 			set SGfc $gridcolor
@@ -4295,10 +4296,10 @@ proc SquareGrid {w xx yy show} {
 	}
 	for {set y 0} {($y * $iscale) < $yy} {incr y} {
 		if {$MajorGuideLines > 0 && (($y - [lindex $MajorGuideLineOffset 1]) % $MajorGuideLines) == 0} {
-			set SGfc "#345F12"
+			set SGfc $majorcolor
 			set SGw 3
 		} elseif {$GuideLines > 0 && (($y - [lindex $GuideLineOffset 1]) % $GuideLines) == 0} {
-			set SGfc "#B00B03"
+			set SGfc $minorcolor
 			set SGw  2
 		} else {
 			set SGfc $gridcolor
