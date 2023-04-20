@@ -264,6 +264,7 @@ proc report_progress {msg} {
 report_progress "Starting up..."
 set dark_mode 0
 set colortheme light
+set _preferences {}
 set SuppressChat 0
 set PeerList {}
 # Files we reference in various places
