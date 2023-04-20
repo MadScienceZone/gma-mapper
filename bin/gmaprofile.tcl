@@ -729,7 +729,7 @@ namespace eval ::gmaprofile {
 		grid ^ ^ [ttk::checkbutton $st.r.fgen -text "Text color:" -variable PEsFGen \
 			      -command "::gmaprofile::_enable_style $st \$PEsFGen {fglt fg light fgdk fg dark}"] \
 			 [button $st.r.fglt -command "::gmaprofile::_set_style_color $st fglt fg light"] \
-			 [button $st.r.fgdk -command "::gmaprofile::_set_style_color $st fgdk fg ark"] \
+			 [button $st.r.fgdk -command "::gmaprofile::_set_style_color $st fgdk fg dark"] \
 			 [label $st.r.ltex -text {Sample (light mode)}] -sticky w
 		grid ^ ^ [ttk::checkbutton $st.r.bgen -text "Background color:" -variable PEsBGen \
 			      -command "::gmaprofile::_enable_style $st \$PEsBGen {bglt bg light bgdk bg dark}"] \
