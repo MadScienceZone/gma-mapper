@@ -1017,6 +1017,7 @@ if {[file exists $preferences_path]} {
 	# This enables us to use the preferences editor on that variable later.
 	set PreferencesData [::gmaprofile::default_preferences]
 	set CurrentProfileName {}
+	set _preferences $PreferencesData
 }
 
 #
@@ -7158,7 +7159,7 @@ proc AddPlayerMenu {type} {
 	pack [label .apm.4.lab -text {Color:}] \
 		 [entry .apm.4.ent -textvariable MOB_COLOR -width 20] \
 		 -side left -anchor w
-	pack [checkbutton .apm.5.ent -text "Reach?" -variable MOB_REACH -selectcolor $check_select_color] \
+	pack [ttk::checkbutton .apm.5.ent -text "Reach?" -variable MOB_REACH -selectcolor $check_select_color] \
 		 -side left -anchor w
 	pack [button .apm.6.apply -command \
 		"AddMobFromMenu [lindex $g 0] [lindex $g 1] \$MOB_COLOR \$MOB_Name \$MOB_AREA \$MOB_SIZE $type \$MOB_REACH" -text Apply] \
@@ -8988,7 +8989,9 @@ proc DisplayChatMessage {d args} {
 		pack [button $wc.3.info -image $icon_info20 -command ShowDiceSyntax] -side right
 		tooltip::tooltip $wc.3.info "Display help for how to write die rolls and use the chat window."
 		set CHAT_blind 0
-		pack [checkbutton $wc.3.blind -text GM -variable CHAT_blind -indicatoron 1 -selectcolor $check_select_color] -side right
+		pack [ttk::checkbutton $wc.3.blind -text GM -variable CHAT_blind] -side right
+		#-selectcolor $check_select_color
+		#-indicatoron 1 
 
 		menubutton $wc.2.to -menu $wc.2.to.menu -text To: -relief raised
 		menu $wc.2.to.menu -tearoff 0
