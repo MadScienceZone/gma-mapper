@@ -1875,5 +1875,12 @@ namespace eval ::gmaprofile {
 	proc dlkeypref {prefs} {
 		return [dlkeyint [dict get $prefs dark]]
 	}
+
+	proc invent_font {fontdict} {
+		variable _profile
+		variable _fontid
+		dict set _profile fonts gmafont[incr _fontid] [define_font $fontdict]
+		return gmafont$_fontid
+	}
 }
 
