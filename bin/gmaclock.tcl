@@ -216,7 +216,7 @@ proc _draw_face {w} {
 	set h [expr double([winfo height $w])]
 	$w delete face
 	set color [dict get $::_preferences styles clocks hand_color [::gmaprofile::dlkeypref $::_preferences]]
-	$w create oval 5 5 [expr $wd-1] [expr $h-1] -width 4 -tags face -outline $color
+	$w create oval 5 5 [expr $wd-4] [expr $h-4] -width 4 -tags face -outline $color
 }
 
 # _update_clock w ?scale=1? ?-complete? ?-running?
