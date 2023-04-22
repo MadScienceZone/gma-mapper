@@ -14,7 +14,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.4.1-beta.0}     ;# @@##@@
+set GMAMapperVersion {4.4.1-beta.1}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
 set GMAMapperProtocol {403}         ;# @@##@@
 set GMAVersionNumber {5.2}            ;# @@##@@
@@ -1004,13 +1004,13 @@ proc editPreferences {} {
 if {[file exists $preferences_path]} {
 	if [catch {
 		set PreferencesData [::gmaprofile::load $preferences_path]
-		::gmaprofile::fix_missing_dieroll_styles PreferencesData
-		::gmaprofile::fix_missing_dialog_styles PreferencesData
+		::gmaprofile::fix_missing PreferencesData
 		ApplyPreferences $PreferencesData
 	} err] {
 		tk_messageBox -type ok -icon error -title "Unable to load preferences" -message "The preferences settings could not be loaded from \"$preferences_path\"." -detail $err
 		set PreferencesData [::gmaprofile::default_preferences]
 		set CurrentProfileName {}
+		ApplyPreferences $PreferencesData
 	}
 } else {
 	# give PreferencesData a reasonable default but don't load it up.
@@ -10507,8 +10507,6 @@ proc display_initiative_clock {} {
 	}
 
 	::gmaclock::initiative_display_window .initiative.clock 20 $dark_mode -background $global_bg_color
-	::gmaclock::set_font_name .initiative.clock {Helvetica 16} -time
-	::gmaclock::set_font_name .initiative.clock {Helvetica 24}
 	pack .initiative.clock -side top -fill both -expand 1
 	update
 	::gmaclock::draw_face .initiative.clock

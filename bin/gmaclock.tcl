@@ -21,7 +21,6 @@ namespace eval ::gmaclock {
 	variable _clock_state
 	variable PI 3.14159265358979323
 
-
 # destroy_clock w
 proc destroy_clock {w} {
 	variable _clock_state
@@ -35,6 +34,7 @@ if {[info exists _clock_state($w)]} {
 # widget w ?-24hr? ?-dark? ?-handscale x? ?-calendar name? ?-- canvasopts ...? -> id
 proc widget {w args} {
 	variable _clock_state
+	global ::_preferences
 
 	if {[info exists _clock_state($w)]} {
 		error "a gmaclock widget already exists with path $w"
@@ -43,7 +43,6 @@ proc widget {w args} {
 	set _clock_state($w) [dict create \
 		calendar [_new_cal] \
 		combat_mode false\
-		dark_mode false \
 		delta_time 0\
 		half_hours true \
 		hand_scale 2 \
@@ -55,7 +54,9 @@ proc widget {w args} {
 	for {set i 0} {$i < [llength $args]} {incr i} {
 		switch -exact -- [lindex $args $i] {
 			-24hr	{dict set _clock_state($w) half_hours false}
-			-dark	{dict set _clock_state($w) dark_mode true}
+			-dark	{
+				#deprecated
+			}
 			-handscale {
 				incr i
 				if {$i >= [llength $args]} {
@@ -128,11 +129,7 @@ proc _start_combat {w {scale 0} {callback {}}} {
 	_cancel_realtime_tick $w
 
 	dict set _clock_state($w) combat_mode true
-	if {[dict get $_clock_state($w) dark_mode]} {
-		set fill #aaaaaa
-	} else {
-		set fill blue
-	}
+	set fill [dict get $::_preferences styles clocks tick_color [::gmaprofile::dlkeypref $::_preferences]]
 	$w delete ticks
 	for {set p 0} {$p < 10} {incr p} {
 		_draw_hand $w $p 10 0.95 1 [expr 0.95-(0.95*$scale)] 2 {face ticks} $fill
@@ -153,11 +150,7 @@ proc _stop_combat {w {scale 1} {callback {}}} {
 	variable _clock_state
 	_cancel_realtime_tick $w
 
-	if {[dict get $_clock_state($w) dark_mode]} {
-		set fill #aaaaaa
-	} else {
-		set fill blue
-	}
+	set fill [dict get $::_preferences styles clocks tick_color [::gmaprofile::dlkeypref $::_preferences]]
 	$w delete ticks
 	for {set p 0} {$p < 10} {incr p} {
 		_draw_hand $w $p 10 0.95 1 [expr 0.95-(0.95*$scale)] 2 {face ticks} $fill
@@ -203,11 +196,7 @@ proc _draw_hand {w position total length time_scale start width taglist {fill {}
 	variable PI
 
 	if {$fill eq {}} {
-		if {[dict get $_clock_state($w) dark_mode]} {
-			set fill #aaaaaa
-		} else {
-			set fill #000000
-		}
+		set fill [dict get $::_preferences styles clocks hand_color [::gmaprofile::dlkeypref $::_preferences]]
 	}
 
 	set radius [expr [winfo width $w] / 2.0]
@@ -226,11 +215,7 @@ proc _draw_face {w} {
 	set wd [expr double([winfo width $w])]
 	set h [expr double([winfo height $w])]
 	$w delete face
-	if {[dict get $_clock_state($w) dark_mode]} {
-		set color #aaaaaa
-	} else {
-		set color #000000
-	}
+	set color [dict get $::_preferences styles clocks hand_color [::gmaprofile::dlkeypref $::_preferences]]
 	$w create oval 5 5 [expr $wd-1] [expr $h-1] -width 4 -tags face -outline $color
 }
 
@@ -484,6 +469,7 @@ proc advance_time {w delta {unit_name {}}} {
 # from InitiativeDisplayWindow, InitiativeSlot of GMA's MadScienceZone.GMA.GUI.ClockForm
 #
 # initiative_display_window w ?limit=20? ?dark_mode=false? ?frameopts ...? -> w
+#                                        ^^^^^^^^^^^^^^^^^ dark_mode argument deprecated
 variable _window_state
 proc dest {w} {
 	variable _window_state
@@ -517,41 +503,20 @@ proc initiative_display_window {w {limit 20} {dark_mode false} args} {
 		_autosize_inhibit 	false \
 		_autosize_task		{} \
 		combat_mode		false \
-		dark_mode		$dark_mode \
 		flist			{} \
 		ilist			{} \
 		limit			$limit \
-		font_name		{Helvetica 24} \
-		time_font_name		{Helvetica 24} \
 	]
 
 	frame $w {*}$args
-	if {$dark_mode} {
-		widget $w.timeclock -dark -- -width 200 -height 200
-	} else {
-		widget $w.timeclock -- -width 200 -height 200
-	}
+	widget $w.timeclock -- -width 200 -height 200
 	pack $w.timeclock -side top
-	set font_name [dict get $_window_state($w) time_font_name]
-	pack [label $w.timedisp -anchor n -font $font_name] -side top -fill x
-	pack [label $w.turndisp -anchor n -font $font_name] -side top -fill x
+	pack [label $w.timedisp -anchor n -font [::gmaprofile::lookup_font $::_preferences [dict get $::_preferences styles clocks timedisp_font]]] -side top -fill x
+	pack [label $w.turndisp -anchor n -font [::gmaprofile::lookup_font $::_preferences [dict get $::_preferences styles clocks turndisp_font]]] -side top -fill x
 	#pack [label $w.turntick -anchor n -font $font_name] -side top -fill x
 	_start_clock $w.timeclock
 	bind $w <Configure> "::gmaclock::autosize $w"
 	return $w
-}
-
-# set_font_name fontname ?-time?
-proc set_font_name {w name args} {
-	variable _window_state
-	if {[lsearch -exact $args -time] >= 0} {
-		dict set _window_state($w) time_font_name $name
-		$w.timedisp configure -font $name
-		$w.turndisp configure -font $name
-		#$w.turntick configure -font $name
-	} else {
-		dict set _window_state($w) font_name $name
-	}
 }
 
 # prevent too many calls to _autosize at once
@@ -589,7 +554,7 @@ proc _autosize {w} {
 		}
 		dict set _window_state($w) flist {}
 	}
-	pack [label $w.test -background #000000 -font [dict get $_window_state($w) font_name] \
+	pack [label $w.test -background #000000 -font [::gmaprofile::lookup_font $::_preferences [dict get $::_preferences styles clocks default_font]]\
 		-foreground #ffffff -text {<---[XXX]--->} -anchor center -relief solid -highlightbackground #ff0000 \
 		-highlightthickness 0] -side top -padx 2 -pady 1 -fill x
 	update
@@ -610,23 +575,16 @@ proc update_initiative_slots {w {limit {}} args} {
 	variable _clock_state
 
 	set force_redraw false
-	if {[set dark_mode [dict get $_window_state($w) dark_mode]]} {
-		set flist_fg #ffffff
-		set flist_bg #222222
-		set next_fg  #ffffff
-		set next_bg  #cc0000
-		set cur_bg   #775500
-		set ready_bg #ff0000
-		set hold_bg  #ff7777
-	} else {
-		set flist_fg #000000
-		set flist_bg #ffffff
-		set next_fg  #ffffff
-		set next_bg  #000000
-		set cur_bg   #ffff00
-		set ready_bg #ff0000
-		set hold_bg  #ffaaaa
-	}
+	set dlkey [::gmaprofile::dlkeypref $::_preferences]
+	::gmautil::dassign $::_preferences \
+		"styles clocks flist_fg $dlkey" flist_fg \
+		"styles clocks flist_bg $dlkey" flist_bg \
+		"styles clocks next_fg $dlkey" next_fg \
+		"styles clocks next_bg $dlkey" next_bg \
+		"styles clocks cur_bg $dlkey" cur_bg \
+		"styles clocks ready_bg $dlkey" ready_bg \
+		"styles clocks hold_bg $dlkey" hold_bg
+
 	if {[lsearch -exact $args -force] >= 0} {
 		set force_redraw true
 	}
@@ -694,7 +652,7 @@ proc update_initiative_slots {w {limit {}} args} {
 					pack $w.sep -side top -padx 2 -pady 1 -fill x
 				}
 				dict set _window_state($w) flist $i [label $w.slot$i -background $flist_bg -foreground $flist_fg \
-					-font [dict get $_window_state($w) font_name] \
+					-font [::gmaprofile::lookup_font $::_preferences [dict get $::_preferences styles clocks default_font]] \
 					-text [dict get $_window_state($w) ilist $i name] -anchor n -relief solid]
 				pack $w.slot$i -side top -padx 2 -pady 1 -fill x
 				if {$i == $slot} {
@@ -709,14 +667,25 @@ proc update_initiative_slots {w {limit {}} args} {
 
 				if {[dict get $_window_state($w) ilist $i health_tracker] ne {}} {
 					if {[dict get $_window_state($w) ilist $i health_tracker value] == 0} {
-						$w.slot$i configure -highlightbackground #ff0000 -highlightcolor #ff0000 -highlightthickness 4
+						$w.slot$i configure \
+							-highlightbackground [dict get $::_preferences styles clocks zero_hp [::gmaprofile::dlkeypref $::_preferences]] \
+							-highlightcolor [dict get $::_preferences styles clocks zero_hp [::gmaprofile::dlkeypref $::_preferences]] \
+							-highlightthickness 4
 					} elseif {[dict get $_window_state($w) ilist $i health_tracker value] < 0} {
-						$w.slot$i configure -highlightbackground #000000 -highlightcolor #000000 -highlightthickness 4
-						if {$dark_mode} {
-							$w.slot$i configure -foreground #ffffff -background #000000
+						$w.slot$i configure \
+							-highlightbackground [dict get $::_preferences styles clocks negative_hp [::gmaprofile::dlkeypref $::_preferences]] \
+							-highlightcolor [dict get $::_preferences styles clocks negative_hp [::gmaprofile::dlkeypref $::_preferences]] \
+							-highlightthickness 4
+						if {[dict get $::_preferences dark]} {
+							$w.slot$i configure \
+								-foreground [dict get $::_preferences styles clocks slot_fg [::gmaprofile::dlkeypref $::_preferences]] \
+								-background [dict get $::_preferences styles clocks slot_bg [::gmaprofile::dlkeypref $::_preferences]]
 						}
 					} elseif {[dict get $_window_state($w) ilist $i health_tracker is_flat_footed]} {
-						$w.slot$i configure -highlightbackground #3333ff -highlightcolor #3333ff -highlightthickness 4
+						$w.slot$i configure \
+							-highlightbackground [dict get $::_preferences styles clocks flat_footed [::gmaprofile::dlkeypref $::_preferences]] \
+							-highlightcolor [dict get $::_preferences styles clocks flat_footed [::gmaprofile::dlkeypref $::_preferences]] \
+							-highlightthickness 4
 					} else {
 						$w.slot$i configure -highlightbackground #000000 -highlightcolor #000000 -highlightthickness 0
 					}
@@ -728,7 +697,7 @@ proc update_initiative_slots {w {limit {}} args} {
 				foreach slot [lsort -integer [dict keys [dict get $_window_state($w) ilist]]] {
 					if {$i < $limit} {
 						dict set _window_state($w) flist $slot [label $w.slot$slot -background $flist_bg \
-							-font [dict get $_window_state($w) font_name] \
+							-font [::gmaprofile::lookup_font $::_preferences [dict get $::_preferences styles clocks default_font]] \
 							-text [dict get $_window_state($w) ilist $slot name] \
 							-anchor n -relief solid]
 						pack $w.slot$slot -side top -padx 2 -pady 1 -fill x
@@ -752,16 +721,30 @@ proc update_initiative_slots {w {limit {}} args} {
 
 				if {[dict get $_window_state($w) ilist $i health_tracker] ne {}} {
 					if {[dict get $_window_state($w) ilist $i health_tracker value] == 0} {
-						$w.slot$i configure -highlightbackground #ff0000 -highlightcolor #ff0000 -highlightthickness 4
+						$w.slot$i configure \
+							-highlightbackground [dict get $::_preferences styles clocks zero_hp [::gmaprofile::dlkeypref $::_preferences]] \
+							-highlightcolor [dict get $::_preferences styles clocks zero_hp [::gmaprofile::dlkeypref $::_preferences]] \
+							-highlightthickness 4
 					} elseif {[dict get $_window_state($w) ilist $i health_tracker value] < 0} {
-						$w.slot$i configure -highlightbackground #000000 -highlightcolor #000000 -highlightthickness 4
-						if {$dark_mode} {
-							$w.slot$i configure -background #000000 -foreground #ffffff
+						$w.slot$i configure \
+							-highlightbackground [dict get $::_preferences styles clocks negative_hp [::gmaprofile::dlkeypref $::_preferences]] \
+							-highlightcolor [dict get $::_preferences styles clocks negative_hp [::gmaprofile::dlkeypref $::_preferences]] \
+							-highlightthickness 4
+						if {[dict get $::_preferences dark]} {
+							$w.slot$i configure \
+								-background [dict get $::_preferences styles clocks slot_bg [::gmaprofile::dlkeypref $::_preferences]] \
+								-foreground [dict get $::_preferences styles clocks slot_fg [::gmaprofile::dlkeypref $::_preferences]]
 						}
 					} elseif {[dict get $_window_state($w) ilist $i health_tracker is_flat_footed]} {
-						$w.slot$i configure -highlightbackground #3333ff -highlightcolor #3333ff -highlightthickness 4
+						$w.slot$i configure \
+							-highlightbackground [dict get $::_preferences styles clocks flat_footed [::gmaprofile::dlkeypref $::_preferences]] \
+							-highlightcolor [dict get $::_preferences styles clocks flat_footed [::gmaprofile::dlkeypref $::_preferences]] \
+							-highlightthickness 4
 					} else {
-						$w.slot$i configure -highlightbackground #000000 -highlightcolor #000000 -highlightthickness 0
+						$w.slot$i configure \
+							-highlightbackground #000000 \
+							-highlightcolor #000000 \
+							-highlightthickness 0
 					}
 				}
 			}
