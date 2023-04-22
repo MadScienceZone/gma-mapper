@@ -161,7 +161,7 @@ namespace eval ::gmaprofile {
 		operator   {A math operator (such as "+", "-", etc.) between components of the die-roll request.}
 		repeat     {An indicator that you want the die-roll expression repeated a number of times.}
 		result     {The overal result of the die-roll request.}
-		roll       {This shows the actual results of the individual dice rolled (when forced to maximum value, the "maxroll" style is used instead.}
+		roll       {This shows the actual results of the individual dice rolled (when forced to maximum value, the "maxroll" style is used instead).}
 		separator  {Any punctuation that is used as a separator in the die-roll expression.}
 		sf         {An indicator that the "|sf" option was used to check for natural min and max rolls as automatic failure or success, along with custom labels, if any, for the success and failure outcomes.}
 		short      {When making a roll with a DC target, or using "|until", this indicates the amount by which this roll fell short of the target.}

@@ -51,8 +51,6 @@ mapper \- GMA battle grid map
 .IR port ]
 .RB [ \-S
 .IR profile ]
-.RB [ \-s
-.IR file ]
 .RB [ \-t
 .IR transcript ]
 .RB [ \-u
@@ -71,10 +69,6 @@ mapper \- GMA battle grid map
 .IR url ]
 .RB [ \-\-dark ]
 .RB [ \-\-debug\-protocol ]
-.RB [ \-\-generate\-config
-.IR path ]
-.RB [ \-\-generate\-style\-config
-.IR path ]
 .RB [ \-\-mkdir\-path
 .IR path ]
 .RB [ \-\-nc\-path
@@ -119,10 +113,6 @@ mapper \- GMA battle grid map
 .RB [ \-\-dark ]
 .RB [ \-\-debug ]
 .RB [ \-\-debug\-protocol ]
-.RB [ \-\-generate\-config
-.IR path ]
-.RB [ \-\-generate\-style\-config
-.IR path ]
 .RB [ \-\-guide
 .IR n [\fB+\fP x [\fB:\fP y ]]]
 .RB [ \-\-host
@@ -158,8 +148,6 @@ mapper \- GMA battle grid map
 .IR profile ]
 .RB [ \-\-ssh\-path
 .IR path ]
-.RB [ \-\-style
-.IR file ]
 .RB [ \-\-transcript
 .IR filename ]
 .RB [ \-\-update\-url
@@ -554,37 +542,6 @@ in a separate window.
 Turns on debugging messages showing all interactions between client and server, and the client-side
 procesesing that is done to support that interaction.
 .TP
-.BI "\-\-generate\-config " path
-Append a set of example settings to the file named in
-.IR path .
-This will include the set of options you might want to configure
-in the mapper, most of which will be commented out. This is intended
-to make it easier for you to create a configuration file for the 
-mapper without having to remember what all of the options are.
-In reality you won't likely need most of them.
-.RS
-.LP
-After writing to this file, the mapper client will exit.
-.RE
-.TP
-.BI "\-\-generate\-style\-config " path
-Append a set of example style settings to the file named
-in
-.IR path .
-This will include all possible style definitions. Their built-in
-default values are also provided, so that if this file were loaded
-as the
-.I style.conf
-file of the mapper, it should result in the same appearance it
-normally would have. The intent is to help you get started configuring
-the styles of the mapper and to see what the mapper's settings would
-be if you didn't override them. You should delete or comment out any
-entries you wish to leave at the built-in default values.
-.RS
-.LP
-After writing to this file, the mapper client will exit.
-.RE
-.TP
 .BI "\-g\fR, \fP\-\-guide " n
 Make every
 .IR n th
@@ -752,18 +709,6 @@ program used to send files
 .I to
 '\" <<ital-is-var>>
 the storage server (authorized users only).
-.TP
-.BI "\-\-style " file
-Loads custom style definitions for fonts, colors, and so forth from the named
-.IR file .
-If this option is not specified but the file
-'\"<<TeX>>
-'\"\z{\textasciitilde/.gma/mapper/\allowbreak style.conf}
-.B ~/.gma/mapper/style.conf
-'\"<</TeX>>
-exists, that file will be read by default. See
-.BR style.conf (5)
-for details about what can go in this file.
 .TP
 .BI "\-t\fR, \fP\-\-transcript " path
 '\" <<TeX>>
@@ -1790,5 +1735,25 @@ more descriptive of the actual function.
 Some of the menu behavior required by the mapper client has been shown not to
 work with Tcl/Tk version 8.6, so the mapper avoids using those features when
 the Tcl/Tk version is less than 8.7.
+.SH "DEPRECATED FEATURES"
+.LP
+The preferred way to configure
+.B mapper
+is to use the built-in preferences editor. This obsoletes the use of the older
+simple configuration file which needed to be edited by hand, and makes it unnecessary
+to use CLI options to specify the runtime parameters for the mapper's operation.
+The use of the legacy configuration file is still supported, however, as is the
+use of CLI options where desired for 
+'\" <</ital-is-var>>
+.I ad-hoc
+changes from the saved preferences.
+.LP
+However, the switch to the preferences system makes the following CLI options now
+obsolete and they no longer perform any function:
+.BR \-\-generate\-config ,
+.BR \-\-generate\-style\-config ,
+.BR \-s ,
+and
+.BR \-\-style .
 .SH COPYRIGHT
 Part of the GMA software suite, copyright \(co 1992\-2023 by Steven L. Willoughby, Aloha, Oregon, USA. All Rights Reserved. Distributed under BSD-3-Clause License. \"@m(c)@
