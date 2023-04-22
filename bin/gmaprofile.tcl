@@ -48,6 +48,34 @@ namespace eval ::gmaprofile {
 		grid_minor,dark    #b00b03
 		grid_major,light   #345f12
 		grid_major,dark    #345f12
+		hand_color,light   black
+		hand_color,dark    #aaaaaa
+		tick_color,light   blue
+		tick_color,dark    #aaaaaa
+		flist_fg,light     black
+		flist_fg,dark      white
+		flist_bg,light     white
+		flist_bg,dark      #232323
+		next_fg,light      white
+		next_fg,dark       white
+		next_bg,light      black
+		next_bg,dark       #cc0000
+		cur_bg,light       #ffff00
+		cur_bg,dark        #267800
+		ready_bg,light     #ff0000
+		ready_bg,dark      #ff0000
+		hold_bg,light      #ffaaaa
+		hold_bg,dark       #ff8e51
+		zero_hp,light	   #ff0000
+		zero_hp,dark	   #ff0000
+		negative_hp,light  #000000
+		negative_hp,dark   #000000
+		slot_fg,light      #000000
+		slot_fg,dark       #aaaaaa
+		slot_bg,light      #cccccc
+		slot_bg,dark       #232323
+		flat_footed,light  #3333ff
+		flat_footed,dark   #3333ff
 	}
 	variable _file_format {
 		GMA_Mapper_preferences_version i
@@ -103,6 +131,25 @@ namespace eval ::gmaprofile {
 	    	}
 		fonts {D {family s size f weight i slant i overstrike ? underline ?}}
 		styles {o {
+			clocks {o {
+				hand_color     {o {dark s light s}}
+				tick_color     {o {dark s light s}}
+				flist_fg       {o {dark s light s}}
+				flist_bg       {o {dark s light s}}
+				next_fg        {o {dark s light s}}
+				next_bg        {o {dark s light s}}
+				cur_bg         {o {dark s light s}}
+				ready_bg       {o {dark s light s}}
+				hold_bg        {o {dark s light s}}
+				zero_hp        {o {dark s light s}}
+				negative_hp    {o {dark s light s}}
+				slot_fg        {o {dark s light s}}
+				slot_bg        {o {dark s light s}}
+				flat_footed    {o {dark s light s}}
+				timedisp_font  s
+				turndisp_font  s
+				default_font   s
+			}}
 			dialogs {o {
 				heading_fg     {o {dark s light s}}
 				normal_fg      {o {dark s light s}}
@@ -198,6 +245,22 @@ namespace eval ::gmaprofile {
 			}
 		}
 	}
+	proc fix_missing_clock_styles {pvar} {
+		upvar $pvar prof
+		set dprof [default_styles]
+		dict for {stylename styledata} [dict get $dprof clocks] {
+			if {![dict exists $prof styles clocks $stylename]} {
+				::DEBUG 0 "Preferences missing clock style \"$stylename\"; using default"
+				dict set prof styles clocks $stylename $styledata
+			}
+		}
+	}
+	proc fix_missing {prefs} {
+		upvar $prefs p
+		fix_missing_dieroll_styles p
+		fix_missing_dialog_styles p
+		fix_missing_clock_styles p
+	}
 	proc default_preferences {} {
 		return [dict create \
 			animate         false\
@@ -289,6 +352,12 @@ namespace eval ::gmaprofile {
 		dict for {stylename styledata} [dict get $_profile styles dierolls components] {
 			if {[dict get $styledata font] eq $srcfont} {
 				lappend references $stylename
+			}
+		}
+		foreach ff {timedisp_font turndisp_font default_font} {
+			if {[dict get $_profile styles clocks $ff] eq $srcfont} {
+				lappend references "clock"
+				break
 			}
 		}
 		if {[llength $references] > 0} {
@@ -718,10 +787,12 @@ namespace eval ::gmaprofile {
 		frame $st.d
 		frame $st.r
 		frame $st.c
+		frame $st.cl
 		$st add $st.f -state normal -sticky news -text Fonts
 		$st add $st.d -state normal -sticky news -text Dialogs
 		$st add $st.r -state normal -sticky news -text {Die Rolls/Chat}
 		$st add $st.c -state normal -sticky news -text Colors
+		$st add $st.cl -state normal -sticky news -text Clocks
 
 		grid x [label $st.d.tl -text {Light Mode}] [label $st.d.td -text {Dark Mode}]
 		set row 1
@@ -775,6 +846,56 @@ namespace eval ::gmaprofile {
 				-command "::gmaprofile::_reset_default_dialog_color [list $st $st.c.$wp $fld]"]\
 				-column 3 -row $row -padx 5 -pady 1 -sticky we
 			incr row
+		}
+#		menu $st.r.ftmenu -postcommand "::gmaprofile::_update_font_menu $st $st.r.ftmenu PEsFT"
+#		_update_font_menu $st $st.r.ftmenu PEsFT
+#	 	grid ^ ^ [label $st.r.ften -text "Font:"] \
+#			 [ttk::menubutton $st.r.ft -menu $st.r.ftmenu -textvariable PEsFT] - - - -sticky w
+		
+		grid x [label $st.cl.tl -text {Light Mode}] [label $st.cl.td -text {Dark Mode}]
+		set row 1
+		foreach {wp name fld} {
+			hand {Clock hands}                  hand_color
+			tick {Clock tick marks}             tick_color
+			ffg  {Initiative list text color}   flist_fg
+			fbg  {Initiative list background}   flist_bg
+			nexf {Next round marker color}      next_fg
+			nexb {Next round marker background} next_bg
+			cur  {Current actor background}     cur_bg
+			rdy  {Readied action background}    ready_bg
+			hold {Held action background}       hold_bg
+			hp0  {Frame: zero hit points}       zero_hp
+			hpng {Frame: negative hit points}   negative_hp
+			flat {Frame: flat-footed}           flat_footed
+			sfg  {Clock text color}             slot_fg
+			sbg  {Clock background color}       slot_bg
+		} {
+			grid configure [label $st.cl.l$wp -text "$name:"] -column 0 -row $row -padx 5 -sticky w
+			set col 1
+			foreach theme {light dark} {
+				set color [dict get $_profile styles clocks $fld $theme]
+				grid configure [button $st.cl.$wp$theme -bg $color -text [::gmacolors::rgb_name $color] \
+					-command "::gmaprofile::_set_clock_color [list $st $st.cl.$wp$theme $theme $name $fld]"]\
+					-column $col -row $row -padx 1 -pady 1 -sticky we
+				incr col
+			}
+			grid configure [button $st.cl.${wp}reset -text "Reset to Default" \
+				-command "::gmaprofile::_reset_default_clock_color [list $st $st.cl.$wp $fld]"]\
+				-column 3 -row $row -padx 5 -pady 1 -sticky we
+			incr row
+		}
+
+		foreach {mn fld mdesc mvar} {
+			1 timedisp_font "Time display font"    PEsCF1
+			2 turndisp_font "Turn display font"    PEsCF2
+			3 default_font  "Initiative list font" PEsCF3
+		} {
+			menu $st.cl.ftmenu$mn -postcommand "::gmaprofile::_update_clock_font_menu [list $st $st.cl.ftmenu$mn $mdesc $mvar $fld]"
+			_update_clock_font_menu $st $st.cl.ftmenu$mn $mdesc $mvar $fld
+			grid [label $st.cl.ften$mn -text $mdesc] \
+				 [ttk::menubutton $st.cl.ft$mn -menu $st.cl.ftmenu$mn -textvariable $mvar] - - - -sticky w
+			global $mvar
+			set $mvar [dict get $_profile styles clocks $fld]
 		}
 		
 		grid [listbox $st.r.styles -yscrollcommand "$st.r.scroll set" -selectmode browse\
@@ -1113,12 +1234,14 @@ namespace eval ::gmaprofile {
 	# The default set of fonts
 	proc default_fonts {} {
 		return [dict create \
-			FullResult [dict create family Helvetica size 16 weight 1 slant 0 overstrike false underline false] \
-			Important [dict create family Helvetica size 12 weight 1 slant 0 overstrike false underline false] \
-			Result [dict create family Helvetica size 14 weight 0 slant 0 overstrike false underline false] \
 			Normal [dict create family Helvetica size 12 weight 0 slant 0 overstrike false underline false] \
+			Important [dict create family Helvetica size 12 weight 1 slant 0 overstrike false underline false] \
 			Special [dict create family Times     size 12 weight 0 slant 1 overstrike false underline false] \
 			System [dict create family Times     size 10 weight 0 slant 1 overstrike false underline false] \
+			FullResult [dict create family Helvetica size 16 weight 1 slant 0 overstrike false underline false] \
+			Result [dict create family Helvetica size 14 weight 0 slant 0 overstrike false underline false] \
+			ClockTime [dict create family Helvetica size 16 weight 0 slant 0 overstrike false underline false] \
+			ClockList [dict create family Helvetica size 24 weight 0 slant 0 overstrike false underline false] \
 		]
 	}
 	proc _refresh_dialog_examples {st} {
@@ -1152,6 +1275,14 @@ namespace eval ::gmaprofile {
 		_refresh_dialog_examples $st
 		_refresh_dieroller_examples $st
 	}
+	proc _reset_default_clock_color {st btn key} {
+		variable _profile
+		set d [default_styles]
+		dict set _profile styles clocks $key light [set lt [dict get $d clocks $key light]]
+		dict set _profile styles clocks $key dark [set dk [dict get $d clocks $key dark]]
+		${btn}light configure -bg $lt -text [::gmacolors::rgb_name $lt]
+		${btn}dark configure -bg $dk -text [::gmacolors::rgb_name $dk]
+	}
 	proc _set_dialog_color {st btn theme style key} {
 		variable _profile
 		if {[set chosencolor [tk_chooseColor -initialcolor [dict get $_profile styles dialogs $key $theme] -parent $btn -title "Choose color for $style ($theme mode)"]] ne {}} {
@@ -1160,6 +1291,13 @@ namespace eval ::gmaprofile {
 		}
 		_refresh_dialog_examples $st
 		_refresh_dieroller_examples $st
+	}
+	proc _set_clock_color {st btn theme style key} {
+		variable _profile
+		if {[set chosencolor [tk_chooseColor -initialcolor [dict get $_profile styles clocks $key $theme] -parent $btn -title "Choose color for $style ($theme mode)"]] ne {}} {
+			dict set _profile styles clocks $key $theme $chosencolor
+			$btn configure -bg $chosencolor -text [::gmacolors::rgb_name $chosencolor]
+		}
 	}
 
 
@@ -1185,6 +1323,25 @@ namespace eval ::gmaprofile {
 	# Note: an empty color value means to use the prevailing dialog/window styling
 	proc default_styles {} {
 		return [dict create \
+		  clocks [dict create \
+		    hand_color  [dict create dark [default_color hand_color dark] light [default_color hand_color light]]\
+		    tick_color  [dict create dark [default_color tick_color dark] light [default_color tick_color light]]\
+		    flist_fg    [dict create dark [default_color flist_fg dark] light [default_color flist_fg light]]\
+		    flist_bg    [dict create dark [default_color flist_bg dark] light [default_color flist_bg light]]\
+		    next_fg     [dict create dark [default_color next_fg dark] light [default_color next_fg light]]\
+		    next_bg     [dict create dark [default_color next_bg dark] light [default_color next_bg light]]\
+		    cur_bg      [dict create dark [default_color cur_bg dark] light [default_color cur_bg light]]\
+		    ready_bg    [dict create dark [default_color ready_bg dark] light [default_color ready_bg light]]\
+		    hold_bg     [dict create dark [default_color hold_bg dark] light [default_color hold_bg light]]\
+		    zero_hp     [dict create dark [default_color zero_hp dark] light [default_color zero_hp light]]\
+		    negative_hp [dict create dark [default_color negative_hp dark] light [default_color negative_hp light]]\
+		    slot_fg     [dict create dark [default_color slot_fg dark] light [default_color slot_fg light]]\
+		    slot_bg     [dict create dark [default_color slot_bg dark] light [default_color slot_bg light]]\
+		    flat_footed [dict create dark [default_color flat_footed dark] light [default_color flat_footed light]]\
+		    timedisp_font  "ClockTime"\
+		    turndisp_font  "ClockTime"\
+		    default_font   "ClockList"\
+		  ] \
 		  dialogs [dict create \
 		    heading_fg   [dict create dark cyan   light blue] \
 		    normal_fg    [dict create dark [default_color fg dark] light [default_color fg light]] \
@@ -1309,7 +1466,6 @@ namespace eval ::gmaprofile {
 		}
 		_refresh_dieroller_examples $st
 	}
-	# TODO use this everywhere
 	proc default_color {key theme} {
 		variable _default_color_table
 		return $_default_color_table($key,$theme)
@@ -1386,6 +1542,13 @@ namespace eval ::gmaprofile {
 			$m add command -label $fontname -command "::gmaprofile::_set_style_font [list $st $fontname $var]"
 		}
 	}
+	proc _update_clock_font_menu {st m desc var fld} {
+		variable _profile
+		$m delete 0 end
+		foreach fontname [dict keys [dict get $_profile fonts]] {
+			$m add command -label $fontname -command "::gmaprofile::_set_clock_font [list $st $fontname $var $fld]"
+		}
+	}
 	proc _set_style_font {st fontname var} {
 		variable _profile
 		global $var
@@ -1396,6 +1559,12 @@ namespace eval ::gmaprofile {
 		dict set _profile styles dierolls components $stylename font $fontname
 		set $var $fontname
 		_refresh_dieroller_examples $st
+	}
+	proc _set_clock_font {st fontname var fld} {
+		variable _profile
+		global $var
+		dict set _profile styles clocks $fld $fontname
+		set $var $fontname
 	}
 	proc _under_to_spaces {s} {
 		set s [string trim $s]
@@ -1696,5 +1865,15 @@ namespace eval ::gmaprofile {
 	#
 	# Die-roll title: ...
 	#
+	proc dlkeyint {is_dark} {
+		if {$is_dark} {
+			return dark
+		} else {
+			return light
+		}
+	}
+	proc dlkeypref {prefs} {
+		return [dlkeyint [dict get $prefs dark]]
+	}
 }
 
