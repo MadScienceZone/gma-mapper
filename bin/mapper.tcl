@@ -1,4 +1,4 @@
-#!/usr/bin/env wish
+# -selectcolor $check_select_color!/usr/bin/env wish
 ########################################################################################
 #  _______  _______  _______                ___          ___                           #
 # (  ____ \(       )(  ___  ) Game         /   )        /   )                          #
@@ -1153,7 +1153,7 @@ for {set argi 0} {$argi < $argc} {incr argi} {
 			}
 		-D - --debug  { incr DEBUG_level }
 		--debug-protocol { ApplyDebugProtocol true }
-		-d - --dark {set dark_mode 1; set colortheme dark}
+		-d - --dark {set dark_mode 1; set colortheme dark; dict set _preferences dark true}
 		--help { usage }
 		-h - --host { 
 			set IThost [getarg -h] 
