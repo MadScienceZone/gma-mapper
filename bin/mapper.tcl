@@ -7159,7 +7159,7 @@ proc AddPlayerMenu {type} {
 	pack [label .apm.4.lab -text {Color:}] \
 		 [entry .apm.4.ent -textvariable MOB_COLOR -width 20] \
 		 -side left -anchor w
-	pack [ttk::checkbutton .apm.5.ent -text "Reach?" -variable MOB_REACH -selectcolor $check_select_color] \
+	pack [ttk::checkbutton .apm.5.ent -text "Reach?" -variable MOB_REACH] \
 		 -side left -anchor w
 	pack [button .apm.6.apply -command \
 		"AddMobFromMenu [lindex $g 0] [lindex $g 1] \$MOB_COLOR \$MOB_Name \$MOB_AREA \$MOB_SIZE $type \$MOB_REACH" -text Apply] \
