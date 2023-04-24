@@ -1062,7 +1062,8 @@ namespace eval ::gmaprofile {
 		     [ttk::entry $s.gmscp -textvariable s_scp_path] \
 		     -sticky w
 		grid [ttk::label $s.passlabel -text "Password:"] \
-		     [ttk::entry $s.pass -textvariable s_pass -show *] - \
+		     [ttk::entry $s.pass -textvariable s_pass -show *] \
+		     [button $s.passvis -command "::gmaprofile::_toggle_password_visibility $s" -text "show"] \
 		     [ttk::label $s.gmscpplbl  -text "Remote scp Destination:"] \
 		     [ttk::entry $s.gmscpp -textvariable s_scp_dest] \
 		     -sticky w
@@ -1881,6 +1882,15 @@ namespace eval ::gmaprofile {
 		variable _fontid
 		dict set _profile fonts gmafont[incr _fontid] [define_font $fontdict]
 		return gmafont$_fontid
+	}
+	proc _toggle_password_visibility {s} {
+		if {[$s.pass cget -show] eq {}} {
+			$s.pass configure -show *
+			$s.passvis configure -text show
+		} else {
+			$s.pass configure -show {}
+			$s.passvis configure -text hide
+		}
 	}
 }
 
