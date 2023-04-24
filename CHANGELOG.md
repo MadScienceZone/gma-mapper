@@ -3,13 +3,17 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.4               <!-- @@##@@ -->
- * Effective Date: 15-Apr-2023               <!-- @@##@@ -->
+ * This Package Version: 4.4.1               <!-- @@##@@ -->
+ * Effective Date: 24-Apr-2023               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 5.3 <!-- @@##@@ -->
+ * GMA Core API Library Version: 5.3.2 <!-- @@##@@ -->
  * GMA Mapper File Format: 20	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 403        <!-- @@##@@ -->
+
+# 4.4.1
+## Enhancements 
+ * Augmented preferences editor to include more color settings, including initiative clock fonts and colors.
 
 # 4.4
 ## Enhancements
