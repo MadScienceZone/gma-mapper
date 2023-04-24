@@ -867,8 +867,8 @@ namespace eval ::gmaprofile {
 			hp0  {Frame: zero hit points}       zero_hp
 			hpng {Frame: negative hit points}   negative_hp
 			flat {Frame: flat-footed}           flat_footed
-			sfg  {Clock text color}             slot_fg
-			sbg  {Clock background color}       slot_bg
+			sfg  {Negative hit point text color} slot_fg
+			sbg  {Negative hit point background} slot_bg
 		} {
 			grid configure [label $st.cl.l$wp -text "$name:"] -column 0 -row $row -padx 5 -sticky w
 			set col 1
