@@ -71,8 +71,8 @@ namespace eval ::gmaprofile {
 		negative_hp,light  #000000
 		negative_hp,dark   #000000
 		slot_fg,light      #000000
-		slot_fg,dark       #aaaaaa
-		slot_bg,light      #cccccc
+		slot_fg,dark       #666666
+		slot_bg,light      #666666
 		slot_bg,dark       #232323
 		flat_footed,light  #3333ff
 		flat_footed,dark   #3333ff
