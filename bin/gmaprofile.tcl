@@ -990,6 +990,14 @@ namespace eval ::gmaprofile {
 		grid columnconfigure $w.n.s 0 -weight 2
 		grid columnconfigure $w.n 0 -weight 2
 
+		set sep_fg white
+		if $dark {
+			set sep_bg blue
+		} else {
+			set sep_bg black
+		}
+
+
 		menu $w.n.a.m_bsize
 		$w.n.a.m_bsize add command -label small -command {::gmaprofile::_bsize small}
 		$w.n.a.m_bsize add command -label medium -command {::gmaprofile::_bsize medium}
@@ -998,14 +1006,14 @@ namespace eval ::gmaprofile {
 		$w.n.a.m_imgfmt add command -label PNG -command {::gmaprofile::_imgfmt png}
 		$w.n.a.m_imgfmt add command -label GIF -command {::gmaprofile::_imgfmt gif}
 
-		grid [ttk::label $w.n.a.title -text "MAPPER APPEARANCE SETTINGS" -anchor center -foreground white -background black] - - - - - - -sticky we -pady 5
+		grid [ttk::label $w.n.a.title -text "MAPPER APPEARANCE SETTINGS" -anchor center -foreground $sep_fg -background $sep_bg] - - - - - - -sticky we -pady 5
 		grid [ttk::checkbutton $w.n.a.animate -text "Animate updates" -variable animate] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.dark -text "Dark theme" -variable dark] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.keep -text "Keep toolbar visible" -variable keep_tools] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.preload -text "Pre-load all cached images" -variable preload] - - - - - - -sticky w
 		grid [ttk::menubutton $w.n.a.imgfmt -textvariable imgtext -menu $w.n.a.m_imgfmt] - - - - - - -sticky w
 		grid [ttk::menubutton $w.n.a.bsize -textvariable bsizetext -menu $w.n.a.m_bsize] - - - - - - -sticky w
-		grid [ttk::label $w.n.a.title2 -text "EXTRA GRID LINES" -anchor center -foreground white -background black] - - - - - - -sticky we -pady 5
+		grid [ttk::label $w.n.a.title2 -text "EXTRA GRID LINES" -anchor center -foreground $sep_fg -background $sep_bg] - - - - - - -sticky we -pady 5
 		grid [ttk::label $w.n.a.majorlbl -text "Major grid lines every"] \
 		     [ttk::spinbox $w.n.a.majori -textvariable major_interval -from 0 -to 100 -increment 1 -width 4] \
 		     [ttk::label $w.n.a.majorl2 -text "offset by"] \
@@ -1023,11 +1031,11 @@ namespace eval ::gmaprofile {
 		     [ttk::label $w.n.a.minorl4 -text "down." ] \
 		     	-sticky w
 
-		grid [ttk::label $w.n.t.title -text "PATHS TO SUPPORT PROGRAMS" -anchor center -foreground white -background black] - -sticky we -pady 5
+		grid [ttk::label $w.n.t.title -text "PATHS TO SUPPORT PROGRAMS" -anchor center -foreground $sep_fg -background $sep_bg] - -sticky we -pady 5
 		grid [ttk::label $w.n.t.curl_label -text "Curl program path:"] \
 		     [ttk::entry $w.n.t.curl -textvariable curl_path] -sticky w
 
-		grid [ttk::label $w.n.d.title -text "DIAGNOSTIC/DEBUGGING OPTIONS" -anchor center -foreground white -background black] - -sticky we -pady 5
+		grid [ttk::label $w.n.d.title -text "DIAGNOSTIC/DEBUGGING OPTIONS" -anchor center -foreground $sep_fg -background $sep_bg] - -sticky we -pady 5
 		grid [ttk::label $w.n.d.level_label -text "Debugging level:"] \
 		     [ttk::spinbox $w.n.d.level -values {0 1 2 3 4 5 6} -textvariable debug_level -width 2] -sticky w
 		grid [ttk::checkbutton $w.n.d.proto -text "Debug client/server protocol messages" -variable debug_proto] - -sticky w
@@ -1043,7 +1051,7 @@ namespace eval ::gmaprofile {
 		
 		set s $w.n.p.settings
 		frame $s
-		grid [ttk::label $s.title -text "CONNECTION" -anchor center -foreground white -background black] - - \
+		grid [ttk::label $s.title -text "CONNECTION" -anchor center -foreground $sep_fg -background $sep_bg] - - \
 		     [ttk::label $s.gmtitle -text "GM SETTINGS" -anchor center -foreground white -background #883333] - \
 			     -sticky we -pady 5
 		grid [ttk::label $s.hostlabel -text "Hostname:"] \
@@ -1074,7 +1082,7 @@ namespace eval ::gmaprofile {
 		     [ttk::entry $s.gmscph -textvariable s_scp_server] \
 		     -sticky w
 
-		grid [ttk::label $s.title2 -text "GENERAL SETTINGS" -anchor center -foreground white -background black] - - \
+		grid [ttk::label $s.title2 -text "GENERAL SETTINGS" -anchor center -foreground $sep_fg -background $sep_bg] - - \
 		     [ttk::label $s.gmscpxlbl -text "scp Proxy:"] \
 		     [ttk::entry $s.gmscpx -textvariable s_scp_proxy] \
 			-sticky we -pady 5
