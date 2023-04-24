@@ -675,12 +675,9 @@ proc update_initiative_slots {w {limit {}} args} {
 						$w.slot$i configure \
 							-highlightbackground [dict get $::_preferences styles clocks negative_hp [::gmaprofile::dlkeypref $::_preferences]] \
 							-highlightcolor [dict get $::_preferences styles clocks negative_hp [::gmaprofile::dlkeypref $::_preferences]] \
-							-highlightthickness 4
-						if {[dict get $::_preferences dark]} {
-							$w.slot$i configure \
-								-foreground [dict get $::_preferences styles clocks slot_fg [::gmaprofile::dlkeypref $::_preferences]] \
-								-background [dict get $::_preferences styles clocks slot_bg [::gmaprofile::dlkeypref $::_preferences]]
-						}
+							-highlightthickness 4 \
+							-foreground [dict get $::_preferences styles clocks slot_fg [::gmaprofile::dlkeypref $::_preferences]] \
+							-background [dict get $::_preferences styles clocks slot_bg [::gmaprofile::dlkeypref $::_preferences]]
 					} elseif {[dict get $_window_state($w) ilist $i health_tracker is_flat_footed]} {
 						$w.slot$i configure \
 							-highlightbackground [dict get $::_preferences styles clocks flat_footed [::gmaprofile::dlkeypref $::_preferences]] \
@@ -729,12 +726,9 @@ proc update_initiative_slots {w {limit {}} args} {
 						$w.slot$i configure \
 							-highlightbackground [dict get $::_preferences styles clocks negative_hp [::gmaprofile::dlkeypref $::_preferences]] \
 							-highlightcolor [dict get $::_preferences styles clocks negative_hp [::gmaprofile::dlkeypref $::_preferences]] \
-							-highlightthickness 4
-						if {[dict get $::_preferences dark]} {
-							$w.slot$i configure \
-								-background [dict get $::_preferences styles clocks slot_bg [::gmaprofile::dlkeypref $::_preferences]] \
-								-foreground [dict get $::_preferences styles clocks slot_fg [::gmaprofile::dlkeypref $::_preferences]]
-						}
+							-highlightthickness 4 \
+							-background [dict get $::_preferences styles clocks slot_bg [::gmaprofile::dlkeypref $::_preferences]] \
+							-foreground [dict get $::_preferences styles clocks slot_fg [::gmaprofile::dlkeypref $::_preferences]]
 					} elseif {[dict get $_window_state($w) ilist $i health_tracker is_flat_footed]} {
 						$w.slot$i configure \
 							-highlightbackground [dict get $::_preferences styles clocks flat_footed [::gmaprofile::dlkeypref $::_preferences]] \
