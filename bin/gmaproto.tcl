@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___          ___                           #
-# (  ____ \(       )(  ___  ) Game         /   )        /   )                          #
-# | (    \/| () () || (   ) | Master's    / /) |       / /) |                          #
-# | |      | || || || (___) | Assistant  / (_) (_     / (_) (_                         #
-# | | ____ | |(_)| ||  ___  |           (____   _)   (____   _)                        #
-# | | \_  )| |   | || (   ) |                ) (          ) (                          #
-# | (___) || )   ( || )   ( | Mapper         | |   _      | |                          #
-# (_______)|/     \||/     \| Client         (_)  (_)     (_)                          #
+#  _______  _______  _______                ___          ___        __                 #
+# (  ____ \(       )(  ___  ) Game         /   )        /   )      /  \                #
+# | (    \/| () () || (   ) | Master's    / /) |       / /) |      \/) )               #
+# | |      | || || || (___) | Assistant  / (_) (_     / (_) (_       | |               #
+# | | ____ | |(_)| ||  ___  |           (____   _)   (____   _)      | |               #
+# | | \_  )| |   | || (   ) |                ) (          ) (        | |               #
+# | (___) || )   ( || )   ( | Mapper         | |   _      | |   _  __) (_              #
+# (_______)|/     \||/     \| Client         (_)  (_)     (_)  (_) \____/              #
 #                                                                                      #
 ########################################################################################
 #
@@ -1030,6 +1030,13 @@ proc ::gmaproto::_encode_payload {input_dict type_dict} {
 						}]]
 					}
 				}
+				D {
+					if {[dict size $v] > 0} {
+						dict set a $f [::json::write object {*}[dict map {dk dv} $v {
+							set dv [::gmaproto::_encode_payload $dv [lindex $t 1]]
+						}]]
+					}
+				}
 				default {
 					error "bug: unrecognized type code $t"
 				}
@@ -1219,6 +1226,20 @@ proc ::gmaproto::_construct {input types} {
 						dict set input $field {}
 					} else {
 						dict set input $field [::gmaproto::_construct [dict get $input $field] [lindex $t 1]]
+					}
+				} else {
+					dict set input $field {}
+				}
+			}
+			D {
+				if {[dict exists $input $field]} {
+					if {[set srcdata [dict get $input $field]] eq "null"} {
+						dict set input $field {}
+					} else {
+						dict unset input $field
+						dict for {fldk fldv} $srcdata {
+							dict set input $field $fldk [::gmaproto::_construct $fldv [lindex $t 1]]
+						}
 					}
 				} else {
 					dict set input $field {}
@@ -2122,7 +2143,7 @@ proc ::gmaproto::GMATypeToProtocolCommand {gt} {
 	}
 	return $gt
 }
-# @[00]@| GMA-Mapper 4.4
+# @[00]@| GMA-Mapper 4.4.1
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
