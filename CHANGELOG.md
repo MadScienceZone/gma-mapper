@@ -15,6 +15,7 @@
 ## Enhancements
  * Added new die-roll result detail types "begingroup" and "endgroup"
  * Updated the in-app documentation for die roll expressions.
+ * Fixed a bug that caused tooltips to be unreadable in dark mode.
 
 # 4.4.1
 ## Enhancements 
