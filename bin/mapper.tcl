@@ -1,20 +1,20 @@
 # -selectcolor $check_select_color!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___          ___        __                 #
-# (  ____ \(       )(  ___  ) Game         /   )        /   )      /  \                #
-# | (    \/| () () || (   ) | Master's    / /) |       / /) |      \/) )               #
-# | |      | || || || (___) | Assistant  / (_) (_     / (_) (_       | |               #
-# | | ____ | |(_)| ||  ___  |           (____   _)   (____   _)      | |               #
-# | | \_  )| |   | || (   ) |                ) (          ) (        | |               #
-# | (___) || )   ( || )   ( | Mapper         | |   _      | |   _  __) (_              #
-# (_______)|/     \||/     \| Client         (_)  (_)     (_)  (_) \____/              #
+#  _______  _______  _______                ___       _______                          #
+# (  ____ \(       )(  ___  ) Game         /   )     (  ____ \                         #
+# | (    \/| () () || (   ) | Master's    / /) |     | (    \/                         #
+# | |      | || || || (___) | Assistant  / (_) (_    | (____                           #
+# | | ____ | |(_)| ||  ___  |           (____   _)   (_____ \                          #
+# | | \_  )| |   | || (   ) |                ) (           ) )                         #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\____) )                         #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/                          #
 #                                                                                      #
 ########################################################################################
 #
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.4.1}     ;# @@##@@
+set GMAMapperVersion {4.5-beta.0}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
 set GMAMapperProtocol {403}         ;# @@##@@
 set GMAVersionNumber {5.2}            ;# @@##@@
@@ -88,6 +88,7 @@ set ITproxy {}
 set ITproxyuser {}
 set ITproxypass {}
 set ITproxyport 0
+#
 #
 #---------------------------[END CONFIG]--------------------------------------
 #
@@ -259,6 +260,33 @@ proc report_progress_noconsole {msg} {
 proc report_progress {msg} {
     puts "mapper: $msg"
     report_progress_noconsole $msg
+}
+
+proc setDarkMode {enabled} {
+	global dark_mode colortheme _preferences
+	if $enabled {
+		set dark_mode 1
+		set colortheme dark
+		dict set _preferences dark true
+		catch {
+			set ::tooltip::labelOpts [list -highlightthickness 0 -relief solid -bd 1 -background blue -foreground white]
+			if [winfo exists $::tooltip::G(TOPLEVEL)] {
+				$::tooltip::G(TOPLEVEL) configure -background blue
+				$::tooltip::G(TOPLEVEL).label configure -background blue -foreground white
+			}
+		}
+	} else {
+		set dark_mode 0
+		set colortheme light
+		dict set _preferences dark false
+		catch {
+			set ::tooltip::labelOpts [list -highlightthickness 0 -relief solid -bd 1 -background lightyellow -foreground black]
+			if [winfo exists $::tooltip::G(TOPLEVEL)] {
+				$::tooltip::G(TOPLEVEL) configure -background lightyellow
+				$::tooltip::G(TOPLEVEL).label configure -background lightyellow -foreground black
+			}
+		}
+	}
 }
 
 report_progress "Starting up..."
@@ -917,11 +945,7 @@ proc ApplyPreferences {data args} {
 		}
 	}
 		
-	if {$dark_mode} {
-		set colortheme dark
-	} else {
-		set colortheme light
-	}
+	setDarkMode $dark_mode
 	set blur_pct [expr max(0, min(100, $blur_pct))]
 	ApplyDebugProtocol $debug_protocol
 	if {$ImageFormat ne {gif} && $ImageFormat ne {png}} {
@@ -1082,14 +1106,15 @@ proc usage {} {
 	exit 1
 }
 
-# Initiative Tracking
+set optlist $argv
+set optc $argc
 
 proc getarg {opt} {
-	global argv argc stderr
+	global optlist optc stderr
 	upvar argi i
 
-	if {[incr i] < $argc} {
-		return [lindex $argv $i]
+	if {[incr i] < $optc} {
+		return [lindex $optlist $i]
 	}
 	puts $stderr "Option $opt requires a parameter!"
 	usage
@@ -1099,16 +1124,16 @@ proc getarg {opt} {
 # Load from mapper.conf ONLY if we didn't already find a new-style preferences file first
 #
 if {$PreferencesData eq {} && [file exists $default_config]} {
-	set argc [expr $argc + 2]
-	set argv [linsert $argv 0 --config $default_config]
+	set optc [expr $optc + 2]
+	set optlist [linsert $optlist 0 --config $default_config]
 }
 
 #
 # Set up for delayed actions prompted by the command line options
 #
 
-for {set argi 0} {$argi < $argc} {incr argi} {
-	set option [lindex $argv $argi]
+for {set argi 0} {$argi < $optc} {incr argi} {
+	set option [lindex $optlist $argi]
 	switch -exact -- $option {
 		-a - --no-animate {
 				set animatePlacement 0
@@ -1129,14 +1154,14 @@ for {set argi 0} {$argi < $argc} {incr argi} {
 				set c_args [split $config_line =]
 				if {[llength $c_args] == 1} {
 					# singleton argument
-					incr argc
-					set argv [linsert $argv [expr $argi + 1] "--$c_args"]
+					incr optc
+					set optlist [linsert $optlist [expr $argi + 1] "--$c_args"]
 				} elseif {[llength $c_args] == 0} {
 					# empty? Weird. ignore it.
 				} else {
 					# arg=value pair
-					incr argc 2
-					set argv [linsert $argv [expr $argi + 1] "--[lindex $c_args 0]" [join [lrange $c_args 1 end] =]]
+					incr optc 2
+					set optlist [linsert $optlist [expr $argi + 1] "--[lindex $c_args 0]" [join [lrange $c_args 1 end] =]]
 				}
 			}
 			close $config_file
@@ -1153,7 +1178,7 @@ for {set argi 0} {$argi < $argc} {incr argi} {
 			}
 		-D - --debug  { incr DEBUG_level }
 		--debug-protocol { ApplyDebugProtocol true }
-		-d - --dark {set dark_mode 1; set colortheme dark; dict set _preferences dark true}
+		-d - --dark {setDarkMode 1}
 		--help { usage }
 		-h - --host { 
 			set IThost [getarg -h] 
@@ -3355,7 +3380,10 @@ proc ShowDiceSyntax {} {
 		 p "\", which means to roll percentile (d100) dice."}
 		{p {}}
 		{p {Where the [...] is shown above, you may place more die roll patterns or integer values, separated by } b + p , b { -} p , b { *} p {, or } b // 
-		 p { to, respectively, add, subtract, multiply, or divide the following value from the total so far.}}
+		 p { to, respectively, add, subtract, multiply, or divide the following value from the total so far.}
+		 p { You can also use the character × for multiplication and ÷ for division.}}
+		{p {}}
+		{p {The math operators for addition, subtraction, multiplication, division, and unary - for negation (and technically the unary + which really doesn't do anything) are interpreted using the standard precedence and order of operation for those operators. You may use parentheses to group sub-expressions to force a particular order of operations.}}
 		{p {}}
 		{p {At the very end, you may place global modifiers separated from each other and from the die roll string with a vertical bar. These affect the outcome of the entire die roll in some way, by repeating the roll, confirming critical rolls, and so forth. The available global modifiers include:}}
 		{p {}}
@@ -9012,8 +9040,8 @@ proc DisplayChatMessage {d args} {
 		RefreshPeerList		;# ask for an update as well
 
 		foreach tag {
-			best bonus constant critlabel critspec dc diebonus diespec discarded
-			exceeded fail from fullmax fullresult iteration label max maximized maxroll 
+			begingroup best bonus constant critlabel critspec dc diebonus diespec discarded
+			endgroup exceeded fail from fullmax fullresult iteration label max maximized maxroll 
 			met min moddelim normal operator repeat result roll separator short sf success 
 			title to until worst system subtotal error notice
 		} {
@@ -10565,9 +10593,7 @@ proc ConnectToServerByIdx {idx} {
 	refresh_title
 }
 
-
-
-# @[00]@| GMA-Mapper 4.4.1
+# @[00]@| GMA-Mapper 4.5
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
