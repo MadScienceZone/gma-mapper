@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___          ___        __                 #
-# (  ____ \(       )(  ___  ) Game         /   )        /   )      /  \                #
-# | (    \/| () () || (   ) | Master's    / /) |       / /) |      \/) )               #
-# | |      | || || || (___) | Assistant  / (_) (_     / (_) (_       | |               #
-# | | ____ | |(_)| ||  ___  |           (____   _)   (____   _)      | |               #
-# | | \_  )| |   | || (   ) |                ) (          ) (        | |               #
-# | (___) || )   ( || )   ( | Mapper         | |   _      | |   _  __) (_              #
-# (_______)|/     \||/     \| Client         (_)  (_)     (_)  (_) \____/              #
+#  _______  _______  _______                ___       _______                          #
+# (  ____ \(       )(  ___  ) Game         /   )     (  ____ \                         #
+# | (    \/| () () || (   ) | Master's    / /) |     | (    \/                         #
+# | |      | || || || (___) | Assistant  / (_) (_    | (____                           #
+# | | ____ | |(_)| ||  ___  |           (____   _)   (_____ \                          #
+# | | \_  )| |   | || (   ) |                ) (           ) )                         #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\____) )                         #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/                          #
 #                                                                                      #
 ########################################################################################
 # Profile editor
@@ -181,6 +181,7 @@ namespace eval ::gmaprofile {
 	variable _description
 	array set _description {
 		best       {When making "best of n" die rolls, this displays the number of rolls to attempt.}
+		begingroup {The operator (i.e., "(") which signals the start of a grouped sub-expression.}
 		bonus      {An extra bonus added or subtracted from the roll, such as when confirming a critical hit with a bonus to the confirmation roll only.}
 		constant   {A constant value in the die roll expression, such as a bonus or penalty.}
 		critlabel  {An indicator that this roll is to confirm a critical hit.}
@@ -189,6 +190,7 @@ namespace eval ::gmaprofile {
 		diebonus   {A bonus or penalty applied to every die rolled for a particular diespec value (but not others in a multiple-die-roll request).}
 		diespec    {A die-roll specification such as "3d12" which indicates a random component of the overall expression.}
 		discarded  {When making "best of n" or "worst of n" rolls, this indicates a set of die rolls that were discarded to get the required results.}
+		endgroup   {The operator (i.e., ")") which signals the end of a grouped sub-expression.}
 		error      {An error message from the server indicating what went wrong with your die roll request.}
 		exceeded   {When making a roll with a DC target, or using "|until", this indicates the amount by which this roll exceeded the target.}
 		fail       {If the roll includes clear success/fail criteria, this indicates why the roll failed.}
@@ -948,7 +950,7 @@ namespace eval ::gmaprofile {
 		grid rowconfigure $st.r 11 -weight 2
 		grid rowconfigure $st.r 12 -weight 2
 
-		foreach stylename [dict keys [dict get $_profile styles dierolls components]] {
+		foreach stylename [lsort [dict keys [dict get $_profile styles dierolls components]]] {
 			$st.r.styles insert end $stylename
 		}
 		bind $st.r.styles <<ListboxSelect>> "::gmaprofile::_select_dieroller_style $st \[%W curselection\]"
@@ -1368,6 +1370,7 @@ namespace eval ::gmaprofile {
 			dierolls [dict create \
 				compact_recents false \
 				components [dict create \
+					begingroup  [dict create fg [dict create dark {} light {}] bg [dict create dark {} light {}] font Normal format {} overstrike false underline false offset 0]\
 					best      [dict create fg [dict create dark #aaaaaa light #888888] bg [dict create dark {} light {}] font Special format { best of %s} overstrike false underline false offset 0]\
 					bonus     [dict create fg [dict create dark #fffb00 light #f05b00] bg [dict create dark {} light {}] font Normal format {} overstrike false underline false offset 0]\
 					constant  [dict create fg [dict create dark {} light {}] bg [dict create dark {} light {}] font Normal format {} overstrike false underline false offset 0]\
@@ -1377,6 +1380,7 @@ namespace eval ::gmaprofile {
 					diebonus  [dict create fg [dict create dark red light red] bg [dict create dark {} light {}] font Special format {(%s per die)} overstrike false underline false offset 0]\
 					diespec   [dict create fg [dict create dark {} light {}] bg [dict create dark {} light {}] font Normal format {} overstrike false underline false offset 0]\
 					discarded [dict create fg [dict create dark #aaaaaa light #888888] bg [dict create dark {} light {}] font Normal format {{%s}} overstrike true underline false offset 0]\
+					endgroup  [dict create fg [dict create dark {} light {}] bg [dict create dark {} light {}] font Normal format {} overstrike false underline false offset 0]\
 					error     [dict create fg [dict create dark red light red] bg [dict create dark {} light {}] font Normal format {ERROR: %s} overstrike false underline false offset 0]\
 					exceeded  [dict create fg [dict create dark #00fa92 light green] bg [dict create dark {} light {}] font Special format { exceeded DC by %s} overstrike false underline false offset 0]\
 					fail      [dict create fg [dict create dark red light red] bg [dict create dark {} light {}] font Important format {(%s) } overstrike false underline false offset 0]\
@@ -1718,11 +1722,13 @@ namespace eval ::gmaprofile {
 				result      23
 				success     HIT
 				separator   =
+				begingroup  (
 				diespec     1d20
 				roll        20
 				operator    +
 				constant    3
 				label       luck
+				endgroup    )
 				bonus       +2
 				moddelim    |
 				min         5
