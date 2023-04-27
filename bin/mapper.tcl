@@ -1,20 +1,20 @@
 # -selectcolor $check_select_color!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___          ___        __                 #
-# (  ____ \(       )(  ___  ) Game         /   )        /   )      /  \                #
-# | (    \/| () () || (   ) | Master's    / /) |       / /) |      \/) )               #
-# | |      | || || || (___) | Assistant  / (_) (_     / (_) (_       | |               #
-# | | ____ | |(_)| ||  ___  |           (____   _)   (____   _)      | |               #
-# | | \_  )| |   | || (   ) |                ) (          ) (        | |               #
-# | (___) || )   ( || )   ( | Mapper         | |   _      | |   _  __) (_              #
-# (_______)|/     \||/     \| Client         (_)  (_)     (_)  (_) \____/              #
+#  _______  _______  _______                ___       _______                          #
+# (  ____ \(       )(  ___  ) Game         /   )     (  ____ \                         #
+# | (    \/| () () || (   ) | Master's    / /) |     | (    \/                         #
+# | |      | || || || (___) | Assistant  / (_) (_    | (____                           #
+# | | ____ | |(_)| ||  ___  |           (____   _)   (_____ \                          #
+# | | \_  )| |   | || (   ) |                ) (           ) )                         #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\____) )                         #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/                          #
 #                                                                                      #
 ########################################################################################
 #
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.4.1}     ;# @@##@@
+set GMAMapperVersion {4.5}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
 set GMAMapperProtocol {403}         ;# @@##@@
 set GMAVersionNumber {5.2}            ;# @@##@@
@@ -9012,8 +9012,8 @@ proc DisplayChatMessage {d args} {
 		RefreshPeerList		;# ask for an update as well
 
 		foreach tag {
-			best bonus constant critlabel critspec dc diebonus diespec discarded
-			exceeded fail from fullmax fullresult iteration label max maximized maxroll 
+			begingroup best bonus constant critlabel critspec dc diebonus diespec discarded
+			endgroup exceeded fail from fullmax fullresult iteration label max maximized maxroll 
 			met min moddelim normal operator repeat result roll separator short sf success 
 			title to until worst system subtotal error notice
 		} {
@@ -10567,7 +10567,7 @@ proc ConnectToServerByIdx {idx} {
 
 
 
-# @[00]@| GMA-Mapper 4.4.1
+# @[00]@| GMA-Mapper 4.5
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
