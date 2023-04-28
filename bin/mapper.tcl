@@ -14,7 +14,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.5-beta.1}     ;# @@##@@
+set GMAMapperVersion {4.5-beta.2}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
 set GMAMapperProtocol {403}         ;# @@##@@
 set GMAVersionNumber {5.2}            ;# @@##@@
@@ -3437,8 +3437,9 @@ proc ShowDiceSyntax {} {
 		{h1 {Presets}}
 		{p {}}
 		{p {Saving preset rolls to the server allows them to be available any time your client connects to it. Each preset is given a unique name. If another preset is added with the same name, it will replace the previous one.}}
-		{p {If a vertical bar (|) appears in the preset name, everything up to and including the bar is not displayed in the tool, but the sort order of the preset display is based on the entire name. This allows you to sort the entries in any arbitrary order without cluttering the display if you wish. This is most convenient if you save your presets to a file, edit them, and load them back again.}}
-		{p {The save file for presets is a structured, record-based text file documented in dice(5).}}
+		{p {Clicking on the [Edit Presets...] button will allow you to add, remove, modify, and reorder the list of presets you have on file. You can also define modifiers and variables. These are fragments of die-roll expressions (such as "+2 inspiration") which you can turn on or off as you need them. When turned on, they are added to all of your die rolls (in the order they appear). You may also give them a variable name, in which case they will not be added to every die roll but will instead be substituted in place of the notation } b < i name b > p {, where } i name p { is the name of the variable.}}
+		{p {}}
+		{p {The export file for presets is a structured, record-based text file documented in dice(5).}}
 	} {
 		foreach {f t} $line {
 			$w.text insert end $t $f
@@ -8851,9 +8852,9 @@ proc _render_die_roller {w width height type args} {
 				if {[set id [string trim [dict get $preset Variable]]] eq {}} {
 					set id [dict get $preset DisplaySeq]
 					if {[dict get $preset Global]} {
-						set t "[dict get $preset DisplayName] (everywhere): (...)[dict get $preset DieRollSpec]"
+						set t "[dict get $preset DisplayName]: (...)[dict get $preset DieRollSpec]"
 					} else {
-						set t "[dict get $preset DisplayName] (everywhere): [dict get $preset DieRollSpec]"
+						set t "[dict get $preset DisplayName]: [dict get $preset DieRollSpec]"
 					}
 					pack [ttk::checkbutton $w.preset$i.enabled -variable DRPS_en$i -command "DRPScheckVarEn $i $id"\
 						-text $t] -side left
@@ -9392,6 +9393,7 @@ proc PresetLists {arrayname args} {
 	set seq 0
 	if $export {
 		array unset DieRollPresetState
+		set DieRollPresetState(apply_order) {}
 	}
 	foreach pname [lsort [array names presets]] {
 		if {[string range $pname 0 0] eq {§}} {
@@ -9418,7 +9420,7 @@ proc PresetLists {arrayname args} {
 			if {[llength $flags] > 1} {
 				dict set d Variable [string trim [lindex $flags 1]]
 			} else {
-				dict set d Varaible {}
+				dict set d Variable {}
 			}
 			
 			set n [lindex $flags 0]
@@ -9430,7 +9432,7 @@ proc PresetLists {arrayname args} {
 				}
 				dict set d DisplaySeq $n
 			} else {
-				dect set d DisplaySeq [incr seq]
+				dict set d DisplaySeq [incr seq]
 			}
 
 			lappend mods $d
@@ -9451,6 +9453,7 @@ proc PresetLists {arrayname args} {
 					set DieRollPresetState(global,$id) [dict get $d DieRollSpec]
 					set DieRollPresetState(on,$id) [dict get $d Enabled]
 					set DieRollPresetState(g,$id) [dict get $d Global]
+					lappend DieRollPresetState(apply_order) $id
 				}
 			}
 		} else {
@@ -10342,11 +10345,10 @@ proc _do_roll {roll_string extra w} {
 	if {[catch {
 		set rollspec [_apply_die_roll_mods $roll_string $extra { ad hoc}]
 		DEBUG 1 " after ad hoc: $rollspec"
-		foreach v [array names DieRollPresetState -glob global,*] {
-			set id [string range $v 7 end]
+		foreach id $DieRollPresetState(apply_order) {
 			if {$DieRollPresetState(on,$id)} {
-				set rollspec [_apply_die_roll_mods $rollspec $DieRollPresetState($v) {} $DieRollPresetState(g,$id)]
-				DEBUG 1 " after $DieRollPresetState($v): $rollspec"
+				set rollspec [_apply_die_roll_mods $rollspec $DieRollPresetState(global,$id) {} $DieRollPresetState(g,$id)]
+				DEBUG 1 " after $DieRollPresetState(global,$id): $rollspec"
 			}
 		}
 		set rollspec [_apply_die_roll_variables $rollspec]

@@ -998,7 +998,7 @@ namespace eval ::gmaprofile {
 
 		set sep_fg white
 		if $dark {
-			set sep_bg blue
+			set sep_bg #000090
 		} else {
 			set sep_bg black
 		}
@@ -1363,7 +1363,7 @@ namespace eval ::gmaprofile {
 		    normal_bg    [dict create dark [default_color bg dark] light [default_color bg light]] \
 		    highlight_fg [dict create dark yellow light red] \
 		    odd_bg       [dict create dark [default_color bg dark] light [default_color bg light]] \
-		    even_bg      [dict create dark blue   light #bbbbff] \
+		    even_bg      [dict create dark #000090 light #bbbbff] \
 		    grid         [dict create dark [default_color grid dark] light [default_color grid light]] \
 		    grid_minor   [dict create dark [default_color grid_minor dark] light [default_color grid_minor light]] \
 		    grid_major   [dict create dark [default_color grid_major dark] light [default_color grid_major light]] \
