@@ -8851,9 +8851,9 @@ proc _render_die_roller {w width height type args} {
 				if {[set id [string trim [dict get $preset Variable]]] eq {}} {
 					set id [dict get $preset DisplaySeq]
 					if {[dict get $preset Global]} {
-						set t "[dict get $preset DisplayName] (everywhere): (...)[dict get $preset DieRollSpec]"
+						set t "[dict get $preset DisplayName]: (...)[dict get $preset DieRollSpec]"
 					} else {
-						set t "[dict get $preset DisplayName] (everywhere): [dict get $preset DieRollSpec]"
+						set t "[dict get $preset DisplayName]: [dict get $preset DieRollSpec]"
 					}
 					pack [ttk::checkbutton $w.preset$i.enabled -variable DRPS_en$i -command "DRPScheckVarEn $i $id"\
 						-text $t] -side left
