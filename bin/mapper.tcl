@@ -1,4 +1,4 @@
-# -selectcolor $check_select_color!/usr/bin/env wish
+#!/usr/bin/env wish
 ########################################################################################
 #  _______  _______  _______                ___       _______                          #
 # (  ____ \(       )(  ___  ) Game         /   )     (  ____ \                         #
@@ -3445,7 +3445,6 @@ proc ShowDiceSyntax {} {
 		}
 		$w.text insert end "\n"
 	}
-	# XXX TODO presets
 }
 
 # Begin drawing a new object of some type on the screen
@@ -8914,6 +8913,113 @@ proc _resize_die_roller {w width height type} {
 	set resize_task($type) {}
 }
 
+proc EditDieRollPresets {} {
+	global dice_preset_data
+	global tmp_presets
+	array unset tmp_presets
+	array set tmp_presets [array get dice_preset_data]
+
+	if [winfo exists .edrp] {
+		DEBUG 0 "There is already a die roll preset editor window open; not making another."
+		return
+	}
+
+	set w .edrp
+	toplevel $w
+	wm title $w "Manage Die-Roll Presets"
+	ttk::notebook $w.n
+	frame $w.n.r
+	frame $w.n.m
+	$w.n add $w.n.r -state normal -sticky news -text Rolls
+	$w.n add $w.n.m -state disabled -sticky news -text Modifiers
+	pack $w.n
+	pack [button $w.can -text Cancel -command "destroy $w"] -side left
+	pack [button $w.ok -text Save -command "array unset dice_preset_data; array set dice_preset_data [array get tmp_presets]; destroy $w"] -side right
+
+	global icon_anchor_n icon_anchor_s icon_delete icon_add
+	grid [label $w.n.r.t1 -text Name] [label $w.n.r.t2 -text Description] [label $w.n.r.t3 -text {Die-Roll Specification}] \
+		x x [button $w.n.r.add -image $icon_add -command "EDRPadd"] -sticky we
+	tooltip::tooltip $w.n.r.add "Add a new die-roll preset"
+
+	set presetdata [PresetLists dice_preset_data]
+	set i 0
+	foreach preset [dict get $presetdata Rolls] {
+		grid [entry $w.n.r.name$i] [entry $w.n.r.desc$i] [entry $w.n.r.dspec$i] \
+		     [button $w.n.r.up$i -image $icon_anchor_n -command "EDRPraise $i"] \
+		     [button $w.n.r.dn$i -image $icon_anchor_s -command "EDRPlower $i"] \
+		     [button $w.n.r.del$i -image $icon_delete -command "EDRPdel $i"] -sticky we
+		$w.n.r.name$i insert 0 [dict get $preset DisplayName]
+		$w.n.r.desc$i insert 0 [dict get $preset Description]
+		$w.n.r.dspec$i insert 0 [dict get $preset DieRollSpec]
+		tooltip::tooltip $w.n.r.up$i "Move this die-roll up in the list"
+		tooltip::tooltip $w.n.r.dn$i "Move this die-roll down in the list"
+		tooltip::tooltip $w.n.r.del$i "Remove this die-roll from the list"
+		if {$i == 0} {
+			$w.n.r.up$i configure -state disabled
+		}
+		incr i
+	}
+	if {$i > 0} {
+		$w.n.r.dn[expr $i - 1] configure -state disabled
+	}
+
+	foreach preset [dict get $presetdata CustomRolls] {
+		grid [entry $w.n.r.name$i] [entry $w.n.r.desc$i] [entry $w.n.r.dspec$i] \
+		     x x [button $w.n.r.del$i -image $icon_delete -command "EDRPdel $i"] -sticky we
+		$w.n.r.name$i insert 0 [dict get $preset Name]
+		$w.n.r.desc$i insert 0 [dict get $preset Description]
+		$w.n.r.dspec$i insert 0 [dict get $preset DieRollSpec]
+		tooltip::tooltip $w.n.r.del$i "Remove this die-roll from the list"
+		incr i
+	}
+
+
+	tkwait window $w
+	# TODO render list again
+}
+
+proc EDRPdel {i}
+proc EDRPlower {i}
+proc EDRPraise {i}
+proc EDRPadd {}
+proc PresetLists {arrayname} {
+	upvar $arrayname presets
+	set mods {}
+	set rolls {}
+	set custom {}
+	set seq 0
+	foreach pname [lsort [array names presets]] {
+		if {[string range $pname 0 0] eq {§}} {
+			lappend mods $presets($pname)
+		} else {
+			set pieces [split $pname |]
+			set d $presets($pname)
+			if {[llength $pieces] < 2} {
+				dict set d DisplayName $pname 
+				dict set d DisplaySeq [incr seq]
+				lappend rolls $d
+			} else {
+				set n [lindex $pieces 0]
+				if {[string is integer -strict $n]} {
+					if {$n <= $seq} {
+						set n [incr seq]
+					} else {
+						set seq $n
+					}
+					dict set d DisplayName [join [lrange $pieces 1 end] |] 
+					dict set d DisplaySeq $n
+					lappend rolls $d
+				} else {
+					dict set d DisplayName [join [lrange $pieces 1 end] |] 
+					dict set d DisplaySeq [lindex $pieces 0]
+					lappend custom $d
+				}
+			}
+		}
+	}
+	return [dict create Modifiers $mods Rolls $rolls CustomRolls $custom]
+}
+
 # DisplayChatMessage d ?-noopen? ?-system?
 proc DisplayChatMessage {d args} {
 	global dark_mode SuppressChat CHAT_TO CHAT_text check_select_color
@@ -8966,10 +9072,35 @@ proc DisplayChatMessage {d args} {
 		# Recent: most recent           +[____][:]     \
 		#         next recent           +[____][:]     | recent
 		#         next recent           +[____][:]     /
-		# Preset: [-] name: roll        +[____][:]     \mouseover to see full description
+		# Preset:
+		#         [-] name: roll        +[____][:]     \mouseover to see full description
 		#         [-] name: roll        +[____][:]     | preset
 		#         [-] name: roll        +[____][:]     /
 		#         [+] Add new preset
+		#
+		# new preset pane:
+		# (edit)(import)(export)
+		# [x] Modifier name: +[_______] (to all rolls)	§nnn;;e|name
+		# [x] Modifier name: +[_______] (as <var>)	§nnn;var;e|name
+		# [::]+[__________] Preset name: description
+		# [::]+[__________] Preset name: description
+		# [::]+[__________] Preset name: description
+		#
+		# remove/mod AddDieRollPreset
+		# add EditDieRollPresets
+		# dice_preset_data: array(name)=dict(Description, DieRollSpec)
+		#
+		# /Rolls\__________________________________________________________
+		# | [name________] [desc__________] [rollspec________] [-][^][v]
+		# | [name________] [desc__________] [rollspec________] [-][^][v]
+		# | [name________] [desc__________] [rollspec________] [-][^][v]
+		# |_______________________________________________________________
+		#
+		# _____/Mods\____________________________________________________________________
+		# | [name________] [desc___________] [rollspec_______] [x]as [_______] [-][^][v]
+		# | [name________] [desc___________] [rollspec_______] [x]as [_______] [-][^][v]
+		# | [name________] [desc___________] [rollspec_______] [x]as [_______] [-][^][v]
+		# |_______________________________________________________________
 		#
 		wm title $w "Chat and Die Rolls"
 		ttk::panedwindow $w.p -orient vertical 
@@ -8996,13 +9127,15 @@ proc DisplayChatMessage {d args} {
 			label $wr.$i.plus -text +
 			set last_known_size(recent,$i) blank
 		}
+		# TODO
 		pack [frame $wp.add] -side bottom -expand 0 -fill x
-		pack [button $wp.add.add -image $icon_add -command AddDieRollPreset] -side left
-		pack [label $wp.add.label -text "Add new die-roll preset" -anchor w] -side left -expand 1 -fill x
+		#pack [button $wp.add.add -image $icon_add -command AddDieRollPreset] -side left
+		#pack [label $wp.add.label -text "Add new die-roll preset" -anchor w] -side left -expand 1 -fill x
+		pack [button $wp.add.add -text "Edit presets..." -command EditDieRollPresets] -side left
 		pack [button $wp.add.save -image $icon_save -command "SaveDieRollPresets $w"] -side right
 		pack [button $wp.add.load -image $icon_open -command "LoadDieRollPresets $w"] -side right
-		tooltip::tooltip $wp.add.load "Load presets from disk file"
-		tooltip::tooltip $wp.add.save "Save presets to disk file"
+		tooltip::tooltip $wp.add.load "Import presets from disk file"
+		tooltip::tooltip $wp.add.save "Export presets to disk file"
 
 		pack [frame $wc.1] -side top -expand 1 -fill both
 		pack [frame $wc.2]\
