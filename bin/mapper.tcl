@@ -3437,8 +3437,9 @@ proc ShowDiceSyntax {} {
 		{h1 {Presets}}
 		{p {}}
 		{p {Saving preset rolls to the server allows them to be available any time your client connects to it. Each preset is given a unique name. If another preset is added with the same name, it will replace the previous one.}}
-		{p {If a vertical bar (|) appears in the preset name, everything up to and including the bar is not displayed in the tool, but the sort order of the preset display is based on the entire name. This allows you to sort the entries in any arbitrary order without cluttering the display if you wish. This is most convenient if you save your presets to a file, edit them, and load them back again.}}
-		{p {The save file for presets is a structured, record-based text file documented in dice(5).}}
+		{p {Clicking on the [Edit Presets...] button will allow you to add, remove, modify, and reorder the list of presets you have on file. You can also define modifiers and variables. These are fragments of die-roll expressions (such as "+2 inspiration") which you can turn on or off as you need them. When turned on, they are added to all of your die rolls (in the order they appear). You may also give them a variable name, in which case they will not be added to every die roll but will instead be substituted in place of the notation } b < i name b > p {, where } i name p { is the name of the variable.}}
+		{p {}}
+		{p {The export file for presets is a structured, record-based text file documented in dice(5).}}
 	} {
 		foreach {f t} $line {
 			$w.text insert end $t $f
@@ -10347,7 +10348,7 @@ proc _do_roll {roll_string extra w} {
 		foreach id $DieRollPresetState(apply_order) {
 			if {$DieRollPresetState(on,$id)} {
 				set rollspec [_apply_die_roll_mods $rollspec $DieRollPresetState(global,$id) {} $DieRollPresetState(g,$id)]
-				DEBUG 1 " after $DieRollPresetState($v): $rollspec"
+				DEBUG 1 " after $DieRollPresetState(global,$id): $rollspec"
 			}
 		}
 		set rollspec [_apply_die_roll_variables $rollspec]
