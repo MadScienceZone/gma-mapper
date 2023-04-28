@@ -76,6 +76,8 @@ namespace eval ::gmaprofile {
 		slot_bg,dark       #232323
 		flat_footed,light  #3333ff
 		flat_footed,dark   #3333ff
+		preset_name,dark   cyan
+		preset_name,light  blue
 	}
 	variable _file_format {
 		GMA_Mapper_preferences_version i
@@ -163,6 +165,7 @@ namespace eval ::gmaprofile {
 				grid           {o {dark s light s}}
 				grid_minor     {o {dark s light s}}
 				grid_major     {o {dark s light s}}
+				preset_name    {o {dark s light s}}
 			}}
 			dierolls {o {
 				compact_recents ?
@@ -241,7 +244,7 @@ namespace eval ::gmaprofile {
 		upvar $pvar prof
 		set dprof [default_styles]
 		dict for {stylename styledata} [dict get $dprof dialogs] {
-			if {![dict exists $prof styles dialogs $stylename]} {
+			if {![dict exists $prof styles dialogs $stylename] || [dict get $prof styles dialogs $stylename] eq {}} {
 				::DEBUG 0 "Preferences missing dialog style \"$stylename\"; using default"
 				dict set prof styles dialogs $stylename $styledata
 			}
@@ -251,7 +254,7 @@ namespace eval ::gmaprofile {
 		upvar $pvar prof
 		set dprof [default_styles]
 		dict for {stylename styledata} [dict get $dprof clocks] {
-			if {![dict exists $prof styles clocks $stylename]} {
+			if {![dict exists $prof styles clocks $stylename] || [dict get $prof styles clocks $stylename] eq {}} {
 				::DEBUG 0 "Preferences missing clock style \"$stylename\"; using default"
 				dict set prof styles clocks $stylename $styledata
 			}
@@ -805,6 +808,7 @@ namespace eval ::gmaprofile {
 			ifg {Highlighted text color} highlight_fg
 			obg {Odd-row background}     odd_bg
 			ebg {Even-row background}    even_bg
+			pre {Die-roll preset name color} preset_name
 		} {
 			grid configure [label $st.d.l$wp -text "$name:"] -column 0 -row $row -padx 5 -sticky w
 			set col 1
@@ -942,7 +946,7 @@ namespace eval ::gmaprofile {
 				-from -100 -to 100 -increment 1 -width 4] -sticky w
 
 		grid ^ ^ [button $st.r.reset -text {Reset to Default Values} -command "::gmaprofile::_reset_style $st"] -sticky w
-		grid [ttk::checkbutton $st.r.compact -text "Use more compact layout for recent die rolls" -variable PEsCRen \
+		grid [ttk::checkbutton $st.r.compact -text "Use less compact layout for die roll presets" -variable PEsCRen \
 			-command "::gmaprofile::_set_style_compact $st \$PEsCRen"] - - - - -sticky w
 		global PEsCRen
 		set PEsCRen [::gmaproto::int_bool [dict get $_profile styles dierolls compact_recents]]
@@ -1366,6 +1370,7 @@ namespace eval ::gmaprofile {
 		    check_select [dict create dark [default_color check_select dark] light [default_color check_select light]] \
 		    check_menu   [dict create dark [default_color check_menu dark] light [default_color check_menu light]] \
 		    bright_fg    [dict create dark [default_color bright_fg dark]  light [default_color bright_fg light]] \
+		    preset_name  [dict create dark [default_color preset_name dark]  light [default_color preset_name light]] \
 		  ]\
 			dierolls [dict create \
 				compact_recents false \
