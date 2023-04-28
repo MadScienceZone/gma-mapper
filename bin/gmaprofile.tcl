@@ -942,7 +942,7 @@ namespace eval ::gmaprofile {
 				-from -100 -to 100 -increment 1 -width 4] -sticky w
 
 		grid ^ ^ [button $st.r.reset -text {Reset to Default Values} -command "::gmaprofile::_reset_style $st"] -sticky w
-		grid [ttk::checkbutton $st.r.compact -text "Use more compact layout for recent die rolls" -variable PEsCRen \
+		grid [ttk::checkbutton $st.r.compact -text "Use less compact layout for die roll presets" -variable PEsCRen \
 			-command "::gmaprofile::_set_style_compact $st \$PEsCRen"] - - - - -sticky w
 		global PEsCRen
 		set PEsCRen [::gmaproto::int_bool [dict get $_profile styles dierolls compact_recents]]
