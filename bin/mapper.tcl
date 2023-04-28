@@ -14,7 +14,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.5-beta.1}     ;# @@##@@
+set GMAMapperVersion {4.5-beta.2}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
 set GMAMapperProtocol {403}         ;# @@##@@
 set GMAVersionNumber {5.2}            ;# @@##@@
@@ -9392,6 +9392,7 @@ proc PresetLists {arrayname args} {
 	set seq 0
 	if $export {
 		array unset DieRollPresetState
+		set DieRollPresetState(apply_order) {}
 	}
 	foreach pname [lsort [array names presets]] {
 		if {[string range $pname 0 0] eq {§}} {
@@ -9418,7 +9419,7 @@ proc PresetLists {arrayname args} {
 			if {[llength $flags] > 1} {
 				dict set d Variable [string trim [lindex $flags 1]]
 			} else {
-				dict set d Varaible {}
+				dict set d Variable {}
 			}
 			
 			set n [lindex $flags 0]
@@ -9430,7 +9431,7 @@ proc PresetLists {arrayname args} {
 				}
 				dict set d DisplaySeq $n
 			} else {
-				dect set d DisplaySeq [incr seq]
+				dict set d DisplaySeq [incr seq]
 			}
 
 			lappend mods $d
@@ -9451,6 +9452,7 @@ proc PresetLists {arrayname args} {
 					set DieRollPresetState(global,$id) [dict get $d DieRollSpec]
 					set DieRollPresetState(on,$id) [dict get $d Enabled]
 					set DieRollPresetState(g,$id) [dict get $d Global]
+					lappend DieRollPresetState(apply_order) $id
 				}
 			}
 		} else {
@@ -10342,10 +10344,9 @@ proc _do_roll {roll_string extra w} {
 	if {[catch {
 		set rollspec [_apply_die_roll_mods $roll_string $extra { ad hoc}]
 		DEBUG 1 " after ad hoc: $rollspec"
-		foreach v [array names DieRollPresetState -glob global,*] {
-			set id [string range $v 7 end]
+		foreach id $DieRollPresetState(apply_order) {
 			if {$DieRollPresetState(on,$id)} {
-				set rollspec [_apply_die_roll_mods $rollspec $DieRollPresetState($v) {} $DieRollPresetState(g,$id)]
+				set rollspec [_apply_die_roll_mods $rollspec $DieRollPresetState(global,$id) {} $DieRollPresetState(g,$id)]
 				DEBUG 1 " after $DieRollPresetState($v): $rollspec"
 			}
 		}
