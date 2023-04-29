@@ -16,6 +16,7 @@
  * Added new die-roll result detail types "begingroup" and "endgroup"
  * Updated the in-app documentation for die roll expressions.
  * Fixed a bug that caused tooltips to be unreadable in dark mode.
+ * Added an editor window to create or edit die-roll title tags with full colored box support.
 
 # 4.4.1
 ## Enhancements 
