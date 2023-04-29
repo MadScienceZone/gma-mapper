@@ -14,7 +14,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.5-beta.3}     ;# @@##@@
+set GMAMapperVersion {4.5-beta.4}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
 set GMAMapperProtocol {403}         ;# @@##@@
 set GMAVersionNumber {5.2}            ;# @@##@@
@@ -8245,6 +8245,8 @@ proc DoCommandDD= {d} {
 			for {set i 0} {$i < [array size dice_preset_data]} {incr i} {
 				DEBUG 1 "destroy $wp.preset$i"
 				destroy $wp.preset$i
+				global DRPS_en$i
+				catch {unset DRPS_en$i}
 			}
 			array unset dice_preset_data
 			foreach preset [dict get $d Presets] {
@@ -8863,7 +8865,9 @@ proc _render_die_roller {w width height type args} {
 						-text "[dict get $preset DisplayName] (as <$id>): [dict get $preset DieRollSpec]"\
 					] -side left
 				}
-				set DRPS_en$i [::gmaproto::int_bool [dict get $preset Enabled]]
+				if {![info exists DRPS_en$i]} {
+					set DRPS_en$i [::gmaproto::int_bool [dict get $preset Enabled]]
+				}
 				::tooltip::tooltip $w.preset$i.enabled [dict get $preset Description]
 				incr i
 			}
@@ -9009,7 +9013,7 @@ proc EditDieRollPresets {} {
 
 	set i 0
 	grid x [label $w.n.m.t1 -text Name] [label $w.n.m.t2 -text Description] [label $w.n.m.t3 -text Expression] \
-		x x x x x [button $w.n.m.add -image $icon_add -command "EDRPaddModifier"] -sticky ew
+		x x x x x x [button $w.n.m.add -image $icon_add -command "EDRPaddModifier"] -sticky ew
 	foreach preset [dict get $tmp_presets Modifiers] {
 		global EDRP_mod_en$i
 		global EDRP_mod_ven$i
@@ -9128,16 +9132,20 @@ proc ECBT_ok {w} {
 	foreach t $titles {
 		set txt [dict get $t Text]
 		if [dict get $t FGen] {
-			append txt "\u2261[dict get $t Foreground]"
+			append txt "\u2261[::gmacolors::rgb_name [dict get $t Foreground]]"
 			if [dict get $t BGen] {
-				append txt "\u2261[dict get $t Background]"
+				append txt "\u2261[::gmacolors::rgb_name [dict get $t Background]]"
 			}
 		}
 		lappend parts $txt
 	}
 	
 	global $ECBTstate($w,var)
-	set $ECBTstate($w,var) "[join $parts \u2016]=$ECBTstate($w,spec)"
+	if {$parts eq {}} {
+		set $ECBTstate($w,var) $ECBTstate($w,spec)
+	} else {
+		set $ECBTstate($w,var) "[join $parts \u2016]=$ECBTstate($w,spec)"
+	}
 	ECBT_cancel $w
 }
 
@@ -9192,9 +9200,9 @@ proc ECBT_del {w i} {
 	global ECBTstate
 	set last $ECBTstate($w,size)
 	set titles [lreplace [ECBT_get_titles $w] $i-1 $i-1]
-	grid forget $w.name$last $w.fgen$last $w.fg$last $w.bgen$last $w.bg$last $w.ex$last $w.del$last
-	delete $w.name$last $w.fgen$last $w.fg$last $w.bgen$last $w.bg$last $w.ex$last $w.del$last
-	incr EBCTstate($w,size) -1
+	grid forget $w.title$last $w.fgen$last $w.fg$last $w.bgen$last $w.bg$last $w.ex$last $w.del$last
+	destroy $w.title$last $w.fgen$last $w.fg$last $w.bgen$last $w.bg$last $w.ex$last $w.del$last
+	incr ECBTstate($w,size) -1
 	ECBT_put_titles $w $titles
 }
 
@@ -9218,8 +9226,8 @@ proc ECBT_put_titles {w titles} {
 	set i 0
 	foreach title $titles {
 		incr i
-		if [dict $title FGen] {
-			if [dict $title BGen] {
+		if [dict get $title FGen] {
+			if [dict get $title BGen] {
 				set c [list [dict get $title Text] [dict get $title Foreground] [dict get $title Background]]
 			} else {
 				set c [list [dict get $title Text] [dict get $title Foreground]]
@@ -9244,7 +9252,7 @@ proc ECBT_set {w i components} {
 		}]} {
 			$w.fg$i configure -state normal -text invalid -background $global_bg_color
 		}
-
+		$w.bgen$i configure -state normal
 
 		if {[llength $components] > 2 && [lindex $components 2] ne {}} {
 			# there is a background color
@@ -9275,6 +9283,7 @@ proc ECBT_set {w i components} {
 		set ECBTstate($w,$i,bg) [::tk::Darken white 40]
 		$w.fg$i configure -state disabled -text auto -background $global_bg_color
 		$w.bg$i configure -state disabled -text auto -background $global_bg_color
+		$w.bgen$i configure -state disabled 
 	}
 	$w.ex$i configure -foreground $ECBTstate($w,$i,fg) -background $ECBTstate($w,$i,bg)
 }
