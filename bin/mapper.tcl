@@ -14,7 +14,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.5-beta.2}     ;# @@##@@
+set GMAMapperVersion {4.5-beta.3}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
 set GMAMapperProtocol {403}         ;# @@##@@
 set GMAVersionNumber {5.2}            ;# @@##@@
@@ -8946,6 +8946,7 @@ proc _resize_die_roller {w width height type} {
 proc EditDieRollPresets {} {
 	global dice_preset_data
 	global tmp_presets
+	global icon_fill
 
 	if [winfo exists .edrp] {
 		DEBUG 0 "There is already a die roll preset editor window open; not making another."
@@ -8965,20 +8966,25 @@ proc EditDieRollPresets {} {
 	pack [button $w.ok -text Save -command "EDRPsaveValues; destroy $w"] -side right
 
 	global icon_anchor_n icon_anchor_s icon_delete icon_add
-	grid [label $w.n.r.t1 -text Name] [label $w.n.r.t2 -text Description] [label $w.n.r.t3 -text {Die-Roll Specification}] \
+	grid [label $w.n.r.t1 -text Name] [label $w.n.r.t2 -text Description] [label $w.n.r.t3 -text {Die-Roll Specification}] - \
 		x x [button $w.n.r.add -image $icon_add -command "EDRPadd"] -sticky we
 	::tooltip::tooltip $w.n.r.add "Add a new die-roll preset"
 
 	set tmp_presets [PresetLists dice_preset_data]
 	set i 0
 	foreach preset [dict get $tmp_presets Rolls] {
-		grid [entry $w.n.r.name$i] [entry $w.n.r.desc$i] [entry $w.n.r.dspec$i] \
+		grid [entry $w.n.r.name$i] [entry $w.n.r.desc$i] \
+		     [button $w.n.r.color$i -image $icon_fill -command "EditColorBoxTitle EDRP_text$i"] \
+		     [entry $w.n.r.dspec$i -textvariable EDRP_text$i] \
 		     [button $w.n.r.up$i -image $icon_anchor_n -command "EDRPraise $i"] \
 		     [button $w.n.r.dn$i -image $icon_anchor_s -command "EDRPlower $i"] \
 		     [button $w.n.r.del$i -image $icon_delete -command "EDRPdel $i"] -sticky we
 		$w.n.r.name$i insert 0 [dict get $preset DisplayName]
 		$w.n.r.desc$i insert 0 [dict get $preset Description]
-		$w.n.r.dspec$i insert 0 [dict get $preset DieRollSpec]
+		global EDRP_text$i
+		set EDRP_text$i [dict get $preset DieRollSpec]
+		#$w.n.r.dspec$i insert 0 [dict get $preset DieRollSpec]
+		::tooltip::tooltip $w.n.r.color$i "Edit color(s) for die-roll title string"
 		::tooltip::tooltip $w.n.r.up$i "Move this die-roll up in the list"
 		::tooltip::tooltip $w.n.r.dn$i "Move this die-roll down in the list"
 		::tooltip::tooltip $w.n.r.del$i "Remove this die-roll from the list"
@@ -8996,7 +9002,7 @@ proc EditDieRollPresets {} {
 		     x x [button $w.n.r.delC$i -image $icon_delete -command "EDRPdelCustom $i"] -sticky we
 		$w.n.r.nameC$i insert 0 [dict get $preset Name]
 		$w.n.r.descC$i insert 0 [dict get $preset Description]
-		$w.n.r.dspecC$i insert 0 [dict get $preset DieRollSpec]
+		$w.n.r.dspecC$i insert 0 [dict get $preset DieRollSpec] -
 		::tooltip::tooltip $w.n.r.delC$i "Remove this die-roll from the list"
 		incr i
 	}
@@ -9048,7 +9054,7 @@ proc EditDieRollPresets {} {
 	if {$i > 0} {
 		$w.n.m.dn[expr $i - 1] configure -state disabled
 	}
-	grid columnconfigure $w.n.r 2 -weight 2
+	grid columnconfigure $w.n.r 3 -weight 2
 	grid columnconfigure $w.n.m 3 -weight 2
 
 
@@ -9056,7 +9062,246 @@ proc EditDieRollPresets {} {
 	# TODO render list again
 }
 
-# [ ] add refresh button to re-fetch presets from server
+#
+# Given a die-roll title string, allow editing the colorbox attributes
+# then call a callback with the resulting value
+#
+#  ______________________________________________________________________
+# |                                                                  [+] |
+# | [______________] [] foreground [C] [] background [C] [example__] [-] |
+# | [______________] [] foreground [C] [] background [C] [example__] [-] |
+# | [______________] [] foreground [C] [] background [C] [example__] [-] |
+# |______________________________________________________________________|
+# |[Cancel]__________________________________________________________[OK]|
+#
+# ≡ 2261
+# ‖ 2016
+set ECBTstate(seq) 0
+proc EditColorBoxTitle {var} {
+	global ECBTstate
+	global global_bg_color
+	global icon_add
+	set w .ecbt[incr ECBTstate(seq)]
+	set ECBTstate($w,size) 0
+	set ECBTstate($w,var) $var
+	global $var
+	set title [set $var]
+
+	if {[llength [set parts [split $title =]]] < 2} {
+		set ECBTstate($w,spec) $title
+		set title {}
+	} else {
+		set title [lindex $parts 0]
+		set ECBTstate($w,spec) [join [lrange $parts 1 end] =]
+	}
+
+	toplevel $w -background $global_bg_color
+	if {[catch {wm title $w "Edit Colorized Die-Roll Title"}]} {
+		wm title $w "Edit Colorized Die-Roll Title $ECBTseq"
+	}
+	grid [label $w.t1 -text "Title Text"] \
+		[label $w.t2 -text "Title Colors"] - - - \
+		[label $w.t3 -text "Preview"] \
+		[button $w.add -image $icon_add -command "ECBT_add $w"] -sticky we
+	grid [button $w.canc -text Cancel -command "ECBT_cancel $w"] - - - - - \
+		[button $w.ok -text OK -command "ECBT_ok $w"] -sticky w
+
+	set i 0
+	set titles [split $title "\u2016"]
+	foreach thisTitle $titles {
+		set components [split $thisTitle "\u2261"]
+		ECBT_add $w
+		ECBT_set $w [incr i] $components
+	}
+}
+
+proc ECBT_cancel {w} {
+	global ECBTstate
+	array unset ECBTstate $w,*
+	destroy $w
+}
+
+proc ECBT_ok {w} {
+	global ECBTstate
+	set titles [ECBT_get_titles $w]
+	set parts {}
+	foreach t $titles {
+		set txt [dict get $t Text]
+		if [dict get $t FGen] {
+			append txt "\u2261[dict get $t Foreground]"
+			if [dict get $t BGen] {
+				append txt "\u2261[dict get $t Background]"
+			}
+		}
+		lappend parts $txt
+	}
+	
+	global $ECBTstate($w,var)
+	set $ECBTstate($w,var) "[join $parts \u2016]=$ECBTstate($w,spec)"
+	ECBT_cancel $w
+}
+
+# | [______________] [] foreground [C] [] background [C] [example__] [-] |
+#    name            fgen          fg  bgen          bg   ex         del
+proc ECBT_fgen {w i} {
+	global ECBTstate
+	global global_bg_color
+	if $ECBTstate($w,$i,fgen) {
+		$w.fg$i configure -state normal
+		$w.bgen$i configure -state normal
+	} else {
+		$w.fg$i configure -state disabled -text white -background $global_bg_color
+		$w.bgen$i configure -state disabled
+		set ECBTstate($w,$i,bgen) 0
+		set ECBTstate($w,$i,fg) white
+		ECBT_bgen $w $i
+	}
+	ECBT_show_colors $w $i
+}
+
+proc ECBT_bgen {w i} {
+	global ECBTstate
+	global global_bg_color
+	if $ECBTstate($w,$i,bgen) {
+		$w.bg$i configure -state normal
+	} else {
+		$w.bg$i configure -state disabled -text auto -background $global_bg_color
+		set ECBTstate($w,$i,bg) [::tk::Darken $ECBTstate($w,$i,fg) 40]
+	}
+	ECBT_show_colors $w $i
+}
+
+proc ECBT_set_color {w i fld} {
+	global ECBTstate
+	if {[set chosencolor [tk_chooseColor -initialcolor $ECBTstate($w,$i,$fld) -parent $w -title "Choose $fld color for title"]] ne {}} {
+		set ECBTstate($w,$i,$fld) $chosencolor
+		$w.$fld$i configure -background $chosencolor -text [::gmacolors::rgb_name $chosencolor]
+	}
+	if {$fld eq "fg" && !$ECBTstate($w,$i,bgen)} {
+		set ECBTstate($w,$i,bg) [::tk::Darken $ECBTstate($w,$i,fg) 40]
+	}
+	ECBT_show_colors $w $i
+}
+
+proc ECBT_show_colors {w i} {
+	global ECBTstate
+	$w.ex$i configure -foreground $ECBTstate($w,$i,fg) -background $ECBTstate($w,$i,bg)
+}
+
+proc ECBT_del {w i} {
+	global ECBTstate
+	set last $ECBTstate($w,size)
+	set titles [lreplace [ECBT_get_titles $w] $i-1 $i-1]
+	grid forget $w.name$last $w.fgen$last $w.fg$last $w.bgen$last $w.bg$last $w.ex$last $w.del$last
+	delete $w.name$last $w.fgen$last $w.fg$last $w.bgen$last $w.bg$last $w.ex$last $w.del$last
+	incr EBCTstate($w,size) -1
+	ECBT_put_titles $w $titles
+}
+
+proc ECBT_get_titles {w} {
+	global ECBTstate
+	set titles {}
+
+	for {set i 1} {$i <= $ECBTstate($w,size)} {incr i} {
+		lappend titles [dict create \
+			Text       $ECBTstate($w,$i,text) \
+			Foreground $ECBTstate($w,$i,fg) \
+			Background $ECBTstate($w,$i,bg) \
+			FGen       $ECBTstate($w,$i,fgen) \
+			BGen       $ECBTstate($w,$i,bgen) \
+		]
+	}
+	return $titles
+}
+
+proc ECBT_put_titles {w titles} {
+	set i 0
+	foreach title $titles {
+		incr i
+		if [dict $title FGen] {
+			if [dict $title BGen] {
+				set c [list [dict get $title Text] [dict get $title Foreground] [dict get $title Background]]
+			} else {
+				set c [list [dict get $title Text] [dict get $title Foreground]]
+			}
+		} else {
+			set c [list [dict get $title Text]]
+		}
+		ECBT_set $w $i $c
+	}
+}
+
+proc ECBT_set {w i components} {
+	global ECBTstate
+	global global_bg_color
+	set ECBTstate($w,$i,text) [lindex $components 0]
+	if {[llength $components] > 1 && [lindex $components 1] ne {}} {
+		# there is a foreground color
+		set ECBTstate($w,$i,fgen) 1
+		set ECBTstate($w,$i,fg) [lindex $components 1]
+		if {[catch {
+			$w.fg$i configure -state normal -text [::gmacolors::rgb_name [lindex $components 1]] -background [lindex $components 1]
+		}]} {
+			$w.fg$i configure -state normal -text invalid -background $global_bg_color
+		}
+
+
+		if {[llength $components] > 2 && [lindex $components 2] ne {}} {
+			# there is a background color
+			set ECBTstate($w,$i,bgen) 1
+			set ECBTstate($w,$i,bg) [lindex $components 2]
+			if {[catch {
+				$w.bg$i configure -state normal -text [::gmacolors::rgb_name [lindex $components 2]]
+			}]} {
+				$w.bg$i configure -state normal -text invalid -background $global_bg_color
+			}
+
+		} else {
+			# automatic background color
+			set ECBTstate($w,$i,bgen) 0
+			if {[catch {
+				set ECBTstate($w,$i,bg) [::tk::Darken [lindex $components 1] 40]
+				$w.bg$i configure -state disabled -text auto -background $ECBTstate($w,$i,bg)
+			}]} {
+				set ECBTstate($w,$i,bg) [::tk::Darken white 40]
+				$w.bg$i configure -state disabled -text auto -background $global_bg_color
+			}
+		}
+	} else {
+		# no color set; use white
+		set ECBTstate($w,$i,fgen) 0
+		set ECBTstate($w,$i,bgen) 0
+		set ECBTstate($w,$i,fg) white
+		set ECBTstate($w,$i,bg) [::tk::Darken white 40]
+		$w.fg$i configure -state disabled -text auto -background $global_bg_color
+		$w.bg$i configure -state disabled -text auto -background $global_bg_color
+	}
+	$w.ex$i configure -foreground $ECBTstate($w,$i,fg) -background $ECBTstate($w,$i,bg)
+}
+
+	
+proc ECBT_add {w} {
+	global ECBTstate icon_delete
+	set i [incr ECBTstate($w,size)]
+	set ECBTstate($w,$i,fgen) 0
+	set ECBTstate($w,$i,text) {}
+	set ECBTstate($w,$i,bgen) 0
+	set ECBTstate($w,$i,fg) white
+	set ECBTstate($w,$i,bg) [::tk::Darken white 40]
+	grid forget $w.canc $w.ok
+	destroy $w.canc $w.ok
+	grid [entry $w.title$i -textvariable ECBTstate($w,$i,text)] \
+		[ttk::checkbutton $w.fgen$i -text foreground -variable ECBTstate($w,$i,fgen) -command "ECBT_fgen $w $i"] \
+		[button $w.fg$i -text white -state disabled -command "ECBT_set_color $w $i fg"] \
+		[ttk::checkbutton $w.bgen$i -state disabled -text background -variable ECBTstate($w,$i,bgen) -command "ECBT_bgen $w $i"] \
+		[button $w.bg$i -text auto -state disabled -command "ECBT_set_color $w $i bg"] \
+		[label $w.ex$i -relief raised -bd 2 -textvariable ECBTstate($w,$i,text) -foreground white -background [::tk::Darken white 40]] \
+		[button $w.del$i -image $icon_delete -command "ECBT_del $w $i"] \
+			-sticky ew
+	grid [button $w.canc -text Cancel -command "ECBT_cancel $w"] - - - - - \
+		[button $w.ok -text OK -command "ECBT_ok $w"] -sticky w
+}
+
 #
 # while editing, we keep the preset data in the global variable tmp_presets
 # which is a dict of
@@ -9077,7 +9322,11 @@ proc EDRPsaveValues {} {
 	set newpresets {}
 	EDRPgetValues
 	foreach p [dict get $tmp_presets Rolls] {
-		lappend newpresets [dict create Name [format %03d|%s [dict get $p DisplaySeq] [dict get $p DisplayName]] \
+		if {[scan [dict get $p DisplaySeq] %d%s seq _] != 1} {
+			DEBUG 0 "ERROR interpreting sequence \"[dict get $p DisplaySeq]\"; can't save presets"
+			return
+		}
+		lappend newpresets [dict create Name [format %03d|%s $seq [dict get $p DisplayName]] \
 						Description [dict get $p Description]\
 						DieRollSpec [dict get $p DieRollSpec]]
 	}
@@ -9094,8 +9343,15 @@ proc EDRPsaveValues {} {
 		if {[dict get $p Global]} {
 			append flags g
 		}
-		lappend newpresets [dict create Name [format "§%03d;%s;%s|%s" \
-							[dict get $p DisplaySeq] \
+		if {[scan [dict get $p DisplaySeq] %d%s seq _] != 1} {
+			DEBUG 0 "ERROR interpreting sequence \"[dict get $p DisplaySeq]\"; can't save presets"
+			return
+		}
+		if {[scan [dict get $p DisplaySeq] %d%s seq _] != 1} {
+			DEBUG 0 "ERROR interpreting sequence \"[dict get $p DisplaySeq]\"; can't save presets"
+			return
+		}
+		lappend newpresets [dict create Name [format "§%03d;%s;%s|%s" $seq \
 							[dict get $p Variable] \
 							$flags\
 							[dict get $p DisplayName]]\
@@ -9423,8 +9679,8 @@ proc PresetLists {arrayname args} {
 				dict set d Variable {}
 			}
 			
-			set n [lindex $flags 0]
-			if {[string is integer -strict $n]} {
+			set nstr [lindex $flags 0]
+			if {[scan $nstr %d%s n _] == 1} {
 				if {$n <= $seq} {
 					set n [incr seq]
 				} else {
@@ -9464,8 +9720,8 @@ proc PresetLists {arrayname args} {
 				dict set d DisplaySeq [incr seq]
 				lappend rolls $d
 			} else {
-				set n [lindex $pieces 0]
-				if {[string is integer -strict $n]} {
+				set nstr [lindex $pieces 0]
+				if {[scan $nstr %d%s n _] == 1} {
 					if {$n <= $seq} {
 						set n [incr seq]
 					} else {
@@ -9499,7 +9755,7 @@ proc EDRPcheckVar {i} {
 proc DisplayChatMessage {d args} {
 	global dark_mode SuppressChat CHAT_TO CHAT_text check_select_color
 	global icon_die16 icon_info20 icon_arrow_refresh check_menu_color
-	global icon_delete icon_add icon_open icon_save ChatTranscript
+	global icon_delete icon_add icon_open icon_save ChatTranscript icon_fill
 	global last_known_size CHAT_blind global_bg_color IThost
 	global _preferences colortheme
 
@@ -9621,6 +9877,8 @@ proc DisplayChatMessage {d args} {
 
 		pack [text $wc.1.text -yscrollcommand "$wc.1.sb set" -height 10 -width 10 -state disabled] -side left -expand 1 -fill both
 		pack [scrollbar $wc.1.sb -orient vertical -command "$wc.1.text yview"] -side right -expand 0 -fill y
+		pack [button $wc.3.tc -image $icon_fill \
+			-command "EditColorBoxTitle CHAT_dice"] -side left -padx 2
 		pack [label $wc.3.l -text Roll: -anchor nw] -side left -padx 2
 
 		pack [entry $wc.3.dice -textvariable CHAT_dice -relief sunken] -side left -fill x -expand 1
