@@ -17,7 +17,7 @@
 set GMAMapperVersion {4.5.2}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
 set GMAMapperProtocol {403}         ;# @@##@@
-set GMAVersionNumber {5.2}            ;# @@##@@
+set CoreVersionNumber {5.4}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -10713,10 +10713,10 @@ proc SyncView {} {
 }
 
 proc aboutMapper {} {
-	global GMAMapperVersion GMAMapperFileFormat GMAMapperProtocol GMAVersionNumber
+	global GMAMapperVersion GMAMapperFileFormat GMAMapperProtocol CoreVersionNumber
 
 	tk_messageBox -type ok -icon info -title "About Mapper" \
-		-message "GMA Mapper Client, Version $GMAMapperVersion, for GMA $GMAVersionNumber.\n\nCopyright \u00A9 Steve Willoughby, Aloha, Oregon, USA. All Rights Reserved. Distributed under the terms and conditions of the 3-Clause BSD License.\n\nThis client supports file format $GMAMapperFileFormat and server protocol $GMAMapperProtocol."
+		-message "GMA Mapper Client, Version $GMAMapperVersion, for GMA $CoreVersionNumber.\n\nCopyright \u00A9 Steve Willoughby, Aloha, Oregon, USA. All Rights Reserved. Distributed under the terms and conditions of the 3-Clause BSD License.\n\nThis client supports file format $GMAMapperFileFormat and server protocol $GMAMapperProtocol."
 }
 
 proc SyncAllClientsToMe {} {
