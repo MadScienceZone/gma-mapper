@@ -8864,7 +8864,7 @@ proc _render_die_roller {w width height type args} {
 						-text $t] -side left
 				} else {
 					pack [ttk::checkbutton $w.preset$i.enabled -variable DRPS_en$i -command "DRPScheckVarEn $i $id"\
-						-text "[dict get $preset DisplayName] (as <$id>): [dict get $preset DieRollSpec]"\
+						-text "[dict get $preset DisplayName] (as \$\{$id\}): [dict get $preset DieRollSpec]"\
 					] -side left
 				}
 				if {![info exists DRPS_en$i]} {
