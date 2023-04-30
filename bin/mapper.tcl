@@ -14,7 +14,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.5-beta.4}     ;# @@##@@
+set GMAMapperVersion {4.5-beta.5}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
 set GMAMapperProtocol {403}         ;# @@##@@
 set GMAVersionNumber {5.2}            ;# @@##@@
@@ -3434,10 +3434,12 @@ proc ShowDiceSyntax {} {
 		 b {Damage = 1d12 + 1d6 fire + 2d6 sneak}
 		 p "\"."}
 		{p {}}
+		{p {If part of a die roll needs to be constrained within a given minimum or maximum value (as opposed to applying a global minimum or maximum on the } i entire p { result via the } b |min p { and } b |max p { options, you can use the } b <= p { and } b >= p { operators. In an expression, } i x b <= i y p { means to take the value of } i x p { but that it must be less than or equal to } i y p {, and likewise for } i x b >= i y p {. You may also use the characters ≤ and ≥ for these operators.}}
+		{p {}}
 		{h1 {Presets}}
 		{p {}}
 		{p {Saving preset rolls to the server allows them to be available any time your client connects to it. Each preset is given a unique name. If another preset is added with the same name, it will replace the previous one.}}
-		{p {Clicking on the [Edit Presets...] button will allow you to add, remove, modify, and reorder the list of presets you have on file. You can also define modifiers and variables. These are fragments of die-roll expressions (such as "+2 inspiration") which you can turn on or off as you need them. When turned on, they are added to all of your die rolls (in the order they appear). You may also give them a variable name, in which case they will not be added to every die roll but will instead be substituted in place of the notation } b < i name b > p {, where } i name p { is the name of the variable.}}
+		{p {Clicking on the [Edit Presets...] button will allow you to add, remove, modify, and reorder the list of presets you have on file. You can also define modifiers and variables. These are fragments of die-roll expressions (such as "+2 inspiration") which you can turn on or off as you need them. When turned on, they are added to all of your die rolls (in the order they appear). You may also give them a variable name, in which case they will not be added to every die roll but will instead be substituted in place of the notation } b $ i name p { or } b $\{ i name b \} p {, where } i name p { is the name of the variable.}}
 		{p {}}
 		{p {The export file for presets is a structured, record-based text file documented in dice(5).}}
 	} {
@@ -9022,9 +9024,9 @@ proc EditDieRollPresets {} {
 		     [entry $w.n.m.name$i] \
 		     [entry $w.n.m.desc$i] \
 		     [entry $w.n.m.dspec$i] \
-		     [ttk::checkbutton $w.n.m.varp$i -text "as symbol <" -variable EDRP_mod_ven$i -command "EDRPcheckVar $i"]\
+		     [ttk::checkbutton $w.n.m.varp$i -text "as symbol $\{" -variable EDRP_mod_ven$i -command "EDRPcheckVar $i"]\
 		     [entry $w.n.m.var$i -width 6]\
-		     [label $w.n.m.rb$i -text > -anchor w] \
+		     [label $w.n.m.rb$i -text \} -anchor w] \
 		     [ttk::checkbutton $w.n.m.g$i -text "()x" -variable EDRP_mod_g$i] \
 		     [button $w.n.m.up$i -image $icon_anchor_n -command "EDRPraiseModifier $i"] \
 		     [button $w.n.m.dn$i -image $icon_anchor_s -command "EDRPlowerModifier $i"] \
@@ -10554,7 +10556,7 @@ proc _apply_die_roll_mods {spec extra label {g false}} {
 	set extra_parts [split $extra |]
 	set spec_parts [split $spec |]
 	DEBUG 1 " orig: $spec_parts; new: $extra_parts"
-	if {[regexp {^([-+*(÷×]|//)} [lindex $extra_parts 0]]} {
+	if {[regexp {^([-+*(÷×≤≥]|//|<=|>=)} [lindex $extra_parts 0]]} {
 		set op {}
 	} else {
 		DEBUG 1 " adding leading +"
@@ -10584,7 +10586,11 @@ proc _apply_die_roll_mods {spec extra label {g false}} {
 proc _apply_die_roll_variables {rollspec} {
 	global DieRollPresetState
 	set it 0
-	while {[regexp -indices {<([a-zA-Z][a-zA-Z0-9]*)>} $rollspec fieldidx varidx]} {
+	foreach varform {
+		{\$\{([a-zA-Z][a-zA-Z0-9]*)\}}
+		{\$([a-zA-Z][a-zA-Z0-9]*)}
+	} {
+	    while {[regexp -indices $varform $rollspec fieldidx varidx]} {
 		DEBUG 1 " substitution $rollspec"
 		if {[incr it] > 100} {
 			error "too many iterations (circular reference?)"
@@ -10599,6 +10605,7 @@ proc _apply_die_roll_variables {rollspec} {
 		} else {
 			error "variable <$varname> does not exist."
 		}
+	    }
 	}
 	DEBUG 1 " substitution $rollspec"
 	return $rollspec
