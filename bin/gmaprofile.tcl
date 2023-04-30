@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___          ___        __                 #
-# (  ____ \(       )(  ___  ) Game         /   )        /   )      /  \                #
-# | (    \/| () () || (   ) | Master's    / /) |       / /) |      \/) )               #
-# | |      | || || || (___) | Assistant  / (_) (_     / (_) (_       | |               #
-# | | ____ | |(_)| ||  ___  |           (____   _)   (____   _)      | |               #
-# | | \_  )| |   | || (   ) |                ) (          ) (        | |               #
-# | (___) || )   ( || )   ( | Mapper         | |   _      | |   _  __) (_              #
-# (_______)|/     \||/     \| Client         (_)  (_)     (_)  (_) \____/              #
+#  _______  _______  _______                ___       _______                          #
+# (  ____ \(       )(  ___  ) Game         /   )     (  ____ \                         #
+# | (    \/| () () || (   ) | Master's    / /) |     | (    \/                         #
+# | |      | || || || (___) | Assistant  / (_) (_    | (____                           #
+# | | ____ | |(_)| ||  ___  |           (____   _)   (_____ \                          #
+# | | \_  )| |   | || (   ) |                ) (           ) )                         #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\____) )                         #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/                          #
 #                                                                                      #
 ########################################################################################
 # Profile editor
@@ -76,6 +76,8 @@ namespace eval ::gmaprofile {
 		slot_bg,dark       #232323
 		flat_footed,light  #3333ff
 		flat_footed,dark   #3333ff
+		preset_name,dark   cyan
+		preset_name,light  blue
 	}
 	variable _file_format {
 		GMA_Mapper_preferences_version i
@@ -163,6 +165,7 @@ namespace eval ::gmaprofile {
 				grid           {o {dark s light s}}
 				grid_minor     {o {dark s light s}}
 				grid_major     {o {dark s light s}}
+				preset_name    {o {dark s light s}}
 			}}
 			dierolls {o {
 				compact_recents ?
@@ -181,6 +184,7 @@ namespace eval ::gmaprofile {
 	variable _description
 	array set _description {
 		best       {When making "best of n" die rolls, this displays the number of rolls to attempt.}
+		begingroup {The operator (i.e., "(") which signals the start of a grouped sub-expression.}
 		bonus      {An extra bonus added or subtracted from the roll, such as when confirming a critical hit with a bonus to the confirmation roll only.}
 		constant   {A constant value in the die roll expression, such as a bonus or penalty.}
 		critlabel  {An indicator that this roll is to confirm a critical hit.}
@@ -189,6 +193,7 @@ namespace eval ::gmaprofile {
 		diebonus   {A bonus or penalty applied to every die rolled for a particular diespec value (but not others in a multiple-die-roll request).}
 		diespec    {A die-roll specification such as "3d12" which indicates a random component of the overall expression.}
 		discarded  {When making "best of n" or "worst of n" rolls, this indicates a set of die rolls that were discarded to get the required results.}
+		endgroup   {The operator (i.e., ")") which signals the end of a grouped sub-expression.}
 		error      {An error message from the server indicating what went wrong with your die roll request.}
 		exceeded   {When making a roll with a DC target, or using "|until", this indicates the amount by which this roll exceeded the target.}
 		fail       {If the roll includes clear success/fail criteria, this indicates why the roll failed.}
@@ -239,7 +244,7 @@ namespace eval ::gmaprofile {
 		upvar $pvar prof
 		set dprof [default_styles]
 		dict for {stylename styledata} [dict get $dprof dialogs] {
-			if {![dict exists $prof styles dialogs $stylename]} {
+			if {![dict exists $prof styles dialogs $stylename] || [dict get $prof styles dialogs $stylename] eq {}} {
 				::DEBUG 0 "Preferences missing dialog style \"$stylename\"; using default"
 				dict set prof styles dialogs $stylename $styledata
 			}
@@ -249,7 +254,7 @@ namespace eval ::gmaprofile {
 		upvar $pvar prof
 		set dprof [default_styles]
 		dict for {stylename styledata} [dict get $dprof clocks] {
-			if {![dict exists $prof styles clocks $stylename]} {
+			if {![dict exists $prof styles clocks $stylename] || [dict get $prof styles clocks $stylename] eq {}} {
 				::DEBUG 0 "Preferences missing clock style \"$stylename\"; using default"
 				dict set prof styles clocks $stylename $styledata
 			}
@@ -803,6 +808,7 @@ namespace eval ::gmaprofile {
 			ifg {Highlighted text color} highlight_fg
 			obg {Odd-row background}     odd_bg
 			ebg {Even-row background}    even_bg
+			pre {Die-roll preset name color} preset_name
 		} {
 			grid configure [label $st.d.l$wp -text "$name:"] -column 0 -row $row -padx 5 -sticky w
 			set col 1
@@ -940,7 +946,7 @@ namespace eval ::gmaprofile {
 				-from -100 -to 100 -increment 1 -width 4] -sticky w
 
 		grid ^ ^ [button $st.r.reset -text {Reset to Default Values} -command "::gmaprofile::_reset_style $st"] -sticky w
-		grid [ttk::checkbutton $st.r.compact -text "Use more compact layout for recent die rolls" -variable PEsCRen \
+		grid [ttk::checkbutton $st.r.compact -text "Use less compact layout for die roll presets" -variable PEsCRen \
 			-command "::gmaprofile::_set_style_compact $st \$PEsCRen"] - - - - -sticky w
 		global PEsCRen
 		set PEsCRen [::gmaproto::int_bool [dict get $_profile styles dierolls compact_recents]]
@@ -948,7 +954,7 @@ namespace eval ::gmaprofile {
 		grid rowconfigure $st.r 11 -weight 2
 		grid rowconfigure $st.r 12 -weight 2
 
-		foreach stylename [dict keys [dict get $_profile styles dierolls components]] {
+		foreach stylename [lsort [dict keys [dict get $_profile styles dierolls components]]] {
 			$st.r.styles insert end $stylename
 		}
 		bind $st.r.styles <<ListboxSelect>> "::gmaprofile::_select_dieroller_style $st \[%W curselection\]"
@@ -992,7 +998,7 @@ namespace eval ::gmaprofile {
 
 		set sep_fg white
 		if $dark {
-			set sep_bg blue
+			set sep_bg #000090
 		} else {
 			set sep_bg black
 		}
@@ -1357,17 +1363,19 @@ namespace eval ::gmaprofile {
 		    normal_bg    [dict create dark [default_color bg dark] light [default_color bg light]] \
 		    highlight_fg [dict create dark yellow light red] \
 		    odd_bg       [dict create dark [default_color bg dark] light [default_color bg light]] \
-		    even_bg      [dict create dark blue   light #bbbbff] \
+		    even_bg      [dict create dark #000090 light #bbbbff] \
 		    grid         [dict create dark [default_color grid dark] light [default_color grid light]] \
 		    grid_minor   [dict create dark [default_color grid_minor dark] light [default_color grid_minor light]] \
 		    grid_major   [dict create dark [default_color grid_major dark] light [default_color grid_major light]] \
 		    check_select [dict create dark [default_color check_select dark] light [default_color check_select light]] \
 		    check_menu   [dict create dark [default_color check_menu dark] light [default_color check_menu light]] \
 		    bright_fg    [dict create dark [default_color bright_fg dark]  light [default_color bright_fg light]] \
+		    preset_name  [dict create dark [default_color preset_name dark]  light [default_color preset_name light]] \
 		  ]\
 			dierolls [dict create \
 				compact_recents false \
 				components [dict create \
+					begingroup  [dict create fg [dict create dark {} light {}] bg [dict create dark {} light {}] font Normal format {} overstrike false underline false offset 0]\
 					best      [dict create fg [dict create dark #aaaaaa light #888888] bg [dict create dark {} light {}] font Special format { best of %s} overstrike false underline false offset 0]\
 					bonus     [dict create fg [dict create dark #fffb00 light #f05b00] bg [dict create dark {} light {}] font Normal format {} overstrike false underline false offset 0]\
 					constant  [dict create fg [dict create dark {} light {}] bg [dict create dark {} light {}] font Normal format {} overstrike false underline false offset 0]\
@@ -1377,6 +1385,7 @@ namespace eval ::gmaprofile {
 					diebonus  [dict create fg [dict create dark red light red] bg [dict create dark {} light {}] font Special format {(%s per die)} overstrike false underline false offset 0]\
 					diespec   [dict create fg [dict create dark {} light {}] bg [dict create dark {} light {}] font Normal format {} overstrike false underline false offset 0]\
 					discarded [dict create fg [dict create dark #aaaaaa light #888888] bg [dict create dark {} light {}] font Normal format {{%s}} overstrike true underline false offset 0]\
+					endgroup  [dict create fg [dict create dark {} light {}] bg [dict create dark {} light {}] font Normal format {} overstrike false underline false offset 0]\
 					error     [dict create fg [dict create dark red light red] bg [dict create dark {} light {}] font Normal format {ERROR: %s} overstrike false underline false offset 0]\
 					exceeded  [dict create fg [dict create dark #00fa92 light green] bg [dict create dark {} light {}] font Special format { exceeded DC by %s} overstrike false underline false offset 0]\
 					fail      [dict create fg [dict create dark red light red] bg [dict create dark {} light {}] font Important format {(%s) } overstrike false underline false offset 0]\
@@ -1718,11 +1727,13 @@ namespace eval ::gmaprofile {
 				result      23
 				success     HIT
 				separator   =
+				begingroup  (
 				diespec     1d20
 				roll        20
 				operator    +
 				constant    3
 				label       luck
+				endgroup    )
 				bonus       +2
 				moddelim    |
 				min         5

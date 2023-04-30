@@ -3,13 +3,20 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.4.1               <!-- @@##@@ -->
- * Effective Date: 24-Apr-2023               <!-- @@##@@ -->
+ * This Package Version: 4.5               <!-- @@##@@ -->
+ * Effective Date: 30-Apr-2023               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 5.3.2 <!-- @@##@@ -->
+ * GMA Core API Library Version: 5.4 <!-- @@##@@ -->
  * GMA Mapper File Format: 20	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 403        <!-- @@##@@ -->
+
+# 4.5
+## Enhancements
+ * Added new die-roll result detail types "begingroup" and "endgroup"
+ * Updated the in-app documentation for die roll expressions.
+ * Fixed a bug that caused tooltips to be unreadable in dark mode.
+ * Added an editor window to create or edit die-roll title tags with full colored box support.
 
 # 4.4.1
 ## Enhancements 
