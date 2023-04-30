@@ -9004,11 +9004,11 @@ proc EditDieRollPresets {} {
 	}
 	set i 0
 	foreach preset [dict get $tmp_presets CustomRolls] {
-		grid [entry $w.n.r.nameC$i] [entry $w.n.r.descC$i] [entry $w.n.r.dspecC$i] \
+		grid [entry $w.n.r.nameC$i] [entry $w.n.r.descC$i] x [entry $w.n.r.dspecC$i] \
 		     x x [button $w.n.r.delC$i -image $icon_delete -command "EDRPdelCustom $i"] -sticky we
 		$w.n.r.nameC$i insert 0 [dict get $preset Name]
 		$w.n.r.descC$i insert 0 [dict get $preset Description]
-		$w.n.r.dspecC$i insert 0 [dict get $preset DieRollSpec] -
+		$w.n.r.dspecC$i insert 0 [dict get $preset DieRollSpec]
 		::tooltip::tooltip $w.n.r.delC$i "Remove this die-roll from the list"
 		incr i
 	}
@@ -9362,12 +9362,22 @@ proc EDRPsaveValues {} {
 			DEBUG 0 "ERROR interpreting sequence \"[dict get $p DisplaySeq]\"; can't save presets"
 			return
 		}
-		lappend newpresets [dict create Name [format "§%03d;%s;%s|%s" $seq \
+		if {[dict exists $p Tag] && [set modtag [dict get $p Tag]] ne {}} {
+			lappend newpresets [dict create Name [format "§%03d;%s;%s;%s|%s" $seq \
+							[dict get $p Variable] \
+							$flags\
+							$modtag\
+							[dict get $p DisplayName]]\
+							Description [dict get $p Description]\
+							DieRollSpec [dict get $p DieRollSpec]]
+		} else {
+			lappend newpresets [dict create Name [format "§%03d;%s;%s|%s" $seq \
 							[dict get $p Variable] \
 							$flags\
 							[dict get $p DisplayName]]\
-						Description [dict get $p Description]\
-						DieRollSpec [dict get $p DieRollSpec]]
+							Description [dict get $p Description]\
+							DieRollSpec [dict get $p DieRollSpec]]
+		}
 	}
 	UpdateDicePresets $newpresets
 }
@@ -9675,6 +9685,9 @@ proc PresetLists {arrayname args} {
 				dict set d DisplayName [join [lrange $parts 1 end] |]
 			}
 			set flags [split [lindex $parts 0] ";"]
+			if {[llength $flags] > 3} {
+				dict set d Tag [lindex $flags 3]
+			}
 			if {[llength $flags] > 2} {
 				if {[lsearch -exact [lindex $flags 2] e] >= 0} {
 					dict set d Enabled true
