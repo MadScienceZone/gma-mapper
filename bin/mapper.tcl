@@ -9392,6 +9392,10 @@ proc EDRPdel {i} {
 	set i [llength [dict get $tmp_presets Rolls]]
 	grid forget $w.n.r.name$i $w.n.r.desc$i $w.n.r.dspec$i $w.n.r.up$i $w.n.r.dn$i $w.n.r.del$i
 	destroy $w.n.r.name$i $w.n.r.desc$i $w.n.r.dspec$i $w.n.r.up$i $w.n.r.dn$i $w.n.r.del$i
+	catch {
+		grid forget $w.n.r.color$i
+		destroy $w.n.r.color$i
+	}
 	EDRPresequence
 	EDRPupdateGUI
 }
