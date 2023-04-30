@@ -11,6 +11,10 @@
  * GMA Mapper File Format: 20	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 403        <!-- @@##@@ -->
 
+# 4.5.1
+## Fixes
+ * There was a bug in the handling of the editing of presets and titles.
+
 # 4.5
 ## Enhancements
  * Added new die-roll result detail types "begingroup" and "endgroup"
