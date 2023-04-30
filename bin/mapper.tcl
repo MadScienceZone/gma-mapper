@@ -9091,7 +9091,7 @@ proc EditColorBoxTitle {var} {
 	set ECBTstate($w,size) 0
 	set ECBTstate($w,var) $var
 	global $var
-	set title [set $var]
+	set title [string map {<= ≤ >= ≥} [set $var]]
 
 	if {[llength [set parts [split $title =]]] < 2} {
 		set ECBTstate($w,spec) $title
@@ -9596,14 +9596,17 @@ proc EDRPupdateGUI {} {
 }
 
 proc EDRPadd {} {
-	global tmp_presets icon_anchor_n icon_anchor_s icon_delete
+	global tmp_presets icon_anchor_n icon_anchor_s icon_delete icon_fill
 	set w .edrp
 	dict lappend tmp_presets Rolls [dict create Name {} DisplayName {} DieRollSpec {} DisplaySeq {} Description {}]
 	set i [expr [llength [dict get $tmp_presets Rolls]] - 1]
-	grid [entry $w.n.r.name$i] [entry $w.n.r.desc$i] [entry $w.n.r.dspec$i] \
+	grid [entry $w.n.r.name$i] [entry $w.n.r.desc$i] \
+	     [button $w.n.r.color$i -image $icon_fill -command "EditColorBoxTitle EDRP_text$i"] \
+	     [entry $w.n.r.dspec$i -textvariable EDRP_text$i] \
 	     [button $w.n.r.up$i -image $icon_anchor_n -command "EDRPraise $i"] \
 	     [button $w.n.r.dn$i -image $icon_anchor_s -command "EDRPlower $i"] \
 	     [button $w.n.r.del$i -image $icon_delete -command "EDRPdel $i"] -sticky we
+	::tooltip::tooltip $w.n.r.color$i "Edit color(s) for die-roll title string"
 	::tooltip::tooltip $w.n.r.up$i "Move this die-roll up in the list"
 	::tooltip::tooltip $w.n.r.dn$i "Move this die-roll down in the list"
 	::tooltip::tooltip $w.n.r.del$i "Remove this die-roll from the list"
