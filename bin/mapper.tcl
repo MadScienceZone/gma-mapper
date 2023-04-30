@@ -1,20 +1,20 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       _______                          #
-# (  ____ \(       )(  ___  ) Game         /   )     (  ____ \                         #
-# | (    \/| () () || (   ) | Master's    / /) |     | (    \/                         #
-# | |      | || || || (___) | Assistant  / (_) (_    | (____                           #
-# | | ____ | |(_)| ||  ___  |           (____   _)   (_____ \                          #
-# | | \_  )| |   | || (   ) |                ) (           ) )                         #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\____) )                         #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/                          #
+#  _______  _______  _______                ___       _______      __                  #
+# (  ____ \(       )(  ___  ) Game         /   )     (  ____ \    /  \                 #
+# | (    \/| () () || (   ) | Master's    / /) |     | (    \/    \/) )                #
+# | |      | || || || (___) | Assistant  / (_) (_    | (____        | |                #
+# | | ____ | |(_)| ||  ___  |           (____   _)   (_____ \       | |                #
+# | | \_  )| |   | || (   ) |                ) (           ) )      | |                #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\____) ) _  __) (_               #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/ (_) \____/               #
 #                                                                                      #
 ########################################################################################
 #
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.5}     ;# @@##@@
+set GMAMapperVersion {4.5.1}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
 set GMAMapperProtocol {403}         ;# @@##@@
 set GMAVersionNumber {5.2}            ;# @@##@@
@@ -9091,7 +9091,7 @@ proc EditColorBoxTitle {var} {
 	set ECBTstate($w,size) 0
 	set ECBTstate($w,var) $var
 	global $var
-	set title [set $var]
+	set title [string map {<= ≤ >= ≥} [set $var]]
 
 	if {[llength [set parts [split $title =]]] < 2} {
 		set ECBTstate($w,spec) $title
@@ -9596,14 +9596,17 @@ proc EDRPupdateGUI {} {
 }
 
 proc EDRPadd {} {
-	global tmp_presets icon_anchor_n icon_anchor_s icon_delete
+	global tmp_presets icon_anchor_n icon_anchor_s icon_delete icon_fill
 	set w .edrp
 	dict lappend tmp_presets Rolls [dict create Name {} DisplayName {} DieRollSpec {} DisplaySeq {} Description {}]
 	set i [expr [llength [dict get $tmp_presets Rolls]] - 1]
-	grid [entry $w.n.r.name$i] [entry $w.n.r.desc$i] [entry $w.n.r.dspec$i] \
+	grid [entry $w.n.r.name$i] [entry $w.n.r.desc$i] \
+	     [button $w.n.r.color$i -image $icon_fill -command "EditColorBoxTitle EDRP_text$i"] \
+	     [entry $w.n.r.dspec$i -textvariable EDRP_text$i] \
 	     [button $w.n.r.up$i -image $icon_anchor_n -command "EDRPraise $i"] \
 	     [button $w.n.r.dn$i -image $icon_anchor_s -command "EDRPlower $i"] \
 	     [button $w.n.r.del$i -image $icon_delete -command "EDRPdel $i"] -sticky we
+	::tooltip::tooltip $w.n.r.color$i "Edit color(s) for die-roll title string"
 	::tooltip::tooltip $w.n.r.up$i "Move this die-roll up in the list"
 	::tooltip::tooltip $w.n.r.dn$i "Move this die-roll down in the list"
 	::tooltip::tooltip $w.n.r.del$i "Remove this die-roll from the list"
@@ -11535,7 +11538,7 @@ proc ConnectToServerByIdx {idx} {
 	refresh_title
 }
 
-# @[00]@| GMA-Mapper 4.5
+# @[00]@| GMA-Mapper 4.5.1
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
