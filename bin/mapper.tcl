@@ -1,23 +1,23 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       _______     _______              #
-# (  ____ \(       )(  ___  ) Game         /   )     (  ____ \   / ___   )             #
-# | (    \/| () () || (   ) | Master's    / /) |     | (    \/   \/   )  |             #
-# | |      | || || || (___) | Assistant  / (_) (_    | (____         /   )             #
-# | | ____ | |(_)| ||  ___  |           (____   _)   (_____ \      _/   /              #
-# | | \_  )| |   | || (   ) |                ) (           ) )    /   _/               #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\____) ) _ (   (__/\             #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/ (_)\_______/             #
+#  _______  _______  _______                ___       _______     ______               #
+# (  ____ \(       )(  ___  ) Game         /   )     (  ____ \   / ___  \              #
+# | (    \/| () () || (   ) | Master's    / /) |     | (    \/   \/   \  \             #
+# | |      | || || || (___) | Assistant  / (_) (_    | (____        ___) /             #
+# | | ____ | |(_)| ||  ___  |           (____   _)   (_____ \      (___ (              #
+# | | \_  )| |   | || (   ) |                ) (           ) )         ) \             #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\____) ) _ /\___/  /             #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/ (_)\______/              #
 #                                                                                      #
 ########################################################################################
 #
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.5.2}     ;# @@##@@
+set GMAMapperVersion {4.5.3}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
 set GMAMapperProtocol {403}         ;# @@##@@
-set GMAVersionNumber {5.2}            ;# @@##@@
+set CoreVersionNumber {5.4}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -9392,6 +9392,10 @@ proc EDRPdel {i} {
 	set i [llength [dict get $tmp_presets Rolls]]
 	grid forget $w.n.r.name$i $w.n.r.desc$i $w.n.r.dspec$i $w.n.r.up$i $w.n.r.dn$i $w.n.r.del$i
 	destroy $w.n.r.name$i $w.n.r.desc$i $w.n.r.dspec$i $w.n.r.up$i $w.n.r.dn$i $w.n.r.del$i
+	catch {
+		grid forget $w.n.r.color$i
+		destroy $w.n.r.color$i
+	}
 	EDRPresequence
 	EDRPupdateGUI
 }
@@ -10713,10 +10717,10 @@ proc SyncView {} {
 }
 
 proc aboutMapper {} {
-	global GMAMapperVersion GMAMapperFileFormat GMAMapperProtocol GMAVersionNumber
+	global GMAMapperVersion GMAMapperFileFormat GMAMapperProtocol CoreVersionNumber
 
 	tk_messageBox -type ok -icon info -title "About Mapper" \
-		-message "GMA Mapper Client, Version $GMAMapperVersion, for GMA $GMAVersionNumber.\n\nCopyright \u00A9 Steve Willoughby, Aloha, Oregon, USA. All Rights Reserved. Distributed under the terms and conditions of the 3-Clause BSD License.\n\nThis client supports file format $GMAMapperFileFormat and server protocol $GMAMapperProtocol."
+		-message "GMA Mapper Client, Version $GMAMapperVersion, for GMA $CoreVersionNumber.\n\nCopyright \u00A9 Steve Willoughby, Aloha, Oregon, USA. All Rights Reserved. Distributed under the terms and conditions of the 3-Clause BSD License.\n\nThis client supports file format $GMAMapperFileFormat and server protocol $GMAMapperProtocol."
 }
 
 proc SyncAllClientsToMe {} {
@@ -11551,7 +11555,7 @@ proc ConnectToServerByIdx {idx} {
 	refresh_title
 }
 
-# @[00]@| GMA-Mapper 4.5.2
+# @[00]@| GMA-Mapper 4.5.3
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
