@@ -3,13 +3,17 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.5.2               <!-- @@##@@ -->
+ * This Package Version: 4.5.3               <!-- @@##@@ -->
  * Effective Date: 30-Apr-2023               <!-- @@##@@ -->
 
 ## Compatibility
  * GMA Core API Library Version: 5.4 <!-- @@##@@ -->
  * GMA Mapper File Format: 20	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 403        <!-- @@##@@ -->
+
+# 4.5.3
+## Fixes
+ * UI bug when editing/deleting presets
 
 # 4.5.2
 ## Fixes
