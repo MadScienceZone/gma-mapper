@@ -1054,6 +1054,71 @@ field before displaying. If a vertical bar
 appears in the
 .BR Name ,
 all text up to and including the bar SHOULD be suppressed from display.
+.RS
+The formatting of the
+.B Name
+field is not mandated by this specification. However, the following
+standard interpretation for data to the left of the vertical bar
+(if any) is RECOMMENDED for clients using this feature:
+'\" <<enumerate>>
+.TP
+1.
+Regular die-roll presets with a preferred display ordering SHOULD
+have a three-digit decimal zero-padded sequence number to the left
+of the bar, e.g.,
+.RB \*(lq 000|attack \*(rq,
+.RB \*(lq 001|damage \*(rq,
+.RB \*(lq "002|fort save" \*(rq,
+etc. The numbers need not be strictly consecutive.
+.TP
+2.
+Stored variables MAY be stored as a die-roll preset with a
+.B Name
+field in the format
+.RS
+.LP
+.BI \[sc] sequence ; var ; flags \fR[\fP; client \fR]\fP| displayname
+.LP
+where
+.B \[sc]
+is Unicode character U+00A7 (section symbol),
+.I sequence
+is a three-digit decimal zero-padded display sequence number as described above,
+.I var
+is the name of the variable by which the contents of this preset may be inserted into another die-roll specification,
+.I flags
+are a set of zero or more single-letter flags affecting how the client should use this value, and
+.I client
+is an optional field with client-specific data not otherwise defined here. If the
+.I client
+field is not given, the semicolon immediately before it may be omitted as well.
+For example:
+.LP
+.RB \*(lq "\[sc]042;CL;e|caster level" \*(rq
+.LP
+The
+.I flags
+are up to the client to interpret, but we RECOMMEND the flag
+.B e
+to mean the value should be enabled (or \*(lqon\*(rq by default
+and
+.B g
+to mean the die-roll expression to the left of it should be grouped together in parentheses.
+.LP
+If the
+.I var
+value is empty (e.g., 
+.RB \*(lq \[sc]000;;e|inspiration \*(rq),
+clients SHOULD interpret this to mean that the preset's value should not be assigned
+to a variable name, but should be appended to any die-roll specification made while it
+is enabled.
+.RE
+.TP
+3.
+Clients SHOULD gracefully handle the existence of data formats not listed
+above without losing or corrupting any presets or metadata.
+'\" <</>>
+.RE
 .TP
 .BI Description
 A text description of the purpose of the preset.
