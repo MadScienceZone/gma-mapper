@@ -152,7 +152,7 @@ proc ::gmafile::save_to_file {f objlist} {
 }
 
 #
-# load_file fileobj -> { meta {{type dict}, ...} }
+# load_from_file fileobj -> { meta {{type dict}, ...} }
 # Reads mapper object data from the given file into the named array variable
 #
 proc ::gmafile::load_from_file {f} {

@@ -2061,22 +2061,17 @@ proc map_modtime {filename desc} {
 			-message "Unable to open $desc: $err" -parent .
 		return -1
 	}
-
-	set cache_mtime 0
-	if {[gets $f v] >= 0} {
-		if {[regexp {^__MAPPER__:([0-9]+)$} [lindex $v 0] vv vid]} {
-			if [catch {
-				if {$vid >= 12 && [llength $v] > 1 && [llength [lindex $v 1]] > 1} {
-					set cache_mtime [lindex [lindex [lindex $v 1] 1] 0]
-				} 
-			} err] {
-				DEBUG 0 "Can't read modification time from $desc: $err"
-				set cache_mtime 0
-			}
-		}
+	if {[catch {set file_metadata [lindex [::gmafile::load_from_file $f] 0]} err ]} {
+		tk_messageBox -type ok -icon error -title "Error reading file"\
+			-message "Unable to read from $desc file $filename: $err" -parent .
+		return -1
 	}
 	close $f
-	return $cache_mtime
+	if {![dict exists $file_metadata Timestamp]} {
+		return 0
+	}
+
+	return [dict get $file_metadata Timestamp]
 }
 
 proc saf_loadfile {file oldcd args} {
@@ -8870,7 +8865,7 @@ proc _render_die_roller {w width height type args} {
 				if {![info exists DRPS_en$i]} {
 					set DRPS_en$i [::gmaproto::int_bool [dict get $preset Enabled]]
 				}
-				::tooltip::tooltip $w.preset$i.enabled [dict get $preset Description]
+				::tooltip::tooltip $w.preset$i.enabled "* [dict get $preset Description]"
 				incr i
 			}
 
