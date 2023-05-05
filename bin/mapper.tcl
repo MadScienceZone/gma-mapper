@@ -8865,7 +8865,7 @@ proc _render_die_roller {w width height type args} {
 				if {![info exists DRPS_en$i]} {
 					set DRPS_en$i [::gmaproto::int_bool [dict get $preset Enabled]]
 				}
-				::tooltip::tooltip $w.preset$i.enabled [dict get $preset Description]
+				::tooltip::tooltip $w.preset$i.enabled "* [dict get $preset Description]"
 				incr i
 			}
 
