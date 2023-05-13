@@ -585,6 +585,26 @@ proc update_initiative_slots {w {limit {}} args} {
 		"styles clocks ready_bg $dlkey" ready_bg \
 		"styles clocks hold_bg $dlkey" hold_bg
 
+	set name_font_x_width [font measure [::gmaprofile::lookup_font $::_preferences [dict get $::_preferences styles clocks default_font]] x]
+	puts "font size $name_font_x_width"
+	if {$name_font_x_width < 8} {
+		set icon_readied_action $::icon_hourglass_go_16
+		set icon_held_action $::icon_hourglass_16
+		set icon_dieing $::icon_cross_16
+		set icon_active $::icon_arrow_right_16
+	} elseif {$name_font_x_width < 20} {
+		set icon_readied_action $::icon_hourglass_go_30
+		set icon_held_action $::icon_hourglass_30
+		set icon_dieing $::icon_cross_30
+		set icon_active $::icon_arrow_right_30
+	} else {
+		set icon_readied_action $::icon_hourglass_go_40
+		set icon_held_action $::icon_hourglass_40
+		set icon_dieing $::icon_cross_40
+		set icon_active $::icon_arrow_right_40
+	}
+
+
 	if {[lsearch -exact $args -force] >= 0} {
 		set force_redraw true
 	}
@@ -592,7 +612,11 @@ proc update_initiative_slots {w {limit {}} args} {
 		set limit [dict get $_window_state($w) limit]
 	}
 	dict for {k f} [dict get $_window_state($w) flist] {
-		$f configure -background $flist_bg -foreground $flist_fg
+		$f configure -background $flist_bg 
+		catch {
+			$f.name configure -background $flist_bg -foreground $flist_fg
+			$f.icon configure -background $flist_bg -foreground $flist_fg
+		}
 	}
 	if {[dict get $_window_state($w) combat_mode]} {
 		dict for {k fld} [dict get $_window_state($w) flist] {
@@ -603,7 +627,7 @@ proc update_initiative_slots {w {limit {}} args} {
 			}
 		}
 		dict for {k fld} [dict get $_window_state($w) ilist] {
-			if {![dict exists $_window_state($w) flist]} {
+			if {![dict exists $_window_state($w) flist $k]} {
 				DEBUG 1 "slot $k introduced to initiative list; forcing redraw"
 				set force_redraw true
 				break
@@ -651,17 +675,28 @@ proc update_initiative_slots {w {limit {}} args} {
 						-foreground $next_fg -text "NEXT ROUND" -relief solid]
 					pack $w.sep -side top -padx 2 -pady 1 -fill x
 				}
-				dict set _window_state($w) flist $i [label $w.slot$i -background $flist_bg -foreground $flist_fg \
+				dict set _window_state($w) flist $i [frame $w.slot$i -background $flist_bg \
+					-relief solid]
+
+				pack [label $w.slot$i.icon -background $flist_bg] -side left
+				pack [label $w.slot$i.name -background $flist_bg -foreground $flist_fg \
 					-font [::gmaprofile::lookup_font $::_preferences [dict get $::_preferences styles clocks default_font]] \
-					-text [dict get $_window_state($w) ilist $i name] -anchor n -relief solid]
-				pack $w.slot$i -side top -padx 2 -pady 1 -fill x
+					-text [dict get $_window_state($w) ilist $i name] -anchor center -relief solid -bd 0] \
+						-side top -fill x
+				pack $w.slot$i -side top -padx 2 -pady 1 -expand 0 -fill x -ipadx 0 -ipady 0
 				if {$i == $slot} {
 					$w.slot$i configure -background $cur_bg
+					$w.slot$i.icon configure -background $cur_bg -image $icon_active
+					$w.slot$i.name configure -background $cur_bg
 				} elseif {[dict get $_window_state($w) ilist $i hold]} {
 					if {[dict get $_window_state($w) ilist $i ready]} {
 						$w.slot$i configure -background $ready_bg
+						$w.slot$i.name configure -background $ready_bg
+						$w.slot$i.icon configure -background $ready_bg -image $icon_readied_action
 					} else {
 						$w.slot$i configure -background $hold_bg
+						$w.slot$i.name configure -background $hold_bg
+						$w.slot$i.icon configure -background $hold_bg -image $icon_held_action
 					}
 				}
 
@@ -676,6 +711,10 @@ proc update_initiative_slots {w {limit {}} args} {
 							-highlightbackground [dict get $::_preferences styles clocks negative_hp [::gmaprofile::dlkeypref $::_preferences]] \
 							-highlightcolor [dict get $::_preferences styles clocks negative_hp [::gmaprofile::dlkeypref $::_preferences]] \
 							-highlightthickness 4 \
+							-background [dict get $::_preferences styles clocks slot_bg [::gmaprofile::dlkeypref $::_preferences]]
+						$w.slot$i.icon configure -image $icon_dieing \
+							-background [dict get $::_preferences styles clocks slot_bg [::gmaprofile::dlkeypref $::_preferences]]
+						$w.slot$i.name configure \
 							-foreground [dict get $::_preferences styles clocks slot_fg [::gmaprofile::dlkeypref $::_preferences]] \
 							-background [dict get $::_preferences styles clocks slot_bg [::gmaprofile::dlkeypref $::_preferences]]
 					} elseif {[dict get $_window_state($w) ilist $i health_tracker is_flat_footed]} {
@@ -693,11 +732,15 @@ proc update_initiative_slots {w {limit {}} args} {
 				set i 0
 				foreach slot [lsort -integer [dict keys [dict get $_window_state($w) ilist]]] {
 					if {$i < $limit} {
-						dict set _window_state($w) flist $slot [label $w.slot$slot -background $flist_bg \
+						dict set _window_state($w) flist $slot [frame $w.slot$slot -background $flist_bg \
+							-relief solid]
+						pack [label $w.slot$slot.icon -background $flist_bg] -side left
+						pack [label $w.slot$slot.name -background $flist_bg -foreground $flist_fg\
 							-font [::gmaprofile::lookup_font $::_preferences [dict get $::_preferences styles clocks default_font]] \
 							-text [dict get $_window_state($w) ilist $slot name] \
-							-anchor n -relief solid]
-						pack $w.slot$slot -side top -padx 2 -pady 1 -fill x
+							-anchor center -relief solid -bd 0] \
+								-side top -fill x
+						pack $w.slot$slot -side top -padx 2 -pady 1 -expand 0 -fill x -ipadx 0 -ipady 0
 					}
 				}
 			}
@@ -709,11 +752,17 @@ proc update_initiative_slots {w {limit {}} args} {
 				if {[dict get $_window_state($w) ilist $i hold]} {
 					if {[dict get $_window_state($w) ilist $i ready]} {
 						$w.slot$i configure -background $ready_bg
+						$w.slot$i.name configure -background $ready_bg
+						$w.slot$i.icon configure -background $ready_bg -image $icon_readied_action
 					} else {
 						$w.slot$i configure -background $hold_bg
+						$w.slot$i.name configure -background $hold_bg
+						$w.slot$i.icon configure -background $hold_bg -image $icon_held_action
 					}
 				} else {
 					$w.slot$i configure -background $flist_bg
+					$w.slot$i.name configure -background $flist_bg
+					$w.slot$i.icon configure -background $flist_bg
 				}
 
 				if {[dict get $_window_state($w) ilist $i health_tracker] ne {}} {
@@ -727,6 +776,11 @@ proc update_initiative_slots {w {limit {}} args} {
 							-highlightbackground [dict get $::_preferences styles clocks negative_hp [::gmaprofile::dlkeypref $::_preferences]] \
 							-highlightcolor [dict get $::_preferences styles clocks negative_hp [::gmaprofile::dlkeypref $::_preferences]] \
 							-highlightthickness 4 \
+							-background [dict get $::_preferences styles clocks slot_bg [::gmaprofile::dlkeypref $::_preferences]] \
+						$w.slot$i.icon configure -image $icon_dieing \
+							-background [dict get $::_preferences styles clocks slot_bg [::gmaprofile::dlkeypref $::_preferences]] \
+							-foreground [dict get $::_preferences styles clocks slot_fg [::gmaprofile::dlkeypref $::_preferences]]
+						$w.slot$i.name configure \
 							-background [dict get $::_preferences styles clocks slot_bg [::gmaprofile::dlkeypref $::_preferences]] \
 							-foreground [dict get $::_preferences styles clocks slot_fg [::gmaprofile::dlkeypref $::_preferences]]
 					} elseif {[dict get $_window_state($w) ilist $i health_tracker is_flat_footed]} {
