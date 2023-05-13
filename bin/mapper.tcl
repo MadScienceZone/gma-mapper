@@ -1521,7 +1521,7 @@ foreach icon_name {
 	shape_square_go dash0 dash24 dash44 dash64 dash6424 dash642424 
 	arrow_both arrow_first arrow_none arrow_last arrow_refresh heart
 	saf saf_open saf_merge saf_unload saf_group_go die16 die16c information info20 die20 die20c
-	delete add clock dieb16 -- menu
+	delete add clock dieb16 -- *hourglass *hourglass_go *arrow_right *cross menu
 } {
 	if {$icon_name eq {--}} {
 		if {$ImageFormat eq {png}} {
@@ -1529,12 +1529,31 @@ foreach icon_name {
 		}
 		continue
 	}
+
+	if {[string range $icon_name 0 0] eq "*"} {
+		set all_sizes true
+		set icon_name [string range $icon_name 1 end]
+	} else {
+		set all_sizes false
+	}
+
 	if {$dark_mode && [file exists "${ICON_DIR}/d_${icon_name}${icon_size}.$_icon_format"]} {
 		set icon_filename "${ICON_DIR}/d_${icon_name}${icon_size}.$_icon_format"
 	} else {
 		set icon_filename "${ICON_DIR}/${icon_name}${icon_size}.$_icon_format"
 	}
 	set icon_$icon_name [image create photo -format $_icon_format -file $icon_filename]
+
+	if $all_sizes {
+		foreach {sz fsz} {16 {} 30 _30 40 _40} {
+			if {$dark_mode && [file exists "${ICON_DIR}/d_${icon_name}${fsz}.$_icon_format"]} {
+				set icon_filename "${ICON_DIR}/d_${icon_name}${fsz}.$_icon_format"
+			} else {
+				set icon_filename "${ICON_DIR}/${icon_name}${fsz}.$_icon_format"
+			}
+			set icon_${icon_name}_$sz [image create photo -format $_icon_format -file $icon_filename]
+		}
+	}
 }
 
 set canvas [canvas .c -height $canh -width $canw -scrollregion [list 0 0 $cansw $cansh] -xscrollcommand {.xs set} -yscrollcommand {.ys set}]
