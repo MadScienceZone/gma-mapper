@@ -586,7 +586,6 @@ proc update_initiative_slots {w {limit {}} args} {
 		"styles clocks hold_bg $dlkey" hold_bg
 
 	set name_font_x_width [font measure [::gmaprofile::lookup_font $::_preferences [dict get $::_preferences styles clocks default_font]] x]
-	puts "font size $name_font_x_width"
 	if {$name_font_x_width < 8} {
 		set icon_readied_action $::icon_hourglass_go_16
 		set icon_held_action $::icon_hourglass_16
