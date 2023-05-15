@@ -3,13 +3,24 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.5.3               <!-- @@##@@ -->
- * Effective Date: 30-Apr-2023               <!-- @@##@@ -->
+ * This Package Version: 4.6               <!-- @@##@@ -->
+ * Effective Date: 14-May-2023               <!-- @@##@@ -->
 
 ## Compatibility
  * GMA Core API Library Version: 5.4 <!-- @@##@@ -->
  * GMA Mapper File Format: 20	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 403        <!-- @@##@@ -->
+
+# 4.6
+## Enhancements
+ * Updated initiative display with icons to show status (current actor, held or readied action, dying) to make the status more obvious despite customizing colors or difficulty differentiating colors on-screen.
+ * Adjusted the default color styles for the initiative display.
+ * Documented the way modifiers and variables are stored as die-roll preset data in the protocol specificaion **mapper-protocol**(7).
+## Fixes
+ * Corrected error which caused the GM's mapper to fail to read the metadata of cached map files, forcing them to be re-uploaded to the server when they didn't need to be.
+ * Worked around issue with the tklib tooltip implementation which caused a bug if a die-roll preset description started with a hyphen.
+## Other Changes
+ * Added deprecation notice in **style.conf**(5).
 
 # 4.5.3
 ## Fixes
