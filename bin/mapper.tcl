@@ -1,20 +1,20 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       _______     ______               #
-# (  ____ \(       )(  ___  ) Game         /   )     (  ____ \   / ___  \              #
-# | (    \/| () () || (   ) | Master's    / /) |     | (    \/   \/   \  \             #
-# | |      | || || || (___) | Assistant  / (_) (_    | (____        ___) /             #
-# | | ____ | |(_)| ||  ___  |           (____   _)   (_____ \      (___ (              #
-# | | \_  )| |   | || (   ) |                ) (           ) )         ) \             #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\____) ) _ /\___/  /             #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/ (_)\______/              #
+#  _______  _______  _______                ___        ______                          #
+# (  ____ \(       )(  ___  ) Game         /   )      / ____ \                         #
+# | (    \/| () () || (   ) | Master's    / /) |     ( (    \/                         #
+# | |      | || || || (___) | Assistant  / (_) (_    | (____                           #
+# | | ____ | |(_)| ||  ___  |           (____   _)   |  ___ \                          #
+# | | \_  )| |   | || (   ) |                ) (     | (   ) )                         #
+# | (___) || )   ( || )   ( | Mapper         | |   _ ( (___) )                         #
+# (_______)|/     \||/     \| Client         (_)  (_) \_____/                          #
 #                                                                                      #
 ########################################################################################
 #
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.5.3}     ;# @@##@@
+set GMAMapperVersion {4.6}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
 set GMAMapperProtocol {403}         ;# @@##@@
 set CoreVersionNumber {5.4}            ;# @@##@@
@@ -1505,7 +1505,7 @@ wm iconphoto . -default $icon_gma_512 $icon_gma_256 $icon_gma_128 $icon_gma_48 $
 
 set _icon_format gif
 foreach icon_name {
-	line rect poly circ arc blank play
+	line rect poly circ arc *blank play
 	arc_pieslice arc_chord arc_arc
 	join_round join_miter join_bevel
 	spline_0 spline_1 spline_2 spline_3 spline_4 spline_5
@@ -1521,7 +1521,7 @@ foreach icon_name {
 	shape_square_go dash0 dash24 dash44 dash64 dash6424 dash642424 
 	arrow_both arrow_first arrow_none arrow_last arrow_refresh heart
 	saf saf_open saf_merge saf_unload saf_group_go die16 die16c information info20 die20 die20c
-	delete add clock dieb16 -- menu
+	delete add clock dieb16 -- *hourglass *hourglass_go *arrow_right *cross *bullet_go menu
 } {
 	if {$icon_name eq {--}} {
 		if {$ImageFormat eq {png}} {
@@ -1529,12 +1529,31 @@ foreach icon_name {
 		}
 		continue
 	}
+
+	if {[string range $icon_name 0 0] eq "*"} {
+		set all_sizes true
+		set icon_name [string range $icon_name 1 end]
+	} else {
+		set all_sizes false
+	}
+
 	if {$dark_mode && [file exists "${ICON_DIR}/d_${icon_name}${icon_size}.$_icon_format"]} {
 		set icon_filename "${ICON_DIR}/d_${icon_name}${icon_size}.$_icon_format"
 	} else {
 		set icon_filename "${ICON_DIR}/${icon_name}${icon_size}.$_icon_format"
 	}
 	set icon_$icon_name [image create photo -format $_icon_format -file $icon_filename]
+
+	if $all_sizes {
+		foreach {sz fsz} {16 {} 30 _30 40 _40} {
+			if {$dark_mode && [file exists "${ICON_DIR}/d_${icon_name}${fsz}.$_icon_format"]} {
+				set icon_filename "${ICON_DIR}/d_${icon_name}${fsz}.$_icon_format"
+			} else {
+				set icon_filename "${ICON_DIR}/${icon_name}${fsz}.$_icon_format"
+			}
+			set icon_${icon_name}_$sz [image create photo -format $_icon_format -file $icon_filename]
+		}
+	}
 }
 
 set canvas [canvas .c -height $canh -width $canw -scrollregion [list 0 0 $cansw $cansh] -xscrollcommand {.xs set} -yscrollcommand {.ys set}]
@@ -2061,22 +2080,17 @@ proc map_modtime {filename desc} {
 			-message "Unable to open $desc: $err" -parent .
 		return -1
 	}
-
-	set cache_mtime 0
-	if {[gets $f v] >= 0} {
-		if {[regexp {^__MAPPER__:([0-9]+)$} [lindex $v 0] vv vid]} {
-			if [catch {
-				if {$vid >= 12 && [llength $v] > 1 && [llength [lindex $v 1]] > 1} {
-					set cache_mtime [lindex [lindex [lindex $v 1] 1] 0]
-				} 
-			} err] {
-				DEBUG 0 "Can't read modification time from $desc: $err"
-				set cache_mtime 0
-			}
-		}
+	if {[catch {set file_metadata [lindex [::gmafile::load_from_file $f] 0]} err ]} {
+		tk_messageBox -type ok -icon error -title "Error reading file"\
+			-message "Unable to read from $desc file $filename: $err" -parent .
+		return -1
 	}
 	close $f
-	return $cache_mtime
+	if {![dict exists $file_metadata Timestamp]} {
+		return 0
+	}
+
+	return [dict get $file_metadata Timestamp]
 }
 
 proc saf_loadfile {file oldcd args} {
@@ -8870,7 +8884,7 @@ proc _render_die_roller {w width height type args} {
 				if {![info exists DRPS_en$i]} {
 					set DRPS_en$i [::gmaproto::int_bool [dict get $preset Enabled]]
 				}
-				::tooltip::tooltip $w.preset$i.enabled [dict get $preset Description]
+				::tooltip::tooltip $w.preset$i.enabled "* [dict get $preset Description]"
 				incr i
 			}
 
@@ -11555,7 +11569,7 @@ proc ConnectToServerByIdx {idx} {
 	refresh_title
 }
 
-# @[00]@| GMA-Mapper 4.5.3
+# @[00]@| GMA-Mapper 4.6
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

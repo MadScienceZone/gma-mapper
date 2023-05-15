@@ -164,7 +164,7 @@ since all communications are asynchronous.
 '\"whether the message is only sent from client to server, only from server to client, or
 '\"if it could be sent in either direction. Priv indicates if the command may only be
 '\"sent by a client authenticated as the \gm.
-'\"Note that Reply indicates the command which SHOULD
+'\"Note that Reply indicates the command which \mc{SHOULD}
 '\"(eventually) arrive in response, but no guarantee is made as to if or when that happens
 '\"since all communications are asynchronous.
 '\"\begin{table}
@@ -1054,6 +1054,71 @@ field before displaying. If a vertical bar
 appears in the
 .BR Name ,
 all text up to and including the bar SHOULD be suppressed from display.
+.RS
+The formatting of the
+.B Name
+field is not mandated by this specification. However, the following
+standard interpretation for data to the left of the vertical bar
+(if any) is RECOMMENDED for clients using this feature:
+'\" <<enumerate>>
+.TP
+1.
+Regular die-roll presets with a preferred display ordering SHOULD
+have a three-digit decimal zero-padded sequence number to the left
+of the bar, e.g.,
+.RB \*(lq 000|attack \*(rq,
+.RB \*(lq 001|damage \*(rq,
+.RB \*(lq "002|fort save" \*(rq,
+etc. The numbers need not be strictly consecutive.
+.TP
+2.
+Stored variables MAY be stored as a die-roll preset with a
+.B Name
+field in the format
+.RS
+.LP
+.BI \fR\*(lq\fP\[sc] sequence ; var ; flags \fR[\fP; client \fR]\fP| displayname \fR\*(rq.\fP
+.LP
+where
+.B \[sc]
+is Unicode character U+00A7 (section symbol),
+.I sequence
+is a three-digit decimal zero-padded display sequence number as described above,
+.I var
+is the name of the variable by which the contents of this preset may be inserted into another die-roll specification,
+.I flags
+are a set of zero or more single-letter flags affecting how the client should use this value, and
+.I client
+is an optional field with client-specific data not otherwise defined here. If the
+.I client
+field is not given, the semicolon immediately before it may be omitted as well.
+For example:
+.LP
+.RB \*(lq "\[sc]042;CL;e|caster level" \*(rq
+.LP
+The
+.I flags
+are up to the client to interpret, but we RECOMMEND the flag
+.RB \*(lq e \*(rq
+to mean the value should be enabled (or \*(lqon\*(rq) by default
+and
+.RB \*(lq g \*(rq
+to mean the die-roll expression to the left of it should be grouped together in parentheses.
+.LP
+If the
+.I var
+value is empty (e.g., 
+.RB \*(lq \[sc]000;;e|inspiration \*(rq),
+clients SHOULD interpret this to mean that the preset's value should not be assigned
+to a variable name, but should be appended to any die-roll specification made while it
+is enabled.
+.RE
+.TP
+3.
+Clients SHOULD gracefully handle the existence of data formats not listed
+above without losing or corrupting any presets or metadata.
+'\" <</>>
+.RE
 .TP
 .BI Description
 A text description of the purpose of the preset.
@@ -1412,6 +1477,7 @@ The payload is a JSON object with the following fields:
 .B File
 The local pathname or server ID identifying the map file to be loaded.
 .TP
+'\" <</ital-is-var>>
 .BI IsLocalFile " (bool)"
 If true, 
 .B File
@@ -1425,6 +1491,7 @@ on hand for later. The client MUST NOT actually load the file's contents to the
 displayed map at this time.
 .TP
 .BI Merge " (bool)"
+'\" <<ital-is-var>>
 If true, the map elements in
 .B File
 are merged with the map's current contents. Otherwise the map's current
@@ -2443,7 +2510,11 @@ is architecture-independent.
 The semantic version number that users should be using. This is set by the GM
 (or designated server administrator\(emhenceforth we will simply use the term
 \*(lqGM\*(rq for this role) for their game. It may not necessarily be
-the latest version available generally.
+the latest version available generally. The version string MAY omit the third
+version number (e.g., 
+.RB \*(lq 4.2 \*(rq
+instead of the more standards-compliant
+.RB \*(lq 4.2.0 \*(rq).
 .TP
 .B Token
 The download token used for obtaining a copy of the package. This is entirely
