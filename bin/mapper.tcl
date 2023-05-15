@@ -1505,7 +1505,7 @@ wm iconphoto . -default $icon_gma_512 $icon_gma_256 $icon_gma_128 $icon_gma_48 $
 
 set _icon_format gif
 foreach icon_name {
-	line rect poly circ arc blank play
+	line rect poly circ arc *blank play
 	arc_pieslice arc_chord arc_arc
 	join_round join_miter join_bevel
 	spline_0 spline_1 spline_2 spline_3 spline_4 spline_5

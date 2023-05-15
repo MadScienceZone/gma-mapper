@@ -60,12 +60,12 @@ namespace eval ::gmaprofile {
 		next_fg,dark       white
 		next_bg,light      black
 		next_bg,dark       #cc0000
-		cur_bg,light       #ffff00
-		cur_bg,dark        #267800
-		ready_bg,light     #ff0000
+		cur_bg,light       #9cffb4  
+		cur_bg,dark        #003300
+		ready_bg,light     #ff3333
 		ready_bg,dark      #ff0000
 		hold_bg,light      #ffaaaa
-		hold_bg,dark       #ff8e51
+		hold_bg,dark       #610400
 		zero_hp,light	   #ff0000
 		zero_hp,dark	   #ff0000
 		negative_hp,light  #000000
