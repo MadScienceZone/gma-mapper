@@ -1521,7 +1521,7 @@ foreach icon_name {
 	shape_square_go dash0 dash24 dash44 dash64 dash6424 dash642424 
 	arrow_both arrow_first arrow_none arrow_last arrow_refresh heart
 	saf saf_open saf_merge saf_unload saf_group_go die16 die16c information info20 die20 die20c
-	delete add clock dieb16 -- *hourglass *hourglass_go *arrow_right *cross menu
+	delete add clock dieb16 -- *hourglass *hourglass_go *arrow_right *cross *bullet_go menu
 } {
 	if {$icon_name eq {--}} {
 		if {$ImageFormat eq {png}} {

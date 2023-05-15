@@ -590,17 +590,17 @@ proc update_initiative_slots {w {limit {}} args} {
 		set icon_readied_action $::icon_hourglass_go_16
 		set icon_held_action $::icon_hourglass_16
 		set icon_dieing $::icon_cross_16
-		set icon_active $::icon_arrow_right_16
+		set icon_active $::icon_bullet_go_16
 	} elseif {$name_font_x_width < 20} {
 		set icon_readied_action $::icon_hourglass_go_30
 		set icon_held_action $::icon_hourglass_30
 		set icon_dieing $::icon_cross_30
-		set icon_active $::icon_arrow_right_30
+		set icon_active $::icon_bullet_go_30
 	} else {
 		set icon_readied_action $::icon_hourglass_go_40
 		set icon_held_action $::icon_hourglass_40
 		set icon_dieing $::icon_cross_40
-		set icon_active $::icon_arrow_right_40
+		set icon_active $::icon_bullet_go_40
 	}
 
 
