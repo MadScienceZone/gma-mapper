@@ -1,20 +1,20 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___        ______                          #
-# (  ____ \(       )(  ___  ) Game         /   )      / ____ \                         #
-# | (    \/| () () || (   ) | Master's    / /) |     ( (    \/                         #
-# | |      | || || || (___) | Assistant  / (_) (_    | (____                           #
-# | | ____ | |(_)| ||  ___  |           (____   _)   |  ___ \                          #
-# | | \_  )| |   | || (   ) |                ) (     | (   ) )                         #
-# | (___) || )   ( || )   ( | Mapper         | |   _ ( (___) )                         #
-# (_______)|/     \||/     \| Client         (_)  (_) \_____/                          #
+#  _______  _______  _______                ___        ______      __           ______ #
+# (  ____ \(       )(  ___  ) Game         /   )      / ____ \    /  \         (  ___  #
+# | (    \/| () () || (   ) | Master's    / /) |     ( (    \/    \/) )        | (   ) #
+# | |      | || || || (___) | Assistant  / (_) (_    | (____        | |  _____ | (__/  #
+# | | ____ | |(_)| ||  ___  |           (____   _)   |  ___ \       | | (_____)|  __ ( #
+# | | \_  )| |   | || (   ) |                ) (     | (   ) )      | |        | (  \  #
+# | (___) || )   ( || )   ( | Mapper         | |   _ ( (___) ) _  __) (_       | )___) #
+# (_______)|/     \||/     \| Client         (_)  (_) \_____/ (_) \____/       |/ \___ #
 #                                                                                      #
 ########################################################################################
 #
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.6}     ;# @@##@@
+set GMAMapperVersion {4.6.1-beta}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
 set GMAMapperProtocol {403}         ;# @@##@@
 set CoreVersionNumber {5.4}            ;# @@##@@
@@ -121,7 +121,9 @@ proc begin_progress { id title max args } {
         if {$max eq "*" || $max == 0} {
             .toolbar2.progbar configure -mode indeterminate
             .toolbar2.progbar start
+	    set max *
         } else {
+            .toolbar2.progbar stop
             .toolbar2.progbar configure -mode determinate -maximum $max
         }
         if {[llength $progress_stack] == 0} {
@@ -191,18 +193,25 @@ proc update_progress { id value newmax args } {
         }
         if [info exists progress_data($id:title)] {
             if {$newmax eq "*" || $newmax == 0} {
-                if {$progress_data($id:max) eq "*"} {
-                    .toolbar2.progbar stop
-                    .toolbar2.progbar configure -mode determinate
-                }
-                set progress_data($id:max) $newmax
-                .toolbar2.progbar configure -maximum $newmax
+		if {$progress_data($id:max) ne "*"} {
+			# switching to indeterminate mode
+			.toolbar2.progbar configure -mode indeterminate -maximum 100.0
+			.toolbar2.progbar start
+			set progress_data($id:max) *
+		}
+		# if we already were in that mode, do nothing.
+	    } else {
+		    if {$progress_data($id:max) eq "*"} {
+			    # switching to determinate mode
+			    .toolbar2.progbar stop
+			    .toolbar2.progbar configure -mode determinate
+		    }
+	    	    set progress_data($id:max) $newmax
+                    .toolbar2.progbar configure -maximum $newmax
             }
+            
             if {$progress_data($id:max) eq "*"} {
                 set progress_data($id:value) [expr $progress_data($id:value) + $value]
-                if {$id eq [lindex $progress_stack end]} {
-                    .toolbar2.progbar step $value
-                }
             } else {
                 set progress_data($id:value) $value
                 if {$id eq [lindex $progress_stack end]} {
@@ -466,7 +475,7 @@ proc DEBUGp {msg} {
 	DEBUG protocol $msg -custom [list white [::tk::Darken white 40]]
 }
 
-# INFO message ?-progress n ?-of m?? ?-done?
+# INFO message ?-progress n ?-of m?? ?-done? ?-display?
 set info_progress_id {}
 
 proc INFO {msg args} {
@@ -495,6 +504,9 @@ proc INFO {msg args} {
 			}
 		}
 	}
+	if {[lsearch -exact $args -display] >= 0} {
+		display_message $msg
+	}
 
 	if {$pvalue ne {}} {
 		if {$info_progress_id eq {}} {
@@ -503,7 +515,7 @@ proc INFO {msg args} {
 			update_progress $info_progress_id $pvalue $maxvalue
 		}
 	}
-	DEBUG 0 "\[info\] $msg" -custom {white blue}
+	DEBUG info "\[info\] $msg" -custom {white blue}
 }
 
 proc DEBUG {level msg args} {
@@ -1465,7 +1477,7 @@ if {[file exists $path_cache]} {
 	foreach old_cache $filelist {
 		set new_location [cache_file_dir $old_cache]
 		set old_location [file join $path_cache $old_cache]
-		DEBUG 0 "Moving old image file $old_location -> $new_location"
+		INFO "Moving old image file $old_location -> $new_location"
 		puts "Moving old image cache file $old_location -> $new_location"
 
 		if {! [file isdirectory $new_location]} {
@@ -1482,7 +1494,7 @@ if {[file exists $path_cache]} {
 	foreach old_cache [glob -nocomplain -types f -directory $path_cache -tails *.map] {
 		set new_location [cache_map_file_dir $old_cache]
 		set old_location [file join $path_cache $old_cache]
-		DEBUG 0 "Moving old map file $old_location -> $new_location"
+		INFO "Moving old map file $old_location -> $new_location"
 		puts "Moving old map cache file $old_location -> $new_location"
 
 		if {! [file isdirectory $new_location]} {
@@ -8580,7 +8592,7 @@ proc UpgradeAvailable {d} {
 			}; # end of "have UpdateURL"
 		}; # end of (not) in git area
 	} elseif {$comp > 0} {
-		DEBUG 0 "You appear to be running a newer mapper ($GMAMapperVersion) than the latest version offered by your server ($new_version $for). If this isn't expected, you may want to nudge your GM and/or system administrator to update the server's advertised version."
+		INFO "You appear to be running a newer mapper ($GMAMapperVersion) than the latest version offered by your server ($new_version $for). If this isn't expected, you may want to nudge your GM and/or system administrator to update the server's advertised version."
 	}
 }
 		
@@ -11610,7 +11622,7 @@ proc ConnectToServerByIdx {idx} {
 	refresh_title
 }
 
-# @[00]@| GMA-Mapper 4.6
+# @[00]@| GMA-Mapper 4.6.1-beta
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
