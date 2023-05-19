@@ -257,7 +257,7 @@ if {[::gmautil::version_compare $::tcl_version 8.7] >= 0} {
 #		when the installation is done, execute this path relative
 #		to the installation directory.
 #
-#	msg_callback
+#	msg_callback msg ?-progress n ?-of m?? ?-done?
 #		called with a message string to update the user on progress.
 #
 # 	curl_proxy
@@ -269,15 +269,17 @@ if {[::gmautil::version_compare $::tcl_version 8.7] >= 0} {
 #
 proc ::gmautil::upgrade {destination_dir_list tmp_path source_base_url source_base_file old_version new_version strip_prefix launch msg_callback curl_proxy curl_path} {
 	variable checklist
+	set pi 0
 
 	array unset checklist
 	set msg_pfx "Upgrade from $old_version to $new_version:"
-	$msg_callback "Beginning upgrade from version $old_version to $new_version..."
+	$msg_callback "Beginning upgrade from version $old_version to $new_version..." -progress [incr pi]
 	#puts "dest ($destination_dir_list) tmp ($tmp_path) url ($source_base_url) file ($source_base_file) old ($old_version) new ($new_version) pfx ($strip_prefix) launch ($launch) msg ($msg_callback) proxy ($curl_proxy) curl ($curl_path)"
 
 	if {[set comp [::gmautil::version_compare $old_version $new_version]] == 0} {
 		tk_messageBox -type ok -icon error -title "Version Numbers are Equal" \
 			-message "You appear to be trying to upgrade to the same version you are running now. That doesn't make sense."
+		$msg_callback "Error: version numbers are equal" -done
 		return
 	}
 	if {$comp > 0} {
@@ -285,11 +287,12 @@ proc ::gmautil::upgrade {destination_dir_list tmp_path source_base_url source_ba
 			-message "If you proceed, you will DOWNGRADE the version of this program. Are you sure?" \
 			-detail "You are currently running version $old_version, but are trying to install $new_version, which is older. Please make sure you really want to do this before continuing."] ne {yes}} {
 			tk_messageBox -type ok -icon error -title "Cancelled" -message "Installation cancelled."
+			$msg_callback "Upgrade aborted by user" -done
 			return
 		}
 	}
 
-	$msg_callback "$msg_pfx preparing directories..."
+	$msg_callback "$msg_pfx preparing directories..." -progress [incr pi]
 	#
 	# Ensure target dir is created and empty
 	# Ensure that temp directory is created
@@ -301,6 +304,7 @@ proc ::gmautil::upgrade {destination_dir_list tmp_path source_base_url source_ba
 				tk_messageBox -type ok -icon error -title "Destination directory conflict" \
 					-message "There is an obstruction in the way of the installation. Cannot proceed."\
 					-detail "$destination_dir exists but is not a directory. Please resolve this and try again."
+				$msg_callback "$destination_dir is not a directory" -done
 				return
 			}
 			if {[tk_messageBox -type yesno -icon warning -title "Destination directory exists" \
@@ -308,6 +312,7 @@ proc ::gmautil::upgrade {destination_dir_list tmp_path source_base_url source_ba
 				-detail "In order to install into $destination_dir, its existing contents will be overwritten. Do not continue unless you are SURE this is the correct action to take."] ne {yes}} {
 				tk_messageBox -type ok -icon info -title "Installation Cancelled" \
 					-message "Installation cancelled."
+				$msg_callback "Upgrade aborted by user" -done
 				return
 			}
 		} else {
@@ -316,7 +321,7 @@ proc ::gmautil::upgrade {destination_dir_list tmp_path source_base_url source_ba
 
 		file mkdir $tmp_path
 
-		$msg_callback "$msg_pfx downloading $new_version from $source_base_url..."
+		$msg_callback "$msg_pfx downloading $new_version from $source_base_url..." -progress [incr pi]
 		foreach suffix {tar.gz tar.gz.sig} {
 			if [catch {
 				if {$curl_proxy ne {}} {
@@ -330,17 +335,19 @@ proc ::gmautil::upgrade {destination_dir_list tmp_path source_base_url source_ba
 					tk_messageBox -type ok -icon error -title "File not found" \
 						-message "We did not find the installation file on the server." \
 						-detail "We tried to download $source_base_url/$source_base_file.$suffix from $source_base_url but the server indicated that file does not exist."
+					$msg_callback "File not found" -done
 					return
 				} else {
 					tk_messageBox -type ok -icon error -title "File download error" \
 						-message "Error downloading file from sever."\
 						-detail "We tried to download $source_base_url/$source_base_file.$suffix from $source_base_url but an error occurred: $err"
+					$msg_callback "Download error" -done
 					return
 				}
 			}
 		}
 
-		$msg_callback "$msg_pfx verifying integrity and authenticity of downloaded file..."
+		$msg_callback "$msg_pfx verifying integrity and authenticity of downloaded file (reading)..." -progress [incr pi]
 		set source_file_path [file join $tmp_path "${source_base_file}.tar.gz"]
 		set source_sig_path  [file join $tmp_path "${source_base_file}.tar.gz.sig"]
 		set source_file [open $source_file_path rb]
@@ -350,20 +357,25 @@ proc ::gmautil::upgrade {destination_dir_list tmp_path source_base_url source_ba
 		close $source_file
 		close $source_sig
 
+		$msg_callback "$msg_pfx verifying integrity and authenticity of downloaded file (checking)..." -progress [incr pi]
 		if {![::gmautil::verify $source_data $sig_data]} {
 			tk_messageBox -type ok -icon error -title "File integrity error" \
 				-message "The downloaded file does not appear to be genuine or is corrupt."\
 				-detail "The file downloaded from the server failed cryptographic signature check. We will not install it. Try again later or check with your GM or system administrator."
+			$msg_callback "Invalid or corrupt file" -done
 			return
 		}
 
-		$msg_callback "$msg_pfx unpacking files..."
+		$msg_callback "$msg_pfx unpacking files..." -progress [incr pi]
 		::ustar::gzip_extract $source_file_path "::gmautil::_install_file [list $destination_dir_list $strip_prefix ${msg_callback} ${msg_pfx}]"
 
-		$msg_callback "$msg_pfx checking file integrity..."
-		foreach key [array names checklist :stat:*] {
+		$msg_callback "$msg_pfx checking file integrity..." -progress [incr pi]
+		set pi 0
+		set namelist [array names checklist :stat:*]
+		set nameqty [llength $namelist]
+		foreach key $namelist {
 			set path [string range $key 6 end]
-			$msg_callback "$msg_pfx checking file integrity for $path"
+			$msg_callback "$msg_pfx checking file integrity for $path" -progress [incr pi] -of $nameqty
 			if {$checklist($key) != 1} {
 				$msg_callback "$msg_pfx checking file integrity for $path: FAILED: not unpacked"
 				tk_messageBox -type ok -icon error -title "File not unpacked" \
@@ -388,7 +400,7 @@ proc ::gmautil::upgrade {destination_dir_list tmp_path source_base_url source_ba
 			}
 		}
 
-		$msg_callback "$msg_pfx cleaning up..."
+		$msg_callback "$msg_pfx cleaning up..." -done
 		file delete -- $source_file_path $source_sig_path
 	} err]} {
 		tk_messageBox -type ok -icon error -title "Installation error" \

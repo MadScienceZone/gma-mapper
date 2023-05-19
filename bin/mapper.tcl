@@ -465,6 +465,47 @@ proc DEBUGp {msg} {
 	puts "::protocol:: $msg"
 	DEBUG protocol $msg -custom [list white [::tk::Darken white 40]]
 }
+
+# INFO message ?-progress n ?-of m?? ?-done?
+set info_progress_id {}
+
+proc INFO {msg args} {
+	global info_progress_id
+	set pvalue {}
+	set maxvalue *
+
+	if {[lsearch -exact $args -done] >= 0} {
+		if {$info_progress_id ne {}} {
+			end_progress $info_progress_id
+			set info_progress_id {}
+		}
+	} else {
+		if {[set pidx [lsearch -exact $args -progress]] >= 0} {
+			if {$pidx+1 < [llength $args]} {
+				set pvalue [lindex $args $pidx+1]
+			} else {
+				DEBUG 0 "INFO option -progress requires a value"
+			}
+		}
+		if {[set pidx [lsearch -exact $args -of]] >= 0} {
+			if {$pidx+1 < [llength $args]} {
+				set maxvalue [lindex $args $pidx+1]
+			} else {
+				DEBUG 0 "INFO option -of requires a value"
+			}
+		}
+	}
+
+	if {$pvalue ne {}} {
+		if {$info_progress_id eq {}} {
+			set info_progress_id [begin_progress * "operation progress" $maxvalue]
+		} else {
+			update_progress $info_progress_id $pvalue $maxvalue
+		}
+	}
+	DEBUG 0 "\[info\] $msg" -custom {white blue}
+}
+
 proc DEBUG {level msg args} {
 	global DEBUG_level DEBUG_file path_DEBUG_file dark_mode colortheme
 
@@ -8515,7 +8556,7 @@ proc UpgradeAvailable {d} {
 						-message "This client is running from $BIN_DIR. Should I install the new one in [file join {*}$target_dirs]?"\
 						-detail "If you click YES, the new client will be installed in the recommended location to make it easier to maintain all the versions of the mapper you have on your system.\nIf you click NO, you will be prompted to choose the installation directory of your choice.\nIt you click CANCEL, we won't install the new version at this time at all."]
 					if {$answer eq {yes}} {
-						::gmautil::upgrade $target_dirs $path_tmp $UpdateURL $upgrade_file $GMAMapperVersion $new_version mapper bin/mapper.tcl ::display_message $CURLproxy $CURLpath
+						::gmautil::upgrade $target_dirs $path_tmp $UpdateURL $upgrade_file $GMAMapperVersion $new_version mapper bin/mapper.tcl ::INFO $CURLproxy $CURLpath
 					} elseif {$answer eq {no}} {
 						set chosen_dir [tk_chooseDirectory -initialdir [file join {*}$target_dirs] \
 							-mustexist true \
@@ -8527,7 +8568,7 @@ proc UpgradeAvailable {d} {
 								-title "Confirm Installation Directory" \
 								-message "Are you sure you wish to install into $chosen_dir?"\
 								-detail "If you click YES, we will install the new mapper client into $chosen_dir."] eq {yes}} {
-								::gmautil::upgrade [file split $chosen_dir] $path_tmp $UpdateURL $upgrade_file $GMAMapperVersion $new_version mapper bin/mapper.tcl ::display_message $CURLproxy $CURLpath
+								::gmautil::upgrade [file split $chosen_dir] $path_tmp $UpdateURL $upgrade_file $GMAMapperVersion $new_version mapper bin/mapper.tcl ::INFO $CURLproxy $CURLpath
 							} else {
 								say "Installation of version $new_version cancelled."
 							}
