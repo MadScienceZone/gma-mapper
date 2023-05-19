@@ -3,13 +3,18 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.6               <!-- @@##@@ -->
- * Effective Date: 14-May-2023               <!-- @@##@@ -->
+ * This Package Version: 4.6.1-beta               <!-- @@##@@ -->
+ * Effective Date: 19-May-2023               <!-- @@##@@ -->
 
 ## Compatibility
  * GMA Core API Library Version: 5.4 <!-- @@##@@ -->
  * GMA Mapper File Format: 20	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 403        <!-- @@##@@ -->
+
+# 4.6.1 (unreleased)
+## Enhancements
+ * Created INFO level of debugging output
+ * Changed appearance of upgrace process to be less jittery
 
 # 4.6
 ## Enhancements
