@@ -3,18 +3,19 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.6.1-beta               <!-- @@##@@ -->
- * Effective Date: 19-May-2023               <!-- @@##@@ -->
+ * This Package Version: 4.6.1               <!-- @@##@@ -->
+ * Effective Date: 20-May-2023               <!-- @@##@@ -->
 
 ## Compatibility
  * GMA Core API Library Version: 5.4 <!-- @@##@@ -->
  * GMA Mapper File Format: 20	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 403        <!-- @@##@@ -->
 
-# 4.6.1 (unreleased)
+# 4.6.1 
 ## Enhancements
  * Created INFO level of debugging output
  * Changed appearance of upgrace process to be less jittery
+ * Added scrolling frames to die-roll preset editor
 
 # 4.6
 ## Enhancements
