@@ -14,7 +14,7 @@
 # 4.6.1 
 ## Enhancements
  * Created INFO level of debugging output
- * Changed appearance of upgrace process to be less jittery
+ * Changed appearance of upgrade process to be less jittery
  * Added scrolling frames to die-roll preset editor
 
 # 4.6
