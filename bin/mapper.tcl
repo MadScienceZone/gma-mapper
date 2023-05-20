@@ -9030,8 +9030,12 @@ proc EditDieRollPresets {} {
 	toplevel $w
 	wm title $w "Manage Die-Roll Presets"
 	ttk::notebook $w.n
-	frame $w.n.r
-	frame $w.n.m
+	sframe new $w.n.r
+	sframe new $w.n.m
+	#frame $w.n.r
+	#frame $w.n.m
+	set wnr [sframe content $w.n.r]
+	set wnm [sframe content $w.n.m]
 	$w.n add $w.n.r -state normal -sticky news -text Rolls
 	$w.n add $w.n.m -state normal -sticky news -text Modifiers
 	pack $w.n -expand 1 -fill both
@@ -9039,96 +9043,96 @@ proc EditDieRollPresets {} {
 	pack [button $w.ok -text Save -command "EDRPsaveValues; destroy $w"] -side right
 
 	global icon_anchor_n icon_anchor_s icon_delete icon_add
-	grid [label $w.n.r.t1 -text Name] [label $w.n.r.t2 -text Description] [label $w.n.r.t3 -text {Die-Roll Specification}] - \
-		x x [button $w.n.r.add -image $icon_add -command "EDRPadd"] -sticky we
-	::tooltip::tooltip $w.n.r.add "Add a new die-roll preset"
+	grid [label $wnr.t1 -text Name] [label $wnr.t2 -text Description] [label $wnr.t3 -text {Die-Roll Specification}] - \
+		x x [button $wnr.add -image $icon_add -command "EDRPadd"] -sticky we
+	::tooltip::tooltip $wnr.add "Add a new die-roll preset"
 
 	set tmp_presets [PresetLists dice_preset_data]
 	set i 0
 	foreach preset [dict get $tmp_presets Rolls] {
-		grid [entry $w.n.r.name$i] [entry $w.n.r.desc$i] \
-		     [button $w.n.r.color$i -image $icon_fill -command "EditColorBoxTitle EDRP_text$i"] \
-		     [entry $w.n.r.dspec$i -textvariable EDRP_text$i] \
-		     [button $w.n.r.up$i -image $icon_anchor_n -command "EDRPraise $i"] \
-		     [button $w.n.r.dn$i -image $icon_anchor_s -command "EDRPlower $i"] \
-		     [button $w.n.r.del$i -image $icon_delete -command "EDRPdel $i"] -sticky we
-		$w.n.r.name$i insert 0 [dict get $preset DisplayName]
-		$w.n.r.desc$i insert 0 [dict get $preset Description]
+		grid [entry $wnr.name$i] [entry $wnr.desc$i] \
+		     [button $wnr.color$i -image $icon_fill -command "EditColorBoxTitle EDRP_text$i"] \
+		     [entry $wnr.dspec$i -textvariable EDRP_text$i] \
+		     [button $wnr.up$i -image $icon_anchor_n -command "EDRPraise $i"] \
+		     [button $wnr.dn$i -image $icon_anchor_s -command "EDRPlower $i"] \
+		     [button $wnr.del$i -image $icon_delete -command "EDRPdel $i"] -sticky we
+		$wnr.name$i insert 0 [dict get $preset DisplayName]
+		$wnr.desc$i insert 0 [dict get $preset Description]
 		global EDRP_text$i
 		set EDRP_text$i [dict get $preset DieRollSpec]
-		#$w.n.r.dspec$i insert 0 [dict get $preset DieRollSpec]
-		::tooltip::tooltip $w.n.r.color$i "Edit color(s) for die-roll title string"
-		::tooltip::tooltip $w.n.r.up$i "Move this die-roll up in the list"
-		::tooltip::tooltip $w.n.r.dn$i "Move this die-roll down in the list"
-		::tooltip::tooltip $w.n.r.del$i "Remove this die-roll from the list"
+		#$wnr.dspec$i insert 0 [dict get $preset DieRollSpec]
+		::tooltip::tooltip $wnr.color$i "Edit color(s) for die-roll title string"
+		::tooltip::tooltip $wnr.up$i "Move this die-roll up in the list"
+		::tooltip::tooltip $wnr.dn$i "Move this die-roll down in the list"
+		::tooltip::tooltip $wnr.del$i "Remove this die-roll from the list"
 		if {$i == 0} {
-			$w.n.r.up$i configure -state disabled
+			$wnr.up$i configure -state disabled
 		}
 		incr i
 	}
 	if {$i > 0} {
-		$w.n.r.dn[expr $i - 1] configure -state disabled
+		$wnr.dn[expr $i - 1] configure -state disabled
 	}
 	set i 0
 	foreach preset [dict get $tmp_presets CustomRolls] {
-		grid [entry $w.n.r.nameC$i] [entry $w.n.r.descC$i] x [entry $w.n.r.dspecC$i] \
-		     x x [button $w.n.r.delC$i -image $icon_delete -command "EDRPdelCustom $i"] -sticky we
-		$w.n.r.nameC$i insert 0 [dict get $preset Name]
-		$w.n.r.descC$i insert 0 [dict get $preset Description]
-		$w.n.r.dspecC$i insert 0 [dict get $preset DieRollSpec]
-		::tooltip::tooltip $w.n.r.delC$i "Remove this die-roll from the list"
+		grid [entry $wnr.nameC$i] [entry $wnr.descC$i] x [entry $wnr.dspecC$i] \
+		     x x [button $wnr.delC$i -image $icon_delete -command "EDRPdelCustom $i"] -sticky we
+		$wnr.nameC$i insert 0 [dict get $preset Name]
+		$wnr.descC$i insert 0 [dict get $preset Description]
+		$wnr.dspecC$i insert 0 [dict get $preset DieRollSpec]
+		::tooltip::tooltip $wnr.delC$i "Remove this die-roll from the list"
 		incr i
 	}
 
 	set i 0
-	grid x [label $w.n.m.t1 -text Name] [label $w.n.m.t2 -text Description] [label $w.n.m.t3 -text Expression] \
-		x x x x x x [button $w.n.m.add -image $icon_add -command "EDRPaddModifier"] -sticky ew
+	grid x [label $wnm.t1 -text Name] [label $wnm.t2 -text Description] [label $wnm.t3 -text Expression] \
+		x x x x x x [button $wnm.add -image $icon_add -command "EDRPaddModifier"] -sticky ew
 	foreach preset [dict get $tmp_presets Modifiers] {
 		global EDRP_mod_en$i
 		global EDRP_mod_ven$i
 		global EDRP_mod_g$i
-		grid [ttk::checkbutton $w.n.m.en$i -text On -variable EDRP_mod_en$i] \
-		     [entry $w.n.m.name$i] \
-		     [entry $w.n.m.desc$i] \
-		     [entry $w.n.m.dspec$i] \
-		     [ttk::checkbutton $w.n.m.varp$i -text "as symbol $\{" -variable EDRP_mod_ven$i -command "EDRPcheckVar $i"]\
-		     [entry $w.n.m.var$i -width 6]\
-		     [label $w.n.m.rb$i -text \} -anchor w] \
-		     [ttk::checkbutton $w.n.m.g$i -text "()x" -variable EDRP_mod_g$i] \
-		     [button $w.n.m.up$i -image $icon_anchor_n -command "EDRPraiseModifier $i"] \
-		     [button $w.n.m.dn$i -image $icon_anchor_s -command "EDRPlowerModifier $i"] \
-		     [button $w.n.m.del$i -image $icon_delete -command "EDRPdelModifier $i"] -sticky ew
-	     	::tooltip::tooltip $w.n.m.g$i "If checked, adds (...) around expression before adding this modifier."
-	     	::tooltip::tooltip $w.n.m.up$i "Move this modifier up in the list"
-	     	::tooltip::tooltip $w.n.m.dn$i "Move this modifier down in the list"
-	     	::tooltip::tooltip $w.n.m.del$i "Remove this modifier from the list"
-	     	::tooltip::tooltip $w.n.m.en$i "If checked, the modifier is in-play"
-	     	::tooltip::tooltip $w.n.m.varp$i "If checked, the modifier is used in place of <var>, otherwise added to all die rolls"
+		grid [ttk::checkbutton $wnm.en$i -text On -variable EDRP_mod_en$i] \
+		     [entry $wnm.name$i] \
+		     [entry $wnm.desc$i] \
+		     [entry $wnm.dspec$i] \
+		     [ttk::checkbutton $wnm.varp$i -text "as symbol $\{" -variable EDRP_mod_ven$i -command "EDRPcheckVar $i"]\
+		     [entry $wnm.var$i -width 6]\
+		     [label $wnm.rb$i -text \} -anchor w] \
+		     [ttk::checkbutton $wnm.g$i -text "()x" -variable EDRP_mod_g$i] \
+		     [button $wnm.up$i -image $icon_anchor_n -command "EDRPraiseModifier $i"] \
+		     [button $wnm.dn$i -image $icon_anchor_s -command "EDRPlowerModifier $i"] \
+		     [button $wnm.del$i -image $icon_delete -command "EDRPdelModifier $i"] -sticky ew
+	     	::tooltip::tooltip $wnm.g$i "If checked, adds (...) around expression before adding this modifier."
+	     	::tooltip::tooltip $wnm.up$i "Move this modifier up in the list"
+	     	::tooltip::tooltip $wnm.dn$i "Move this modifier down in the list"
+	     	::tooltip::tooltip $wnm.del$i "Remove this modifier from the list"
+	     	::tooltip::tooltip $wnm.en$i "If checked, the modifier is in-play"
+	     	::tooltip::tooltip $wnm.varp$i "If checked, the modifier is used in place of <var>, otherwise added to all die rolls"
 		set EDRP_mod_en$i [::gmaproto::int_bool [dict get $preset Enabled]]
 		set EDRP_mod_g$i [::gmaproto::int_bool [dict get $preset Global]]
 		if {[dict get $preset Variable] eq {}} {
 			set EDRP_mod_ven$i 0
-			$w.n.m.var$i configure -state disabled
-			$w.n.m.g$i configure -state normal
+			$wnm.var$i configure -state disabled
+			$wnm.g$i configure -state normal
 		} else {
 			set EDRP_mod_ven$i 1
-			$w.n.m.var$i insert 0 [dict get $preset Variable]
-			$w.n.m.g$i configure -state disabled
+			$wnm.var$i insert 0 [dict get $preset Variable]
+			$wnm.g$i configure -state disabled
 			set EDRP_mod_g$i 0
 		}
-		$w.n.m.name$i insert 0 [dict get $preset DisplayName]
-		$w.n.m.desc$i insert 0 [dict get $preset Description]
-		$w.n.m.dspec$i insert 0 [dict get $preset DieRollSpec]
+		$wnm.name$i insert 0 [dict get $preset DisplayName]
+		$wnm.desc$i insert 0 [dict get $preset Description]
+		$wnm.dspec$i insert 0 [dict get $preset DieRollSpec]
 		if {$i == 0} {
-			$w.n.m.up$i configure -state disabled
+			$wnm.up$i configure -state disabled
 		}
 		incr i
 	}
 	if {$i > 0} {
-		$w.n.m.dn[expr $i - 1] configure -state disabled
+		$wnm.dn[expr $i - 1] configure -state disabled
 	}
-	grid columnconfigure $w.n.r 3 -weight 2
-	grid columnconfigure $w.n.m 3 -weight 2
+	grid columnconfigure $wnr 3 -weight 2
+	grid columnconfigure $wnm 3 -weight 2
 
 
 	tkwait window $w
@@ -9454,14 +9458,16 @@ proc EDRPdel {i} {
 	global tmp_presets
 	set w .edrp
 
+	set wnr [sframe content $w.n.r]
+	set wnm [sframe content $w.n.m]
 	EDRPgetValues
 	dict set tmp_presets Rolls [lreplace [dict get $tmp_presets Rolls] $i $i]
 	set i [llength [dict get $tmp_presets Rolls]]
-	grid forget $w.n.r.name$i $w.n.r.desc$i $w.n.r.dspec$i $w.n.r.up$i $w.n.r.dn$i $w.n.r.del$i
-	destroy $w.n.r.name$i $w.n.r.desc$i $w.n.r.dspec$i $w.n.r.up$i $w.n.r.dn$i $w.n.r.del$i
+	grid forget $wnr.name$i $wnr.desc$i $wnr.dspec$i $wnr.up$i $wnr.dn$i $wnr.del$i
+	destroy $wnr.name$i $wnr.desc$i $wnr.dspec$i $wnr.up$i $wnr.dn$i $wnr.del$i
 	catch {
-		grid forget $w.n.r.color$i
-		destroy $w.n.r.color$i
+		grid forget $wnr.color$i
+		destroy $wnr.color$i
 	}
 	EDRPresequence
 	EDRPupdateGUI
@@ -9471,11 +9477,13 @@ proc EDRPdelModifier {i} {
 	global tmp_presets
 	set w .edrp
 
+	set wnr [sframe content $w.n.r]
+	set wnm [sframe content $w.n.m]
 	EDRPgetValues
 	dict set tmp_presets Modifiers [lreplace [dict get $tmp_presets Modifiers] $i $i]
 	set i [llength [dict get $tmp_presets Modifiers]]
-	grid forget $w.n.m.en$i $w.n.m.name$i $w.n.m.desc$i $w.n.m.dspec$i $w.n.m.varp$i $w.n.m.var$i $w.n.m.rb$i $w.n.m.up$i $w.n.m.dn$i $w.n.m.del$i $w.n.m.g$i
-	destroy $w.n.m.en$i $w.n.m.name$i $w.n.m.desc$i $w.n.m.dspec$i $w.n.m.varp$i $w.n.m.var$i $w.n.m.rb$i $w.n.m.up$i $w.n.m.dn$i $w.n.m.del$i $w.n.m.g$i
+	grid forget $wnm.en$i $wnm.name$i $wnm.desc$i $wnm.dspec$i $wnm.varp$i $wnm.var$i $wnm.rb$i $wnm.up$i $wnm.dn$i $wnm.del$i $wnm.g$i
+	destroy $wnm.en$i $wnm.name$i $wnm.desc$i $wnm.dspec$i $wnm.varp$i $wnm.var$i $wnm.rb$i $wnm.up$i $wnm.dn$i $wnm.del$i $wnm.g$i
 	EDRPresequence
 	EDRPupdateGUI
 }
@@ -9484,11 +9492,13 @@ proc EDRPdelCustom {i} {
 	global tmp_presets
 	set w .edrp
 
+	set wnr [sframe content $w.n.r]
+	set wnm [sframe content $w.n.m]
 	EDRPgetValues
 	dict set tmp_presets CustomRolls [lreplace [dict get $tmp_presets CustomRolls] $i $i]
 	set i [llength [dict get $tmp_presets CustomRolls]]
-	grid forget $w.n.r.nameC$i $w.n.r.descC$i $w.n.r.dspecC$i $w.n.r.delC$i
-	destroy $w.n.r.nameC$i $w.n.r.descC$i $w.n.r.dspecC$i $w.n.r.delC$i
+	grid forget $wnr.nameC$i $wnr.descC$i $wnr.dspecC$i $wnr.delC$i
+	destroy $wnr.nameC$i $wnr.descC$i $wnr.dspecC$i $wnr.delC$i
 	EDRPupdateGUI
 }
 
@@ -9569,23 +9579,25 @@ proc EDRPresequence {} {
 proc EDRPgetValues {} {
 	global tmp_presets
 	set w .edrp
+	set wnr [sframe content $w.n.r]
+	set wnm [sframe content $w.n.m]
 	set n [llength [dict get $tmp_presets Rolls]]
 	dict set tmp_presets Rolls {}
 	for {set i 0} {$i < $n} {incr i} {
 		dict lappend tmp_presets Rolls [dict create \
 			DisplaySeq [format %03d $i] \
-			DisplayName [$w.n.r.name$i get] \
-			Description [$w.n.r.desc$i get] \
-			DieRollSpec [$w.n.r.dspec$i get]]
+			DisplayName [$wnr.name$i get] \
+			Description [$wnr.desc$i get] \
+			DieRollSpec [$wnr.dspec$i get]]
 	}
 
 	set n [llength [dict get $tmp_presets CustomRolls]]
 	dict set tmp_presets CustomRolls {}
 	for {set i 0} {$i < $n} {incr i} {
 		dict lappend tmp_presets CustomRolls [dict create \
-			Name        [$w.n.r.nameC$i get] \
-			Description [$w.n.r.descC$i get] \
-			DieRollSpec [$w.n.r.dspecC$i get]]
+			Name        [$wnr.nameC$i get] \
+			Description [$wnr.descC$i get] \
+			DieRollSpec [$wnr.dspecC$i get]]
 	}
 
 	set n [llength [dict get $tmp_presets Modifiers]]
@@ -9593,7 +9605,7 @@ proc EDRPgetValues {} {
 	for {set i 0} {$i < $n} {incr i} {
 		global EDRP_mod_en$i
 		global EDRP_mod_g$i
-		set v [string trim [$w.n.m.var$i get]]
+		set v [string trim [$wnm.var$i get]]
 		if {$v ne {}} {
 			set g false
 		} else {
@@ -9601,10 +9613,10 @@ proc EDRPgetValues {} {
 		}
 		dict lappend tmp_presets Modifiers [dict create \
 			Variable $v\
-			DisplayName [$w.n.m.name$i get] \
+			DisplayName [$wnm.name$i get] \
 			DisplaySeq [format %3d $i] \
-			Description [$w.n.m.desc$i get] \
-			DieRollSpec [$w.n.m.dspec$i get] \
+			Description [$wnm.desc$i get] \
+			DieRollSpec [$wnm.dspec$i get] \
 			Enabled [set EDRP_mod_en$i] \
 			Global $g]
 	}
@@ -9614,39 +9626,41 @@ proc EDRPgetValues {} {
 proc EDRPupdateGUI {} {
 	global tmp_presets
 	set w .edrp
+	set wnr [sframe content $w.n.r]
+	set wnm [sframe content $w.n.m]
 	set i 0
 	foreach p [dict get $tmp_presets Rolls] {
 		foreach {ww fld} {name DisplayName desc Description dspec DieRollSpec} {
-			$w.n.r.$ww$i delete 0 end
-			$w.n.r.$ww$i insert 0 [dict get $p $fld]
+			$wnr.$ww$i delete 0 end
+			$wnr.$ww$i insert 0 [dict get $p $fld]
 		}
 		if {$i == 0} {
-			$w.n.r.up$i configure -state disabled
+			$wnr.up$i configure -state disabled
 		} else {
-			$w.n.r.up$i configure -state normal
+			$wnr.up$i configure -state normal
 		}
-		$w.n.r.dn$i configure -state normal
+		$wnr.dn$i configure -state normal
 		incr i
 	}
 	if {$i > 0} {
-		$w.n.r.dn[expr $i - 1] configure -state disabled
+		$wnr.dn[expr $i - 1] configure -state disabled
 	}
 
 	set i 0
 	foreach p [dict get $tmp_presets CustomRolls] {
 		foreach {ww fld} {nameC Name descC Description dspecC DieRollSpec} {
-			$w.n.r.$ww$i delete 0 end
-			$w.n.r.$ww$i insert 0 [dict get $p $fld]
+			$wnr.$ww$i delete 0 end
+			$wnr.$ww$i insert 0 [dict get $p $fld]
 		}
 		incr i
 	}
 
 	set i 0
 	foreach p [dict get $tmp_presets Modifiers] {
-		$w.n.m.var$i configure -state normal
+		$wnm.var$i configure -state normal
 		foreach {ww fld} {name DisplayName desc Description dspec DieRollSpec var Variable} {
-			$w.n.m.$ww$i delete 0 end
-			$w.n.m.$ww$i insert 0 [dict get $p $fld]
+			$wnm.$ww$i delete 0 end
+			$wnm.$ww$i insert 0 [dict get $p $fld]
 		}
 		global EDRP_mod_ven$i
 		global EDRP_mod_en$i
@@ -9654,43 +9668,45 @@ proc EDRPupdateGUI {} {
 		set EDRP_mod_g$i [::gmaproto::int_bool [dict get $p Global]]
 		if {[dict get $p Variable] eq {}} {
 			set EDRP_mod_ven$i 0
-			$w.n.m.var$i configure -state disabled
-			$w.n.m.g$i configure -state normal
+			$wnm.var$i configure -state disabled
+			$wnm.g$i configure -state normal
 		} else {
 			set EDRP_mod_ven$i 1
 			set EDRP_mod_g$i 0
-			$w.n.m.g$i configure -state disabled
+			$wnm.g$i configure -state disabled
 		}
 		set EDRP_mod_en$i [::gmaproto::int_bool [dict get $p Enabled]]
 
 		if {$i == 0} {
-			$w.n.m.up$i configure -state disabled
+			$wnm.up$i configure -state disabled
 		} else {
-			$w.n.m.up$i configure -state normal
+			$wnm.up$i configure -state normal
 		}
-		$w.n.m.dn$i configure -state normal
+		$wnm.dn$i configure -state normal
 		incr i
 	}
 	if {$i > 0} {
-		$w.n.m.dn[expr $i - 1] configure -state disabled
+		$wnm.dn[expr $i - 1] configure -state disabled
 	}
 }
 
 proc EDRPadd {} {
 	global tmp_presets icon_anchor_n icon_anchor_s icon_delete icon_fill
 	set w .edrp
+	set wnr [sframe content $w.n.r]
+	set wnm [sframe content $w.n.m]
 	dict lappend tmp_presets Rolls [dict create Name {} DisplayName {} DieRollSpec {} DisplaySeq {} Description {}]
 	set i [expr [llength [dict get $tmp_presets Rolls]] - 1]
-	grid [entry $w.n.r.name$i] [entry $w.n.r.desc$i] \
-	     [button $w.n.r.color$i -image $icon_fill -command "EditColorBoxTitle EDRP_text$i"] \
-	     [entry $w.n.r.dspec$i -textvariable EDRP_text$i] \
-	     [button $w.n.r.up$i -image $icon_anchor_n -command "EDRPraise $i"] \
-	     [button $w.n.r.dn$i -image $icon_anchor_s -command "EDRPlower $i"] \
-	     [button $w.n.r.del$i -image $icon_delete -command "EDRPdel $i"] -sticky we
-	::tooltip::tooltip $w.n.r.color$i "Edit color(s) for die-roll title string"
-	::tooltip::tooltip $w.n.r.up$i "Move this die-roll up in the list"
-	::tooltip::tooltip $w.n.r.dn$i "Move this die-roll down in the list"
-	::tooltip::tooltip $w.n.r.del$i "Remove this die-roll from the list"
+	grid [entry $wnr.name$i] [entry $wnr.desc$i] \
+	     [button $wnr.color$i -image $icon_fill -command "EditColorBoxTitle EDRP_text$i"] \
+	     [entry $wnr.dspec$i -textvariable EDRP_text$i] \
+	     [button $wnr.up$i -image $icon_anchor_n -command "EDRPraise $i"] \
+	     [button $wnr.dn$i -image $icon_anchor_s -command "EDRPlower $i"] \
+	     [button $wnr.del$i -image $icon_delete -command "EDRPdel $i"] -sticky we
+	::tooltip::tooltip $wnr.color$i "Edit color(s) for die-roll title string"
+	::tooltip::tooltip $wnr.up$i "Move this die-roll up in the list"
+	::tooltip::tooltip $wnr.dn$i "Move this die-roll down in the list"
+	::tooltip::tooltip $wnr.del$i "Remove this die-roll from the list"
 	EDRPgetValues
 	EDRPresequence
 	EDRPupdateGUI
@@ -9698,6 +9714,8 @@ proc EDRPadd {} {
 proc EDRPaddModifier {} {
 	global tmp_presets icon_anchor_n icon_anchor_s icon_delete
 	set w .edrp
+	set wnr [sframe content $w.n.r]
+	set wnm [sframe content $w.n.m]
 	dict lappend tmp_presets Modifiers [dict create Global false Enabled false Variable {} Name {} DisplayName {} DieRollSpec {} DisplaySeq {} Description {}]
 	set i [expr [llength [dict get $tmp_presets Modifiers]] - 1]
 	global EDRP_mod_en$i EDRP_mod_ven$i
@@ -9705,24 +9723,24 @@ proc EDRPaddModifier {} {
 	set EDRP_mod_en$i 0
 	set EDRP_mod_ven$i 0
 	set EDRP_mod_g$i 0
-	grid [ttk::checkbutton $w.n.m.en$i -text On -variable EDRP_mod_en$i] \
-		[entry $w.n.m.name$i] \
-		[entry $w.n.m.desc$i] \
-		[entry $w.n.m.dspec$i] \
-		[ttk::checkbutton $w.n.m.varp$i -text "as symbol <" -variable EDRP_mod_ven$i -command "EDRPcheckVar $i"]\
-		[entry $w.n.m.var$i -width 6] \
-		[label $w.n.m.rb$i -text > -anchor w] \
-		[ttk::checkbutton $w.n.m.g$i -text "()x" -variable EDRP_mod_g$i]\
-		[button $w.n.m.up$i -image $icon_anchor_n -command "EDRPraiseModifier $i"]\
-		[button $w.n.m.dn$i -image $icon_anchor_s -command "EDRPlowerModifier $i"]\
-		[button $w.n.m.del$i -image $icon_delete -command "EDRPdelModifier $i"]\
+	grid [ttk::checkbutton $wnm.en$i -text On -variable EDRP_mod_en$i] \
+		[entry $wnm.name$i] \
+		[entry $wnm.desc$i] \
+		[entry $wnm.dspec$i] \
+		[ttk::checkbutton $wnm.varp$i -text "as symbol <" -variable EDRP_mod_ven$i -command "EDRPcheckVar $i"]\
+		[entry $wnm.var$i -width 6] \
+		[label $wnm.rb$i -text > -anchor w] \
+		[ttk::checkbutton $wnm.g$i -text "()x" -variable EDRP_mod_g$i]\
+		[button $wnm.up$i -image $icon_anchor_n -command "EDRPraiseModifier $i"]\
+		[button $wnm.dn$i -image $icon_anchor_s -command "EDRPlowerModifier $i"]\
+		[button $wnm.del$i -image $icon_delete -command "EDRPdelModifier $i"]\
 		-sticky ew
-	::tooltip::tooltip $w.n.m.g$i "If checked, adds (...) around expression before adding this modifier."
-	::tooltip::tooltip $w.n.m.up$i "Move this modifier up in the list"
-	::tooltip::tooltip $w.n.m.dn$i "Move this modifier down in the list"
-	::tooltip::tooltip $w.n.m.del$i "Remove this modifier from the list"
-	::tooltip::tooltip $w.n.m.en$i "If checked, the modifier is in-play"
-	::tooltip::tooltip $w.n.m.varp$i "If checked, the modifier is used in place of <var>, otherwise added to all die rolls"
+	::tooltip::tooltip $wnm.g$i "If checked, adds (...) around expression before adding this modifier."
+	::tooltip::tooltip $wnm.up$i "Move this modifier up in the list"
+	::tooltip::tooltip $wnm.dn$i "Move this modifier down in the list"
+	::tooltip::tooltip $wnm.del$i "Remove this modifier from the list"
+	::tooltip::tooltip $wnm.en$i "If checked, the modifier is in-play"
+	::tooltip::tooltip $wnm.varp$i "If checked, the modifier is used in place of <var>, otherwise added to all die rolls"
 	EDRPgetValues
 	EDRPresequence
 	EDRPupdateGUI
@@ -9843,10 +9861,12 @@ proc PresetLists {arrayname args} {
 proc EDRPcheckVar {i} {
 	global EDRP_mod_ven$i
 	set w .edrp
-	$w.n.m.var$i configure -state normal
+	set wnr [sframe content $w.n.r]
+	set wnm [sframe content $w.n.m]
+	$wnm.var$i configure -state normal
 	if {![set EDRP_mod_ven$i]} {
-		$w.n.m.var$i delete 0 end
-		$w.n.m.var$i configure -state disabled
+		$wnm.var$i delete 0 end
+		$wnm.var$i configure -state disabled
 	}
 }
 # DisplayChatMessage d ?-noopen? ?-system?
