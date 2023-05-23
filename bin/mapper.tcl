@@ -5071,9 +5071,12 @@ array set MarkerDescription {
 
 
 proc CreatureStatusTransparent {id conditions} {
-	global MarkerTransparent
+	global MarkerTransparent MOBdata
 	set transparent false
 
+	if {[dict get $MOBdata($id) Hidden]} {
+		return true
+	}
 	foreach condition [CreatureStatusConditions $id $conditions] {
 		if {[info exists MarkerTransparent($condition)] && $MarkerTransparent($condition)} {
 			set transparent true
@@ -5333,9 +5336,6 @@ proc RenderSomeone {w id} {
 	global ShowHealthStats is_GM
 	set lower_neighbors {}
 
-	if {[dict get $MOBdata($id) Hidden] && !$is_GM} {
-		return
-	}
 
 	#
 	# find out where everyone is
@@ -5344,7 +5344,7 @@ proc RenderSomeone {w id} {
 	array unset WhereIsMOB
 	foreach mob_id [array names MOBdata] {
 		DEBUG 1 "Looking for location of $mob_id"
-		if {![dict get $MOBdata($mob_id) Killed]} {
+		if {![dict get $MOBdata($mob_id) Killed] && ![dict get $MOBdata($mob_id) Hidden]} {
 			set xx [dict get $MOBdata($mob_id) Gx]
 			set yy [dict get $MOBdata($mob_id) Gy]
 			set sz [MonsterSizeValue [dict get $MOBdata($mob_id) Size]]
@@ -5373,6 +5373,10 @@ proc RenderSomeone {w id} {
 	}
 
 	$w delete "M#$id"
+
+	if {[dict get $MOBdata($id) Hidden] && !$is_GM} {
+		return
+	}
 
 	# spell area of effect
 	if {[set AoE [dict get $MOBdata($id) AoE]] ne {}} {
@@ -5531,6 +5535,7 @@ proc RenderSomeone {w id} {
 
 	if {$is_transparent} {
 		set image_candidates [lmap v $image_candidates {string cat ! $v}]
+		lappend image_candidates "!$mob_img_name"
 	}
 
 	global zoom 
