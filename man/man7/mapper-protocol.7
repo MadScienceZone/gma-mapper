@@ -75,7 +75,7 @@ MAY
 be implemented to wait synchronously for a server
 response during the authentication negotiation stage.
 .LP
-This describes protocol version 403. These notes are intended to be 
+This describes protocol version 404. These notes are intended to be 
 detailed enough to implement a client from and should be considered
 the definitive standard reference to the protocol.
 .LP
@@ -1338,6 +1338,14 @@ If it begins with
 (e.g., 
 .RB \*(lq ..blue \*(rq),
 then the effect is the same, but the dashes are shorter.
+'\" <<New>>
+.TP
+'\" <</ital-is-var>>
+.BI Transparent " (bool)"
+'\" <<ital-is-var>>
+If true, the creature token should be displayed in a semi-transparent
+form whenever it has this condition.
+'\" <</New>>
 .RE
 .TP
 .B Description
@@ -2154,6 +2162,12 @@ is 10, then hit points are displayed only in 10% increments.
 '\" <</>>
 .RE
 .TP
+'\" <<New>>
+'\" <</ital-is-var>>
+.BI Hidden " (bool)"
+If true, this creature token is hidden from player view, although the GM can still see it.
+'\" <</New>>
+.TP
 .BI Gx " (float)"
 The grid 
 .I x
@@ -2565,8 +2579,18 @@ Steve Willoughby / steve@madscience.zone;
 John Mechalas (elevation and movement modes).
 .SH HISTORY
 .LP
-This document defines map protocol version 403,
+'\" <<New>>
+This document defines map protocol version 404,
 which introduced the
+.B Hidden
+attribute for creature tokens, the transparent image type,
+and the
+.B Transparent
+attribute for status markers.
+'\" <</New>>
+.LP
+Protocol version 403
+introduced the
 .B AI/
 server message and additional fields to the
 .B OK
