@@ -11,6 +11,10 @@
  * GMA Mapper File Format: 20	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 404        <!-- @@##@@ -->
 
+# Unreleased
+## Enhancements
+ * Now supports protocol 405
+
 # 4.7
 ## Enhancements
  * Now supports protocol 404
