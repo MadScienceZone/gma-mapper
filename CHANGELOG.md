@@ -3,7 +3,7 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.7               <!-- @@##@@ -->
+ * This Package Version: 4.8-beta          <!-- @@##@@ -->
  * Effective Date: 24-May-2023               <!-- @@##@@ -->
 
 ## Compatibility
@@ -11,9 +11,11 @@
  * GMA Mapper File Format: 20	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 404        <!-- @@##@@ -->
 
-# Unreleased
+# Unreleased 4.8
 ## Enhancements
  * Now supports protocol 405
+## Fixes
+ * Corrects enabling/disabling of die-roll modifier option checkbuttons
 
 # 4.7
 ## Enhancements
