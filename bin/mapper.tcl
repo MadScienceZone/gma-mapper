@@ -5024,6 +5024,11 @@ array set MarkerShape {
 	panicked    		<>
 }
 
+array set MarkerTransparent {
+	incorporeal true
+	invisible   true
+}
+
 array set MarkerDescription {
 	bleed	    		{Bleeding: take damage each turn unless stopped by a DC 15 Heal check or any spell that cures hit point damage.}
 	{ability drained} 	{Ability Drained}
