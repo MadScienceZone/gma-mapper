@@ -9055,8 +9055,8 @@ proc _render_die_roller {w width height type args} {
 					{*}[lindex $row_bg [expr $i % 2]]] -side left -padx 2
 				pack [label $w.preset$i.def -text [cleanupDieRollSpec $def] -anchor w {*}[lindex $row_bg [expr $i % 2]]] -side left -expand 1 -fill x
 				#pack [button $w.preset$i.del -image $icon_delete -command "DeleteDieRollPreset {$preset_name}"] -side right
-				::tooltip::tooltip $w.preset$i.name $desc
-				::tooltip::tooltip $w.preset$i.def $desc
+				::tooltip::tooltip $w.preset$i.name "* $desc"
+				::tooltip::tooltip $w.preset$i.def "* $desc"
 				bind $w.preset$i.extra <FocusIn> "_pop_open_extra $w.preset$i.extra -1"
 				bind $w.preset$i.extra <FocusOut> "_collapse_extra $w.preset$i.extra -1"
 				incr i
