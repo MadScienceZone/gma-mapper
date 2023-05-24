@@ -3,13 +3,20 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.7-beta.0               <!-- @@##@@ -->
- * Effective Date: 23-May-2023               <!-- @@##@@ -->
+ * This Package Version: 4.7               <!-- @@##@@ -->
+ * Effective Date: 24-May-2023               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 5.5-beta.0 <!-- @@##@@ -->
+ * GMA Core API Library Version: 5.5 <!-- @@##@@ -->
  * GMA Mapper File Format: 20	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 404        <!-- @@##@@ -->
+
+# 4.7
+## Enhancements
+ * Now supports protocol 404
+ * Supports semi-transparent creature token images for hidden creatures and for certain status conditions.
+## Fixes
+ * Mitigated tooltip library bug for tip strings that begin with a hyphen.
 
 # 4.6.1 
 ## Enhancements
