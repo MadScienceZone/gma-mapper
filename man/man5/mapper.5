@@ -123,6 +123,13 @@ by the
 .B PS
 server command.
 '\" <</>>
+.SH COMPATIBILITY
+.LP
+Programs are expected to silently ignore data fields which they don't expect,
+and to default any missing fields with the zero value for their data type.
+Thus, it is not always necessary for the file version number to increase
+if a change in data fields would produce a benign default behavior given
+these assumptions.
 .SH EXAMPLE
 '\" <<TeX>>
 '\" \begin{Coding}
