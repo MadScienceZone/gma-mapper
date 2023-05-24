@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___        ______      __                  #
-# (  ____ \(       )(  ___  ) Game         /   )      / ____ \    /  \                 #
-# | (    \/| () () || (   ) | Master's    / /) |     ( (    \/    \/) )                #
-# | |      | || || || (___) | Assistant  / (_) (_    | (____        | |                #
-# | | ____ | |(_)| ||  ___  |           (____   _)   |  ___ \       | |                #
-# | | \_  )| |   | || (   ) |                ) (     | (   ) )      | |                #
-# | (___) || )   ( || )   ( | Mapper         | |   _ ( (___) ) _  __) (_               #
-# (_______)|/     \||/     \| Client         (_)  (_) \_____/ (_) \____/               #
+#  _______  _______  _______                ___       ______                           #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \                          #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  )                         #
+# | |      | || || || (___) | Assistant  / (_) (_        /  /                          #
+# | | ____ | |(_)| ||  ___  |           (____   _)      /  /                           #
+# | | \_  )| |   | || (   ) |                ) (       /  /                            #
+# | (___) || )   ( || )   ( | Mapper         | |   _  /  /                             #
+# (_______)|/     \||/     \| Client         (_)  (_) \_/                              #
 #                                                                                      #
 ########################################################################################
 #
@@ -57,9 +57,9 @@ package require base64 2.4.2
 package require uuid 1.0.1
 
 namespace eval ::gmaproto {
-	variable protocol 403
+	variable protocol 404
 	variable min_protocol 333
-	variable max_protocol 403
+	variable max_protocol 404
 	variable max_max_protocol 499
 	variable debug_f {}
 	variable legacy false
@@ -140,7 +140,7 @@ namespace eval ::gmaproto {
 		DD=     {Presets {a {Name s Description s DieRollSpec s}}}
 		DENIED  {Reason s}
 		DR      {}
-		DSM     {Condition s Shape s Color s Description s}
+		DSM     {Condition s Shape s Color s Description s Transparent ?}
 		ECHO    {s s i i o d}
 		GRANTED {User s}
 		I       {ActorID s Hours i Minutes i Seconds i Rounds i Count i}
@@ -163,7 +163,7 @@ namespace eval ::gmaproto {
 		PRIV    {Command s Reason s}
 		POLO    {}
 		PROGRESS {OperationID s Title s Value i MaxValue i IsDone ?}
-		PS      {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l Elev i Color s Note s Size s Area s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i}
+		PS      {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l Elev i Color s Note s Size s Area s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ?}
 		READY   {}
 		ROLL    {Sender s Recipients l MessageID i ToAll ? ToGM ? Title s Result {o {InvalidRequest ? ResultSuppressed ? Result i Details {a {Type s Value s}}}} RequestID s MoreResults ?}
 		SYNC    {}
@@ -1325,7 +1325,7 @@ proc ::gmaproto::place_someone_d {d} {
 	::gmaproto::_protocol_send PS {*}$d
 }
 
-proc ::gmaproto::place_someone {obj_id color name area size obj_type gx gy reach health skin skin_sizes elevation note status_list aoe move_mode killed dim} {
+proc ::gmaproto::place_someone {obj_id color name area size obj_type gx gy reach health skin skin_sizes elevation note status_list aoe move_mode killed dim {hidden false}} {
 	if {$obj_type eq "monster"} {
 		set ct 1
 	} elseif {$obj_type eq "player"} {
@@ -1335,7 +1335,7 @@ proc ::gmaproto::place_someone {obj_id color name area size obj_type gx gy reach
 	}
 
 
-	::gmaproto::_protocol_send PS ID $obj_id Name $name Gx $gx Gy $gy Reach $reach Area $area Size $size Color $color CreatureType $ct Health $health Skin $skin SkinSize $skin_sizes Elev $elevation Note $note StatusList $status_list AoE $aoe MoveMode $move_mode Killed $killed Dim $dim
+	::gmaproto::_protocol_send PS ID $obj_id Name $name Gx $gx Gy $gy Reach $reach Area $area Size $size Color $color CreatureType $ct Health $health Skin $skin SkinSize $skin_sizes Elev $elevation Note $note StatusList $status_list AoE $aoe MoveMode $move_mode Killed $killed Dim $dim Hidden $hidden
 }
 
 proc ::gmaproto::polo {} {
@@ -1378,8 +1378,8 @@ proc ::gmaproto::remove_obj_attributes {obj_id attr vs} {
 	::gmaproto::_raw_send "OA- {\"ObjID\":[json::write string $obj_id],\"AttrName\":[json::write string $attr],\"Values\":[json::write array {*}$vs]}"
 }
 
-proc ::gmaproto::update_status_marker {condition shape color desc} {
-	::gmaproto::_protocol_send DSM Condition $condition Shape $shape Color $color Description $desc
+proc ::gmaproto::update_status_marker {condition shape color {desc {}} {transparent false}} {
+	::gmaproto::_protocol_send DSM Condition $condition Shape $shape Color $color Description $desc Transparent $transparent
 }
 
 proc ::gmaproto::write_only {is_main} {
@@ -2143,7 +2143,7 @@ proc ::gmaproto::GMATypeToProtocolCommand {gt} {
 	}
 	return $gt
 }
-# @[00]@| GMA-Mapper 4.6.1
+# @[00]@| GMA-Mapper 4.7
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

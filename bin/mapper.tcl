@@ -1,23 +1,23 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___        ______      __                  #
-# (  ____ \(       )(  ___  ) Game         /   )      / ____ \    /  \                 #
-# | (    \/| () () || (   ) | Master's    / /) |     ( (    \/    \/) )                #
-# | |      | || || || (___) | Assistant  / (_) (_    | (____        | |                #
-# | | ____ | |(_)| ||  ___  |           (____   _)   |  ___ \       | |                #
-# | | \_  )| |   | || (   ) |                ) (     | (   ) )      | |                #
-# | (___) || )   ( || )   ( | Mapper         | |   _ ( (___) ) _  __) (_               #
-# (_______)|/     \||/     \| Client         (_)  (_) \_____/ (_) \____/               #
+#  _______  _______  _______                ___       ______                           #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \                          #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  )                         #
+# | |      | || || || (___) | Assistant  / (_) (_        /  /                          #
+# | | ____ | |(_)| ||  ___  |           (____   _)      /  /                           #
+# | | \_  )| |   | || (   ) |                ) (       /  /                            #
+# | (___) || )   ( || )   ( | Mapper         | |   _  /  /                             #
+# (_______)|/     \||/     \| Client         (_)  (_) \_/                              #
 #                                                                                      #
 ########################################################################################
 #
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.6.1}     ;# @@##@@
+set GMAMapperVersion {4.7}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
-set GMAMapperProtocol {403}         ;# @@##@@
-set CoreVersionNumber {5.4}            ;# @@##@@
+set GMAMapperProtocol {404}         ;# @@##@@
+set CoreVersionNumber {5.5}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -106,6 +106,7 @@ set time_abs 0
 set time_rel 0
 set ClockProgress 0
 set progress_stack {}
+set is_GM false
 proc begin_progress { id title max args } {
     if [catch {
         DEBUG 1 "begin_progress [list $id $title $max $args]"
@@ -5023,6 +5024,11 @@ array set MarkerShape {
 	panicked    		<>
 }
 
+array set MarkerTransparent {
+	incorporeal true
+	invisible   true
+}
+
 array set MarkerDescription {
 	bleed	    		{Bleeding: take damage each turn unless stopped by a DC 15 Heal check or any spell that cures hit point damage.}
 	{ability drained} 	{Ability Drained}
@@ -5069,8 +5075,23 @@ array set MarkerDescription {
 }
 
 
-proc CreatureStatusMarker {w id x y s calc_condition} {
-	global MOBdata MarkerColor MarkerShape
+proc CreatureStatusTransparent {id conditions} {
+	global MarkerTransparent MOBdata
+	set transparent false
+
+	if {[dict get $MOBdata($id) Hidden]} {
+		return true
+	}
+	foreach condition [CreatureStatusConditions $id $conditions] {
+		if {[info exists MarkerTransparent($condition)] && $MarkerTransparent($condition)} {
+			set transparent true
+		}
+	}
+	return $transparent
+}
+
+proc CreatureStatusConditions {id calc_condition} {
+	global MOBdata
 	
 	# HEALTH conditions
 	#  normal/{} flat staggered unconscious stable disabled dying
@@ -5088,7 +5109,16 @@ proc CreatureStatusMarker {w id x y s calc_condition} {
 			lappend conditions $condition
 		}
 	}
+	return $conditions
+}
 
+proc CreatureStatusMarker {w id x y s calc_condition} {
+	global MOBdata MarkerColor MarkerShape
+	
+	# HEALTH conditions
+	#  normal/{} flat staggered unconscious stable disabled dying
+	# dying: half-slash through the token
+	set conditions [CreatureStatusConditions $id $calc_condition]
 	if {[llength $conditions] == 0} {
 		return
 	}
@@ -5308,8 +5338,9 @@ proc RenderSomeone {w id} {
 	DEBUG 3 "RenderSomeone $w $id"
 	global MOBdata ThreatLineWidth iscale SelectLineWidth ThreatLineHatchWidth ReachLineColor
 	global HealthBarWidth HealthBarFrameWidth HealthBarConditionFrameWidth
-	global ShowHealthStats
+	global ShowHealthStats is_GM
 	set lower_neighbors {}
+
 
 	#
 	# find out where everyone is
@@ -5318,7 +5349,7 @@ proc RenderSomeone {w id} {
 	array unset WhereIsMOB
 	foreach mob_id [array names MOBdata] {
 		DEBUG 1 "Looking for location of $mob_id"
-		if {![dict get $MOBdata($mob_id) Killed]} {
+		if {![dict get $MOBdata($mob_id) Killed] && ![dict get $MOBdata($mob_id) Hidden]} {
 			set xx [dict get $MOBdata($mob_id) Gx]
 			set yy [dict get $MOBdata($mob_id) Gy]
 			set sz [MonsterSizeValue [dict get $MOBdata($mob_id) Size]]
@@ -5347,6 +5378,10 @@ proc RenderSomeone {w id} {
 	}
 
 	$w delete "M#$id"
+
+	if {[dict get $MOBdata($id) Hidden] && !$is_GM} {
+		return
+	}
 
 	# spell area of effect
 	if {[set AoE [dict get $MOBdata($id) AoE]] ne {}} {
@@ -5474,6 +5509,11 @@ proc RenderSomeone {w id} {
 		set mob_img_name $mob_creature_name
 	}
 
+        # TODO this may be a little premature, but that's ok as long as the computed
+	# health conditions don't require shifting to transparency. We'll assume for
+        # now that only explicitly set ones will do that.
+        set is_transparent [CreatureStatusTransparent $id {}]
+
 	#
 	# prefix to use based on skin selected and possibly if alive
 	#
@@ -5498,9 +5538,15 @@ proc RenderSomeone {w id} {
 	}
 	lappend image_candidates "$i_pfx^$skin_idx^$mob_img_name"
 
+	if {$is_transparent} {
+		set image_candidates [lmap v $image_candidates {string cat ! $v}]
+		lappend image_candidates "!$mob_img_name"
+	}
+
 	global zoom 
 	global TILE_SET
 	#set tile_id [FindImage $image_pfx $zoom]
+	
     #
     # Run through each possible name to see if we have that name 
     # cached already, before broadcasting a request for one.
@@ -5531,14 +5577,17 @@ proc RenderSomeone {w id} {
                 break
             }
         }
-	}
+     }
+
 
 	#
 	# if we found a copy of the image, it will now appear in TILE_SET.
 	#
 	if [info exists TILE_SET([tile_id $image_pfx $zoom])] {
 		DEBUG 3 "$image_pfx:$zoom = $TILE_SET([tile_id $image_pfx $zoom])"
-		$w create oval [expr $x*$iscale] [expr $y*$iscale] [expr ($x+$mob_size)*$iscale] [expr ($y+$mob_size)*$iscale] -fill $fillcolor -tags "mob MF#$id M#$id MN#$id allMOB"
+		if {!$is_transparent} {
+			$w create oval [expr $x*$iscale] [expr $y*$iscale] [expr ($x+$mob_size)*$iscale] [expr ($y+$mob_size)*$iscale] -fill $fillcolor -tags "mob MF#$id M#$id MN#$id allMOB MB#$id"
+		}
 		$w create image [expr $x*$iscale] [expr $y*$iscale] -anchor nw -image $TILE_SET([tile_id $image_pfx $zoom]) -tags "mob M#$id MN#$id allMOB"
 		set nametag_w "$w.nt_$id"
 		if {[winfo exists $nametag_w]} {
@@ -5571,9 +5620,9 @@ proc RenderSomeone {w id} {
 		}
 	} else {
 		DEBUG 3 "No $image_pfx:$zoom found in TILE_SET"
-		$w create oval [expr $x*$iscale] [expr $y*$iscale] [expr ($x+$mob_size)*$iscale] [expr ($y+$mob_size)*$iscale] -fill $fillcolor -tags "mob MF#$id M#$id MN#$id allMOB"
+		$w create oval [expr $x*$iscale] [expr $y*$iscale] [expr ($x+$mob_size)*$iscale] [expr ($y+$mob_size)*$iscale] -fill $fillcolor -tags "mob MF#$id M#$id MN#$id MB#id allMOB"
 		$w create text [expr ($x+(.5*$mob_size))*$iscale] [expr ($y+(.5*$mob_size))*$iscale] -fill $textcolor \
-			-font [FontBySize [dict get $MOBdata($id) Size]] -text $mob_name -tags "M#$id MF#$id MT#$id allMOB"
+			-font [FontBySize [dict get $MOBdata($id) Size]] -text $mob_name -tags "M#$id MF#$id MN#$id MT#$id allMOB"
 	}
 	if {[dict get $MOBdata($id) Killed]} {
 		$w create line [expr $x*$iscale] [expr $y*$iscale] [expr ($x+$mob_size)*$iscale] [expr ($y+$mob_size)*$iscale] \
@@ -6655,6 +6704,9 @@ proc MobStateFlag {mob_id attr value} {
 	if {[llength $mob_id] != 1} { 
 		return false ; # not just one target, so no.
 	}
+	if {$attr eq {__hide__}} {
+		return [dict get $MOBdata($mob_id) Hidden]
+	}
 	if {[info exists MOBdata($mob_id)]} {
 		if {![dict exists $MOBdata($mob_id) $attr]} {
 			DEBUG 0 "MobStateFlag($mob_id,$attr,$value) no such attribute"
@@ -6795,9 +6847,16 @@ proc ToggleObjectAttribute {id key value} {
 proc CondPerson {mob_id condition} {
 	global canvas
 
-	if {[ToggleObjectAttribute $mob_id StatusList $condition] != 0} {
+	if {$condition eq {__hide__}} {
+		global MOBdata
+		dict set MOBdata($mob_id) Hidden [expr ! [dict get $MOBdata($mob_id) Hidden]]
 		RenderSomeone $canvas $mob_id
-		SendMobChanges $mob_id {StatusList}
+		SendMobChanges $mob_id {Hidden}
+	} else {
+		if {[ToggleObjectAttribute $mob_id StatusList $condition] != 0} {
+			RenderSomeone $canvas $mob_id
+			SendMobChanges $mob_id {StatusList}
+		}
 	}
 }
 
@@ -6808,7 +6867,7 @@ proc CondAll {mob_list condition} {
 }
 
 proc CreateConditionSubMenu {args} {
-	global MarkerShape MarkerColor
+	global MarkerShape MarkerColor is_GM
 
 	if {[lindex $args 0] == {-mass}} {
 		set mob_id __mass__
@@ -6824,16 +6883,49 @@ proc CreateConditionSubMenu {args} {
 	set mid .contextMenu.$sub$mob_id
 	catch {$mid delete 0 end; destroy $mid}
 	menu $mid
-	foreach condition [lsort [array names MarkerShape]] {
-		if {[info exists MarkerColor($condition)] && $MarkerColor($condition) ne {} && $MarkerShape($condition) ne {}} {
-			if {[MobStateFlag $mob_list StatusList $condition]} {
-				$mid add command -command [list $cmd $mob_list $condition] -label $condition -foreground #ff0000
-			} else {
-				$mid add command -command [list $cmd $mob_list $condition] -label $condition
+	set choices [lsort [array names MarkerShape]]
+	if {[llength $choices] > 20} {
+		set groupsize [expr int([llength $choices] / 10)]
+		set submenu {}
+		for {set i 0} {$i < [llength $choices]} {incr i} {
+			if {$i % $groupsize == 0} {
+				if {[set last [expr $i + $groupsize - 1]] >= [llength $choices]} {
+					set last end
+				}
+				catch {$mid.$i delete 0 end; destroy $mid.$i}
+				menu $mid.$i
+				$mid add cascade -menu $mid.$i -label "[lindex $choices $i] - [lindex $choices $last]"
+				set submenu $mid.$i
+			}
+			set condition [lindex $choices $i]
+			if {[info exists MarkerColor($condition)] && $MarkerColor($condition) ne {} && $MarkerShape($condition) ne {}} {
+				if {[MobStateFlag $mob_list StatusList $condition]} {
+					$submenu add command -command [list $cmd $mob_list $condition] -label $condition -foreground #ff0000
+				} else {
+					$submenu add command -command [list $cmd $mob_list $condition] -label $condition
+				}
+			}
+		}
+	} else {
+		foreach condition [lsort [array names MarkerShape]] {
+			if {[info exists MarkerColor($condition)] && $MarkerColor($condition) ne {} && $MarkerShape($condition) ne {}} {
+				if {[MobStateFlag $mob_list StatusList $condition]} {
+					$mid add command -command [list $cmd $mob_list $condition] -label $condition -foreground #ff0000
+				} else {
+					$mid add command -command [list $cmd $mob_list $condition] -label $condition
+				}
 			}
 		}
 	}
+	$mid add separator
 	$mid add command -command [list $cmd $mob_list __clear__] -label "(clear all)"
+	if {$is_GM} {
+		if {[MobStateFlag $mob_list __hide__ {}]} {
+			$mid add command -command [list $cmd $mob_list __hide__] -label "(hidden)" -foreground #ff0000
+		} else {
+			$mid add command -command [list $cmd $mob_list __hide__] -label "(hidden)"
+		}
+	}
 	return $mid
 }
 
@@ -8330,13 +8422,16 @@ proc DoCommandDD= {d} {
 
 proc DoCommandDSM {d} {
 	# define status marker
-	::gmautil::dassign $d Condition condition Shape shape Color color Description description
-	global MarkerColor MarkerShape MarkerDescription
+	::gmautil::dassign $d Condition condition Shape shape Color color Description description Transparent transparent
+	global MarkerColor MarkerShape MarkerDescription MarkerTransparent
 
 	if {$shape eq {} || $color eq {}} {
 		array unset MarkerColor $condition
 		array unset MarkerShape $condition
+		array unset MarkerTransparent $condition
+		array unset MarkerDescription $condition
 	} else {
+		set MarkerTransparent($condition) $transparent
 		set MarkerColor($condition) $color
 		set MarkerShape($condition) $shape
 		if {$description eq {}} {
@@ -8493,9 +8588,12 @@ proc DoCommandTO {d} {
 # Hook for any post-login activities we need to do
 #
 proc DoCommandLoginSuccessful {} {
-	global local_user
+	global local_user is_GM
 
 	set local_user $::gmaproto::username
+	if {$local_user eq {GM}} {
+		set is_GM true
+	}
 	refresh_title
 }
 
@@ -8957,8 +9055,8 @@ proc _render_die_roller {w width height type args} {
 					{*}[lindex $row_bg [expr $i % 2]]] -side left -padx 2
 				pack [label $w.preset$i.def -text [cleanupDieRollSpec $def] -anchor w {*}[lindex $row_bg [expr $i % 2]]] -side left -expand 1 -fill x
 				#pack [button $w.preset$i.del -image $icon_delete -command "DeleteDieRollPreset {$preset_name}"] -side right
-				::tooltip::tooltip $w.preset$i.name $desc
-				::tooltip::tooltip $w.preset$i.def $desc
+				::tooltip::tooltip $w.preset$i.name "* $desc"
+				::tooltip::tooltip $w.preset$i.def "* $desc"
 				bind $w.preset$i.extra <FocusIn> "_pop_open_extra $w.preset$i.extra -1"
 				bind $w.preset$i.extra <FocusOut> "_collapse_extra $w.preset$i.extra -1"
 				incr i
@@ -11642,7 +11740,7 @@ proc ConnectToServerByIdx {idx} {
 	refresh_title
 }
 
-# @[00]@| GMA-Mapper 4.6.1
+# @[00]@| GMA-Mapper 4.7
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
