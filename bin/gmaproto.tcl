@@ -57,9 +57,9 @@ package require base64 2.4.2
 package require uuid 1.0.1
 
 namespace eval ::gmaproto {
-	variable protocol 404
+	variable protocol 405
 	variable min_protocol 333
-	variable max_protocol 404
+	variable max_protocol 405
 	variable max_max_protocol 499
 	variable debug_f {}
 	variable legacy false
@@ -159,7 +159,7 @@ namespace eval ::gmaproto {
 		OA      {ObjID s NewAttrs d}
 		OA+     {ObjID s AttrName s Values l}
 		OA-     {ObjID s AttrName s Values l}
-		OK      {Protocol i Challenge b ServerStarted s ServerActive s ServerTime s}
+		OK      {Protocol i Challenge b ServerStarted s ServerActive s ServerTime s ServerVersion s}
 		PRIV    {Command s Reason s}
 		POLO    {}
 		PROGRESS {OperationID s Title s Value i MaxValue i IsDone ?}
@@ -1885,6 +1885,8 @@ proc ::gmaproto::_login {} {
 					::DEBUG 0 "The server speaks a protocol too new for me; checking for available updates..."
 					::DEBUG 0 "It may be possible to proceed with this client but not all commands may work as expected."
 				}
+				::gmaproto::DEBUG "Connected to server version [dict get $params ServerVersion] with protocol $::gmaproto::protocol"
+				::report_progress "Connected to server version [dict get $params ServerVersion] with protocol $::gmaproto::protocol"
 				if {$challenge ne {}} {
 					::gmaproto::DEBUG "Authenticating to server"
 					if {$::gmaproto::password eq {?}} {
