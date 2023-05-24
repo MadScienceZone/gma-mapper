@@ -9957,7 +9957,7 @@ proc PresetLists {arrayname args} {
 }
 
 proc EDRPcheckVar {i} {
-	global EDRP_mod_ven$i
+	global EDRP_mod_ven$i EDRP_mod_g$i
 	set w .edrp
 	set wnr [sframe content $w.n.r]
 	set wnm [sframe content $w.n.m]
@@ -9965,6 +9965,10 @@ proc EDRPcheckVar {i} {
 	if {![set EDRP_mod_ven$i]} {
 		$wnm.var$i delete 0 end
 		$wnm.var$i configure -state disabled
+		$wnm.g$i configure -state normal
+	} else {
+		$wnm.g$i configure -state disabled
+		set EDRP_mod_g$i 0
 	}
 }
 # DisplayChatMessage d ?-noopen? ?-system?
