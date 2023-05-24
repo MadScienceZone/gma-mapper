@@ -2054,6 +2054,12 @@ server configuration), it is an indicator that the server's main event loop is d
 .BI ServerTime " (RFC 3339-formatted datetime string)"
 The current wall-clock time on the server. This provides an accurate point of reference
 to determine how long ago the other server time values occurred.
+'\" <<New>>
+.TP
+.B ServerVersion
+The server's version number.
+(Added in protocol 405.)
+'\" <</New>>
 '\" <<ital-is-var>>
 '\" <</>>
 .RE
@@ -2597,14 +2603,18 @@ John Mechalas (elevation and movement modes).
 .SH HISTORY
 .LP
 '\" <<New>>
-This document defines map protocol version 404,
+This document defines map protocol version 405,
 which introduced the
+.B ServerVersion
+field to the server's greeting.
+'\" <</New>>
+.LP
+Protocol 404 introduced the
 .B Hidden
 attribute for creature tokens, the transparent image type,
 and the
 .B Transparent
 attribute for status markers.
-'\" <</New>>
 .LP
 Protocol version 403
 introduced the
