@@ -1,23 +1,23 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       ______                           #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \                          #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  )                         #
-# | |      | || || || (___) | Assistant  / (_) (_        /  /                          #
-# | | ____ | |(_)| ||  ___  |           (____   _)      /  /                           #
-# | | \_  )| |   | || (   ) |                ) (       /  /                            #
-# | (___) || )   ( || )   ( | Mapper         | |   _  /  /                             #
-# (_______)|/     \||/     \| Client         (_)  (_) \_/                              #
+#  _______  _______  _______                ___        _____                           #
+# (  ____ \(       )(  ___  ) Game         /   )      / ___ \                          #
+# | (    \/| () () || (   ) | Master's    / /) |     ( (___) )                         #
+# | |      | || || || (___) | Assistant  / (_) (_     \     /                          #
+# | | ____ | |(_)| ||  ___  |           (____   _)    / ___ \                          #
+# | | \_  )| |   | || (   ) |                ) (     ( (   ) )                         #
+# | (___) || )   ( || )   ( | Mapper         | |   _ ( (___) )                         #
+# (_______)|/     \||/     \| Client         (_)  (_) \_____/                          #
 #                                                                                      #
 ########################################################################################
 #
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.8-beta}     ;# @@##@@
+set GMAMapperVersion {4.8}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
 set GMAMapperProtocol {405}         ;# @@##@@
-set CoreVersionNumber {5.5}            ;# @@##@@
+set CoreVersionNumber {5.6}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -11744,7 +11744,7 @@ proc ConnectToServerByIdx {idx} {
 	refresh_title
 }
 
-# @[00]@| GMA-Mapper 4.7
+# @[00]@| GMA-Mapper 4.8
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
