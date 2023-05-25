@@ -3,13 +3,21 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.7               <!-- @@##@@ -->
- * Effective Date: 24-May-2023               <!-- @@##@@ -->
+ * This Package Version: 4.8          <!-- @@##@@ -->
+ * Effective Date: 25-May-2023               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 5.5 <!-- @@##@@ -->
+ * GMA Core API Library Version: 5.6 <!-- @@##@@ -->
  * GMA Mapper File Format: 20	     <!-- @@##@@ -->
- * GMA Mapper Protocol: 404        <!-- @@##@@ -->
+ * GMA Mapper Protocol: 405        <!-- @@##@@ -->
+
+# 4.8
+## Enhancements
+ * Now supports protocol 405.
+## Fixes
+ * Corrects enabling/disabling of die-roll modifier option checkbuttons.
+ * Fixes bug which lost custom images from creature tokens when saving maps to disk.
+ * Corrects a bug with tracking hidden creatures.
 
 # 4.7
 ## Enhancements

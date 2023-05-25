@@ -1,23 +1,23 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       ______                           #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \                          #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  )                         #
-# | |      | || || || (___) | Assistant  / (_) (_        /  /                          #
-# | | ____ | |(_)| ||  ___  |           (____   _)      /  /                           #
-# | | \_  )| |   | || (   ) |                ) (       /  /                            #
-# | (___) || )   ( || )   ( | Mapper         | |   _  /  /                             #
-# (_______)|/     \||/     \| Client         (_)  (_) \_/                              #
+#  _______  _______  _______                ___        _____                           #
+# (  ____ \(       )(  ___  ) Game         /   )      / ___ \                          #
+# | (    \/| () () || (   ) | Master's    / /) |     ( (___) )                         #
+# | |      | || || || (___) | Assistant  / (_) (_     \     /                          #
+# | | ____ | |(_)| ||  ___  |           (____   _)    / ___ \                          #
+# | | \_  )| |   | || (   ) |                ) (     ( (   ) )                         #
+# | (___) || )   ( || )   ( | Mapper         | |   _ ( (___) )                         #
+# (_______)|/     \||/     \| Client         (_)  (_) \_____/                          #
 #                                                                                      #
 ########################################################################################
 #
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.7}     ;# @@##@@
+set GMAMapperVersion {4.8}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
-set GMAMapperProtocol {404}         ;# @@##@@
-set CoreVersionNumber {5.5}            ;# @@##@@
+set GMAMapperProtocol {405}         ;# @@##@@
+set CoreVersionNumber {5.6}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -2488,7 +2488,7 @@ proc unloadfile {file args} {
 }
 
 proc savefile {} {
-	global OBJdata OBJtype MOBdata MOBid OBJ_FILE LastFileComment LastFileLocation
+	global OBJdata OBJtype MOBdata MOBid OBJ_FILE LastFileComment LastFileLocation MOB_IMAGE
 
 	if {[set file [tk_getSaveFile -defaultextension .map -initialfile $OBJ_FILE -filetypes {
 		{{GMA Mapper Files} {.map}}
@@ -2511,7 +2511,7 @@ proc savefile {} {
 		::gmafile::save_arrays_to_file $f [dict create\
 			Comment $LastFileComment\
 			Location $LastFileLocation\
-		] OBJdata OBJtype MOBdata
+		] OBJdata OBJtype MOBdata MOB_IMAGE
 		close $f
 	} err]} {
 		say "Error writing map file to disk: $err"
@@ -9957,7 +9957,7 @@ proc PresetLists {arrayname args} {
 }
 
 proc EDRPcheckVar {i} {
-	global EDRP_mod_ven$i
+	global EDRP_mod_ven$i EDRP_mod_g$i
 	set w .edrp
 	set wnr [sframe content $w.n.r]
 	set wnm [sframe content $w.n.m]
@@ -9965,6 +9965,10 @@ proc EDRPcheckVar {i} {
 	if {![set EDRP_mod_ven$i]} {
 		$wnm.var$i delete 0 end
 		$wnm.var$i configure -state disabled
+		$wnm.g$i configure -state normal
+	} else {
+		$wnm.g$i configure -state disabled
+		set EDRP_mod_g$i 0
 	}
 }
 # DisplayChatMessage d ?-noopen? ?-system?
@@ -10909,7 +10913,7 @@ proc aboutMapper {} {
 }
 
 proc SyncAllClientsToMe {} {
-	global SafMode GMAMapperFileFormat OBJdata OBJtype MOBdata ClockDisplay
+	global SafMode GMAMapperFileFormat OBJdata OBJtype MOBdata ClockDisplay MOB_IMAGE
 
 	set oldcd $ClockDisplay
 	if [tk_messageBox -type yesno -icon question -title "Push map data to other clients?" \
@@ -10936,7 +10940,7 @@ proc SyncAllClientsToMe {} {
 				::gmafile::save_arrays_to_file $temp_file [dict create \
 					Comment "Dynamic push of map data from one client to the others" \
 					Location "Full-map sync" \
-					] OBJdata OBJtype MOBdata
+					] OBJdata OBJtype MOBdata MOB_IMAGE
 				close $temp_file
 			} err] {
 				tk_messageBox -type ok -icon error -title "Error writing file"\
@@ -11740,7 +11744,7 @@ proc ConnectToServerByIdx {idx} {
 	refresh_title
 }
 
-# @[00]@| GMA-Mapper 4.7
+# @[00]@| GMA-Mapper 4.8
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

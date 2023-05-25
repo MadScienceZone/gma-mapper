@@ -1,16 +1,16 @@
 ########################################################################################
-#  _______  _______  _______                ___       ______                           #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \                          #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  )                         #
-# | |      | || || || (___) | Assistant  / (_) (_        /  /                          #
-# | | ____ | |(_)| ||  ___  |           (____   _)      /  /                           #
-# | | \_  )| |   | || (   ) |                ) (       /  /                            #
-# | (___) || )   ( || )   ( | Mapper         | |   _  /  /                             #
-# (_______)|/     \||/     \| Client         (_)  (_) \_/                              #
+#  _______  _______  _______                ___        _____                           #
+# (  ____ \(       )(  ___  ) Game         /   )      / ___ \                          #
+# | (    \/| () () || (   ) | Master's    / /) |     ( (___) )                         #
+# | |      | || || || (___) | Assistant  / (_) (_     \     /                          #
+# | | ____ | |(_)| ||  ___  |           (____   _)    / ___ \                          #
+# | | \_  )| |   | || (   ) |                ) (     ( (   ) )                         #
+# | (___) || )   ( || )   ( | Mapper         | |   _ ( (___) )                         #
+# (_______)|/     \||/     \| Client         (_)  (_) \_____/                          #
 #                                                                                      #
 ########################################################################################
 #
-# @[00]@| GMA-Mapper 4.7
+# @[00]@| GMA-Mapper 4.8
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
@@ -74,7 +74,7 @@ namespace eval ::gmafile {
 		__DMETA__ {Timestamp i DateTime s Comment s}
 		ARC      {ArcMode i Start f Extent f ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		CIRC     {ArcMode i Start f Extent f ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
-		CREATURE {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l Elev i Color s Note s Size s Area s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i}
+		CREATURE {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l Elev i Color s Note s Size s Area s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ?}
 		IMG      {Name s Sizes {a {File s ImageData b IsLocalFile ? Zoom f}}}
 		LINE     {Arrow i ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		MAP      {File s IsLocalFile ? CacheOnly ? Merge ?}
@@ -92,11 +92,16 @@ namespace eval ::gmafile {
 # save_to_file fileobj { meta {{type dict}, ...} }
 # save_arrays_to_file fileobj metadict elements elementtypes creatures
 #
-proc ::gmafile::save_arrays_to_file {f meta elements elementtypes creatures} {
+proc ::gmafile::save_arrays_to_file {f meta elements elementtypes creatures {imagemap {}}} {
 	set objlist {}
 	upvar 1 $elements e
 	upvar 1 $elementtypes t
 	upvar 1 $creatures c
+	if {$imagemap ne {}} {
+		upvar 1 $imagemap imap
+	} else {
+		array unset imap
+	}
 
 	foreach id [array names e] {
 		set d $e($id)
@@ -122,7 +127,11 @@ proc ::gmafile::save_arrays_to_file {f meta elements elementtypes creatures} {
 	}
 
 	foreach id [array names c] {
-		lappend objlist [list CREATURE $c($id)]
+		set d $c($id)
+		if {[dict exists $d Name] && [info exists imap([dict get $d Name])]} {
+			set d [dict replace $d Name "$imap([dict get $d Name])=[dict get $d Name]"]
+		}
+		lappend objlist [list CREATURE $d]
 	}
 
 	::gmafile::save_to_file $f [list $meta $objlist]
