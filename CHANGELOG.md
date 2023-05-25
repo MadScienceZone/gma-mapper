@@ -13,9 +13,10 @@
 
 # Unreleased 4.8
 ## Enhancements
- * Now supports protocol 405
+ * Now supports protocol 405.
 ## Fixes
- * Corrects enabling/disabling of die-roll modifier option checkbuttons
+ * Corrects enabling/disabling of die-roll modifier option checkbuttons.
+ * Fixes bug which lost custom images from creature tokens when saving maps to disk.
 
 # 4.7
 ## Enhancements
