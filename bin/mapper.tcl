@@ -2488,7 +2488,7 @@ proc unloadfile {file args} {
 }
 
 proc savefile {} {
-	global OBJdata OBJtype MOBdata MOBid OBJ_FILE LastFileComment LastFileLocation
+	global OBJdata OBJtype MOBdata MOBid OBJ_FILE LastFileComment LastFileLocation MOB_IMAGE
 
 	if {[set file [tk_getSaveFile -defaultextension .map -initialfile $OBJ_FILE -filetypes {
 		{{GMA Mapper Files} {.map}}
@@ -2511,7 +2511,7 @@ proc savefile {} {
 		::gmafile::save_arrays_to_file $f [dict create\
 			Comment $LastFileComment\
 			Location $LastFileLocation\
-		] OBJdata OBJtype MOBdata
+		] OBJdata OBJtype MOBdata MOB_IMAGE
 		close $f
 	} err]} {
 		say "Error writing map file to disk: $err"
@@ -10913,7 +10913,7 @@ proc aboutMapper {} {
 }
 
 proc SyncAllClientsToMe {} {
-	global SafMode GMAMapperFileFormat OBJdata OBJtype MOBdata ClockDisplay
+	global SafMode GMAMapperFileFormat OBJdata OBJtype MOBdata ClockDisplay MOB_IMAGE
 
 	set oldcd $ClockDisplay
 	if [tk_messageBox -type yesno -icon question -title "Push map data to other clients?" \
@@ -10940,7 +10940,7 @@ proc SyncAllClientsToMe {} {
 				::gmafile::save_arrays_to_file $temp_file [dict create \
 					Comment "Dynamic push of map data from one client to the others" \
 					Location "Full-map sync" \
-					] OBJdata OBJtype MOBdata
+					] OBJdata OBJtype MOBdata MOB_IMAGE
 				close $temp_file
 			} err] {
 				tk_messageBox -type ok -icon error -title "Error writing file"\
