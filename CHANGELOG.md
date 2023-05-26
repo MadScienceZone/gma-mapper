@@ -3,13 +3,18 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.8          <!-- @@##@@ -->
- * Effective Date: 25-May-2023               <!-- @@##@@ -->
+ * This Package Version: 4.8.1          <!-- @@##@@ -->
+ * Effective Date: 26-May-2023               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 5.6 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.1 <!-- @@##@@ -->
  * GMA Mapper File Format: 20	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 405        <!-- @@##@@ -->
+
+# 4.8.1
+## Fixes
+ * The mapper didn't lock map objects when saving.
+ * The debug window was midding the application icon.
 
 # 4.8
 ## Enhancements
