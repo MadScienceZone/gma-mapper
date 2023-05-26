@@ -14,7 +14,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.8}     ;# @@##@@
+set GMAMapperVersion {4.8.1-alpha}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
 set GMAMapperProtocol {405}         ;# @@##@@
 set CoreVersionNumber {5.6}            ;# @@##@@
@@ -1556,6 +1556,10 @@ if {[catch {
 	}
 }
 wm iconphoto . -default $icon_gma_512 $icon_gma_256 $icon_gma_128 $icon_gma_48 $icon_gma_32 $icon_gma_16
+catch {
+	wm iconphoto .debugwindow -default $icon_gma_512 $icon_gma_256 $icon_gma_128 $icon_gma_48 $icon_gma_32 $icon_gma_16
+}
+
 
 set _icon_format gif
 foreach icon_name {
