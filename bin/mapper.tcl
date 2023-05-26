@@ -2515,7 +2515,7 @@ proc savefile {} {
 		::gmafile::save_arrays_to_file $f [dict create\
 			Comment $LastFileComment\
 			Location $LastFileLocation\
-		] OBJdata OBJtype MOBdata MOB_IMAGE
+		] OBJdata OBJtype MOBdata MOB_IMAGE $lock_objects
 		close $f
 	} err]} {
 		say "Error writing map file to disk: $err"

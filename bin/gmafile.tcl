@@ -92,7 +92,7 @@ namespace eval ::gmafile {
 # save_to_file fileobj { meta {{type dict}, ...} }
 # save_arrays_to_file fileobj metadict elements elementtypes creatures
 #
-proc ::gmafile::save_arrays_to_file {f meta elements elementtypes creatures {imagemap {}}} {
+proc ::gmafile::save_arrays_to_file {f meta elements elementtypes creatures {imagemap {}} {lock_objects false}} {
 	set objlist {}
 	upvar 1 $elements e
 	upvar 1 $elementtypes t
@@ -123,6 +123,9 @@ proc ::gmafile::save_arrays_to_file {f meta elements elementtypes creatures {ima
 			continue
 		}
 
+		if {$lock_objects} {
+			dict set d Locked true
+		}
 		lappend objlist [list $ot $d]
 	}
 
