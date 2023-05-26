@@ -1,16 +1,16 @@
 ########################################################################################
-#  _______  _______  _______                ___        _____                           #
-# (  ____ \(       )(  ___  ) Game         /   )      / ___ \                          #
-# | (    \/| () () || (   ) | Master's    / /) |     ( (___) )                         #
-# | |      | || || || (___) | Assistant  / (_) (_     \     /                          #
-# | | ____ | |(_)| ||  ___  |           (____   _)    / ___ \                          #
-# | | \_  )| |   | || (   ) |                ) (     ( (   ) )                         #
-# | (___) || )   ( || )   ( | Mapper         | |   _ ( (___) )                         #
-# (_______)|/     \||/     \| Client         (_)  (_) \_____/                          #
+#  _______  _______  _______                ___        _____       __                  #
+# (  ____ \(       )(  ___  ) Game         /   )      / ___ \     /  \                 #
+# | (    \/| () () || (   ) | Master's    / /) |     ( (___) )    \/) )                #
+# | |      | || || || (___) | Assistant  / (_) (_     \     /       | |                #
+# | | ____ | |(_)| ||  ___  |           (____   _)    / ___ \       | |                #
+# | | \_  )| |   | || (   ) |                ) (     ( (   ) )      | |                #
+# | (___) || )   ( || )   ( | Mapper         | |   _ ( (___) ) _  __) (_               #
+# (_______)|/     \||/     \| Client         (_)  (_) \_____/ (_) \____/               #
 #                                                                                      #
 ########################################################################################
 #
-# @[00]@| GMA-Mapper 4.8
+# @[00]@| GMA-Mapper 4.8.1
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
@@ -92,7 +92,7 @@ namespace eval ::gmafile {
 # save_to_file fileobj { meta {{type dict}, ...} }
 # save_arrays_to_file fileobj metadict elements elementtypes creatures
 #
-proc ::gmafile::save_arrays_to_file {f meta elements elementtypes creatures {imagemap {}}} {
+proc ::gmafile::save_arrays_to_file {f meta elements elementtypes creatures {imagemap {}} {lock_objects false}} {
 	set objlist {}
 	upvar 1 $elements e
 	upvar 1 $elementtypes t
@@ -123,6 +123,9 @@ proc ::gmafile::save_arrays_to_file {f meta elements elementtypes creatures {ima
 			continue
 		}
 
+		if {$lock_objects} {
+			dict set d Locked true
+		}
 		lappend objlist [list $ot $d]
 	}
 
