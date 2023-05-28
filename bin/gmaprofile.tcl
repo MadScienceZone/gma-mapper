@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___        _____       __                  #
-# (  ____ \(       )(  ___  ) Game         /   )      / ___ \     /  \                 #
-# | (    \/| () () || (   ) | Master's    / /) |     ( (___) )    \/) )                #
-# | |      | || || || (___) | Assistant  / (_) (_     \     /       | |                #
-# | | ____ | |(_)| ||  ___  |           (____   _)    / ___ \       | |                #
-# | | \_  )| |   | || (   ) |                ) (     ( (   ) )      | |                #
-# | (___) || )   ( || )   ( | Mapper         | |   _ ( (___) ) _  __) (_               #
-# (_______)|/     \||/     \| Client         (_)  (_) \_____/ (_) \____/               #
+#  _______  _______  _______                ___        _____                           #
+# (  ____ \(       )(  ___  ) Game         /   )      / ___ \                          #
+# | (    \/| () () || (   ) | Master's    / /) |     ( (   ) )                         #
+# | |      | || || || (___) | Assistant  / (_) (_    ( (___) |                         #
+# | | ____ | |(_)| ||  ___  |           (____   _)    \____  |                         #
+# | | \_  )| |   | || (   ) |                ) (           ) |                         #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\____) )                         #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/                          #
 #                                                                                      #
 ########################################################################################
 # Profile editor
@@ -83,6 +83,7 @@ namespace eval ::gmaprofile {
 		GMA_Mapper_preferences_version i
 		animate ?
 		button_size s
+		colorize_die_rolls ?
 		curl_path s
 		current_profile s
 		dark ?
@@ -270,6 +271,7 @@ namespace eval ::gmaprofile {
 		return [dict create \
 			animate         false\
 			button_size     small\
+			colorize_die_rolls true\
 			curl_path       [::gmautil::searchInPath curl]\
 			current_profile offline\
 			dark            false\
@@ -535,7 +537,7 @@ namespace eval ::gmaprofile {
 		set _profile $_profile_backup
 	}
 	proc _save {} {
-		global animate button_size bsizetext dark image_format keep_tools preload
+		global animate colorize_die_rolls button_size bsizetext dark image_format keep_tools preload
 		global imgtext debug_level debug_proto curl_path profiles
 		global major_interval major_offset_x major_offset_y
 		global minor_interval minor_offset_x minor_offset_y
@@ -544,6 +546,7 @@ namespace eval ::gmaprofile {
 		set _profile [dict replace $_profile \
 			animate $animate \
 			button_size $button_size \
+			colorize_die_rolls $colorize_die_rolls \
 			curl_path $curl_path \
 			dark $dark \
 			debug_level $debug_level \
@@ -712,7 +715,7 @@ namespace eval ::gmaprofile {
 	}
 
 	proc editor {w d} {
-		global animate button_size bsizetext dark image_format keep_tools preload
+		global animate button_size bsizetext colorize_die_rolls dark image_format keep_tools preload
 		global imgtext debug_proto debug_level curl_path profiles 
 		global major_interval major_offset_x major_offset_y
 		global minor_interval minor_offset_x minor_offset_y
@@ -728,6 +731,7 @@ namespace eval ::gmaprofile {
 		::gmautil::dassign $::gmaprofile::_profile \
 			animate animate \
 			button_size button_size \
+			colorize_die_rolls colorize_die_rolls \
 			curl_path curl_path \
 			dark dark \
 			debug_level debug_level \
@@ -740,6 +744,7 @@ namespace eval ::gmaprofile {
 			current_profile current_profile
 
 		set animate [::gmaproto::int_bool $animate]
+		set colorize_die_rolls [::gmaproto::int_bool $colorize_die_rolls]
 		set dark [::gmaproto::int_bool $dark]
 		set keep_tools [::gmaproto::int_bool $keep_tools]
 		set preload [::gmaproto::int_bool $preload]
@@ -1014,6 +1019,7 @@ namespace eval ::gmaprofile {
 
 		grid [ttk::label $w.n.a.title -text "MAPPER APPEARANCE SETTINGS" -anchor center -foreground $sep_fg -background $sep_bg] - - - - - - -sticky we -pady 5
 		grid [ttk::checkbutton $w.n.a.animate -text "Animate updates" -variable animate] - - - - - - -sticky w
+		grid [ttk::checkbutton $w.n.a.cdr -text "Enable colors in die-roll titles" -variable colorize_die_rolls] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.dark -text "Dark theme" -variable dark] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.keep -text "Keep toolbar visible" -variable keep_tools] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.preload -text "Pre-load all cached images" -variable preload] - - - - - - -sticky w

@@ -1,23 +1,23 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___        _____       __                  #
-# (  ____ \(       )(  ___  ) Game         /   )      / ___ \     /  \                 #
-# | (    \/| () () || (   ) | Master's    / /) |     ( (___) )    \/) )                #
-# | |      | || || || (___) | Assistant  / (_) (_     \     /       | |                #
-# | | ____ | |(_)| ||  ___  |           (____   _)    / ___ \       | |                #
-# | | \_  )| |   | || (   ) |                ) (     ( (   ) )      | |                #
-# | (___) || )   ( || )   ( | Mapper         | |   _ ( (___) ) _  __) (_               #
-# (_______)|/     \||/     \| Client         (_)  (_) \_____/ (_) \____/               #
+#  _______  _______  _______                ___        _____                           #
+# (  ____ \(       )(  ___  ) Game         /   )      / ___ \                          #
+# | (    \/| () () || (   ) | Master's    / /) |     ( (   ) )                         #
+# | |      | || || || (___) | Assistant  / (_) (_    ( (___) |                         #
+# | | ____ | |(_)| ||  ___  |           (____   _)    \____  |                         #
+# | | \_  )| |   | || (   ) |                ) (           ) |                         #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\____) )                         #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/                          #
 #                                                                                      #
 ########################################################################################
 #
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.8.1}     ;# @@##@@
+set GMAMapperVersion {4.9}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
 set GMAMapperProtocol {405}         ;# @@##@@
-set CoreVersionNumber {6.1}            ;# @@##@@
+set CoreVersionNumber {6.1.1}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -1079,6 +1079,15 @@ proc editPreferences {} {
 #
 # Load preferences from disk if possible
 #
+# First, look for --preferences <path> in the command args
+for {set i 0} {$i < $argc} {incr i} {
+	if {[lindex $argv $i] eq {--preferences} && $i+1 < $argc} {
+		set preferences_path [lindex $argv $i+1]
+		INFO "Using alternative preferences file $preferences_path"
+		break
+	}
+}
+
 if {[file exists $preferences_path]} {
 	if [catch {
 		set PreferencesData [::gmaprofile::load $preferences_path]
@@ -1116,7 +1125,8 @@ proc usage {} {
 	puts $stderr {        [-n] [-P pass] [-p port] [-S profile] [-t transcriptfile] [-u name]}
 	puts $stderr {        [-x proxyurl] [-X proxyhost] [--button-size size] [--chat-history n]}
 	puts $stderr {        [--curl-path path] [--curl-url-base url] [--dark] [--debug-protocol]}
-	puts $stderr {        [--mkdir-path path] [--nc-path path] [--no-animate] [--no-blur-all] [--scp-dest dir]}
+	puts $stderr {        [--mkdir-path path] [--nc-path path] [--no-animate] [--no-blur-all]}
+	puts $stderr {        [--preferences path] [--scp-dest dir]}
 	puts $stderr {        [--scp-path path] [--scp-server hostname] [--ssh-path path] [--update-url url]}
 	puts $stderr {Each option and its argument must appear in separate CLI parameters (words).}
 	puts $stderr {   -A, --animate:     Enable animation of drawing onto the map}
@@ -1152,6 +1162,7 @@ proc usage {} {
 	puts $stderr "   --curl-url-base:  base URL for stored data \[$CURLserver\]"
 	puts $stderr "   --mkdir-path:     pathname of server-side mkdir command \[$SERVER_MKDIRpath\]"
 	puts $stderr "   --nc-path:        pathname of nc command to invoke \[$NCpath\]"
+	puts $stderr "   --preferences:    pathname of alternative preferences.json file (may NOT be in a config file)"
 	puts $stderr "   --scp-dest:       server-side top-level storage directory \[$SCPdest\]"
 	puts $stderr "   --scp-path:       pathname of scp command to invoke \[$SCPpath\]"
 	puts $stderr "   --scp-server:     storage server hostname \[$SCPserver\]"
@@ -1181,10 +1192,6 @@ if {$PreferencesData eq {} && [file exists $default_config]} {
 	set optc [expr $optc + 2]
 	set optlist [linsert $optlist 0 --config $default_config]
 }
-
-#
-# Set up for delayed actions prompted by the command line options
-#
 
 for {set argi 0} {$argi < $optc} {incr argi} {
 	set option [lindex $optlist $argi]
@@ -1293,6 +1300,7 @@ for {set argi 0} {$argi < $optc} {incr argi} {
 		--generate-config       { puts "The --generate-config option is deprecated." }
 		--update-url      { set UpdateURL [getarg --update-url] }
 		--upgrade-notice  { set UpgradeNotice true }
+		--preferences     { getarg --preferences }
 		default {
 			if {[string range $option 0 0] eq "-"} {
 				usage
@@ -8592,13 +8600,16 @@ proc DoCommandTO {d} {
 # Hook for any post-login activities we need to do
 #
 proc DoCommandLoginSuccessful {} {
-	global local_user is_GM
+	global local_user is_GM _preferences
 
 	set local_user $::gmaproto::username
 	if {$local_user eq {GM}} {
 		set is_GM true
 	}
 	refresh_title
+	if {[dict get $_preferences colorize_die_rolls]} {
+		::gmaproto::allow DICE-COLOR-BOXES
+	}
 }
 
 #
@@ -11748,7 +11759,7 @@ proc ConnectToServerByIdx {idx} {
 	refresh_title
 }
 
-# @[00]@| GMA-Mapper 4.8.1
+# @[00]@| GMA-Mapper 4.9
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

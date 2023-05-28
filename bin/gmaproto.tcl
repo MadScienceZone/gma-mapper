@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___        _____       __                  #
-# (  ____ \(       )(  ___  ) Game         /   )      / ___ \     /  \                 #
-# | (    \/| () () || (   ) | Master's    / /) |     ( (___) )    \/) )                #
-# | |      | || || || (___) | Assistant  / (_) (_     \     /       | |                #
-# | | ____ | |(_)| ||  ___  |           (____   _)    / ___ \       | |                #
-# | | \_  )| |   | || (   ) |                ) (     ( (   ) )      | |                #
-# | (___) || )   ( || )   ( | Mapper         | |   _ ( (___) ) _  __) (_               #
-# (_______)|/     \||/     \| Client         (_)  (_) \_____/ (_) \____/               #
+#  _______  _______  _______                ___        _____                           #
+# (  ____ \(       )(  ___  ) Game         /   )      / ___ \                          #
+# | (    \/| () () || (   ) | Master's    / /) |     ( (   ) )                         #
+# | |      | || || || (___) | Assistant  / (_) (_    ( (___) |                         #
+# | | ____ | |(_)| ||  ___  |           (____   _)    \____  |                         #
+# | | \_  )| |   | || (   ) |                ) (           ) |                         #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\____) )                         #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/                          #
 #                                                                                      #
 ########################################################################################
 #
@@ -1953,7 +1953,6 @@ proc ::gmaproto::_login {} {
 	set ::gmaproto::pending_login false
 	::report_progress "Server login successful."
 	after 5000 { ::report_progress "" }
-	::gmaproto::allow DICE-COLOR-BOXES
 	::gmaproto::_transmit
 	::gmaproto::_dispatch
 	after 2000 { ::gmaproto::_background_poll }
@@ -2145,7 +2144,7 @@ proc ::gmaproto::GMATypeToProtocolCommand {gt} {
 	}
 	return $gt
 }
-# @[00]@| GMA-Mapper 4.8.1
+# @[00]@| GMA-Mapper 4.9
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

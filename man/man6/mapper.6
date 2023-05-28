@@ -1,7 +1,7 @@
 '\" t
 '\" <<ital-is-var>>
 '\" <<bold-is-fixed>>
-.TH MAPPER 6 "GMA-Mapper 4.8.1" 26-May-2023 "Games" \" @@mp@@
+.TH MAPPER 6 "GMA-Mapper 4.9" 28-May-2023 "Games" \" @@mp@@
 .SH NAME
 mapper \- GMA battle grid map
 .SH SYNOPSIS
@@ -75,6 +75,8 @@ mapper \- GMA battle grid map
 .IR path ]
 .RB [ \-\-no\-animate ]
 .RB [ \-\-no\-blur\-all ]
+.RB [ \-\-preferences
+.IR path ]
 .RB [ \-\-scp\-dest
 .IR dir ]
 .RB [ \-\-scp\-path
@@ -133,6 +135,8 @@ mapper \- GMA battle grid map
 .IR pass ]
 .RB [ \-\-port
 .IR port ]
+.RB [ \-\-preferences
+.IR path ]
 .RB [ \-\-preload ]
 .RB [ \-\-proxy\-host
 .IR proxyhost ]
@@ -647,6 +651,16 @@ If the
 option is given, connect to the specified TCP
 .I port
 number on that host.  The default is port 2323.
+.TP
+.BI "\-\-preferences " path
+Use the specified
+.I path
+instead of
+.B ~/.gma/mapper/preferences.json
+for the set of user preferences to use for this invocation. This allows
+a completely separate set of preferences to be used for different users
+or purposes. This command may not appear in a configuration file
+(and is ignored if it is). It must be given only on the command line.
 .TP
 .BR \-l ", " \-\-preload
 Pre-load all the cached images into memory at start-up, instead of loading them
