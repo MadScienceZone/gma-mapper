@@ -1953,7 +1953,6 @@ proc ::gmaproto::_login {} {
 	set ::gmaproto::pending_login false
 	::report_progress "Server login successful."
 	after 5000 { ::report_progress "" }
-	::gmaproto::allow DICE-COLOR-BOXES
 	::gmaproto::_transmit
 	::gmaproto::_dispatch
 	after 2000 { ::gmaproto::_background_poll }
