@@ -1079,6 +1079,15 @@ proc editPreferences {} {
 #
 # Load preferences from disk if possible
 #
+# First, look for --preferences <path> in the command args
+for {set i 0} {$i < $argc} {incr i} {
+	if {[lindex $argv $i] eq {--preferences} && $i+1 < $argc} {
+		set preferences_path [lindex $argv $i+1]
+		INFO "Using alternative preferences file $preferences_path"
+		break
+	}
+}
+
 if {[file exists $preferences_path]} {
 	if [catch {
 		set PreferencesData [::gmaprofile::load $preferences_path]
@@ -1116,7 +1125,8 @@ proc usage {} {
 	puts $stderr {        [-n] [-P pass] [-p port] [-S profile] [-t transcriptfile] [-u name]}
 	puts $stderr {        [-x proxyurl] [-X proxyhost] [--button-size size] [--chat-history n]}
 	puts $stderr {        [--curl-path path] [--curl-url-base url] [--dark] [--debug-protocol]}
-	puts $stderr {        [--mkdir-path path] [--nc-path path] [--no-animate] [--no-blur-all] [--scp-dest dir]}
+	puts $stderr {        [--mkdir-path path] [--nc-path path] [--no-animate] [--no-blur-all]}
+	puts $stderr {        [--preferences path] [--scp-dest dir]}
 	puts $stderr {        [--scp-path path] [--scp-server hostname] [--ssh-path path] [--update-url url]}
 	puts $stderr {Each option and its argument must appear in separate CLI parameters (words).}
 	puts $stderr {   -A, --animate:     Enable animation of drawing onto the map}
@@ -1152,6 +1162,7 @@ proc usage {} {
 	puts $stderr "   --curl-url-base:  base URL for stored data \[$CURLserver\]"
 	puts $stderr "   --mkdir-path:     pathname of server-side mkdir command \[$SERVER_MKDIRpath\]"
 	puts $stderr "   --nc-path:        pathname of nc command to invoke \[$NCpath\]"
+	puts $stderr "   --preferences:    pathname of alternative preferences.json file (may NOT be in a config file)"
 	puts $stderr "   --scp-dest:       server-side top-level storage directory \[$SCPdest\]"
 	puts $stderr "   --scp-path:       pathname of scp command to invoke \[$SCPpath\]"
 	puts $stderr "   --scp-server:     storage server hostname \[$SCPserver\]"
@@ -1181,10 +1192,6 @@ if {$PreferencesData eq {} && [file exists $default_config]} {
 	set optc [expr $optc + 2]
 	set optlist [linsert $optlist 0 --config $default_config]
 }
-
-#
-# Set up for delayed actions prompted by the command line options
-#
 
 for {set argi 0} {$argi < $optc} {incr argi} {
 	set option [lindex $optlist $argi]
@@ -1293,6 +1300,7 @@ for {set argi 0} {$argi < $optc} {incr argi} {
 		--generate-config       { puts "The --generate-config option is deprecated." }
 		--update-url      { set UpdateURL [getarg --update-url] }
 		--upgrade-notice  { set UpgradeNotice true }
+		--preferences     { getarg --preferences }
 		default {
 			if {[string range $option 0 0] eq "-"} {
 				usage
