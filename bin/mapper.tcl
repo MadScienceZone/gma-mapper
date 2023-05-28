@@ -8592,13 +8592,16 @@ proc DoCommandTO {d} {
 # Hook for any post-login activities we need to do
 #
 proc DoCommandLoginSuccessful {} {
-	global local_user is_GM
+	global local_user is_GM _preferences
 
 	set local_user $::gmaproto::username
 	if {$local_user eq {GM}} {
 		set is_GM true
 	}
 	refresh_title
+	if {[dict get $_preferences colorize_die_rolls]} {
+		::gmaproto::allow DICE-COLOR-BOXES
+	}
 }
 
 #
