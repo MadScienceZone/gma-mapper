@@ -3,13 +3,17 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.9          <!-- @@##@@ -->
+ * This Package Version: 4.9.1          <!-- @@##@@ -->
  * Effective Date: 28-May-2023               <!-- @@##@@ -->
 
 ## Compatibility
  * GMA Core API Library Version: 6.1.1 <!-- @@##@@ -->
  * GMA Mapper File Format: 20	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 405        <!-- @@##@@ -->
+
+# 4.9.1
+## Fixes
+ * Expanded the entry widgets for the URL fields in the server preferences setting tab. They were too short for the URLs we expect to go there, and there was room on the form to let them be bigger.
 
 # 4.9
 ## Enhancements

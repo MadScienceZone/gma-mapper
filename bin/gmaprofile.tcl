@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___        _____                           #
-# (  ____ \(       )(  ___  ) Game         /   )      / ___ \                          #
-# | (    \/| () () || (   ) | Master's    / /) |     ( (   ) )                         #
-# | |      | || || || (___) | Assistant  / (_) (_    ( (___) |                         #
-# | | ____ | |(_)| ||  ___  |           (____   _)    \____  |                         #
-# | | \_  )| |   | || (   ) |                ) (           ) |                         #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\____) )                         #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/                          #
+#  _______  _______  _______                ___        _____       __                  #
+# (  ____ \(       )(  ___  ) Game         /   )      / ___ \     /  \                 #
+# | (    \/| () () || (   ) | Master's    / /) |     ( (   ) )    \/) )                #
+# | |      | || || || (___) | Assistant  / (_) (_    ( (___) |      | |                #
+# | | ____ | |(_)| ||  ___  |           (____   _)    \____  |      | |                #
+# | | \_  )| |   | || (   ) |                ) (           ) |      | |                #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\____) ) _  __) (_               #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/ (_) \____/               #
 #                                                                                      #
 ########################################################################################
 # Profile editor
@@ -1116,9 +1116,9 @@ namespace eval ::gmaprofile {
 		     [ttk::entry $s.chattx -textvariable s_chat_log] \
 		     [ttk::label $s.chattxhelp -text "(empty to disable; may use % fields)"] -sticky w
 		grid [ttk::label $s.urllbl -text "Server Image Base URL:"] \
-		     [ttk::entry $s.url -textvariable s_curl_server] - -sticky we
+		     [ttk::entry $s.url -textvariable s_curl_server] - - - -sticky we
 		grid [ttk::label $s.updlbl -text "Mapper Upgrade URL:"] \
-		     [ttk::entry $s.upd -textvariable s_update_url] - -sticky we
+		     [ttk::entry $s.upd -textvariable s_update_url] - - - -sticky we
 		grid [ttk::label $s.modlbl -text "Module Code:"] \
 		     [ttk::entry $s.mod -textvariable s_module_id] - -sticky w
 
