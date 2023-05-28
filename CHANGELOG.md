@@ -3,13 +3,18 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.8.1          <!-- @@##@@ -->
- * Effective Date: 26-May-2023               <!-- @@##@@ -->
+ * This Package Version: 4.9          <!-- @@##@@ -->
+ * Effective Date: 28-May-2023               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.1 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.1.1 <!-- @@##@@ -->
  * GMA Mapper File Format: 20	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 405        <!-- @@##@@ -->
+
+# 4.9
+## Enhancements
+ * Adds an option in the user preferences to turn on/off colorized die-roll titles
+ * Adds `--preferences` command-line option to switch between preference files.
 
 # 4.8.1
 ## Fixes
