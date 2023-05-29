@@ -120,7 +120,7 @@ namespace eval ::gmaproto {
 	}
 		#AC      {Name s ObjID s Color s Area s Size s}
 	array set _message_payload {
-		AC      {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l Elev i Color s Note s Size s Area s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i}
+		AC      {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l Elev i Color s Note s Size s Area s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i CustomReach {o {Enabled ? Natural i Extended i}}}
 		ACCEPT  {Messages l}
 		AI      {Name s Sizes {a {File s ImageData b IsLocalFile ? Zoom f}}}
 		AI?	{Name s Sizes {a {Zoom f}}}
@@ -163,7 +163,7 @@ namespace eval ::gmaproto {
 		PRIV    {Command s Reason s}
 		POLO    {}
 		PROGRESS {OperationID s Title s Value i MaxValue i IsDone ?}
-		PS      {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l Elev i Color s Note s Size s Area s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ?}
+		PS      {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l Elev i Color s Note s Size s Area s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}}}
 		READY   {}
 		ROLL    {Sender s Recipients l MessageID i ToAll ? ToGM ? Title s Result {o {InvalidRequest ? ResultSuppressed ? Result i Details {a {Type s Value s}}}} RequestID s MoreResults ?}
 		SYNC    {}
@@ -1325,7 +1325,7 @@ proc ::gmaproto::place_someone_d {d} {
 	::gmaproto::_protocol_send PS {*}$d
 }
 
-proc ::gmaproto::place_someone {obj_id color name area size obj_type gx gy reach health skin skin_sizes elevation note status_list aoe move_mode killed dim {hidden false}} {
+proc ::gmaproto::place_someone {obj_id color name area size obj_type gx gy reach health skin skin_sizes elevation note status_list aoe move_mode killed dim {hidden false} {custom_reach {}}} {
 	if {$obj_type eq "monster"} {
 		set ct 1
 	} elseif {$obj_type eq "player"} {
@@ -1334,8 +1334,7 @@ proc ::gmaproto::place_someone {obj_id color name area size obj_type gx gy reach
 		error "invalid object type $obj_type for place_someone"
 	}
 
-
-	::gmaproto::_protocol_send PS ID $obj_id Name $name Gx $gx Gy $gy Reach $reach Area $area Size $size Color $color CreatureType $ct Health $health Skin $skin SkinSize $skin_sizes Elev $elevation Note $note StatusList $status_list AoE $aoe MoveMode $move_mode Killed $killed Dim $dim Hidden $hidden
+	::gmaproto::_protocol_send PS ID $obj_id Name $name Gx $gx Gy $gy Reach $reach Area $area Size $size Color $color CreatureType $ct Health $health Skin $skin SkinSize $skin_sizes Elev $elevation Note $note StatusList $status_list AoE $aoe MoveMode $move_mode Killed $killed Dim $dim Hidden $hidden CustomReach $custom_reach
 }
 
 proc ::gmaproto::polo {} {
