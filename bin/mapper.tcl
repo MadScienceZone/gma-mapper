@@ -14,7 +14,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.9.1}     ;# @@##@@
+set GMAMapperVersion {4.10-alpha}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
 set GMAMapperProtocol {405}         ;# @@##@@
 set CoreVersionNumber {6.1.1}            ;# @@##@@
@@ -5085,7 +5085,16 @@ proc RenderSomeone {w id} {
 
 	set x [dict get $MOBdata($id) Gx]
 	set y [dict get $MOBdata($id) Gy]
-	lassign [ReachMatrix [dict get $MOBdata($id) Area]] mob_area mob_reach mob_matrix
+	set custom_reach [dict get $MOBdata($id) CustomReach]
+	if {$custom_reach ne {} && [dict get $custom_reach Enabled]} {
+		lassign [ComputedReachMatrix \
+			[dict get $MOBdata($id) Area] \
+			[dict get $custom_reach Natural] \
+			[dict get $custom_reach Extended] \
+		] mob_area mob_reach mob_matrix
+	} else {
+		lassign [ReachMatrix [dict get $MOBdata($id) Area]] mob_area mob_reach mob_matrix
+	}
 	set mob_size [MonsterSizeValue [dict get $MOBdata($id) Size]]
 
 	# If somehow we have a misaligned creature that's at least "small",
@@ -6783,6 +6792,133 @@ proc CreateSizeSubMenu {args} {
 	return $mid
 }
 
+
+# CreateReachSubMenu -shallow mob   -> menu .contextMenu.reach_m_(mob) of choices to apply to mob	(only mob involved)
+# CreateReachSubMenu -deep mob      -> menu .contextMenu.reach.m_(mob) of choices to apply to mob	(one of many mobs involved)
+# 	call SetCustomReach [mob...] -setnat|-setext|-incrnat|-incrext|-toggle squares|reach|all
+# CreateReachSubMenu -mass [mob...] -> menu .contextMenu.reach.m___mass__ of choices to apply to all mobs
+# 	call SetCustomReachAll [mob...] -setnat|-setext|-incrnat|-incrext|-toggle squares|reach|all
+proc DefaultCustomReach {size} {
+	set template [ReachMatrix $size]
+	if {$template eq {}} {
+		set template [list 0 0 {}]
+	}
+	return [dict create \
+		Enabled false \
+		Natural [lindex $template 0] \
+		Extended [lindex $template 1] \
+	]
+}
+
+proc SetCustomReach {mob_id mode value} {
+	global MOBdata canvas
+	set d $MOBdata($mob_id)
+	set reach [dict get $d Reach]
+	set custom [dict get $d CustomReach]
+	set size [dict get $d Size]
+	set area [dict get $d Area]
+	if {$custom eq {}} {
+		set custom [DefaultCustomReach $area]
+	}
+
+	# Apply requested changes
+	switch -exact -- $mode {
+		-setnat { dict set custom Natural $value }
+		-setext { dict set custom Extended $value }
+		-incrnat { dict set custom Natural [expr [dict get $custom Natural] + $value] }
+		-incrext { dict set custom Extended [expr [dict get $custom Extended] + $value] }
+		-toggle {
+			global SCRR SCRN
+			if {$SCRR($mob_id)} {
+				if {$SCRN($mob_id)} {
+					set reach 2
+				} else {
+					set reach 1
+				}
+			} else {
+				set reach 0
+			}
+		}
+	}
+
+	if {[MatchesStandardTemplate $area [dict get $custom Natural] [dict get $custom Extended]] ne {}} {
+		dict set custom Enabled false
+	} else {
+		dict set custom Enabled true
+	}
+	dict set MOBdata($mob_id) CustomReach $custom
+	dict set MOBdata($mob_id) Reach $reach
+
+	RenderSomeone $canvas $mob_id
+	SendMobChanges $mob_id {CustomReach Reach}
+}
+
+proc SetCustomReachAll {mob_list mode value} {
+	foreach mob $mob_list {
+		SetCustomReach $mob $mode $value
+	}
+}
+
+proc CreateReachSubMenu {args} {
+	global MOBdata
+
+	if {[lindex $args 0] == {-mass}} {
+		set mob_id __mass__
+		set mob_list [lindex $args 1]
+		set cmd SetCustomReachAll
+		set sub reach.m_
+	} else {
+		set sub [expr [string equal [lindex $args 0] {-deep}] ? {{reach.m_}} : {{reach_m_}}]
+		set mob_list [set mob_id [lindex $args 1]]
+		set cmd SetCustomReach
+	}
+	set mid .contextMenu.$sub$mob_id
+	catch {$mid.nat delete 0 end; destroy $mid.nat}
+	catch {$mid.ext delete 0 end; destroy $mid.ext}
+	catch {$mid delete 0 end; destroy $mid}
+	menu $mid
+	menu $mid.nat
+	menu $mid.ext
+	foreach {feet code} {
+		0 0
+		5 1
+		10 2
+		15 3
+		20 4
+		25 5
+		30 6
+		35 7
+		40 8
+		45 9
+	} {
+		$mid.nat add command -command [list $cmd $mob_list -setnat $code] -label "$feet ft"
+		$mid.ext add command -command [list $cmd $mob_list -setext $code] -label "$feet ft"
+	}
+	foreach submenu {nat ext} {
+		$mid.$submenu add separator
+		$mid.$submenu add command -command [list $cmd $mob_list -incr$submenu  2] -label "+10 ft"
+		$mid.$submenu add command -command [list $cmd $mob_list -incr$submenu  1] -label "+5 ft"
+		$mid.$submenu add command -command [list $cmd $mob_list -incr$submenu -1] -label "-5 ft"
+		$mid.$submenu add command -command [list $cmd $mob_list -incr$submenu -2] -label "-10 ft"
+	}
+	global SCRR SCRN
+	$mid add checkbutton -onvalue 1 -offvalue 0 -variable SCRR($mob_id) -command [list $cmd $mob_list -toggle reach] -label "Extended Reach"
+	$mid add checkbutton -onvalue 1 -offvalue 0 -variable SCRN($mob_id) -command [list $cmd $mob_list -toggle all] -label "Include Natural Distance"
+
+	if {$mob_id eq {__mass__}} {
+		set SCRR(__mass__) 2
+		set SCRN(__mass__) 2
+	} else {
+		set reach [dict get $MOBdata($mob_id) Reach]
+		set SCRR($mob_id) [expr $reach == 0 ? 0 : 1]
+		set SCRN($mob_id) [expr $reach == 2 ? 1 : 0]
+	}
+
+	$mid add cascade -menu $mid.nat -label "Natural Reach Distance"
+	$mid add cascade -menu $mid.ext -label "Extended Reach Distance"
+	return $mid
+}
+
 proc DoContext {x y} {
 	global MOB_X MOB_Y canvas MOBdata
 	set MOB_X $x
@@ -6801,7 +6937,7 @@ proc DoContext {x y} {
 		.contextMenu delete 3
 		.contextMenu insert 3 command -command "" -label "Toggle Death" -state disabled
 		.contextMenu delete 4
-		.contextMenu insert 4 command -command "" -label "Cycle Reach" -state disabled
+		.contextMenu insert 4 command -command "" -label "Set Reach" -state disabled
 		.contextMenu delete 5
 		.contextMenu insert 5 command -command "" -label "Toggle Spell Area" -state disabled
 		.contextMenu delete 6
@@ -6828,7 +6964,8 @@ proc DoContext {x y} {
 		.contextMenu delete 3
 		.contextMenu insert 3 command -command "KillPerson $mob_id" -label "Toggle Death for $mob_name"
 		.contextMenu delete 4
-		.contextMenu insert 4 command -command "ToggleReach $mob_id" -label "Cycle Reach for $mob_name"
+#		.contextMenu insert 4 command -command "ToggleReach $mob_id" -label "Cycle Reach for $mob_name"
+		.contextMenu insert 4 cascade -menu [CreateReachSubMenu -shallow $mob_id] -label "Set Reach for $mob_name"
 		.contextMenu delete 5
 		.contextMenu insert 5 command -command "ToggleSpellArea $mob_id" -label "Toggle Spell Area for $mob_name"
 		.contextMenu delete 6
@@ -6864,7 +7001,8 @@ proc DoContext {x y} {
 			set mob_name [dict get $MOBdata($mob_id) Name]
 			.contextMenu.del add command -command "RemovePerson $mob_id; ::gmaproto::clear $mob_id" -label $mob_name
 			.contextMenu.kill add command -command "KillPerson $mob_id" -label $mob_name
-			.contextMenu.reach add command -command "ToggleReach $mob_id" -label $mob_name
+#			.contextMenu.reach add command -command "ToggleReach $mob_id" -label $mob_name
+			.contextMenu.reach add cascade -menu [CreateReachSubMenu -deep $mob_id] -label $mob_name
 			.contextMenu.aoe add command -command "ToggleSpellArea $mob_id" -label $mob_name
 			.contextMenu.poly add cascade -menu [CreatePolySubMenu -deep $mob_id] -label $mob_name
 			.contextMenu.size add cascade -menu [CreateSizeSubMenu -deep $mob_id] -label $mob_name
@@ -6877,6 +7015,7 @@ proc DoContext {x y} {
 		}
 		.contextMenu.del add command -command "RemoveAll $mob_list" -label "(all of the above)"
 		.contextMenu.kill add command -command "KillAll $mob_list" -label "(all of the above)"
+		.contextMenu.reach add cascade -menu [CreateReachSubMenu -mass $mob_list] -label "(all of the above)"
 		.contextMenu.poly add cascade -menu [CreatePolySubMenu -mass $mob_list] -label "(all of the above)"
 		.contextMenu.size add cascade -menu [CreateSizeSubMenu -mass $mob_list] -label "(all of the above)"
 		.contextMenu.tag add cascade -menu [CreateTagSubMenu -mass $mob_list] -label "(all of the above)"
@@ -6888,7 +7027,7 @@ proc DoContext {x y} {
 		.contextMenu delete 3
 		.contextMenu insert 3 cascade -menu .contextMenu.kill -label "Toggle Death"
 		.contextMenu delete 4
-		.contextMenu insert 4 cascade -menu .contextMenu.reach -label "Cycle Reach"
+		.contextMenu insert 4 cascade -menu .contextMenu.reach -label "Set Reach"
 		.contextMenu delete 5
 		.contextMenu insert 5 cascade -menu .contextMenu.aoe -label "Toggle Spell Area"
 		.contextMenu delete 6
@@ -6939,7 +7078,7 @@ menu .contextMenu.tsel -tearoff 0
 .contextMenu add command -command {AddPlayerMenu player} -label {Add Player...}				;# 1
 .contextMenu add command -command {AddPlayerMenu monster} -label {Add Monster...}			;# 2
 .contextMenu add command -command "" -label {Toggle Death} -state disabled				;# 3
-.contextMenu add command -command "" -label {Cycle Reach} -state disabled				;# 4
+.contextMenu add command -command "" -label {Set Reach} -state disabled				;# 4
 .contextMenu add command -command "" -label {Toggle Spell Area} -state disabled				;# 5
 .contextMenu add command -command "" -label {Polymorph} -state disabled					;# 6
 .contextMenu add command -command "" -label {Change Size} -state disabled				;# 7
