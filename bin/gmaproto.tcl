@@ -175,6 +175,7 @@ namespace eval ::gmaproto {
 		/CONN   {}
 		Health  {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}
 		Font	{Family s Size f Weight i Slant i}
+		CustomReach {Enabled ? Natural i Extended i}
 	}
 	variable all_messages {}
 	foreach {_ v} [array get _message_map] {lappend all_messages $v}
@@ -418,6 +419,25 @@ proc ::gmaproto::_protocol_encode {oldcommand kvdict} {
 	return $message
 }
 
+proc ::gmaproto::_protocol_encode_struct {oldcommand kvdict} {
+	set command [::gmaproto::GMATypeToProtocolCommand $oldcommand]
+	#
+	# encode as JSON, eliminating zero fields and ones not mentioned in the protocol spec
+	#
+	if {![info exists ::gmaproto::_message_payload($command)]} {
+		error "protocol command $command is not valid"
+	}
+
+	if {[llength $::gmaproto::_message_payload($command)] == 0} {
+		set message {}
+	} else {
+		::json::write aligned false
+		::json::write indented false
+		set message [::gmaproto::_encode_payload $kvdict $::gmaproto::_message_payload($command)]
+	}
+	return $message
+}
+
 # attrname internal_value -> jsonified_value
 proc ::gmaproto::_attribute_encode {k v} {
 	switch -exact -- $k {
@@ -465,7 +485,8 @@ proc ::gmaproto::_attribute_encode {k v} {
 		StatusList { return [::json::write array {*}[lmap s $v {json::write string $s}]] }
 
 		Font   -
-		Health { return [::gmaproto::_protocol_encode $k $v] }
+		CustomReach -
+		Health { return [::gmaproto::_protocol_encode_struct $k $v] }
 
 		Points {
 			set plist {}
