@@ -11,6 +11,10 @@
  * GMA Mapper File Format: 20	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 406        <!-- @@##@@ -->
 
+# 4.9.2
+## Fixes
+ * Corrected a bug in the error message produced when the server tries to set a nonexistent attribute in an object.
+
 # 4.9.1
 ## Fixes
  * Expanded the entry widgets for the URL fields in the server preferences setting tab. They were too short for the URLs we expect to go there, and there was room on the form to let them be bigger.
@@ -23,7 +27,7 @@
 # 4.8.1
 ## Fixes
  * The mapper didn't lock map objects when saving.
- * The debug window was midding the application icon.
+ * The debug window was missing the application icon.
 
 # 4.8
 ## Enhancements
