@@ -1,23 +1,23 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___        _____       __                  #
-# (  ____ \(       )(  ___  ) Game         /   )      / ___ \     /  \                 #
-# | (    \/| () () || (   ) | Master's    / /) |     ( (   ) )    \/) )                #
-# | |      | || || || (___) | Assistant  / (_) (_    ( (___) |      | |                #
-# | | ____ | |(_)| ||  ___  |           (____   _)    \____  |      | |                #
-# | | \_  )| |   | || (   ) |                ) (           ) |      | |                #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\____) ) _  __) (_               #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/ (_) \____/               #
+#  _______  _______  _______                ___        _____      _______              #
+# (  ____ \(       )(  ___  ) Game         /   )      / ___ \    / ___   )             #
+# | (    \/| () () || (   ) | Master's    / /) |     ( (   ) )   \/   )  |             #
+# | |      | || || || (___) | Assistant  / (_) (_    ( (___) |       /   )             #
+# | | ____ | |(_)| ||  ___  |           (____   _)    \____  |     _/   /              #
+# | | \_  )| |   | || (   ) |                ) (           ) |    /   _/               #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\____) ) _ (   (__/\             #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/ (_)\_______/             #
 #                                                                                      #
 ########################################################################################
 #
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.9.1}     ;# @@##@@
+set GMAMapperVersion {4.9.2}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
 set GMAMapperProtocol {405}         ;# @@##@@
-set CoreVersionNumber {6.1.1}            ;# @@##@@
+set CoreVersionNumber {6.2}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -11103,7 +11103,7 @@ proc SetObjectAttribute {id kvlist} {
 			}
 		}
 		if {![dict exists [set ${a}($id)] $k]} {
-			DEBUG 0 "Attempt to set field $key in object $id but type $datatype has no such field."
+			DEBUG 0 "Attempt to set field $k in object $id but type $datatype has no such field."
 		} else {
 			if {$k eq {AoE} && $v eq {null}} {
 				set v {}
@@ -11759,7 +11759,7 @@ proc ConnectToServerByIdx {idx} {
 	refresh_title
 }
 
-# @[00]@| GMA-Mapper 4.9.1
+# @[00]@| GMA-Mapper 4.9.2
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
