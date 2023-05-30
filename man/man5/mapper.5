@@ -6,7 +6,7 @@
 mapper \- battle grid save file format
 .SH DESCRIPTION
 .LP
-The version 20 file format for the
+The version 21 file format for the
 .BR mapper (6)
 battle grid program is described in this document.
 .LP
@@ -133,7 +133,7 @@ these assumptions.
 .SH EXAMPLE
 '\" <<TeX>>
 '\" \begin{Coding}
-'\" |__MAPPER__:20|\\
+'\" |__MAPPER__:21|\\
 '\" \guillemotleft|__META__|\guillemotright{}| {|\\
 '\" |  "Timestamp": 1650611775,|\\
 '\" |  "DateTime": "Fri Apr 22 00:16:15 PDT 2022",|\\
@@ -178,7 +178,7 @@ these assumptions.
 .nf
 .na
 \fB
-__MAPPER__:20
+__MAPPER__:21
 \[Fo]__META__\[Fc] {
   "Timestamp": 1650611775,
   "DateTime": "Fri Apr 22 00:16:15 PDT 2022",
@@ -437,6 +437,10 @@ moving to map version 4.x.
 .LP
 This version introduced the JSON-based file format, replacing the older
 key/value line sequence.
+.SS "Changes as of File Format 21"
+.LP
+The fields for creatures have been changed as documented in
+.BR mapper-protocol (7).
 .SH AUTHORS
 .LP
 Steve Willoughby / steve@madscience.zone;

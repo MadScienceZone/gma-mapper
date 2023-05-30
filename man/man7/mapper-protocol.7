@@ -2230,6 +2230,7 @@ A note to attach to the creature token to indicate special conditions or status.
 .TP
 .BI Size
 The tactical size category of the creature.
+'\" <<ital-is-var>>
 '\" <<New>>
 This has the general form
 .RS
@@ -2255,6 +2256,7 @@ is a custom creature space diameter in feet (if different than the standard for 
 '\".BI Area
 '\"The tactical size category for the creature's threat zone.
 .TP
+'\" <</ital-is-var>>
 .BI StatusList " (list of strings)"
 A list of condition codes which apply to the character. These are defined by
 the
@@ -2320,6 +2322,7 @@ monsters, or 2 for players. Clients MUST NOT set this field to a value other
 than 1 or 2.
 '\" <<New>>
 .TP
+'\" <</ital-is-var>>
 .BI CustomReach " (object)"
 Specify a custom reach distance for this creature, if different than the standard
 for a creature of its size category. This contains the following fields:
@@ -2342,8 +2345,8 @@ but indicates the distance for reach weapons.
 .RE
 .LP
 (Added in protocol 406.)
-'\" <</>>
 '\" <</New>>
+'\" <</>>
 .RE
 .TP
 .B READY
