@@ -3,13 +3,17 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.9.1          <!-- @@##@@ -->
- * Effective Date: 28-May-2023               <!-- @@##@@ -->
+ * This Package Version: 4.9.2          <!-- @@##@@ -->
+ * Effective Date: 30-May-2023               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.1.1 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.2 <!-- @@##@@ -->
  * GMA Mapper File Format: 20	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 405        <!-- @@##@@ -->
+
+# 4.9.2
+## Fixes
+ * Corrected a bug in the error message produced when the server tries to set a nonexistent attribute in an object.
 
 # 4.9.1
 ## Fixes
@@ -23,7 +27,7 @@
 # 4.8.1
 ## Fixes
  * The mapper didn't lock map objects when saving.
- * The debug window was midding the application icon.
+ * The debug window was missing the application icon.
 
 # 4.8
 ## Enhancements
