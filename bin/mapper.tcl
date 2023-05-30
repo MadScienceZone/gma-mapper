@@ -8429,7 +8429,6 @@ proc DoCommandPROGRESS {d} {
 proc DoCommandPS {d} {
 	global canvas
 	dict set d Name [AcceptCreatureImageName [dict get $d Name]]
-	DEBUG 0 "DoCommandPS $d"
 	PlaceSomeone $canvas $d
 	RefreshGrid false
 	RefreshMOBs
