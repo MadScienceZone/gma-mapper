@@ -3,15 +3,15 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.10-alpha.3-alpha.2          <!-- @@##@@ -->
+ * This Package Version: 4.10-beta          <!-- @@##@@ -->
  * Effective Date: 30-May-2023               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.3-alpha.2-alpha.1 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.3-beta <!-- @@##@@ -->
  * GMA Mapper File Format: 21	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 406        <!-- @@##@@ -->
 
-# 4.10-alpha
+# 4.10-beta
 ## Enhancements
  * Now implements server protocol 406
    * Removes `Area` attribute from creatures (affects AC and PS commands and saved files).
