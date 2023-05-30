@@ -14,10 +14,10 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.10-alpha.2}     ;# @@##@@
-set GMAMapperFileFormat {20}        ;# @@##@@
+set GMAMapperVersion {4.10-alpha.3}     ;# @@##@@
+set GMAMapperFileFormat {21}        ;# @@##@@
 set GMAMapperProtocol {406}         ;# @@##@@
-set CoreVersionNumber {6.3-alpha.1}            ;# @@##@@
+set CoreVersionNumber {6.3-alpha.2}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -11611,7 +11611,7 @@ proc ConnectToServerByIdx {idx} {
 	refresh_title
 }
 
-# @[00]@| GMA-Mapper 4.10-alpha.2
+# @[00]@| GMA-Mapper 4.10-alpha.3
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
