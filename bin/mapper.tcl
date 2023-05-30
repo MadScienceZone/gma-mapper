@@ -14,10 +14,10 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.10-alpha.1}     ;# @@##@@
+set GMAMapperVersion {4.10-alpha.2}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
 set GMAMapperProtocol {406}         ;# @@##@@
-set CoreVersionNumber {6.2}            ;# @@##@@
+set CoreVersionNumber {6.3-alpha.1}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -7333,6 +7333,9 @@ proc PolymorphMass {mob_list skin} {
 proc ChangeSize {id code} {
 	global MOBdata canvas
 	dict set MOBdata($id) Size $code
+	if {[string length $code] > 1} {
+		dict set MOBdata($id) CustomReach Enabled false
+	}
 #	dict set MOBdata($id) Area $code
 	RenderSomeone $canvas $id
 	SendMobChanges $id {Size}
@@ -11613,7 +11616,7 @@ proc ConnectToServerByIdx {idx} {
 	refresh_title
 }
 
-# @[00]@| GMA-Mapper 4.10-alpha
+# @[00]@| GMA-Mapper 4.10-alpha.2
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
