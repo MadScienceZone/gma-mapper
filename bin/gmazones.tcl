@@ -314,11 +314,8 @@ proc FullCreatureAreaInfo {id} {
 	# if we have an explicit size override, take that first
 	set szparams [CreatureSizeParams [dict get $MOBdata($id) Size]]
 	set custom_reach [dict get $MOBdata($id) CustomReach]
-	DEBUG 0 "szparams=$szparams"
-	DEBUG 0 "custom_reach=$custom_reach"
 	if {$szparams ne {} && ($custom_reach eq {} || ![dict get $custom_reach Enabled])} {
 		lassign $szparams szcode sznat szext szsz
-		DEBUG 0 "szcode=$szcode, sznat=$sznat, szext=$szext, szsz=$szsz"
 		if {$sznat ne {} || $szext ne {}} {
 			if {$szext eq {}} {
 				if {$sznat eq {}} {
@@ -336,7 +333,6 @@ proc FullCreatureAreaInfo {id} {
 				Extended $szext \
 			]
 		}
-		DEBUG 0 "->szcode=$szcode, sznat=$sznat, szext=$szext, szsz=$szsz, custom_reach=$custom_reach"
 	}
 
 	if {$custom_reach ne {} && [dict get $custom_reach Enabled]} {
@@ -345,13 +341,10 @@ proc FullCreatureAreaInfo {id} {
 			[dict get $custom_reach Natural] \
 			[dict get $custom_reach Extended] \
 		] mob_area mob_reach mob_matrix
-		DEBUG 0 ">>mob_area=$mob_area, mob_reach=$mob_reach, mob_matrix=$mob_matrix"
 	} else {
 		lassign [ReachMatrix [dict get $MOBdata($id) Size]] mob_area mob_reach mob_matrix
-		DEBUG 0 ">>mob_area=$mob_area, mob_reach=$mob_reach, mob_matrix=$mob_matrix"
 	}
 	set mob_size [MonsterSizeValue [dict get $MOBdata($id) Size]]
-	DEBUG 0 "mob_size=$mob_size"
 
 	return [list $mob_size $mob_area $mob_reach $mob_matrix $custom_reach]
 }
