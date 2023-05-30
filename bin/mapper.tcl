@@ -11103,7 +11103,7 @@ proc SetObjectAttribute {id kvlist} {
 			}
 		}
 		if {![dict exists [set ${a}($id)] $k]} {
-			DEBUG 0 "Attempt to set field $key in object $id but type $datatype has no such field."
+			DEBUG 0 "Attempt to set field $k in object $id but type $datatype has no such field."
 		} else {
 			if {$k eq {AoE} && $v eq {null}} {
 				set v {}
