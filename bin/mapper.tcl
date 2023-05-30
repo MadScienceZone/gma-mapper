@@ -6768,7 +6768,6 @@ proc CreateSizeSubMenu {args} {
 		{T t} Tiny
 		{S s} Small
 		{M m} Medium
-		{M20 m20} {Medium (20-ft reach)}
 		l {Large (long)}
 		L {Large (tall)}
 		{L0 l0} {Large (no reach)}
@@ -6778,7 +6777,6 @@ proc CreateSizeSubMenu {args} {
 		G {Gargantuan (tall)}
 		c {Colossal (long)}
 		C {Colossal (tall)}
-		C80 {80-ft (tall)}
 	} {
 		if {[MobStateList $mob_list Size $size_code]} {
 			$mid add command -command [list $cmd $mob_list [lindex $size_code 0]] -label $size_name -foreground #ff0000
