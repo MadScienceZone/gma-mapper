@@ -1,7 +1,7 @@
 '\" t
 '\" <<bold-is-fixed>>
 '\" <<ital-is-var>>
-.TH GMAPROTO 3 "GMA-Mapper 4.9.2" 30-May-2023 "API Functions" \" @@mp@@
+.TH GMAPROTO 3 "GMA-Mapper 4.10-beta" 30-May-2023 "API Functions" \" @@mp@@
 .SH NAME
 gmaproto \- GMA client/server communication functions
 .SH SYNOPSIS
@@ -148,27 +148,26 @@ gmaproto \- GMA client/server communication functions
 .RB ? \-protocol ?
 \[->]
 .I gtype
-.LP
-.B ::gmaproto::place_someone
-.I id
-.I color
-.I name
-.I area
-.I size
-.I type
-.I gx
-.I gy
-.I reach
-.I health
-.I skin
-.I skin_sizes
-.I elev
-.I note
-.I status_list
-.I aoe
-.I move_mode
-.I killed
-.I dim
+'\".LP
+'\".B ::gmaproto::place_someone
+'\".I id
+'\".I color
+'\".I name
+'\".I size
+'\".I type
+'\".I gx
+'\".I gy
+'\".I reach
+'\".I health
+'\".I skin
+'\".I skin_sizes
+'\".I elev
+'\".I note
+'\".I status_list
+'\".I aoe
+'\".I move_mode
+'\".I killed
+'\".I dim
 .LP
 .B ::gmaproto::place_someone_d
 .I d
@@ -559,18 +558,16 @@ If the
 option is given, the protocol command name (with
 .B LS\-
 prefix) is returned instead of the base type name.
+'\".TP
+'\".BI "::gmaproto::place_someone " id " " color " " name " " area " " size " " type " " gx " " gy " " reach " " health " " skin " " skin_sizes " " elev " " note " " status_list " " aoe " " move_mode " " killed " " dim
 .TP
-.BI "::gmaproto::place_someone " id " " color " " name " " area " " size " " type " " gx " " gy " " reach " " health " " skin " " skin_sizes " " elev " " note " " status_list " " aoe " " move_mode " " killed " " dim
+.BI "::gmaproto::place_someone_d " d
 Tells the other clients to place a creature token on the map as described. If another creature is already present with the same name,
 it is replaced by the new one.
 This sends the
 .B PS
 protocol command.
-.TP
-.BI "::gmaproto::place_someone_d " d
-Like
-.B ::gmaproto::place_someone
-but takes a dictionary instead of discrete parameters.
+The parameter is a dictionary holding a creature object.
 .TP
 .B ::gmaproto::polo
 Sends a \*(lqstill alive\*(rq response to the server, typically in response to receiving a

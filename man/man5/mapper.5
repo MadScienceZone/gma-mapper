@@ -1,12 +1,12 @@
 '\" t
 '\" <<ital-is-var>>
 '\" <<bold-is-fixed>>
-.TH MAPPER 5 "GMA-Mapper 4.9.2" 30-May-2023 "File Formats" \" @@mp@@
+.TH MAPPER 5 "GMA-Mapper 4.10-beta" 30-May-2023 "File Formats" \" @@mp@@
 .SH NAME
 mapper \- battle grid save file format
 .SH DESCRIPTION
 .LP
-The version 20 file format for the
+The version 21 file format for the
 .BR mapper (6)
 battle grid program is described in this document.
 .LP
@@ -133,7 +133,7 @@ these assumptions.
 .SH EXAMPLE
 '\" <<TeX>>
 '\" \begin{Coding}
-'\" |__MAPPER__:20|\\
+'\" |__MAPPER__:21|\\
 '\" \guillemotleft|__META__|\guillemotright{}| {|\\
 '\" |  "Timestamp": 1650611775,|\\
 '\" |  "DateTime": "Fri Apr 22 00:16:15 PDT 2022",|\\
@@ -178,7 +178,7 @@ these assumptions.
 .nf
 .na
 \fB
-__MAPPER__:20
+__MAPPER__:21
 \[Fo]__META__\[Fc] {
   "Timestamp": 1650611775,
   "DateTime": "Fri Apr 22 00:16:15 PDT 2022",
@@ -237,23 +237,6 @@ Additionally, it indicates that an image called \*(lqre5_e2\*(rq
 may be found with server ID \*(lqSJy9rpbTDElsCfklYHMvsgre5_e2@50\*(rq
 at zoom factor 1.0, or with server ID \*(lqSJy9rpbTDElsCfklYHMvsgre5_e2@100\*(rq
 at zoom factor 2.0.
-.SH "WEIRD SIZES"
-.LP
-While the mapper implements the standard d20/Pathfinder creature size categories,
-including tall (uppercase) and wide (lowercase) variants, sometimes there are special
-cases which fall outside that list. The following special codes are also usable:
-'\" <<desc>>
-.TP 8
-.B C80
-Colossal creature with 80-foot space and 80-foot reach (looking at you, Oliphaunt of Jandelay).
-.TP
-.B L0/l0
-Large creature with no threat zone and no reach (such as a swarm of 
-teensy critters).
-.TP
-.B M20/m20
-Medium creature (5-foot space, 5-foot threat zone) with a 20-foot reach zone.
-'\" <</>>
 .SH "SEE ALSO"
 .LP
 .BR mapper (6),
@@ -454,6 +437,10 @@ moving to map version 4.x.
 .LP
 This version introduced the JSON-based file format, replacing the older
 key/value line sequence.
+.SS "Changes as of File Format 21"
+.LP
+The fields for creatures have been changed as documented in
+.BR mapper-protocol (7).
 .SH AUTHORS
 .LP
 Steve Willoughby / steve@madscience.zone;

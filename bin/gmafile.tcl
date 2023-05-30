@@ -1,16 +1,16 @@
 ########################################################################################
-#  _______  _______  _______                ___        _____      _______              #
-# (  ____ \(       )(  ___  ) Game         /   )      / ___ \    / ___   )             #
-# | (    \/| () () || (   ) | Master's    / /) |     ( (   ) )   \/   )  |             #
-# | |      | || || || (___) | Assistant  / (_) (_    ( (___) |       /   )             #
-# | | ____ | |(_)| ||  ___  |           (____   _)    \____  |     _/   /              #
-# | | \_  )| |   | || (   ) |                ) (           ) |    /   _/               #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\____) ) _ (   (__/\             #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/ (_)\_______/             #
+#  _______  _______  _______                ___        __    _______         ______    #
+# (  ____ \(       )(  ___  ) Game         /   )      /  \  (  __   )       (  ___ \ ( #
+# | (    \/| () () || (   ) | Master's    / /) |      \/) ) | (  )  |       | (   ) )| #
+# | |      | || || || (___) | Assistant  / (_) (_       | | | | /   | _____ | (__/ / | #
+# | | ____ | |(_)| ||  ___  |           (____   _)      | | | (/ /) |(_____)|  __ (  | #
+# | | \_  )| |   | || (   ) |                ) (        | | |   / | |       | (  \ \ | #
+# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_|  (__) |       | )___) )| #
+# (_______)|/     \||/     \| Client         (_)  (_) \____/(_______)       |/ \___/ ( #
 #                                                                                      #
 ########################################################################################
 #
-# @[00]@| GMA-Mapper 4.9.2
+# @[00]@| GMA-Mapper 4.10-beta
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
@@ -53,7 +53,7 @@
 # Mapper JSON data handling functions.
 # Steve Willoughby <steve@madscience.zone>
 #
-# Implements GMA Map File Version 20.
+# Implements GMA Map File Version 21.
 #
 #
 
@@ -62,19 +62,19 @@ package require gmaproto 1.0
 package require Tcl 8.5
 
 namespace eval ::gmafile {
-	variable version 20
+	variable version 21
 	variable dice_version 2
 	variable min_dice_version 1
 	variable max_dice_version 2
 	variable min_version 16
-	variable max_version 20
+	variable max_version 21
 
 	array set _data_payload {
 		__META__ {Timestamp i DateTime s Comment s Location s}
 		__DMETA__ {Timestamp i DateTime s Comment s}
 		ARC      {ArcMode i Start f Extent f ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		CIRC     {ArcMode i Start f Extent f ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
-		CREATURE {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l Elev i Color s Note s Size s Area s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ?}
+		CREATURE {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l Elev i Color s Note s Size s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}}}
 		IMG      {Name s Sizes {a {File s ImageData b IsLocalFile ? Zoom f}}}
 		LINE     {Arrow i ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		MAP      {File s IsLocalFile ? CacheOnly ? Merge ?}
@@ -376,7 +376,7 @@ proc ::gmafile::upgrade_elements {filedata} {
 		set mob_id [string range $mob_id 5 end]
 		::gmafile::require_arr OldMobs $mob_id NAME
 		::gmafile::default_arr OldMobs $mob_id -value 0 GX GY SKIN ELEV REACH KILLED DIM
-		::gmafile::default_arr OldMobs $mob_id HEALTH MOVEMODE COLOR NOTE SKIN SKINSIZE SIZE STATUSLIST AOE AREA
+		::gmafile::default_arr OldMobs $mob_id HEALTH MOVEMODE COLOR NOTE SKIN SKINSIZE SIZE STATUSLIST AOE 
 
 		if {$OldMobs(HEALTH:$mob_id) eq {}} {
 			set health {}
@@ -403,7 +403,6 @@ proc ::gmafile::upgrade_elements {filedata} {
 			Color $OldMobs(COLOR:$mob_id) \
 			Note $OldMobs(NOTE:$mob_id) \
 			Size $OldMobs(SIZE:$mob_id) \
-			Area $OldMobs(AREA:$mob_id) \
 			StatusList $OldMobs(STATUSLIST:$mob_id) \
 			AoE  $aoe \
 			MoveMode [::gmaproto::to_enum MoveMode $OldMobs(MOVEMODE:$mob_id)] \
