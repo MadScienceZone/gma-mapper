@@ -1347,17 +1347,17 @@ proc ::gmaproto::place_someone_d {d} {
 	::gmaproto::_protocol_send PS {*}$d
 }
 
-proc ::gmaproto::place_someone {obj_id color name _ size obj_type gx gy reach health skin skin_sizes elevation note status_list aoe move_mode killed dim {hidden false} {custom_reach {}}} {
-	if {$obj_type eq "monster"} {
-		set ct 1
-	} elseif {$obj_type eq "player"} {
-		set ct 2
-	} else {
-		error "invalid object type $obj_type for place_someone"
-	}
-
-	::gmaproto::_protocol_send PS ID $obj_id Name $name Gx $gx Gy $gy Reach $reach Size $size Color $color CreatureType $ct Health $health Skin $skin SkinSize $skin_sizes Elev $elevation Note $note StatusList $status_list AoE $aoe MoveMode $move_mode Killed $killed Dim $dim Hidden $hidden CustomReach $custom_reach
-}
+#proc ::gmaproto::place_someone {obj_id color name size obj_type gx gy reach health skin skin_sizes elevation note status_list aoe move_mode killed dim {hidden false} {custom_reach {}}} {
+#	if {$obj_type eq "monster"} {
+#		set ct 1
+#	} elseif {$obj_type eq "player"} {
+#		set ct 2
+#	} else {
+#		error "invalid object type $obj_type for place_someone"
+#	}
+#
+#	::gmaproto::_protocol_send PS ID $obj_id Name $name Gx $gx Gy $gy Reach $reach Size $size Color $color CreatureType $ct Health $health Skin $skin SkinSize $skin_sizes Elev $elevation Note $note StatusList $status_list AoE $aoe MoveMode $move_mode Killed $killed Dim $dim Hidden $hidden CustomReach $custom_reach
+#}
 
 proc ::gmaproto::polo {} {
 	::gmaproto::_protocol_send POLO

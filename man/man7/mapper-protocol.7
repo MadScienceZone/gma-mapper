@@ -1,5 +1,5 @@
 '\" t
-'\" *** 403 ***
+'\" *** 406 ***
 '\" <<ital-is-var>>
 '\" <<bold-is-fixed>>
 .TH MAPPER-PROTOCOL 7 "GMA-Mapper 4.3.4" 16-Mar-2023 "Games" \" @@mp@@
@@ -75,7 +75,7 @@ MAY
 be implemented to wait synchronously for a server
 response during the authentication negotiation stage.
 .LP
-This describes protocol version 405. These notes are intended to be 
+This describes protocol version 406. These notes are intended to be 
 detailed enough to implement a client from and should be considered
 the definitive standard reference to the protocol.
 .LP
@@ -2230,9 +2230,30 @@ A note to attach to the creature token to indicate special conditions or status.
 .TP
 .BI Size
 The tactical size category of the creature.
-.TP
-.BI Area
-The tactical size category for the creature's threat zone.
+'\" <<New>>
+This has the general form
+.RS
+.RS
+.LP
+.IR category [ natural ][\fB->\fP extended ][\fB=\fP space ]
+.RE
+.LP
+where
+.I category
+is a single-letter category code,
+.I natural
+is a custom natural reach distance in feet (if different than the standard for that size category),
+.I extended
+is a custom extended reach distance in feet (if different than the standard for that size category),
+and
+.I space
+is a custom creature space diameter in feet (if different than the standard for that size category).
+(Changed in protocol 406.)
+'\" <</New>>
+.RE
+'\".TP
+'\".BI Area
+'\"The tactical size category for the creature's threat zone.
 .TP
 .BI StatusList " (list of strings)"
 A list of condition codes which apply to the character. These are defined by
@@ -2297,7 +2318,32 @@ should be de-emphasized compared to the one with initiative.
 The specific type of creature. This may be 0 if the type is unknown, 1 for
 monsters, or 2 for players. Clients MUST NOT set this field to a value other
 than 1 or 2.
+'\" <<New>>
+.TP
+.BI CustomReach " (object)"
+Specify a custom reach distance for this creature, if different than the standard
+for a creature of its size category. This contains the following fields:
+'\" <<list>>
+.RS
+.TP
+.BI Enabled " (bool)"
+If true, there is a custom reach distance as described in the other fields. if false,
+the other fields should be ignored.
+.TP
+.BI Natural " (int)"
+The number of feet from the perimeter of the creature token to which the creature's natural
+reach extends.
+.TP
+.BI Extended " (int)"
+As
+.B Natural
+but indicates the distance for reach weapons.
 '\" <</>>
+.RE
+.LP
+(Added in protocol 406.)
+'\" <</>>
+'\" <</New>>
 .RE
 .TP
 .B READY
@@ -2603,11 +2649,20 @@ John Mechalas (elevation and movement modes).
 .SH HISTORY
 .LP
 '\" <<New>>
-This document defines map protocol version 405,
-which introduced the
+This document defines map protocol version 406,
+which dropped the
+.B Area
+attribute from creatures and added the
+.B CustomReach
+attribute and the expanded syntax for the
+.B Size
+attribute.
+'\" <</New>>
+.LP
+Protocol version 405
+introduced the
 .B ServerVersion
 field to the server's greeting.
-'\" <</New>>
 .LP
 Protocol 404 introduced the
 .B Hidden
