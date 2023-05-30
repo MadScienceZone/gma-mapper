@@ -14,7 +14,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.10-alpha}     ;# @@##@@
+set GMAMapperVersion {4.10-alpha.1}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
 set GMAMapperProtocol {406}         ;# @@##@@
 set CoreVersionNumber {6.2}            ;# @@##@@
@@ -4449,7 +4449,7 @@ proc SquareGrid {w xx yy show} {
 #   MOB(GX:<id>)    <grid-x>
 #   MOB(GY:<id>)    <grid-y>
 #   MOB(COLOR:<id>) <color>
-#   MOB(AREA:<id>)  <grids surrounding object for threat area> or size code
+# DEPRECATED  MOB(AREA:<id>)  <grids surrounding object for threat area> or size code
 #		FDTSMLHGC  lower-case is long, upper-case is tall
 #   MOB(SIZE:<id>)  <grid diameter> or size code
 #   MOB(TYPE:<id>)  {player|monster}
@@ -4490,6 +4490,13 @@ proc PlaceSomeone {w d} {
 		DEBUG 1 "--PlaceSomeone $n using existing id $id (updating in-place)"
 		set MOBdata($id) [dict merge $MOBdata($id) $d]
 	}
+
+	lassign [FullCreatureAreaInfo $id] mob_size mob_area mob_reach mob_matrix custom_reach
+	if {$custom_reach ne {}} {
+		dict set MOBdata($id) CustomReach $custom_reach
+	}
+	DEBUG 0 "place $MOBdata($id)"
+
 	MoveSomeone $w $id [dict get $d Gx] [dict get $d Gy]
 }
 
@@ -4507,7 +4514,7 @@ proc MOBCenterPoint {id} {
 	global MOBdata iscale
 	set x [dict get $MOBdata($id) Gx]
 	set y [dict get $MOBdata($id) Gy]
-	set r [expr [MonsterSizeValue [dict get $MOBdata($id) Size]] / 2.0]
+	set r [expr [lindex [FullCreatureAreaInfo $id] 0] / 2.0]
 	return [list [expr ($x+$r)*$iscale] [expr ($y+$r)*$iscale] [expr $r*$iscale]]
 }
 
@@ -5085,17 +5092,8 @@ proc RenderSomeone {w id} {
 
 	set x [dict get $MOBdata($id) Gx]
 	set y [dict get $MOBdata($id) Gy]
-	set custom_reach [dict get $MOBdata($id) CustomReach]
-	if {$custom_reach ne {} && [dict get $custom_reach Enabled]} {
-		lassign [ComputedReachMatrix \
-			[dict get $MOBdata($id) Area] \
-			[dict get $custom_reach Natural] \
-			[dict get $custom_reach Extended] \
-		] mob_area mob_reach mob_matrix
-	} else {
-		lassign [ReachMatrix [dict get $MOBdata($id) Area]] mob_area mob_reach mob_matrix
-	}
-	set mob_size [MonsterSizeValue [dict get $MOBdata($id) Size]]
+	lassign [FullCreatureAreaInfo $id] mob_size mob_area mob_reach mob_matrix custom_reach
+	DEBUG 0 "creature $id size [dict get $MOBdata($id) Size] -> size $mob_size area $mob_area reach $mob_reach matrix $mob_matrix custom $custom_reach"
 
 	# If somehow we have a misaligned creature that's at least "small",
 	# snap to even grid boundary
@@ -5631,9 +5629,10 @@ proc RenderSomeone {w id} {
 		foreach threatening_mob_id [array names MOBdata] {
 			DEBUG 1 "Checking who $threatening_mob_id is threatening"
 			if {[dict get $MOBdata($threatening_mob_id) Killed]} continue
-			lassign [ReachMatrix [dict get $MOBdata($threatening_mob_id) Area]] ar re mat
+			lassign [FullCreatureAreaInfo $threatening_mob_id] sz ar re mat _
+#			lassign [ReachMatrix [dict get $MOBdata($threatening_mob_id) Size]] ar re mat
 			lassign [MOBCenterPoint $threatening_mob_id] xc yc rc
-			set sz [MonsterSizeValue [dict get $MOBdata($threatening_mob_id) Size]]
+#			set sz [MonsterSizeValue [dict get $MOBdata($threatening_mob_id) Size]]
 			DEBUG 1 "-- area $ar reach $re ($xc,$yc) r=$rc"
 			set Xstart [expr ([dict get $MOBdata($threatening_mob_id) Gx] - $re)]
 			set yy [expr ([dict get $MOBdata($threatening_mob_id) Gy] - $re)]
@@ -6816,9 +6815,8 @@ proc SetCustomReach {mob_id mode value} {
 	set reach [dict get $d Reach]
 	set custom [dict get $d CustomReach]
 	set size [dict get $d Size]
-	set area [dict get $d Area]
 	if {$custom eq {}} {
-		set custom [DefaultCustomReach $area]
+		set custom [DefaultCustomReach $size]
 	}
 
 	# Apply requested changes
@@ -6841,7 +6839,7 @@ proc SetCustomReach {mob_id mode value} {
 		}
 	}
 
-	if {[MatchesStandardTemplate $area [dict get $custom Natural] [dict get $custom Extended]] ne {}} {
+	if {[MatchesStandardTemplate $size [dict get $custom Natural] [dict get $custom Extended]] ne {}} {
 		dict set custom Enabled false
 	} else {
 		dict set custom Enabled true
@@ -7103,11 +7101,11 @@ proc AddPlayer {name color args} {
 	global MOB_X MOB_Y canvas
 
 	set g [ScreenXYToGridXY $MOB_X $MOB_Y]
-	if {[llength $args] > 0} { set area [lindex $args 0] } else { set area 1 }
+	# deprecated # if {[llength $args] > 0} { set area [lindex $args 0] } else { set area 1 }
 	if {[llength $args] > 1} { set size [lindex $args 1] } else { set size 1 }
 	if {[llength $args] > 2} { set id   [lindex $args 2] } else { set id [new_id] }
 	# XXX check for existing player
-	set d [::gmaproto::new_dict PS Gx [lindex $g 0] Gy [lindex $g 1] Color $color Name [AcceptCreatureImageName $name] Area $area Size $size CreatureType 2 ID $id]
+	set d [::gmaproto::new_dict PS Gx [lindex $g 0] Gy [lindex $g 1] Color $color Name [AcceptCreatureImageName $name] Size $size CreatureType 2 ID $id]
 	DEBUG 3 "PlaceSomeone $canvas $d"
 	PlaceSomeone $canvas $d
 	::gmaproto::place_someone_d [InsertCreatureImageName $d]
@@ -7123,7 +7121,7 @@ proc InsertCreatureImageName {d} {
 
 set MOB_Name {}
 set MOB_SIZE M
-set MOB_AREA M
+# deprecated # set MOB_AREA M
 set MOB_COLOR red
 set MOB_REACH 0
 
@@ -7175,7 +7173,8 @@ proc SetTilePlaceHolder {obj_id width height tile_id} {
 
 proc AddPlayerMenu {type} {
 	global MOB_X MOB_Y canvas check_select_color
-	global MOB_Name MOB_SIZE MOB_AREA MOB_COLOR MOB_REACH
+	global MOB_Name MOB_SIZE MOB_COLOR MOB_REACH
+	# deprecated MOB_AREA
 
 	#catch {destroy .apm}
 
@@ -7199,21 +7198,23 @@ proc AddPlayerMenu {type} {
 	     [entry .apm.1.ent -textvariable MOB_Name -width 20] \
 		 -side left -anchor w
 	pack [label .apm.2.lab -text {Size:}] \
-		 [entry .apm.2.ent -textvariable MOB_SIZE -width 3 -validate key -validatecommand {set MOB_AREA "%P"; return 1}] \
+		 [entry .apm.2.ent -textvariable MOB_SIZE -width 3] \
 		 -side left -anchor w
-	pack [label .apm.3.lab -text {Area:}] \
-		 [entry .apm.3.ent -textvariable MOB_AREA -width 3] \
-		 -side left -anchor w
+
+#		 [entry .apm.2.ent -textvariable MOB_SIZE -width 3 -validate key -validatecommand {set MOB_AREA "%P"; return 1}] \
+#	pack [label .apm.3.lab -text {Area:}] \
+#		 [entry .apm.3.ent -textvariable MOB_AREA -width 3] \
+#		 -side left -anchor w
 	pack [label .apm.4.lab -text {Color:}] \
 		 [entry .apm.4.ent -textvariable MOB_COLOR -width 20] \
 		 -side left -anchor w
 	pack [ttk::checkbutton .apm.5.ent -text "Reach?" -variable MOB_REACH] \
 		 -side left -anchor w
 	pack [button .apm.6.apply -command \
-		"AddMobFromMenu [lindex $g 0] [lindex $g 1] \$MOB_COLOR \$MOB_Name \$MOB_AREA \$MOB_SIZE $type \$MOB_REACH" -text Apply] \
+		"AddMobFromMenu [lindex $g 0] [lindex $g 1] \$MOB_COLOR \$MOB_Name 0 \$MOB_SIZE $type \$MOB_REACH" -text Apply] \
 	     [button .apm.6.cancel -command "destroy .apm" -text Cancel] \
 	     [button .apm.6.ok -command \
-		 "AddMobFromMenu [lindex $g 0] [lindex $g 1] \$MOB_COLOR \$MOB_Name \$MOB_AREA \$MOB_SIZE $type \$MOB_REACH; destroy .apm" -text Ok] \
+		 "AddMobFromMenu [lindex $g 0] [lindex $g 1] \$MOB_COLOR \$MOB_Name 0 \$MOB_SIZE $type \$MOB_REACH; destroy .apm" -text Ok] \
 		 -side right
 }
 
@@ -7230,14 +7231,14 @@ proc ValidateSizeCode {code} {
 	return 1
 }
 
-proc AddMobFromMenu {baseX baseY color name area size type reach} {
+proc AddMobFromMenu {baseX baseY color name _ size type reach} {
 	global canvas
 	global PC_IDs
 
-	if {![ValidateSizeCode $area]} {
-		say "Area value $area is not valid.  Specify number of squares or type code (upper-case for tall)."
-		return
-	}
+#	if {![ValidateSizeCode $area]} {
+#		say "Area value $area is not valid.  Specify number of squares or type code (upper-case for tall)."
+#		return
+#	}
 	if {![ValidateSizeCode $size]} {
 		say "Size value $size is not valid.  Specify number of squares or type code (upper-case for tall)."
 		return
@@ -7257,7 +7258,7 @@ proc AddMobFromMenu {baseX baseY color name area size type reach} {
 			}
 			set apm_id [new_id]
 			DEBUG 3 "Multi-add $i of $multistart-$multiend: ${basename}#$i"
-			set d [::gmaproto::new_dict PS Gx [expr $baseX+$XX] Gy $baseY Color $color Name [AcceptCreatureImageName "${basename}#$i"] Area $area Size $size CreatureType [::gmaproto::to_enum CreatureType $type] ID $apm_id Reach $reach]
+			set d [::gmaproto::new_dict PS Gx [expr $baseX+$XX] Gy $baseY Color $color Name [AcceptCreatureImageName "${basename}#$i"] Size $size CreatureType [::gmaproto::to_enum CreatureType $type] ID $apm_id Reach $reach]
 			PlaceSomeone $canvas $d
 			::gmaproto::place_someone_d [InsertCreatureImageName $d]
 		}
@@ -7273,7 +7274,7 @@ proc AddMobFromMenu {baseX baseY color name area size type reach} {
 		} else {
 			set apm_id [new_id]
 		}
-		set d [::gmaproto::new_dict PS Gx $baseX Gy $baseY Color $color Name $basename Area $area Size $size CreatureType [::gmaproto::to_enum CreatureType $type] ID $apm_id Reach $reach]
+		set d [::gmaproto::new_dict PS Gx $baseX Gy $baseY Color $color Name $basename Size $size CreatureType [::gmaproto::to_enum CreatureType $type] ID $apm_id Reach $reach]
 		PlaceSomeone $canvas $d
 		::gmaproto::place_someone_d [InsertCreatureImageName $d]
 	}
@@ -7332,9 +7333,9 @@ proc PolymorphMass {mob_list skin} {
 proc ChangeSize {id code} {
 	global MOBdata canvas
 	dict set MOBdata($id) Size $code
-	dict set MOBdata($id) Area $code
+#	dict set MOBdata($id) Area $code
 	RenderSomeone $canvas $id
-	SendMobChanges $id {Size Area}
+	SendMobChanges $id {Size}
 }
 
 proc ChangeSizeAll {mob_list code} {
@@ -8121,7 +8122,7 @@ proc DoCommandIL {d} {
 proc DoCommandAC {d} {
 	# Add character to the menu
 	global PC_IDs
-	::gmautil::dassign $d Name name ID id Color color Area area Size size
+	::gmautil::dassign $d Name name ID id Color color Size size
 	set creature_name [AcceptCreatureImageName $name]
 	if {[info exists PC_IDs($creature_name)]} {
 		if {$PC_IDs($creature_name) ne $id} {
@@ -8131,7 +8132,7 @@ proc DoCommandAC {d} {
 		}
 	} else {
 		set PC_IDs($creature_name) $id
-		.contextMenu add command -command "AddPlayer $creature_name $color $area $size $id" -label $creature_name 
+		.contextMenu add command -command "AddPlayer $creature_name $color 0 $size $id" -label $creature_name 
 	}
 }
 
@@ -8427,6 +8428,7 @@ proc DoCommandPROGRESS {d} {
 proc DoCommandPS {d} {
 	global canvas
 	dict set d Name [AcceptCreatureImageName [dict get $d Name]]
+	DEBUG 0 "DoCommandPS $d"
 	PlaceSomeone $canvas $d
 	RefreshGrid false
 	RefreshMOBs
@@ -10922,11 +10924,16 @@ proc SetObjectAttribute {id kvlist} {
 	if {[set idlist [ResolveObjectId_OA $id]] eq {}} {
 		return
 	}
+	
 	lassign $idlist a id datatype
 	global $a
 
 	DEBUG 4 "Changing attributes of object $id from $kvlist"
 	foreach {k v} $kvlist {
+		if {$datatype eq "PS" && $k eq "CustomReach"} {
+			set v [::gmaproto::new_dict CustomReach {*}$v]
+		}
+
 		if {$datatype eq "PS" && $k eq "Name"} {
 			# changing creature name: also need to change the ID reverse mapping
 			::gmautil::dassign $MOBdata($id) Name mob_name

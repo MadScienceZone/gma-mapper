@@ -120,7 +120,7 @@ namespace eval ::gmaproto {
 	}
 		#AC      {Name s ObjID s Color s Area s Size s}
 	array set _message_payload {
-		AC      {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l Elev i Color s Note s Size s Area s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i CustomReach {o {Enabled ? Natural i Extended i}}}
+		AC      {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l Elev i Color s Note s Size s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i CustomReach {o {Enabled ? Natural i Extended i}}}
 		ACCEPT  {Messages l}
 		AI      {Name s Sizes {a {File s ImageData b IsLocalFile ? Zoom f}}}
 		AI?	{Name s Sizes {a {Zoom f}}}
@@ -163,7 +163,7 @@ namespace eval ::gmaproto {
 		PRIV    {Command s Reason s}
 		POLO    {}
 		PROGRESS {OperationID s Title s Value i MaxValue i IsDone ?}
-		PS      {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l Elev i Color s Note s Size s Area s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}}}
+		PS      {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l Elev i Color s Note s Size s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}}}
 		READY   {}
 		ROLL    {Sender s Recipients l MessageID i ToAll ? ToGM ? Title s Result {o {InvalidRequest ? ResultSuppressed ? Result i Details {a {Type s Value s}}}} RequestID s MoreResults ?}
 		SYNC    {}
@@ -601,6 +601,7 @@ proc ::gmaproto::_backport_attribute {k v} {
 				[dict get $v HPBlur]\
 			]
 		}
+
 		Font {
 			set fontspec [list [dict get $v Family] [dict get $v Size]]
 			if {[dict get $v Weight] == 1} { lappend fontspec bold }
@@ -889,7 +890,7 @@ proc ::gmaproto::_backport_message {new_message} {
 			set nparams [list [dict get $params ID] \
 				       [dict get $params Color] \
 				       [dict get $params Name] \
-				       [dict get $params Area] \
+				       [dict get $params Size] \
 				       [dict get $params Size] \
 				       $ptype \
 				       [dict get $params Gx] \
@@ -1346,7 +1347,7 @@ proc ::gmaproto::place_someone_d {d} {
 	::gmaproto::_protocol_send PS {*}$d
 }
 
-proc ::gmaproto::place_someone {obj_id color name area size obj_type gx gy reach health skin skin_sizes elevation note status_list aoe move_mode killed dim {hidden false} {custom_reach {}}} {
+proc ::gmaproto::place_someone {obj_id color name _ size obj_type gx gy reach health skin skin_sizes elevation note status_list aoe move_mode killed dim {hidden false} {custom_reach {}}} {
 	if {$obj_type eq "monster"} {
 		set ct 1
 	} elseif {$obj_type eq "player"} {
@@ -1355,7 +1356,7 @@ proc ::gmaproto::place_someone {obj_id color name area size obj_type gx gy reach
 		error "invalid object type $obj_type for place_someone"
 	}
 
-	::gmaproto::_protocol_send PS ID $obj_id Name $name Gx $gx Gy $gy Reach $reach Area $area Size $size Color $color CreatureType $ct Health $health Skin $skin SkinSize $skin_sizes Elev $elevation Note $note StatusList $status_list AoE $aoe MoveMode $move_mode Killed $killed Dim $dim Hidden $hidden CustomReach $custom_reach
+	::gmaproto::_protocol_send PS ID $obj_id Name $name Gx $gx Gy $gy Reach $reach Size $size Color $color CreatureType $ct Health $health Skin $skin SkinSize $skin_sizes Elev $elevation Note $note StatusList $status_list AoE $aoe MoveMode $move_mode Killed $killed Dim $dim Hidden $hidden CustomReach $custom_reach
 }
 
 proc ::gmaproto::polo {} {
@@ -1550,7 +1551,7 @@ proc ::gmaproto::_repackage_legacy_packet {cmd params} {
 		AC {
 			# AC name id color area size
 			::gmautil::rdist 5 5 AC $params n i c a s
-			return [list "AC {\"Name\":[json::write string $n],\"ID\":[json::write string $i],\"Color\":[json::write string $c],\"Area\":[json::write string $a],\"Size\":[json::write string $s]}"]
+			return [list "AC {\"Name\":[json::write string $n],\"ID\":[json::write string $i],\"Color\":[json::write string $c],\"Size\":[json::write string $s]}"]
 		}
 		AI {
 			# AI name size
@@ -1767,7 +1768,7 @@ proc ::gmaproto::_repackage_legacy_packet {cmd params} {
 			} else {
 				set t 0
 			}
-			return [list "PS {\"ID\":[json::write string $i],\"Name\":[json::write string $n],\"Gx\":$x,\"Gy\":$y,\"Color\":[json::write string $c],\"Size\":[json::write string $s],\"Area\":[json::write string $a],\"Reach\":$r,\"CreatureType\":$t}"]
+			return [list "PS {\"ID\":[json::write string $i],\"Name\":[json::write string $n],\"Gx\":$x,\"Gy\":$y,\"Color\":[json::write string $c],\"Size\":[json::write string $s],\"Reach\":$r,\"CreatureType\":$t}"]
 		}
 		ROLL {
 			# ROLL from reciplist title result structuredlist messageID

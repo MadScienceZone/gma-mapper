@@ -74,7 +74,7 @@ namespace eval ::gmafile {
 		__DMETA__ {Timestamp i DateTime s Comment s}
 		ARC      {ArcMode i Start f Extent f ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		CIRC     {ArcMode i Start f Extent f ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
-		CREATURE {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l Elev i Color s Note s Size s Area s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ?}
+		CREATURE {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l Elev i Color s Note s Size s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ?}
 		IMG      {Name s Sizes {a {File s ImageData b IsLocalFile ? Zoom f}}}
 		LINE     {Arrow i ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		MAP      {File s IsLocalFile ? CacheOnly ? Merge ?}
@@ -376,7 +376,7 @@ proc ::gmafile::upgrade_elements {filedata} {
 		set mob_id [string range $mob_id 5 end]
 		::gmafile::require_arr OldMobs $mob_id NAME
 		::gmafile::default_arr OldMobs $mob_id -value 0 GX GY SKIN ELEV REACH KILLED DIM
-		::gmafile::default_arr OldMobs $mob_id HEALTH MOVEMODE COLOR NOTE SKIN SKINSIZE SIZE STATUSLIST AOE AREA
+		::gmafile::default_arr OldMobs $mob_id HEALTH MOVEMODE COLOR NOTE SKIN SKINSIZE SIZE STATUSLIST AOE 
 
 		if {$OldMobs(HEALTH:$mob_id) eq {}} {
 			set health {}
@@ -403,7 +403,6 @@ proc ::gmafile::upgrade_elements {filedata} {
 			Color $OldMobs(COLOR:$mob_id) \
 			Note $OldMobs(NOTE:$mob_id) \
 			Size $OldMobs(SIZE:$mob_id) \
-			Area $OldMobs(AREA:$mob_id) \
 			StatusList $OldMobs(STATUSLIST:$mob_id) \
 			AoE  $aoe \
 			MoveMode [::gmaproto::to_enum MoveMode $OldMobs(MOVEMODE:$mob_id)] \
