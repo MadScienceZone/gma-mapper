@@ -4495,7 +4495,6 @@ proc PlaceSomeone {w d} {
 	if {$custom_reach ne {}} {
 		dict set MOBdata($id) CustomReach $custom_reach
 	}
-	DEBUG 0 "place $MOBdata($id)"
 
 	MoveSomeone $w $id [dict get $d Gx] [dict get $d Gy]
 }
@@ -5093,7 +5092,6 @@ proc RenderSomeone {w id} {
 	set x [dict get $MOBdata($id) Gx]
 	set y [dict get $MOBdata($id) Gy]
 	lassign [FullCreatureAreaInfo $id] mob_size mob_area mob_reach mob_matrix custom_reach
-	DEBUG 0 "creature $id size [dict get $MOBdata($id) Size] -> size $mob_size area $mob_area reach $mob_reach matrix $mob_matrix custom $custom_reach"
 
 	# If somehow we have a misaligned creature that's at least "small",
 	# snap to even grid boundary
