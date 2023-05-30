@@ -1,7 +1,7 @@
 '\" t
 '\" <<ital-is-var>>
 '\" <<bold-is-fixed>>
-.TH MAPPER 6 "GMA-Mapper 4.9.2" 30-May-2023 "Games" \" @@mp@@
+.TH MAPPER 6 "GMA-Mapper 4.10-beta" 30-May-2023 "Games" \" @@mp@@
 .SH NAME
 mapper \- GMA battle grid map
 .SH SYNOPSIS
@@ -1599,22 +1599,6 @@ group (e.g., to toggle death for all the selected tokens).
 In combat mode, the area threatened by each creature is shown as a dashed outline,
 and is cross-hatched when that player's turn is up for action. Arrows are drawn between
 creatures in range to be melee targets.
-.SH "WEIRD SIZES"
-.LP
-While the mapper implements the standard d20/Pathfinder creature size categories,
-including tall (uppercase) and wide (lowercase) variants, sometimes there are special
-cases which fall outside that list. The following special codes are also usable:
-'\" <<desc>>
-.TP 10
-.B C80
-Colossal creature with a size of 80 feet and an 80-foot threat zone. (Looking at you, Oliphaunt of Jandelay.)
-.TP
-.B M20/m20
-Medium creature (5-foot space, 5-foot threat zone) with a 20-foot reach zone.
-.TP
-.B L0/l0
-10-foot swarm (10-foot space, no threat or reach zone).
-'\" <</>>
 .SH INSTALLATION
 .LP
 To run the mapper, you'll need an up-to-date Tcl/Tk interpreter (8.6 or later), 
