@@ -12,7 +12,7 @@
 # version 1.0, 17 July 2020.
 # Steve Willoughby <steve@madscience.zone>
 #
-# @[00]@| GMA-Mapper 4.10-beta.1
+# @[00]@| GMA-Mapper 4.10-beta.2
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

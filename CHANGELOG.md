@@ -3,7 +3,7 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.10-beta.1          <!-- @@##@@ -->
+ * This Package Version: 4.10-beta.2          <!-- @@##@@ -->
  * Effective Date: 31-May-2023               <!-- @@##@@ -->
 
 ## Compatibility
@@ -20,6 +20,11 @@
    * Creature `Size` attribute syntax expanded to generalize specifying creature size, space, and reach in a single attribute.
    * Changed context menu from "cycle reach" to an expanded submenu allowing full customization of reach zones.
    * (beta.1) Added highlighting to reach menu to show the creature's current reach zones.
+   * (beta.2) Removed redundant items from the context menu, that weren't related to the context of operations involving a particular square of the map, to keep the menu as short as possible.
+     * `Scroll to Visible Objects` already exists in the View menu.
+     * `Scroll Others' Views to Match Mine` also already exists in the View menu.
+     * `Refresh Display` already exists in the View menu too.
+     * `About Mapper...` already exists in the Help menu.
 ## Fixes
  * Corrected internal encoding of complex attribute types.
  * (beta.1) Corrected a bug where, after removing creatures which were in the selection list, the selection list continued to point to the now-nonexistent creature.
