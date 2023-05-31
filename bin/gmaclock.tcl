@@ -1046,7 +1046,7 @@ proc exists {w} {
 
 }
 #
-# @[00]@| GMA-Mapper 4.10-beta.2
+# @[00]@| GMA-Mapper 4.10-beta.3
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

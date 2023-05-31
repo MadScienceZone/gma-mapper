@@ -3,7 +3,7 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.10-beta.2          <!-- @@##@@ -->
+ * This Package Version: 4.10-beta.3          <!-- @@##@@ -->
  * Effective Date: 31-May-2023               <!-- @@##@@ -->
 
 ## Compatibility
@@ -28,6 +28,7 @@
 ## Fixes
  * Corrected internal encoding of complex attribute types.
  * (beta.1) Corrected a bug where, after removing creatures which were in the selection list, the selection list continued to point to the now-nonexistent creature.
+ * (beta.3) Fixed layout of the dialog to add creatures to the map.
 ## Comments
 The move (across the board with GMA components) to deprecate the `Area` attribute from creatures has been a long time coming, but with the addition of fully customizable reach zones, it's now fully redundant and needs to be removed now.
 Originally, creatures (the `Monster` object class in the GMA Core code) have a `size`, `space`, and `reach` attribute corresponding to the monster stats as published in the various bestiary volumes (d20, Pathfinder, etc.). The mapper (and client/server protocol) had corresponding `Size` and `Area` attributes with `Size` indicating creature size (aka `space`) and threat zone (aka `reach`), which is normally doubled for extended reach when using a reach weapon.

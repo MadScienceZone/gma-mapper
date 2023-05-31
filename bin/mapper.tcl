@@ -14,7 +14,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.10-beta.2}     ;# @@##@@
+set GMAMapperVersion {4.10-beta.3}     ;# @@##@@
 set GMAMapperFileFormat {21}        ;# @@##@@
 set GMAMapperProtocol {406}         ;# @@##@@
 set CoreVersionNumber {6.3-beta}            ;# @@##@@
@@ -7206,35 +7206,22 @@ proc AddPlayerMenu {type} {
 	#toplevel .apm -class dialog
 	create_dialog .apm
 	wm title .apm "Add Player or Monster"
-	pack [frame .apm.1] \
-	     [frame .apm.2] \
-		 [frame .apm.3] \
-		 [frame .apm.4] \
-		 [frame .apm.5] \
-		 [frame .apm.6] \
-		 -side top
-	pack [label .apm.1.lab -text {Name:}] \
-	     [entry .apm.1.ent -textvariable MOB_Name -width 20] \
-		 -side left -anchor w
-	pack [label .apm.2.lab -text {Size:}] \
-		 [entry .apm.2.ent -textvariable MOB_SIZE -width 3] \
-		 -side left -anchor w
 
-#		 [entry .apm.2.ent -textvariable MOB_SIZE -width 3 -validate key -validatecommand {set MOB_AREA "%P"; return 1}] \
-#	pack [label .apm.3.lab -text {Area:}] \
-#		 [entry .apm.3.ent -textvariable MOB_AREA -width 3] \
-#		 -side left -anchor w
-	pack [label .apm.4.lab -text {Color:}] \
-		 [entry .apm.4.ent -textvariable MOB_COLOR -width 20] \
-		 -side left -anchor w
-	pack [ttk::checkbutton .apm.5.ent -text "Reach?" -variable MOB_REACH] \
-		 -side left -anchor w
-	pack [button .apm.6.apply -command \
-		"AddMobFromMenu [lindex $g 0] [lindex $g 1] \$MOB_COLOR \$MOB_Name 0 \$MOB_SIZE $type \$MOB_REACH" -text Apply] \
-	     [button .apm.6.cancel -command "destroy .apm" -text Cancel] \
-	     [button .apm.6.ok -command \
-		 "AddMobFromMenu [lindex $g 0] [lindex $g 1] \$MOB_COLOR \$MOB_Name 0 \$MOB_SIZE $type \$MOB_REACH; destroy .apm" -text Ok] \
-		 -side right
+	grid [label .apm.lab1 -text {Name:}] 			   -row 0 -column 0 -sticky w
+	grid [entry .apm.ent1 -textvariable MOB_Name -width 20] -  -row 0 -column 1 -sticky ew
+	::tooltip::tooltip .apm.lab1 {[<image>=]<name>[ #<n>[-<m>]]}
+	::tooltip::tooltip .apm.ent1 {[<image>=]<name>[ #<n>[-<m>]]}
+	grid [label .apm.lab2 -text {Size Category:}] 		   -row 1 -column 0 -sticky w
+	grid [entry .apm.ent2 -textvariable MOB_SIZE -width 20] -  -row 1 -column 1 -sticky ew
+	::tooltip::tooltip .apm.lab2 {<category>[<natural reach>][-><extended reach>][=<space>]}
+	::tooltip::tooltip .apm.ent2 {<category>[<natural reach>][-><extended reach>][=<space>]}
+	grid [label .apm.lab4 -text {Threat Zone Color:}] 	   -row 2 -column 0 -sticky w
+	grid [entry .apm.ent4 -textvariable MOB_COLOR -width 20] - -row 2 -column 1 -sticky ew
+	grid x [ttk::checkbutton .apm.ent5 -text {Extended Reach Active} -variable MOB_REACH] - -sticky w
+
+	grid [button .apm.apply -command "AddMobFromMenu [lindex $g 0] [lindex $g 1] \$MOB_COLOR \$MOB_Name 0 \$MOB_SIZE $type \$MOB_REACH" -text Apply] -sticky w -row 4 -column 0
+	grid [button .apm.cancel -command "destroy .apm" -text Cancel] -row 4 -column 1
+	grid [button .apm.ok -command "AddMobFromMenu [lindex $g 0] [lindex $g 1] \$MOB_COLOR \$MOB_Name 0 \$MOB_SIZE $type \$MOB_REACH; destroy .apm" -text OK] -sticky e -row 4 -column 2
 }
 
 proc ValidateSizeCode {code} {
@@ -11640,7 +11627,7 @@ proc ConnectToServerByIdx {idx} {
 	refresh_title
 }
 
-# @[00]@| GMA-Mapper 4.10-beta.2
+# @[00]@| GMA-Mapper 4.10-beta.3
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
