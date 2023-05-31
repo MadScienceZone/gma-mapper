@@ -5779,17 +5779,23 @@ proc RemoveFromSelection {id} {
 proc ClearSelection {} {
 	global MOB_SELECTED canvas
 	foreach id [array names MOB_SELECTED] {
-		set MOB_SELECTED($id) false
-		RenderSomeone $canvas $id
+		catch {
+			set MOB_SELECTED($id) false
+			RenderSomeone $canvas $id
+		}
 	}
 	SetSelectionContextMenu
 	array unset MOB_SELECTED
 }
 
 proc GetSelectionList {} {
-	global MOB_SELECTED
+	global MOB_SELECTED MOBdata
 	set result {}
 	foreach id [array names MOB_SELECTED] {
+		if {![info exists MOBdata($id)] && $MOB_SELECTED($id)} {
+			DEBUG 0 "Removed nonexistent id $id from selection list"
+			set MOB_SELECTED($id) false
+		}
 		if {$MOB_SELECTED($id)} {
 			lappend result $id
 		}
@@ -6885,8 +6891,25 @@ proc CreateReachSubMenu {args} {
 		40 8
 		45 9
 	} {
-		$mid.nat add command -command [list $cmd $mob_list -setnat $code] -label "$feet ft"
-		$mid.ext add command -command [list $cmd $mob_list -setext $code] -label "$feet ft"
+		set this_nat false
+		set this_ext false
+		if {$mob_id ne {__mass__}} {
+			if {[catch {
+				lassign [FullCreatureAreaInfo $mob_id] _ n e _ _
+				set this_nat [expr $n == $code]
+				set this_ext [expr $e == $code]
+			} err]} {
+				DEBUG 0 "Error trying to look up reach zones for $mob_id: $err"
+			}
+		}
+
+		foreach menutype {nat ext} {
+			if {[set this_$menutype]} {
+				$mid.$menutype add command -command [list $cmd $mob_list -set$menutype $code] -label "$feet ft" -foreground #ff0000
+			} else {
+				$mid.$menutype add command -command [list $cmd $mob_list -set$menutype $code] -label "$feet ft"
+			}
+		}
 	}
 	foreach submenu {nat ext} {
 		$mid.$submenu add separator
@@ -7277,7 +7300,7 @@ proc AddMobFromMenu {baseX baseY color name _ size type reach} {
 }
 
 proc RemovePerson id {
-	global canvas MOBdata MOBid
+	global canvas MOBdata MOBid MOB_SELECTED
 
 	DEBUG 3 "RemovePerson $id"
 	$canvas delete M#$id
@@ -7286,6 +7309,9 @@ proc RemovePerson id {
 	catch { destroy $canvas.ms$id }
 	catch { destroy $canvas.z$id }
 	catch {	destroy $canvas.nt_$id }
+	if {[info exists MOB_SELECTED($id)] && $MOB_SELECTED($id)} {
+		set MOB_SELECTED($id) false
+	}
 }
 
 proc KillAll args {
@@ -7299,6 +7325,9 @@ proc RemoveAll args {
 		RemovePerson $mob
 		::gmaproto::clear $mob
 	}
+	# Since this is called when clearing all selected creatures, and those creatures will then cease
+	# to exist, we shouldn't leave the selection list around pointing to bogus creatures.
+	ClearSelection
 }
 
 proc KillPerson id {
