@@ -312,7 +312,7 @@ proc FullCreatureAreaInfo {id} {
 	global MOBdata
 
 	# if we have an explicit size override, take that first
-	set szparams [CreatureSizeParams [dict get $MOBdata($id) Size]]
+	set szparams [CreatureSizeParams [set disp_size [CreatureDisplayedSize $id]]]
 	set custom_reach [dict get $MOBdata($id) CustomReach]
 	if {$szparams ne {} && ($custom_reach eq {} || ![dict get $custom_reach Enabled])} {
 		lassign $szparams szcode sznat szext szsz
@@ -337,20 +337,20 @@ proc FullCreatureAreaInfo {id} {
 
 	if {$custom_reach ne {} && [dict get $custom_reach Enabled]} {
 		lassign [ComputedReachMatrix \
-			[dict get $MOBdata($id) Size] \
+			$disp_size \
 			[dict get $custom_reach Natural] \
 			[dict get $custom_reach Extended] \
 		] mob_area mob_reach mob_matrix
 	} else {
-		lassign [ReachMatrix [dict get $MOBdata($id) Size]] mob_area mob_reach mob_matrix
+		lassign [ReachMatrix $disp_size] mob_area mob_reach mob_matrix
 	}
-	set mob_size [MonsterSizeValue [dict get $MOBdata($id) Size]]
+	set mob_size [MonsterSizeValue $disp_size]
 
 	return [list $mob_size $mob_area $mob_reach $mob_matrix $custom_reach]
 }
 
 #
-# @[00]@| GMA-Mapper 4.10-beta.3
+# @[00]@| GMA-Mapper 4.10-beta.4
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

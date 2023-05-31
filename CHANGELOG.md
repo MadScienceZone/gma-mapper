@@ -3,7 +3,7 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.10-beta.3          <!-- @@##@@ -->
+ * This Package Version: 4.10-beta.4          <!-- @@##@@ -->
  * Effective Date: 31-May-2023               <!-- @@##@@ -->
 
 ## Compatibility
