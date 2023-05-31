@@ -14,7 +14,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.10-beta.3}     ;# @@##@@
+set GMAMapperVersion {4.10-beta.4}     ;# @@##@@
 set GMAMapperFileFormat {21}        ;# @@##@@
 set GMAMapperProtocol {406}         ;# @@##@@
 set CoreVersionNumber {6.3-beta}            ;# @@##@@
@@ -4546,6 +4546,47 @@ proc FindImage {image_pfx zoom} {
 	return $tile_id
 }
 
+# Resizing creature tokens locally can be done with an expanded usage of the
+# mechanism used to zoom in/out on the map.
+# Assuming we could have tokens at zoom levels 0.25, 0.50, 1, 2, 4, 8, 16, and 32,
+# compute the actual zoom level based on the map zoom level, creature original size
+# (used for creating their token originally) and the displayed size.
+proc _creature_zoom_relative_to_medium size {
+	if {[set p [CreatureSizeParams $size]] ne {}} {
+		if {[lindex $p 3] ne {}} {
+			return [lindex $p 3]
+		}
+		switch -exact -- [lindex $p 0] {
+			f - F { return 0.1 }
+			d - D { return 0.2 }
+			t - T { return 0.5 }
+			s - S - m - M { return 1.0 }
+			l - L { return 2.0 }
+			h - H { return 3.0 }
+			g - G { return 4.0 }
+			c - C { return 6.0 }
+		}
+	}
+	return 0
+}
+proc creature_display_zoom {size dispsize zoom} {
+	set newzoom [expr ($zoom / [_creature_zoom_relative_to_medium $size]) * [_creature_zoom_relative_to_medium $dispsize]]
+	foreach defined {32.00 16.00 12.00 8.00 6.00 4.00 3.00 2.00 1.00 0.50 0.25} {
+		if {$newzoom >= $defined} {
+			return $defined
+		}
+	}
+	return 0
+}
+
+proc CreatureDisplayedSize {id} {
+	global MOBdata
+	if {[dict exists $MOBdata($id) DispSize] && [set dsize [dict get $MOBdata($id) DispSize]] ne {}} {
+		return $dsize
+	}
+	return [dict get $MOBdata($id) Size]
+}
+
 #
 # RenderSomeone draws a creature token at its current location based on its object attributes.
 #
@@ -5060,7 +5101,7 @@ proc CreatureStatusMarker {w id x y s calc_condition} {
 	}
 }
 
-proc RenderSomeone {w id} {
+proc RenderSomeone {w id {norecurse false}} {
 	DEBUG 3 "RenderSomeone $w $id"
 	global MOBdata ThreatLineWidth iscale SelectLineWidth ThreatLineHatchWidth ReachLineColor
 	global HealthBarWidth HealthBarFrameWidth HealthBarConditionFrameWidth
@@ -5078,7 +5119,7 @@ proc RenderSomeone {w id} {
 		if {![dict get $MOBdata($mob_id) Killed] && ![dict get $MOBdata($mob_id) Hidden]} {
 			set xx [dict get $MOBdata($mob_id) Gx]
 			set yy [dict get $MOBdata($mob_id) Gy]
-			set sz [MonsterSizeValue [dict get $MOBdata($mob_id) Size]]
+			set sz [MonsterSizeValue [CreatureDisplayedSize $mob_id]]
 			DEBUG 1 "- Found at ($xx,$yy), size=$sz:"
 			for {set xi 0} {$xi < $sz} {incr xi} {
 				for {set yi 0} {$yi < $sz} {incr yi} {
@@ -5127,7 +5168,7 @@ proc RenderSomeone {w id} {
 				# this makes some overlapping draw calls, but gets the job done.
 				#
 				# Our (GX,GY) reference point is already at the upper left of the occupied space.
-				set sz [MonsterSizeValue [dict get $MOBdata($id) Size]]
+				set sz [MonsterSizeValue [CreatureDisplayeSize $id]]
 				for {set AoEx 0} {$AoEx <= $sz} {incr AoEx} {
 					_DrawAoeZone $w $id [expr $GX0+$AoEx] $GY0 [expr $GXX+$AoEx] $GYY $aoe_radius $aoe_color radius [list M#$id MA#$id allMOB MAzone]			
 					if {$sz >= 1} {
@@ -5277,12 +5318,20 @@ proc RenderSomeone {w id} {
     # cached already, before broadcasting a request for one.
     #
     set found_image false
-    DEBUG 3 "Looking up image at zoom $zoom for each of: $image_candidates"
+    if {[dict exists $MOBdata($id) DispSize] \
+     && [set disp_size [dict get $MOBdata($id) DispSize]] ne {} \
+     && [set real_size [dict get $MOBdata($id) Size]] ne $disp_size} {
+	    set disp_zoom [creature_display_zoom $real_size $disp_size $zoom]
+    } else {
+	    set disp_zoom $zoom
+    }
+
+    DEBUG 3 "Looking up image at zoom $disp_zoom for each of: $image_candidates"
 	foreach image_pfx $image_candidates {
 		#
 		# if we already know we have this image, just use it
 		#
-		if {[info exists TILE_SET([tile_id $image_pfx $zoom])]} {
+		if {[info exists TILE_SET([tile_id $image_pfx $disp_zoom])]} {
             DEBUG 3 "- Found $image_pfx, using that"
             set found_image true
 			break
@@ -5295,8 +5344,8 @@ proc RenderSomeone {w id} {
         DEBUG 3 "No candidate tiles were found. Querying server and checking cache..."
         foreach ip $image_candidates {
             DEBUG 3 "- Trying $ip"
-            FindImage $ip $zoom
-            if {[info exists TILE_SET([tile_id $ip $zoom])]} {
+            FindImage $ip $disp_zoom
+            if {[info exists TILE_SET([tile_id $ip $disp_zoom])]} {
                 DEBUG 3 "-- Found $ip, using that."
                 set image_pfx $ip
                 break
@@ -5308,18 +5357,18 @@ proc RenderSomeone {w id} {
 	#
 	# if we found a copy of the image, it will now appear in TILE_SET.
 	#
-	if [info exists TILE_SET([tile_id $image_pfx $zoom])] {
-		DEBUG 3 "$image_pfx:$zoom = $TILE_SET([tile_id $image_pfx $zoom])"
+	if [info exists TILE_SET([tile_id $image_pfx $disp_zoom])] {
+		DEBUG 3 "$image_pfx:$disp_zoom = $TILE_SET([tile_id $image_pfx $disp_zoom])"
 		if {!$is_transparent} {
 			$w create oval [expr $x*$iscale] [expr $y*$iscale] [expr ($x+$mob_size)*$iscale] [expr ($y+$mob_size)*$iscale] -fill $fillcolor -tags "mob MF#$id M#$id MN#$id allMOB MB#$id"
 		}
-		$w create image [expr $x*$iscale] [expr $y*$iscale] -anchor nw -image $TILE_SET([tile_id $image_pfx $zoom]) -tags "mob M#$id MN#$id allMOB"
+		$w create image [expr $x*$iscale] [expr $y*$iscale] -anchor nw -image $TILE_SET([tile_id $image_pfx $disp_zoom]) -tags "mob M#$id MN#$id allMOB"
 		set nametag_w "$w.nt_$id"
 		if {[winfo exists $nametag_w]} {
-			$nametag_w configure -font [FontBySize [dict get $MOBdata($id) Size]] -text $mob_name
+			$nametag_w configure -font [FontBySize [CreatureDisplayedSize $id]] -text $mob_name
 		} else {
 			label $nametag_w -background [::tk::Darken [dict get $MOBdata($id) Color] 40] \
-				-foreground white -font [FontBySize [dict get $MOBdata($id) Size]] -text $mob_name 
+				-foreground white -font [FontBySize [CreatureDisplayedSize $id]] -text $mob_name 
 		}
 		# is anyone above me?
 		set nametag_anchor sw
@@ -5339,15 +5388,15 @@ proc RenderSomeone {w id} {
 		}
 
 		if {[dict get $MOBdata($id) Killed]} {
-			$w create text [expr $x*$iscale] [expr $y*$iscale] -text $mob_name -anchor nw -font [FontBySize [dict get $MOBdata($id) Size]] -fill $textcolor -tags "M#$id MF#$id MT#$id allMOB"
+			$w create text [expr $x*$iscale] [expr $y*$iscale] -text $mob_name -anchor nw -font [FontBySize [CreatureDisplayedSize $id]] -fill $textcolor -tags "M#$id MF#$id MT#$id allMOB"
 		} else {
 			$w create window [expr $x*$iscale] [expr $y*$iscale] -anchor $nametag_anchor -window $nametag_w -tags "M#$id MF#$id MT#$id allMOB"
 		}
 	} else {
-		DEBUG 3 "No $image_pfx:$zoom found in TILE_SET"
+		DEBUG 3 "No $image_pfx:$disp_zoom found in TILE_SET"
 		$w create oval [expr $x*$iscale] [expr $y*$iscale] [expr ($x+$mob_size)*$iscale] [expr ($y+$mob_size)*$iscale] -fill $fillcolor -tags "mob MF#$id M#$id MN#$id MB#id allMOB"
 		$w create text [expr ($x+(.5*$mob_size))*$iscale] [expr ($y+(.5*$mob_size))*$iscale] -fill $textcolor \
-			-font [FontBySize [dict get $MOBdata($id) Size]] -text $mob_name -tags "M#$id MF#$id MN#$id MT#$id allMOB"
+			-font [FontBySize [CreatureDisplayedSize $id]] -text $mob_name -tags "M#$id MF#$id MN#$id MT#$id allMOB"
 	}
 	if {[dict get $MOBdata($id) Killed]} {
 		$w create line [expr $x*$iscale] [expr $y*$iscale] [expr ($x+$mob_size)*$iscale] [expr ($y+$mob_size)*$iscale] \
@@ -5588,7 +5637,7 @@ proc RenderSomeone {w id} {
 			catch {label $w.z$id -text {} -foreground $textcolor -background $fillcolor}
 		}
 		$w create window [expr ($x+($mob_size))*$iscale] [expr ($y)*$iscale] -tags "M#$id MELEV#$id allMOB" -anchor ne -window $w.z$id 
-		$w.z$id configure -foreground $textcolor -background $fillcolor -text $elev -font [FontBySize [dict get $MOBdata($id) Size]]
+		$w.z$id configure -foreground $textcolor -background $fillcolor -text $elev -font [FontBySize [CreatureDisplayedSize $id]]
 	}
 
 	#
@@ -5600,7 +5649,7 @@ proc RenderSomeone {w id} {
 		}
 		$w create window [expr ($x+($mob_size))*$iscale] [expr ($y+$mob_size)*$iscale] \
 			-tags "M#$id MT#$id allMOB" -anchor se -window $w.ms$id 
-		$w.ms$id configure -text $noteText -font [FontBySize [dict get $MOBdata($id) Size]]
+		$w.ms$id configure -text $noteText -font [FontBySize [CreatureDisplayedSize $id]]
 	}
 
 	#
@@ -5628,9 +5677,9 @@ proc RenderSomeone {w id} {
 			DEBUG 1 "Checking who $threatening_mob_id is threatening"
 			if {[dict get $MOBdata($threatening_mob_id) Killed]} continue
 			lassign [FullCreatureAreaInfo $threatening_mob_id] sz ar re mat _
-#			lassign [ReachMatrix [dict get $MOBdata($threatening_mob_id) Size]] ar re mat
+#			lassign [ReachMatrix [CreatureDisplayedSize $threatening_mob_id]] ar re mat
 			lassign [MOBCenterPoint $threatening_mob_id] xc yc rc
-#			set sz [MonsterSizeValue [dict get $MOBdata($threatening_mob_id) Size]]
+#			set sz [MonsterSizeValue [CreatureDisplayedSize $threatening_mob_id]]
 			DEBUG 1 "-- area $ar reach $re ($xc,$yc) r=$rc"
 			set Xstart [expr ([dict get $MOBdata($threatening_mob_id) Gx] - $re)]
 			set yy [expr ([dict get $MOBdata($threatening_mob_id) Gy] - $re)]
@@ -5703,9 +5752,9 @@ proc RenderSomeone {w id} {
 			}
 		}
 	}
-	if {[llength $lower_neighbors] > 0} {
+	if {!$norecurse && [llength $lower_neighbors] > 0} {
 		foreach neighbor [lsort -unique $lower_neighbors] {
-			RenderSomeone $w $neighbor
+			RenderSomeone $w $neighbor true
 		}
 	}
 }
@@ -5827,7 +5876,7 @@ proc ScreenXYToMOBID {w x y} {
 	DEBUG 3 "Looking for object at $x,$y (grid $gx,$gy)..."
 	set mob_list {}
 	foreach id [array names MOBdata] {
-		set msz [expr max(1, [MonsterSizeValue [dict get $MOBdata($id) Size]])]
+		set msz [expr max(1, [MonsterSizeValue [CreatureDisplayedSize $id]])]
 		set mx0 [expr int([dict get $MOBdata($id) Gx])]
 		set mx1 [expr $mx0 + $msz]
 		set my0 [expr int([dict get $MOBdata($id) Gy])]
@@ -5874,7 +5923,7 @@ proc ScreenXYToGridXY {x y args} {
 
 	if {$args ne {-exact} && $MOB_MOVING ne {}} {
 		DEBUG 3 "ScreenXYToGridXY $x $y $args for MOB $MOB_MOVING"
-		set mob_size [MonsterSizeValue [dict get $MOBdata($MOB_MOVING) Size]]
+		set mob_size [MonsterSizeValue [CreatureDisplayedSize $MOB_MOVING]]
 		DEBUG 3 "--size $mob_size"
 		if {$mob_size < 1} {
 			DEBUG 3 "-- calc as [list [expr int([$canvas canvasx $x]/($iscale*$mob_size))*$mob_size] [expr int([$canvas canvasy $y]/($iscale*$mob_size))*$mob_size]]"
@@ -6755,15 +6804,16 @@ proc CreatePolySubMenu {args} {
 }
 
 proc CreateSizeSubMenu {args} {
+	global MOBdata
 	if {[lindex $args 0] == {-mass}} {
 		set mob_id __mass__
 		set mob_list [lindex $args 1]
-		set cmd ChangeSizeAll
+		set cmd ChangeDispSizeAll
 		set sub size.m_
 	} else {
 		set sub [expr [string equal [lindex $args 0] {-deep}] ? {{size.m_}} : {{size_m_}}]
 		set mob_list [set mob_id [lindex $args 1]]
-		set cmd ChangeSize
+		set cmd ChangeDispSize
 	}
 	set mid .contextMenu.$sub$mob_id
 	catch {$mid delete 0 end; destroy $mid}
@@ -6784,10 +6834,17 @@ proc CreateSizeSubMenu {args} {
 		c {Colossal (long)}
 		C {Colossal (tall)}
 	} {
-		if {[MobStateList $mob_list Size $size_code]} {
-			$mid add command -command [list $cmd $mob_list [lindex $size_code 0]] -label $size_name -foreground #ff0000
-		} else {
-			$mid add command -command [list $cmd $mob_list [lindex $size_code 0]] -label $size_name
+		if {$mob_id ne {__mass__}} {
+			set real_size [dict get $MOBdata($mob_id) Size]
+			set disp_size [CreatureDisplayedSize $mob_id]
+
+			if {[lsearch -exact $size_code $disp_size] >= 0} {
+				$mid add command -command [list $cmd $mob_list [lindex $size_code 0]] -label $size_name -foreground #ff0000
+			} elseif {[lsearch -exact $size_code $real_size] >= 0} {
+				$mid add command -command [list $cmd $mob_list [lindex $size_code 0]] -label $size_name -foreground #0000bb
+			} else {
+				$mid add command -command [list $cmd $mob_list [lindex $size_code 0]] -label $size_name
+			}
 		}
 	}
 	return $mid
@@ -6816,7 +6873,7 @@ proc SetCustomReach {mob_id mode value} {
 	set d $MOBdata($mob_id)
 	set reach [dict get $d Reach]
 	set custom [dict get $d CustomReach]
-	set size [dict get $d Size]
+	set size [CreatureDisplayedSize $mob_id]
 	if {$custom eq {}} {
 		set custom [DefaultCustomReach $size]
 	}
@@ -7225,26 +7282,13 @@ proc AddPlayerMenu {type} {
 }
 
 proc ValidateSizeCode {code} {
-	#
-	# return true if code is valid
-	#
-	if {[string is integer -strict $code]} {return 1}
-	if {$code eq {C80}} {return 1}
-	if {$code eq {m20} || $code eq {M20}} {return 1}
-	if {$code eq {l0} || $code eq {L0}} {return 1}
-	if {[string length $code] != 1} {return 0}
-	if {[string first $code FDTSMLHGCfdtsmlhgc] < 0} {return 0}
-	return 1
+	return [expr [CreatureSizeParams $code] ne {}]
 }
 
 proc AddMobFromMenu {baseX baseY color name _ size type reach} {
 	global canvas
 	global PC_IDs
 
-#	if {![ValidateSizeCode $area]} {
-#		say "Area value $area is not valid.  Specify number of squares or type code (upper-case for tall)."
-#		return
-#	}
 	if {![ValidateSizeCode $size]} {
 		say "Size value $size is not valid.  Specify number of squares or type code (upper-case for tall)."
 		return
@@ -7329,11 +7373,11 @@ proc PolymorphPerson {id skin} {
 	global MOBdata canvas
 	dict set MOBdata($id) Skin $skin
 	if {[llength [dict get $MOBdata($id) SkinSize]] > $skin} {
-		ChangeSize $id [lindex [dict get $MOBdata($id) SkinSize] $skin]
+		ChangeRealSize $id [lindex [dict get $MOBdata($id) SkinSize] $skin]
 	}
 			
 	RenderSomeone $canvas $id
-	SendMobChanges $id Skin
+	SendMobChanges $id {Skin Size DispSize}
 }
 
 proc PolymorphMass {mob_list skin} {
@@ -7342,20 +7386,26 @@ proc PolymorphMass {mob_list skin} {
 	}
 }
 
-proc ChangeSize {id code} {
+proc ChangeDispSize {id code} {
 	global MOBdata canvas
-	dict set MOBdata($id) Size $code
 	if {[string length $code] > 1} {
 		dict set MOBdata($id) CustomReach Enabled false
 	}
-#	dict set MOBdata($id) Area $code
+	dict set MOBdata($id) DispSize $code
+
 	RenderSomeone $canvas $id
-	SendMobChanges $id {Size}
+	SendMobChanges $id {DispSize}
 }
 
-proc ChangeSizeAll {mob_list code} {
+proc ChangeRealSize {id code} {
+	global MOBdata
+	dict set MOBdata($id) Size $code
+	ChangeDisplaySize $id $code
+}
+
+proc ChangeDispSizeAll {mob_list code} {
 	foreach mob $mob_list {
-		ChangeSize $mob $code
+		ChangeDispSize $mob $code
 	}
 }
 #
@@ -11627,7 +11677,7 @@ proc ConnectToServerByIdx {idx} {
 	refresh_title
 }
 
-# @[00]@| GMA-Mapper 4.10-beta.3
+# @[00]@| GMA-Mapper 4.10-beta.4
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
