@@ -350,7 +350,7 @@ proc FullCreatureAreaInfo {id} {
 }
 
 #
-# @[00]@| GMA-Mapper 4.10-beta.1
+# @[00]@| GMA-Mapper 4.10-beta.2
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
