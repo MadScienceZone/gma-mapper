@@ -7104,16 +7104,16 @@ menu .contextMenu.tsel -tearoff 0
 .contextMenu add command -command "" -label {Elevation} -state disabled					;# 10
 .contextMenu add command -command "" -label {Movement Mode} -state disabled				;# 11
 .contextMenu add separator										;# 12
-.contextMenu add command -command "" -label {Distance from...} -state disabled		 		;# 13 NEW
-.contextMenu add command -command "" -label {Distance from...} -state disabled				;# 14 NEW
-.contextMenu add separator										;# 15 NEW
-.contextMenu add command -command "" -label {Toggle Selection} -state disabled				;# 16 NEW
-.contextMenu add command -command "ClearSelection" -label {Deselect All} -state disabled		;# 17, was 13
-.contextMenu add command -command "FindNearby" -label {Scroll to Visible Objects}			;# 18, was 14
-.contextMenu add command -command "SyncView" -label {Scroll Others' Views to Match Mine}		;# 19, was 15
-.contextMenu add command -command "refreshScreen" -label {Refresh Display}				;# 20, was 16
-.contextMenu add command -command "aboutMapper" -label {About Mapper...}				;# 21, was 17
-.contextMenu add separator										;# 22, was 18
+.contextMenu add command -command "" -label {Distance from...} -state disabled		 		;# 13 
+.contextMenu add command -command "" -label {Distance from...} -state disabled				;# 14 
+.contextMenu add separator										;# 15 
+.contextMenu add command -command "" -label {Toggle Selection} -state disabled				;# 16 
+.contextMenu add command -command "ClearSelection" -label {Deselect All} -state disabled		;# 17
+#.contextMenu add command -command "FindNearby" -label {Scroll to Visible Objects}			;# 18 REMOVED
+#.contextMenu add command -command "SyncView" -label {Scroll Others' Views to Match Mine}		;# 19 REMOVED
+#.contextMenu add command -command "refreshScreen" -label {Refresh Display}				;# 20 REMOVED
+#.contextMenu add command -command "aboutMapper" -label {About Mapper...}				;# 21 REMOVED
+.contextMenu add separator										;# 18; was 22
 
 # AddPlayer name color ?area? ?size? ?id?  defaults to 1x1, generated ID
 proc AddPlayer {name color args} {
