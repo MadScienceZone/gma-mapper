@@ -3,13 +3,17 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.9.2          <!-- @@##@@ -->
- * Effective Date: 30-May-2023               <!-- @@##@@ -->
+ * This Package Version: 4.9.3          <!-- @@##@@ -->
+ * Effective Date: 31-May-2023               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.2 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.3-beta <!-- @@##@@ -->
  * GMA Mapper File Format: 20	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 405        <!-- @@##@@ -->
+
+# 4.9.3
+## Fixes
+ * Corrected bug that forced `RenderSomeone` function to recurse too deeply, causing a runtime exception.
 
 # 4.9.2
 ## Fixes
