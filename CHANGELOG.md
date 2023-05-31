@@ -3,7 +3,7 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.10-beta.3          <!-- @@##@@ -->
+ * This Package Version: 4.10-beta.4          <!-- @@##@@ -->
  * Effective Date: 31-May-2023               <!-- @@##@@ -->
 
 ## Compatibility
@@ -11,11 +11,17 @@
  * GMA Mapper File Format: 21	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 406        <!-- @@##@@ -->
 
+## DEPRECATION NOTICE
+The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
+If you are still running an ancient version of the server and clients, you need to upgrade to the latest
+versions.
+
 # 4.10-beta
 ## Enhancements
  * Now implements server protocol 406
    * Removes `Area` attribute from creatures (affects AC and PS commands and saved files).
    * Adds `CustomReach` attribute to creatures (affects AC and PS commands and saved files).
+   * Adds `DispSize` attribute to creatures (affects AC and PS commands and saved files).
    * File format updated to 21 to reflect the new attributes.
    * Creature `Size` attribute syntax expanded to generalize specifying creature size, space, and reach in a single attribute.
    * Changed context menu from "cycle reach" to an expanded submenu allowing full customization of reach zones.
@@ -25,6 +31,7 @@
      * `Scroll Others' Views to Match Mine` also already exists in the View menu.
      * `Refresh Display` already exists in the View menu too.
      * `About Mapper...` already exists in the Help menu.
+   * (beta.4) Scales creature token image when changing size on the map. Works better if `rendersizes` makes additional sizes for the token.
 ## Fixes
  * Corrected internal encoding of complex attribute types.
  * (beta.1) Corrected a bug where, after removing creatures which were in the selection list, the selection list continued to point to the now-nonexistent creature.
