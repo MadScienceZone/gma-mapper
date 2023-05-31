@@ -19,8 +19,10 @@
    * File format updated to 21 to reflect the new attributes.
    * Creature `Size` attribute syntax expanded to generalize specifying creature size, space, and reach in a single attribute.
    * Changed context menu from "cycle reach" to an expanded submenu allowing full customization of reach zones.
+   * (beta.1) Added highlighting to reach menu to show the creature's current reach zones.
 ## Fixes
  * Corrected internal encoding of complex attribute types.
+ * (beta.1) Corrected a bug where, after removing creatures which were in the selection list, the selection list continued to point to the now-nonexistent creature.
 ## Comments
 The move (across the board with GMA components) to deprecate the `Area` attribute from creatures has been a long time coming, but with the addition of fully customizable reach zones, it's now fully redundant and needs to be removed now.
 Originally, creatures (the `Monster` object class in the GMA Core code) have a `size`, `space`, and `reach` attribute corresponding to the monster stats as published in the various bestiary volumes (d20, Pathfinder, etc.). The mapper (and client/server protocol) had corresponding `Size` and `Area` attributes with `Size` indicating creature size (aka `space`) and threat zone (aka `reach`), which is normally doubled for extended reach when using a reach weapon.
