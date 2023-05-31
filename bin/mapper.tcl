@@ -14,7 +14,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.10-beta.3}     ;# @@##@@
+set GMAMapperVersion {4.10-beta.4}     ;# @@##@@
 set GMAMapperFileFormat {21}        ;# @@##@@
 set GMAMapperProtocol {406}         ;# @@##@@
 set CoreVersionNumber {6.3-beta}            ;# @@##@@
@@ -4552,21 +4552,26 @@ proc FindImage {image_pfx zoom} {
 # compute the actual zoom level based on the map zoom level, creature original size
 # (used for creating their token originally) and the displayed size.
 proc _creature_zoom_relative_to_medium size {
-	switch -exact -- $size {
-		f - F { return 0.1 }
-		d - D { return 0.2 }
-		t - T { return 0.5 }
-		s - S - m - M { return 1.0 }
-		l - L { return 2.0 }
-		h - H { return 3.0 }
-		g - G { return 4.0 }
-		c - C { return 6.0 }
+	if {[set p [CreatureSizeParams $size]] ne {}} {
+		if {[lindex $p 3] ne {}} {
+			return [lindex $p 3]
+		}
+		switch -exact -- [lindex $p 0] {
+			f - F { return 0.1 }
+			d - D { return 0.2 }
+			t - T { return 0.5 }
+			s - S - m - M { return 1.0 }
+			l - L { return 2.0 }
+			h - H { return 3.0 }
+			g - G { return 4.0 }
+			c - C { return 6.0 }
+		}
 	}
 	return 0
 }
 proc creature_display_zoom {size dispsize zoom} {
 	set newzoom [expr ($zoom / [_creature_zoom_relative_to_medium $size]) * [_creature_zoom_relative_to_medium $dispsize]]
-	foreach defined {32.00 16.00 8.00 4.00 2.00 1.00 0.50 0.25} {
+	foreach defined {32.00 16.00 12.00 8.00 6.00 4.00 3.00 2.00 1.00 0.50 0.25} {
 		if {$newzoom >= $defined} {
 			return $defined
 		}
@@ -6799,6 +6804,7 @@ proc CreatePolySubMenu {args} {
 }
 
 proc CreateSizeSubMenu {args} {
+	global MOBdata
 	if {[lindex $args 0] == {-mass}} {
 		set mob_id __mass__
 		set mob_list [lindex $args 1]
@@ -6828,10 +6834,17 @@ proc CreateSizeSubMenu {args} {
 		c {Colossal (long)}
 		C {Colossal (tall)}
 	} {
-		if {[MobStateList $mob_list Size $size_code]} {
-			$mid add command -command [list $cmd $mob_list [lindex $size_code 0]] -label $size_name -foreground #ff0000
-		} else {
-			$mid add command -command [list $cmd $mob_list [lindex $size_code 0]] -label $size_name
+		if {$mob_id ne {__mass__}} {
+			set real_size [dict get $MOBdata($mob_id) Size]
+			set disp_size [CreatureDisplayedSize $mob_id]
+
+			if {[lsearch -exact $size_code $disp_size] >= 0} {
+				$mid add command -command [list $cmd $mob_list [lindex $size_code 0]] -label $size_name -foreground #ff0000
+			} elseif {[lsearch -exact $size_code $real_size] >= 0} {
+				$mid add command -command [list $cmd $mob_list [lindex $size_code 0]] -label $size_name -foreground #0000bb
+			} else {
+				$mid add command -command [list $cmd $mob_list [lindex $size_code 0]] -label $size_name
+			}
 		}
 	}
 	return $mid
@@ -11664,7 +11677,7 @@ proc ConnectToServerByIdx {idx} {
 	refresh_title
 }
 
-# @[00]@| GMA-Mapper 4.10-beta.3
+# @[00]@| GMA-Mapper 4.10-beta.4
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
