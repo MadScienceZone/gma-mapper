@@ -1,23 +1,23 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___        _____      _______              #
-# (  ____ \(       )(  ___  ) Game         /   )      / ___ \    / ___   )             #
-# | (    \/| () () || (   ) | Master's    / /) |     ( (   ) )   \/   )  |             #
-# | |      | || || || (___) | Assistant  / (_) (_    ( (___) |       /   )             #
-# | | ____ | |(_)| ||  ___  |           (____   _)    \____  |     _/   /              #
-# | | \_  )| |   | || (   ) |                ) (           ) |    /   _/               #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\____) ) _ (   (__/\             #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/ (_)\_______/             #
+#  _______  _______  _______                ___        _____      ______               #
+# (  ____ \(       )(  ___  ) Game         /   )      / ___ \    / ___  \              #
+# | (    \/| () () || (   ) | Master's    / /) |     ( (   ) )   \/   \  \             #
+# | |      | || || || (___) | Assistant  / (_) (_    ( (___) |      ___) /             #
+# | | ____ | |(_)| ||  ___  |           (____   _)    \____  |     (___ (              #
+# | | \_  )| |   | || (   ) |                ) (           ) |         ) \             #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\____) ) _ /\___/  /             #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/ (_)\______/              #
 #                                                                                      #
 ########################################################################################
 #
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.9.2}     ;# @@##@@
+set GMAMapperVersion {4.9.3}     ;# @@##@@
 set GMAMapperFileFormat {20}        ;# @@##@@
 set GMAMapperProtocol {405}         ;# @@##@@
-set CoreVersionNumber {6.2}            ;# @@##@@
+set CoreVersionNumber {6.3-beta}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -5346,7 +5346,7 @@ proc CreatureStatusMarker {w id x y s calc_condition} {
 	}
 }
 
-proc RenderSomeone {w id} {
+proc RenderSomeone {w id {norecurse false}} {
 	DEBUG 3 "RenderSomeone $w $id"
 	global MOBdata ThreatLineWidth iscale SelectLineWidth ThreatLineHatchWidth ReachLineColor
 	global HealthBarWidth HealthBarFrameWidth HealthBarConditionFrameWidth
@@ -5989,9 +5989,9 @@ proc RenderSomeone {w id} {
 			}
 		}
 	}
-	if {[llength $lower_neighbors] > 0} {
+	if {!$norecurse && [llength $lower_neighbors] > 0} {
 		foreach neighbor [lsort -unique $lower_neighbors] {
-			RenderSomeone $w $neighbor
+			RenderSomeone $w $neighbor true
 		}
 	}
 }
@@ -11759,7 +11759,7 @@ proc ConnectToServerByIdx {idx} {
 	refresh_title
 }
 
-# @[00]@| GMA-Mapper 4.9.2
+# @[00]@| GMA-Mapper 4.9.3
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
