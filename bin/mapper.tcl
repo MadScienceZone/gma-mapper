@@ -4575,9 +4575,9 @@ proc creature_display_zoom {size dispsize zoom} {
 }
 
 proc CreatureDisplayedSize {id} {
-	global MOBdata MOB_DISP_SIZE
-	if {[info exists MOB_DISP_SIZE($id)]} {
-		return $MOB_DISP_SIZE($id)
+	global MOBdata
+	if {[dict exists $MOBdata($id) DispSize] && [set dsize [dict get $MOBdata($id) DispSize]] ne {}} {
+		return $dsize
 	}
 	return [dict get $MOBdata($id) Size]
 }
@@ -5096,7 +5096,7 @@ proc CreatureStatusMarker {w id x y s calc_condition} {
 	}
 }
 
-proc RenderSomeone {w id} {
+proc RenderSomeone {w id {norecurse false}} {
 	DEBUG 3 "RenderSomeone $w $id"
 	global MOBdata ThreatLineWidth iscale SelectLineWidth ThreatLineHatchWidth ReachLineColor
 	global HealthBarWidth HealthBarFrameWidth HealthBarConditionFrameWidth
@@ -5313,7 +5313,14 @@ proc RenderSomeone {w id} {
     # cached already, before broadcasting a request for one.
     #
     set found_image false
-    set disp_zoom [creature_display_zoom m m $zoom]
+    if {[dict exists $MOBdata($id) DispSize] \
+     && [set disp_size [dict get $MOBdata($id) DispSize]] ne {} \
+     && [set real_size [dict get $MOBdata($id) Size]] ne $disp_size} {
+	    set disp_zoom [creature_display_zoom $real_size $disp_size $zoom]
+    } else {
+	    set disp_zoom $zoom
+    }
+
     DEBUG 3 "Looking up image at zoom $disp_zoom for each of: $image_candidates"
 	foreach image_pfx $image_candidates {
 		#
@@ -5740,9 +5747,9 @@ proc RenderSomeone {w id} {
 			}
 		}
 	}
-	if {[llength $lower_neighbors] > 0} {
+	if {!$norecurse && [llength $lower_neighbors] > 0} {
 		foreach neighbor [lsort -unique $lower_neighbors] {
-			RenderSomeone $w $neighbor
+			RenderSomeone $w $neighbor true
 		}
 	}
 }
@@ -6795,12 +6802,12 @@ proc CreateSizeSubMenu {args} {
 	if {[lindex $args 0] == {-mass}} {
 		set mob_id __mass__
 		set mob_list [lindex $args 1]
-		set cmd ChangeSizeAll
+		set cmd ChangeDispSizeAll
 		set sub size.m_
 	} else {
 		set sub [expr [string equal [lindex $args 0] {-deep}] ? {{size.m_}} : {{size_m_}}]
 		set mob_list [set mob_id [lindex $args 1]]
-		set cmd ChangeSize
+		set cmd ChangeDispSize
 	}
 	set mid .contextMenu.$sub$mob_id
 	catch {$mid delete 0 end; destroy $mid}
@@ -7262,26 +7269,13 @@ proc AddPlayerMenu {type} {
 }
 
 proc ValidateSizeCode {code} {
-	#
-	# return true if code is valid
-	#
-	if {[string is integer -strict $code]} {return 1}
-	if {$code eq {C80}} {return 1}
-	if {$code eq {m20} || $code eq {M20}} {return 1}
-	if {$code eq {l0} || $code eq {L0}} {return 1}
-	if {[string length $code] != 1} {return 0}
-	if {[string first $code FDTSMLHGCfdtsmlhgc] < 0} {return 0}
-	return 1
+	return [expr [CreatureSizeParams $code] ne {}]
 }
 
 proc AddMobFromMenu {baseX baseY color name _ size type reach} {
 	global canvas
 	global PC_IDs
 
-#	if {![ValidateSizeCode $area]} {
-#		say "Area value $area is not valid.  Specify number of squares or type code (upper-case for tall)."
-#		return
-#	}
 	if {![ValidateSizeCode $size]} {
 		say "Size value $size is not valid.  Specify number of squares or type code (upper-case for tall)."
 		return
@@ -7366,11 +7360,11 @@ proc PolymorphPerson {id skin} {
 	global MOBdata canvas
 	dict set MOBdata($id) Skin $skin
 	if {[llength [dict get $MOBdata($id) SkinSize]] > $skin} {
-		ChangeSize $id [lindex [dict get $MOBdata($id) SkinSize] $skin]
+		ChangeRealSize $id [lindex [dict get $MOBdata($id) SkinSize] $skin]
 	}
 			
 	RenderSomeone $canvas $id
-	SendMobChanges $id Skin
+	SendMobChanges $id {Skin Size DispSize}
 }
 
 proc PolymorphMass {mob_list skin} {
@@ -7379,34 +7373,26 @@ proc PolymorphMass {mob_list skin} {
 	}
 }
 
-proc ChangeDisplayedSize {id code} {
-	global MOB_DISP_SIZE MOBdata canvas
+proc ChangeDispSize {id code} {
+	global MOBdata canvas
 	if {[string length $code] > 1} {
 		dict set MOBdata($id) CustomReach Enabled false
 	}
-	if {$code == [dict get $MOBdata($id) Size]} {
-		array unset MOB_DISP_SIZE($id)
-	} else {
-		set MOB_DISP_SIZE($id) $code
-	}
+	dict set MOBdata($id) DispSize $code
+
 	RenderSomeone $canvas $id
 	SendMobChanges $id {DispSize}
 }
 
-proc ChangeSize {id code} {
-	global MOBdata canvas MOB_DISP_SIZE
+proc ChangeRealSize {id code} {
+	global MOBdata
 	dict set MOBdata($id) Size $code
-	if {[string length $code] > 1} {
-		dict set MOBdata($id) CustomReach Enabled false
-	}
-#	dict set MOBdata($id) Area $code
-	RenderSomeone $canvas $id
-	SendMobChanges $id {Size}
+	ChangeDisplaySize $id $code
 }
 
-proc ChangeSizeAll {mob_list code} {
+proc ChangeDispSizeAll {mob_list code} {
 	foreach mob $mob_list {
-		ChangeSize $mob $code
+		ChangeDispSize $mob $code
 	}
 }
 #

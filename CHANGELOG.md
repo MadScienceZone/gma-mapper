@@ -11,6 +11,11 @@
  * GMA Mapper File Format: 21	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 406        <!-- @@##@@ -->
 
+## DEPRECATION NOTICE
+The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
+If you are still running an ancient version of the server and clients, you need to upgrade to the latest
+versions.
+
 # 4.10-beta
 ## Enhancements
  * Now implements server protocol 406
