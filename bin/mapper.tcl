@@ -7282,7 +7282,10 @@ proc AddPlayerMenu {type} {
 }
 
 proc ValidateSizeCode {code} {
-	return [expr [CreatureSizeParams $code] ne {}]
+	if {[llength [CreatureSizeParams $code]] == 0} {
+		return false
+	}
+	return true
 }
 
 proc AddMobFromMenu {baseX baseY color name _ size type reach} {
