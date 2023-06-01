@@ -48,6 +48,10 @@ This also bled into some places in the code where `Size` and `Area` could be use
 
 Now we have fully customizable creature size and threat zones. To support entry of creatures with arbitrary sizes, the `Monster.size` attribute (and correspondingly the `Size` protocol field) has been expanded to allow specification of all those values in a way that is backward compatible with the bespoke codes like `L0`, `M20`, etc., so they are no longer special cases. At this point, the space and reach of creatures is fully specified in the size field, so there's no justification to keep the `Area` field anymore. In the `Monster` class in GMA Core, it is now deprecated to set `Monster.space` and `Monster.reach`. Just set `Monster.size` and the `space` and `reach` object attributes will be auto-filled accordingly.
 
+# 4.9.3
+## Fixes
+ * Corrected bug that forced `RenderSomeone` function to recurse too deeply, causing a runtime exception.
+
 # 4.9.2
 ## Fixes
  * Corrected a bug in the error message produced when the server tries to set a nonexistent attribute in an object.
