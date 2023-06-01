@@ -1,20 +1,20 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___        __    _______                   #
-# (  ____ \(       )(  ___  ) Game         /   )      /  \  (  __   )                  #
-# | (    \/| () () || (   ) | Master's    / /) |      \/) ) | (  )  |                  #
-# | |      | || || || (___) | Assistant  / (_) (_       | | | | /   |                  #
-# | | ____ | |(_)| ||  ___  |           (____   _)      | | | (/ /) |                  #
-# | | \_  )| |   | || (   ) |                ) (        | | |   / | |                  #
-# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_|  (__) |                  #
-# (_______)|/     \||/     \| Client         (_)  (_) \____/(_______)                  #
+#  _______  _______  _______                ___        __    _______      __           #
+# (  ____ \(       )(  ___  ) Game         /   )      /  \  (  __   )    /  \          #
+# | (    \/| () () || (   ) | Master's    / /) |      \/) ) | (  )  |    \/) )         #
+# | |      | || || || (___) | Assistant  / (_) (_       | | | | /   |      | |         #
+# | | ____ | |(_)| ||  ___  |           (____   _)      | | | (/ /) |      | |         #
+# | | \_  )| |   | || (   ) |                ) (        | | |   / | |      | |         #
+# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_|  (__) | _  __) (_        #
+# (_______)|/     \||/     \| Client         (_)  (_) \____/(_______)(_) \____/        #
 #                                                                                      #
 ########################################################################################
 #
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.10}     ;# @@##@@
+set GMAMapperVersion {4.10.1}     ;# @@##@@
 set GMAMapperFileFormat {21}        ;# @@##@@
 set GMAMapperProtocol {406}         ;# @@##@@
 set CoreVersionNumber {6.3}            ;# @@##@@
@@ -4491,9 +4491,13 @@ proc PlaceSomeone {w d} {
 		set MOBdata($id) [dict merge $MOBdata($id) $d]
 	}
 
-	lassign [FullCreatureAreaInfo $id] mob_size mob_area mob_reach mob_matrix custom_reach
-	if {$custom_reach ne {}} {
-		dict set MOBdata($id) CustomReach $custom_reach
+	if {[set fullinfo [FullCreatureAreaInfo $id]] eq {}} {
+		DEBUG 0 "Can't get area info for creature $id"
+	} else {
+		lassign $fullinfo mob_size mob_area mob_reach mob_matrix custom_reach
+		if {$custom_reach ne {}} {
+			dict set MOBdata($id) CustomReach $custom_reach
+		}
 	}
 
 	MoveSomeone $w $id [dict get $d Gx] [dict get $d Gy]
@@ -4513,7 +4517,12 @@ proc MOBCenterPoint {id} {
 	global MOBdata iscale
 	set x [dict get $MOBdata($id) Gx]
 	set y [dict get $MOBdata($id) Gy]
-	set r [expr [lindex [FullCreatureAreaInfo $id] 0] / 2.0]
+	if {[set fullinfo [FullCreatureAreaInfo $id]] eq {}} {
+		DEBUG 0 "Can't get area info on $id to figure out the center point"
+		set r 1
+	} else {
+		set r [expr [lindex $fullinfo 0] / 2.0]
+	}
 	return [list [expr ($x+$r)*$iscale] [expr ($y+$r)*$iscale] [expr $r*$iscale]]
 }
 
@@ -5132,7 +5141,12 @@ proc RenderSomeone {w id {norecurse false}} {
 
 	set x [dict get $MOBdata($id) Gx]
 	set y [dict get $MOBdata($id) Gy]
-	lassign [FullCreatureAreaInfo $id] mob_size mob_area mob_reach mob_matrix custom_reach
+	if {[set fullinfo [FullCreatureAreaInfo $id]] eq {}} {
+		DEBUG 0 "can't get full area info on $id to render them on the map!"
+		lassign {1 1 2 {} {}} mob_size mob_area mob_reach mob_matrix custom_reach
+	} else {
+		lassign $fullinfo mob_size mob_area mob_reach mob_matrix custom_reach
+	}
 
 	# If somehow we have a misaligned creature that's at least "small",
 	# snap to even grid boundary
@@ -5676,7 +5690,11 @@ proc RenderSomeone {w id {norecurse false}} {
 		foreach threatening_mob_id [array names MOBdata] {
 			DEBUG 1 "Checking who $threatening_mob_id is threatening"
 			if {[dict get $MOBdata($threatening_mob_id) Killed]} continue
-			lassign [FullCreatureAreaInfo $threatening_mob_id] sz ar re mat _
+			if {[set fullinfo [FullCreatureAreaInfo $threatening_mob_id]] eq {}} {
+				DEBUG 0 "can't get full area info for threatening creature $threatening_mob_id"
+				continue
+			}
+			lassign $fullinfo sz ar re mat _
 #			lassign [ReachMatrix [CreatureDisplayedSize $threatening_mob_id]] ar re mat
 			lassign [MOBCenterPoint $threatening_mob_id] xc yc rc
 #			set sz [MonsterSizeValue [CreatureDisplayedSize $threatening_mob_id]]
@@ -6877,13 +6895,30 @@ proc SetCustomReach {mob_id mode value} {
 	if {$custom eq {}} {
 		set custom [DefaultCustomReach $size]
 	}
+	set whatchanged {}
 
 	# Apply requested changes
 	switch -exact -- $mode {
-		-setnat { dict set custom Natural $value }
-		-setext { dict set custom Extended $value }
-		-incrnat { dict set custom Natural [expr [dict get $custom Natural] + $value] }
-		-incrext { dict set custom Extended [expr [dict get $custom Extended] + $value] }
+		-setnat { 
+			dict set custom Natural $value 
+			dict set custom Enabled true
+			set whatchanged CustomReach
+		}
+		-setext { 
+			dict set custom Extended $value 
+			dict set custom Enabled true
+			set whatchanged CustomReach
+		}
+		-incrnat { 
+			dict set custom Natural [expr [dict get $custom Natural] + $value] 
+			dict set custom Enabled true
+			set whatchanged CustomReach
+		}
+		-incrext { 
+			dict set custom Extended [expr [dict get $custom Extended] + $value] 
+			dict set custom Enabled true
+			set whatchanged CustomReach
+		}
 		-toggle {
 			global SCRR SCRN
 			if {$SCRR($mob_id)} {
@@ -6895,19 +6930,25 @@ proc SetCustomReach {mob_id mode value} {
 			} else {
 				set reach 0
 			}
+			set whatchanged Reach
 		}
 	}
 
-	if {[MatchesStandardTemplate $size [dict get $custom Natural] [dict get $custom Extended]] ne {}} {
-		dict set custom Enabled false
-	} else {
-		dict set custom Enabled true
+	switch $whatchanged {
+		Reach {
+			dict set MOBdata($mob_id) Reach $reach
+			SendMobChanges $mob_id {Reach}
+		}
+		CustomReach {
+			if {[dict get $custom Natural] > [dict get $custom Extended]} {
+				dict set custom Extended [dict get $custom Natural]
+			}
+			dict set MOBdata($mob_id) CustomReach $custom
+			SendMobChanges $mob_id {CustomReach}
+		}
 	}
-	dict set MOBdata($mob_id) CustomReach $custom
-	dict set MOBdata($mob_id) Reach $reach
 
 	RenderSomeone $canvas $mob_id
-	SendMobChanges $mob_id {CustomReach Reach}
 }
 
 proc SetCustomReachAll {mob_list mode value} {
@@ -6962,9 +7003,9 @@ proc CreateReachSubMenu {args} {
 
 		foreach menutype {nat ext} {
 			if {[set this_$menutype]} {
-				$mid.$menutype add command -command [list $cmd $mob_list -set$menutype $code] -label "$feet ft" -foreground #ff0000
+				$mid.$menutype add command -command [list $cmd $mob_list -set$menutype $feet] -label "$feet ft" -foreground #ff0000
 			} else {
-				$mid.$menutype add command -command [list $cmd $mob_list -set$menutype $code] -label "$feet ft"
+				$mid.$menutype add command -command [list $cmd $mob_list -set$menutype $feet] -label "$feet ft"
 			}
 		}
 	}
@@ -7282,7 +7323,10 @@ proc AddPlayerMenu {type} {
 }
 
 proc ValidateSizeCode {code} {
-	return [expr [CreatureSizeParams $code] ne {}]
+	if {[llength [CreatureSizeParams $code]] == 0} {
+		return false
+	}
+	return true
 }
 
 proc AddMobFromMenu {baseX baseY color name _ size type reach} {
@@ -11677,7 +11721,7 @@ proc ConnectToServerByIdx {idx} {
 	refresh_title
 }
 
-# @[00]@| GMA-Mapper 4.10
+# @[00]@| GMA-Mapper 4.10.1
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

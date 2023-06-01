@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___        __    _______                   #
-# (  ____ \(       )(  ___  ) Game         /   )      /  \  (  __   )                  #
-# | (    \/| () () || (   ) | Master's    / /) |      \/) ) | (  )  |                  #
-# | |      | || || || (___) | Assistant  / (_) (_       | | | | /   |                  #
-# | | ____ | |(_)| ||  ___  |           (____   _)      | | | (/ /) |                  #
-# | | \_  )| |   | || (   ) |                ) (        | | |   / | |                  #
-# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_|  (__) |                  #
-# (_______)|/     \||/     \| Client         (_)  (_) \____/(_______)                  #
+#  _______  _______  _______                ___        __    _______      __           #
+# (  ____ \(       )(  ___  ) Game         /   )      /  \  (  __   )    /  \          #
+# | (    \/| () () || (   ) | Master's    / /) |      \/) ) | (  )  |    \/) )         #
+# | |      | || || || (___) | Assistant  / (_) (_       | | | | /   |      | |         #
+# | | ____ | |(_)| ||  ___  |           (____   _)      | | | (/ /) |      | |         #
+# | | \_  )| |   | || (   ) |                ) (        | | |   / | |      | |         #
+# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_|  (__) | _  __) (_        #
+# (_______)|/     \||/     \| Client         (_)  (_) \____/(_______)(_) \____/        #
 #                                                                                      #
 ########################################################################################
 
@@ -27,20 +27,17 @@ proc CreatureSizeParams {size_code} {
 #   natural - size category or number of squares of natural reach from creature perimeter
 #   reach - size category or number of squares of extended reach from creature perimeter
 #
-proc MatchesStandardTemplate {size natural reach} {
+proc MatchesStandardTemplate {size natural extended} {
 	set params [CreatureSizeParams $size]
+	if {$params eq {}} {
+		# the size is completely invald
+		return {}
+	}
+	lassign $params category nat ext space
 	set template [ReachMatrix $size]
-	if {$params eq {} || [lindex $params 3] eq {}} {
-		if {$size eq $natural && $size eq $reach && $sz eq {}} {
-			# effectively reduces to the standard template for the given size
-			return $template
-		}
-		if {[llength $template] == 3} {
-			if {[string trim [lindex $template 0]] == $natural && [string trim [lindex $template 1]] == $reach} {
-				# the template happens to match what we asked for anyway
-				return $template
-			}
-		}
+	if {$template ne {} && $space eq {} && [lindex $template 0] == $natural && [lindex $template 1] == $extended} {
+		# effectively reduces to the standard template for the given size
+		return $template
 	}
 	return {}
 }
@@ -111,7 +108,7 @@ proc MonsterSizeValue {size} {
 	set sz [CreatureSizeParams $size]
 	if {$sz ne {}} {
 		if {[lindex $sz 3] ne {}} {
-			return [expr [lindex $sz 3] / 5]
+			return [lindex $sz 3]
 		}
 	
 		set size [lindex $sz 0]
@@ -314,43 +311,44 @@ proc FullCreatureAreaInfo {id} {
 	# if we have an explicit size override, take that first
 	set szparams [CreatureSizeParams [set disp_size [CreatureDisplayedSize $id]]]
 	set custom_reach [dict get $MOBdata($id) CustomReach]
-	if {$szparams ne {} && ($custom_reach eq {} || ![dict get $custom_reach Enabled])} {
-		lassign $szparams szcode sznat szext szsz
-		if {$sznat ne {} || $szext ne {}} {
-			if {$szext eq {}} {
-				if {$sznat eq {}} {
-					set szext [lindex [ReachMatrix $szcode] 1]
-				} else {
-					set szext [expr $sznat * 2]
-				}
-			}
+	if {$szparams eq {}} {
+		# not a valid size code!
+		return {}
+	}
+	lassign $szparams szcode sznat szext szsz
+	lassign [ReachMatrix $szcode] std_nat std_ext std_matrix
+	if {$szsz eq {}} {
+		set szsz [MonsterSizeValue $szcode]
+	}
+
+	# No active customization: use standard values or those encoded in size
+	if {$custom_reach eq {} || ([dict exists $custom_reach Enabled] && ![dict get $custom_reach Enabled])} {
+		if {$szext eq {}} {
+			# no encoded ext
 			if {$sznat eq {}} {
-				set sznat [lindex [ReachMatrix $szcode] 0]
+				# no encoded ext or nat
+				set szext $std_ext
+				set sznat $std_nat
+			} else {
+				# encoded nat but not ext
+				set szext [expr $sznat * 2]
 			}
-			set custom_reach [dict create \
-				Enabled true \
-				Natural $sznat \
-				Extended $szext \
-			]
+		} elseif {$sznat eq {}} {
+			# encoded ext but not nat
+			set sznat $std_nat
 		}
-	}
-
-	if {$custom_reach ne {} && [dict get $custom_reach Enabled]} {
-		lassign [ComputedReachMatrix \
-			$disp_size \
-			[dict get $custom_reach Natural] \
-			[dict get $custom_reach Extended] \
-		] mob_area mob_reach mob_matrix
 	} else {
-		lassign [ReachMatrix $disp_size] mob_area mob_reach mob_matrix
+		# we do have an active custom set of numbers, so use those
+		# to set szext, sznat
+		set sznat [expr [dict get $custom_reach Natural] / 5]
+		set szext [expr [dict get $custom_reach Extended] / 5]
 	}
-	set mob_size [MonsterSizeValue $disp_size]
-
-	return [list $mob_size $mob_area $mob_reach $mob_matrix $custom_reach]
+	
+	return [list $szsz $sznat $szext [lindex [ComputedReachMatrix $szcode $sznat $szext] 2] $custom_reach]
 }
 
 #
-# @[00]@| GMA-Mapper 4.10
+# @[00]@| GMA-Mapper 4.10.1
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
