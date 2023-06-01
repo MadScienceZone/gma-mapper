@@ -2164,6 +2164,7 @@ proc ::gmaproto::GMATypeToProtocolCommand {gt} {
 	}
 	return $gt
 }
+
 # @[00]@| GMA-Mapper 4.10-beta.4
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
