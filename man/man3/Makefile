@@ -1,4 +1,7 @@
-all: gmafile.3.pdf gmaproto.3.pdf gmautil.3.pdf ustar.3.pdf gmacolors.3.pdf
+all: gmafile.3.pdf gmaproto.3.pdf gmautil.3.pdf ustar.3.pdf gmacolors.3.pdf mapper.3.pdf
+
+mapper.3.pdf: mapper.3
+	groff -man $< | ps2pdf - $@
 
 gmacolors.3.pdf: gmacolors.3
 	groff -man $< | ps2pdf - $@
