@@ -14,7 +14,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.10.1}     ;# @@##@@
+set GMAMapperVersion {4.10.2-alpha}     ;# @@##@@
 set GMAMapperFileFormat {21}        ;# @@##@@
 set GMAMapperProtocol {406}         ;# @@##@@
 set CoreVersionNumber {6.3}            ;# @@##@@
@@ -1128,6 +1128,7 @@ proc usage {} {
 	puts $stderr {        [--mkdir-path path] [--nc-path path] [--no-animate] [--no-blur-all]}
 	puts $stderr {        [--preferences path] [--scp-dest dir]}
 	puts $stderr {        [--scp-path path] [--scp-server hostname] [--ssh-path path] [--update-url url]}
+	puts $stderr {        [--recursionlimit n]}
 	puts $stderr {Each option and its argument must appear in separate CLI parameters (words).}
 	puts $stderr {   -A, --animate:     Enable animation of drawing onto the map}
 	puts $stderr {   -a, --no-animate:  Suppress animation of drawing onto the map}
@@ -1151,6 +1152,7 @@ proc usage {} {
 	puts $stderr {   -n, --no-chat:		Do not display incoming chat messages}
 	puts $stderr {   -P, --password:    Password to log in to the map service}
 	puts $stderr {   -p, --port:        Port for initiative tracker [2323]}
+	puts $stderr {       --recursionlimit: set runtime recursion limit}
 	puts $stderr {   -S, --select:      Select server profile (but don't make it the default)}
 	puts $stderr {   -t, --transcript:  Specify file to record a transcript of chat messages and die rolls.}
 	puts $stderr {   -u, --username:    Set the name you go by on your game server}
@@ -1301,6 +1303,11 @@ for {set argi 0} {$argi < $optc} {incr argi} {
 		--update-url      { set UpdateURL [getarg --update-url] }
 		--upgrade-notice  { set UpgradeNotice true }
 		--preferences     { getarg --preferences }
+		--recursionlimit  { 
+			set oldlimit [interp recursionlimit {}]
+			set newlimit [interp recursionlimit {} [getarg --recursionlimit]]
+			INFO "recurion limit changed from $oldlimit to $newlimit"
+		}
 		default {
 			if {[string range $option 0 0] eq "-"} {
 				usage
