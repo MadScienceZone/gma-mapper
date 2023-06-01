@@ -2250,11 +2250,18 @@ and
 .I space
 is a custom creature space diameter in feet (if different than the standard for that size category).
 (Changed in protocol 406.)
-'\" <</New>>
 .RE
 '\".TP
 '\".BI Area
 '\"The tactical size category for the creature's threat zone.
+.TP
+.B DispSize
+If non-empty, this indicates that the creature is temporarily resized
+to the given size category and should be displayed as such.
+The value is otherwise identical to
+.BR Size .
+(Added in 406.)
+'\" <</New>>
 .TP
 '\" <</ital-is-var>>
 .BI StatusList " (list of strings)"
@@ -2659,6 +2666,8 @@ attribute from creatures and added the
 .B CustomReach
 attribute and the expanded syntax for the
 .B Size
+attribute, as well as the new
+.B DispSize
 attribute.
 '\" <</New>>
 .LP
