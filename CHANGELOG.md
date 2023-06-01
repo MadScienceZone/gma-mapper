@@ -3,18 +3,57 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.9.3          <!-- @@##@@ -->
+ * This Package Version: 4.10          <!-- @@##@@ -->
  * Effective Date: 31-May-2023               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.3-beta.1 <!-- @@##@@ -->
- * GMA Mapper File Format: 20	     <!-- @@##@@ -->
- * GMA Mapper Protocol: 405        <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.3 <!-- @@##@@ -->
+ * GMA Mapper File Format: 21	     <!-- @@##@@ -->
+ * GMA Mapper Protocol: 406        <!-- @@##@@ -->
 
 ## DEPRECATION NOTICE
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.10-beta
+## Enhancements
+* Now implements server protocol 406
+* Removes `Area` attribute from creatures (affects AC and PS commands and saved files).
+* Adds `CustomReach` attribute to creatures (affects AC and PS commands and saved files).
+* Adds `DispSize` attribute to creatures (affects AC and PS commands and saved files).
+* File format updated to 21 to reflect the new attributes.
+* Creature `Size` attribute syntax expanded to generalize specifying creature size, space, and reach in a single attribute.
+* Changed context menu from "cycle reach" to an expanded submenu allowing full customization of reach zones.
+* Added highlighting to reach menu to show the creature's current reach zones.
+* Removed redundant items from the context menu, that weren't related to the context of operations involving a particular square of the map, to keep the menu as short as possible
+.
+* `Scroll to Visible Objects` already exists in the View menu.
+* `Scroll Others' Views to Match Mine` also already exists in the View menu.
+* `Refresh Display` already exists in the View menu too.
+* `About Mapper...` already exists in the Help menu.
+* Scales creature token image when changing size on the map. Works better if `rendersizes` makes additional sizes for the token.
+## Fixes
+* Corrected internal encoding of complex attribute types.
+* Corrected a bug where, after removing creatures which were in the selection list, the selection list continued to point to the now-nonexistent creature.
+* Fixed layout of the dialog to add creatures to the map.
+## Comments
+The move (across the board with GMA components) to deprecate the `Area` attribute from creatures has been a long time coming, but with the addition of fully customizable reach zones, it's no
+w fully redundant and needs to be removed now.
+Originally, creatures (the `Monster` object class in the GMA Core code) have a `size`, `space`, and `reach` attribute corresponding to the monster stats as published in the various bestiary
+volumes (d20, Pathfinder, etc.). The mapper (and client/server protocol) had corresponding `Size` and `Area` attributes with `Size` indicating creature size (aka `space`) and threat zone (ak
+a `reach`), which is normally doubled for extended reach when using a reach weapon.
+
+The `Size` and `Area` fields were integers indicating distances in 5' grid-square units but this was later expanded to allow standard size categories such as `M` and `L` to make adding creat
+ures manually on the map easier. However, since that single code indicates both space and reach for standard creatures, even the dialog box to add creatures to the map was wired to automatic
+ally populate `Area` with the value you typed for `Size`, exposing the essential redundancy of having both fields, other than the occasional special case.
+
+As time went on we added some bespoke size categories for those special cases, like `L0` for swarms (large creature with 10' space but 0' reach), which meant more and more the `Monster.size`
+field and `Size` protocol field could drive the other stats but at the expense of adding a bunch of special cases to the size list.
+
+This also bled into some places in the code where `Size` and `Area` could be used interchangeably when they shouldn't be.
+
+Now we have fully customizable creature size and threat zones. To support entry of creatures with arbitrary sizes, the `Monster.size` attribute (and correspondingly the `Size` protocol field) has been expanded to allow specification of all those values in a way that is backward compatible with the bespoke codes like `L0`, `M20`, etc., so they are no longer special cases. At this point, the space and reach of creatures is fully specified in the size field, so there's no justification to keep the `Area` field anymore. In the `Monster` class in GMA Core, it is now deprecated to set `Monster.space` and `Monster.reach`. Just set `Monster.size` and the `space` and `reach` object attributes will be auto-filled accordingly.
 
 # 4.9.3
 ## Fixes
