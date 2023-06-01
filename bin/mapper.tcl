@@ -1,22 +1,22 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___        _____      ______               #
-# (  ____ \(       )(  ___  ) Game         /   )      / ___ \    / ___  \              #
-# | (    \/| () () || (   ) | Master's    / /) |     ( (   ) )   \/   \  \             #
-# | |      | || || || (___) | Assistant  / (_) (_    ( (___) |      ___) /             #
-# | | ____ | |(_)| ||  ___  |           (____   _)    \____  |     (___ (              #
-# | | \_  )| |   | || (   ) |                ) (           ) |         ) \             #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\____) ) _ /\___/  /             #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/ (_)\______/              #
+#  _______  _______  _______                ___        __    _______         ______    #
+# (  ____ \(       )(  ___  ) Game         /   )      /  \  (  __   )       (  ___ \ ( #
+# | (    \/| () () || (   ) | Master's    / /) |      \/) ) | (  )  |       | (   ) )| #
+# | |      | || || || (___) | Assistant  / (_) (_       | | | | /   | _____ | (__/ / | #
+# | | ____ | |(_)| ||  ___  |           (____   _)      | | | (/ /) |(_____)|  __ (  | #
+# | | \_  )| |   | || (   ) |                ) (        | | |   / | |       | (  \ \ | #
+# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_|  (__) |       | )___) )| #
+# (_______)|/     \||/     \| Client         (_)  (_) \____/(_______)       |/ \___/ ( #
 #                                                                                      #
 ########################################################################################
 #
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.9.3}     ;# @@##@@
-set GMAMapperFileFormat {20}        ;# @@##@@
-set GMAMapperProtocol {405}         ;# @@##@@
+set GMAMapperVersion {4.10-beta.4}     ;# @@##@@
+set GMAMapperFileFormat {21}        ;# @@##@@
+set GMAMapperProtocol {406}         ;# @@##@@
 set CoreVersionNumber {6.3-beta}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
@@ -812,7 +812,7 @@ if {$tcl_platform(os) eq "Darwin"} {
 
 set ICON_DIR [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end-1 end lib MadScienceZone GMA Mapper icons]]]
 set BIN_DIR [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end end]]]
-foreach module {scrolledframe ustar gmaclock gmacolors gmautil gmaprofile gmaproto gmafile} {
+foreach module {scrolledframe ustar gmaclock gmacolors gmautil gmaprofile gmaproto gmafile gmazones} {
 	source [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end end $module.tcl]]]
 }
 
@@ -4449,7 +4449,7 @@ proc SquareGrid {w xx yy show} {
 #   MOB(GX:<id>)    <grid-x>
 #   MOB(GY:<id>)    <grid-y>
 #   MOB(COLOR:<id>) <color>
-#   MOB(AREA:<id>)  <grids surrounding object for threat area> or size code
+# DEPRECATED  MOB(AREA:<id>)  <grids surrounding object for threat area> or size code
 #		FDTSMLHGC  lower-case is long, upper-case is tall
 #   MOB(SIZE:<id>)  <grid diameter> or size code
 #   MOB(TYPE:<id>)  {player|monster}
@@ -4490,6 +4490,12 @@ proc PlaceSomeone {w d} {
 		DEBUG 1 "--PlaceSomeone $n using existing id $id (updating in-place)"
 		set MOBdata($id) [dict merge $MOBdata($id) $d]
 	}
+
+	lassign [FullCreatureAreaInfo $id] mob_size mob_area mob_reach mob_matrix custom_reach
+	if {$custom_reach ne {}} {
+		dict set MOBdata($id) CustomReach $custom_reach
+	}
+
 	MoveSomeone $w $id [dict get $d Gx] [dict get $d Gy]
 }
 
@@ -4503,303 +4509,11 @@ proc MoveSomeone {w id x y} {
 	}
 }
 
-#
-# convert size code to:  reach-dia weapon-dia matrix
-#
-proc MonsterSizeValue {size} {
-	switch $size {
-		F - f { return 0.1 }
-		D - d { return 0.2 }
-		T - t { return 0.5 }
-		S - s - 
-		M - m - m20 - M20 - 1 { return 1 }
-		L - l - l0 - L0 - 2 { return 2 }
-		H - h - 3 { return 3 }
-		G - g - 4 { return 4 }
-		C - c - 6 { return 6 }
-		C80 { return 16 }
-		default { return 0 }
-	}
-}
-
-# -> {area reach matrix}
-#
-# Spaces with 0 will not be drawn as threatened squares
-# with 1 or 3 will be in the reach threat zone.
-# with 2 or 3 will be in the normal threat zone
-#
-proc ReachMatrix {size} {
-	switch $size {
-		F - f -
-		D - d -
-		T - t { return { 0 0 {
-		}}}
-		1 -
-		S - s -
-		M - m { return { 1 2 {
-			{ 1 1 1 1 1 }
-			{ 1 2 2 2 1 }	
-			{ 1 2 2 2 1 }	
-			{ 1 2 2 2 1 }	
-			{ 1 1 1 1 1 }
-		}}}
-		l { return { 1 2 {
-			{ 1 1 1 1 1 1 }
-			{ 1 2 2 2 2 1 }
-			{ 1 2 2 2 2 1 }
-			{ 1 2 2 2 2 1 }
-			{ 1 2 2 2 2 1 }
-			{ 1 1 1 1 1 1 }
-		}}}
-		2 -
-		L { return { 2 4 {
-			{ 0 0 0 1 1 1 1 0 0 0 }
-			{ 0 1 1 1 1 1 1 1 1 0 }
-			{ 0 1 3 2 2 2 2 3 1 0 }
-			{ 1 1 2 2 2 2 2 2 1 1 }
-			{ 1 1 2 2 2 2 2 2 1 1 }
-			{ 1 1 2 2 2 2 2 2 1 1 }
-			{ 1 1 2 2 2 2 2 2 1 1 }
-			{ 0 1 3 2 2 2 2 3 1 0 }
-			{ 0 1 1 1 1 1 1 1 1 0 }
-			{ 0 0 0 1 1 1 1 0 0 0 }
-		}}}
-		M20 -
-		m20 {
-			return { 1 4 {
-			{ 0 0 0 1 1 1 0 0 0 }
-			{ 0 1 1 1 1 1 1 1 0 }
-			{ 0 1 1 1 1 1 1 1 0 }
-			{ 1 1 1 2 2 2 1 1 1 }
-			{ 1 1 1 2 2 2 1 1 1 }
-			{ 1 1 1 2 2 2 1 1 1 }
-			{ 0 1 1 1 1 1 1 1 0 }
-			{ 0 1 1 1 1 1 1 1 0 }
-			{ 0 0 0 1 1 1 0 0 0 }
-		}}}
-		L0 -
-		l0 {
-			return { 0 0 {
-			{ 0 0 }
-			{ 0 0 }
-		}}}
-		h { return { 2 4 {
-			{ 0 0 0 1 1 1 1 1 0 0 0 }
-			{ 0 1 1 1 1 1 1 1 1 1 0 }
-			{ 0 1 3 2 2 2 2 2 3 1 0 }
-			{ 1 1 2 2 2 2 2 2 2 1 1 }
-			{ 1 1 2 2 2 2 2 2 2 1 1 }
-			{ 1 1 2 2 2 2 2 2 2 1 1 }
-			{ 1 1 2 2 2 2 2 2 2 1 1 }
-			{ 1 1 2 2 2 2 2 2 2 1 1 }
-			{ 0 1 3 2 2 2 2 2 3 1 0 }
-			{ 0 1 1 1 1 1 1 1 1 1 0 }
-			{ 0 0 0 1 1 1 1 1 0 0 0 }
-		}}}
-		3 -
-		H { return { 3 6 {
-			{ 0 0 0 0 0 1 1 1 1 1 0 0 0 0 0 }
-			{ 0 0 0 1 1 1 1 1 1 1 1 1 0 0 0 }
-			{ 0 0 1 1 1 1 1 1 1 1 1 1 1 0 0 }
-			{ 0 1 1 1 1 2 2 2 2 2 1 1 1 1 0 }
-			{ 0 1 1 1 2 2 2 2 2 2 2 1 1 1 0 }
-			{ 1 1 1 2 2 2 2 2 2 2 2 2 1 1 1 }
-			{ 1 1 1 2 2 2 2 2 2 2 2 2 1 1 1 }
-			{ 1 1 1 2 2 2 2 2 2 2 2 2 1 1 1 }
-			{ 1 1 1 2 2 2 2 2 2 2 2 2 1 1 1 }
-			{ 1 1 1 2 2 2 2 2 2 2 2 2 1 1 1 }
-			{ 0 1 1 1 2 2 2 2 2 2 2 1 1 1 0 }
-			{ 0 1 1 1 1 2 2 2 2 2 1 1 1 1 0 }
-			{ 0 0 1 1 1 1 1 1 1 1 1 1 1 0 0 }
-			{ 0 0 0 1 1 1 1 1 1 1 1 1 0 0 0 }
-			{ 0 0 0 0 0 1 1 1 1 1 0 0 0 0 0 }
-		}}}
-		G { return { 4 8 {
-			{ 0 0 0 0 0 0 0 1 1 1 1 1 1 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 }
-			{ 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 }
-			{ 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 }
-			{ 0 0 1 1 1 1 1 1 2 2 2 2 1 1 1 1 1 1 0 0 }
-			{ 0 1 1 1 1 1 2 2 2 2 2 2 2 2 1 1 1 1 1 0 }
-			{ 0 1 1 1 1 2 2 2 2 2 2 2 2 2 2 1 1 1 1 0 }
-			{ 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 }
-			{ 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 }
-			{ 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 }
-			{ 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 }
-			{ 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 }
-			{ 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 }
-			{ 0 1 1 1 1 2 2 2 2 2 2 2 2 2 2 1 1 1 1 0 }
-			{ 0 1 1 1 1 1 2 2 2 2 2 2 2 2 1 1 1 1 1 0 }
-			{ 0 0 1 1 1 1 1 1 2 2 2 2 1 1 1 1 1 1 0 0 }
-			{ 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 }
-			{ 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 }
-			{ 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 1 1 1 1 1 1 0 0 0 0 0 0 0 }
-		}}}
-		g { return { 3 6 {
-			{ 0 0 0 0 0 1 1 1 1 1 1 0 0 0 0 0 }
-			{ 0 0 0 1 1 1 1 1 1 1 1 1 1 0 0 0 }
-			{ 0 0 1 1 1 1 1 1 1 1 1 1 1 1 0 0 }
-			{ 0 1 1 1 1 1 2 2 2 2 1 1 1 1 1 0 }
-			{ 0 1 1 1 2 2 2 2 2 2 2 2 1 1 1 0 }
-			{ 1 1 1 1 2 2 2 2 2 2 2 2 1 1 1 1 }
-			{ 1 1 1 2 2 2 2 2 2 2 2 2 2 1 1 1 }
-			{ 1 1 1 2 2 2 2 2 2 2 2 2 2 1 1 1 }
-			{ 1 1 1 2 2 2 2 2 2 2 2 2 2 1 1 1 }
-			{ 1 1 1 2 2 2 2 2 2 2 2 2 2 1 1 1 }
-			{ 1 1 1 1 2 2 2 2 2 2 2 2 1 1 1 1 }
-			{ 0 1 1 1 2 2 2 2 2 2 2 2 1 1 1 0 }
-			{ 0 1 1 1 1 1 2 2 2 2 1 1 1 1 1 0 }
-			{ 0 0 1 1 1 1 1 1 1 1 1 1 1 1 0 0 }
-			{ 0 0 0 1 1 1 1 1 1 1 1 1 1 0 0 0 }
-			{ 0 0 0 0 0 1 1 1 1 1 1 0 0 0 0 0 }
-		}}}
-		C { return { 6 12 {
-			{ 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 }
-			{ 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 }
-			{ 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 }
-			{ 0 0 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 }
-			{ 0 0 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 0 0 }
-			{ 0 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 0 }
-			{ 0 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 0 }
-			{ 0 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 0 }
-			{ 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 }
-			{ 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 }
-			{ 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 }
-			{ 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 }
-			{ 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 }
-			{ 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 }
-			{ 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 }
-			{ 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 }
-			{ 0 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 0 }
-			{ 0 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 0 }
-			{ 0 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 0 }
-			{ 0 0 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 0 0 }
-			{ 0 0 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 }
-			{ 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 }
-			{ 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 }
-			{ 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 }
-		}}}
-		C80 { return { 16 32 {
-			{ 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 }
-			{ 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 }
-			{ 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 }
-			{ 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 }
-			{ 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 }
-			{ 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 }
-			{ 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 }
-			{ 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 }
-			{ 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 }
-			{ 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 }
-			{ 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 }
-			{ 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 }
-			{ 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 }
-			{ 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 }
-			{ 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 }
-			{ 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 }
-			{ 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 }
-			{ 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 }
-			{ 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 }
-			{ 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 }
-			{ 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 }
-			{ 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 }
-			{ 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 }
-			{ 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 }
-			{ 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 }
-			{ 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 }
-			{ 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 }
-			{ 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 }
-			{ 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 }
-			{ 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 }
-			{ 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 }
-			{ 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 }
-			{ 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 }
-			{ 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 }
-			{ 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 }
-			{ 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 }
-			{ 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 }
-			{ 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 }
-			{ 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 }
-			{ 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 }
-		}}}
-		c { return { 4 8 {
-			{ 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 }
-			{ 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 }
-			{ 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 }
-			{ 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 }
-			{ 0 0 1 1 1 1 1 1 2 2 2 2 2 2 1 1 1 1 1 1 0 0 }
-			{ 0 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 0 }
-			{ 0 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 0 }
-			{ 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 }
-			{ 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 }
-			{ 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 }
-			{ 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 }
-			{ 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 }
-			{ 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 }
-			{ 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 }
-			{ 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 }
-			{ 0 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 0 }
-			{ 0 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 0 }
-			{ 0 0 1 1 1 1 1 1 2 2 2 2 2 2 1 1 1 1 1 1 0 0 }
-			{ 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 }
-			{ 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 }
-			{ 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 }
-			{ 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 }
-		}}}
-	}
-}
-
 proc MOBCenterPoint {id} {
 	global MOBdata iscale
 	set x [dict get $MOBdata($id) Gx]
 	set y [dict get $MOBdata($id) Gy]
-	set r [expr [MonsterSizeValue [dict get $MOBdata($id) Size]] / 2.0]
+	set r [expr [lindex [FullCreatureAreaInfo $id] 0] / 2.0]
 	return [list [expr ($x+$r)*$iscale] [expr ($y+$r)*$iscale] [expr $r*$iscale]]
 }
 
@@ -4830,6 +4544,47 @@ proc FindImage {image_pfx zoom} {
 	}
 
 	return $tile_id
+}
+
+# Resizing creature tokens locally can be done with an expanded usage of the
+# mechanism used to zoom in/out on the map.
+# Assuming we could have tokens at zoom levels 0.25, 0.50, 1, 2, 4, 8, 16, and 32,
+# compute the actual zoom level based on the map zoom level, creature original size
+# (used for creating their token originally) and the displayed size.
+proc _creature_zoom_relative_to_medium size {
+	if {[set p [CreatureSizeParams $size]] ne {}} {
+		if {[lindex $p 3] ne {}} {
+			return [lindex $p 3]
+		}
+		switch -exact -- [lindex $p 0] {
+			f - F { return 0.1 }
+			d - D { return 0.2 }
+			t - T { return 0.5 }
+			s - S - m - M { return 1.0 }
+			l - L { return 2.0 }
+			h - H { return 3.0 }
+			g - G { return 4.0 }
+			c - C { return 6.0 }
+		}
+	}
+	return 0
+}
+proc creature_display_zoom {size dispsize zoom} {
+	set newzoom [expr ($zoom / [_creature_zoom_relative_to_medium $size]) * [_creature_zoom_relative_to_medium $dispsize]]
+	foreach defined {32.00 16.00 12.00 8.00 6.00 4.00 3.00 2.00 1.00 0.50 0.25} {
+		if {$newzoom >= $defined} {
+			return $defined
+		}
+	}
+	return 0
+}
+
+proc CreatureDisplayedSize {id} {
+	global MOBdata
+	if {[dict exists $MOBdata($id) DispSize] && [set dsize [dict get $MOBdata($id) DispSize]] ne {}} {
+		return $dsize
+	}
+	return [dict get $MOBdata($id) Size]
 }
 
 #
@@ -5364,7 +5119,7 @@ proc RenderSomeone {w id {norecurse false}} {
 		if {![dict get $MOBdata($mob_id) Killed] && ![dict get $MOBdata($mob_id) Hidden]} {
 			set xx [dict get $MOBdata($mob_id) Gx]
 			set yy [dict get $MOBdata($mob_id) Gy]
-			set sz [MonsterSizeValue [dict get $MOBdata($mob_id) Size]]
+			set sz [MonsterSizeValue [CreatureDisplayedSize $mob_id]]
 			DEBUG 1 "- Found at ($xx,$yy), size=$sz:"
 			for {set xi 0} {$xi < $sz} {incr xi} {
 				for {set yi 0} {$yi < $sz} {incr yi} {
@@ -5377,8 +5132,7 @@ proc RenderSomeone {w id {norecurse false}} {
 
 	set x [dict get $MOBdata($id) Gx]
 	set y [dict get $MOBdata($id) Gy]
-	lassign [ReachMatrix [dict get $MOBdata($id) Area]] mob_area mob_reach mob_matrix
-	set mob_size [MonsterSizeValue [dict get $MOBdata($id) Size]]
+	lassign [FullCreatureAreaInfo $id] mob_size mob_area mob_reach mob_matrix custom_reach
 
 	# If somehow we have a misaligned creature that's at least "small",
 	# snap to even grid boundary
@@ -5414,7 +5168,7 @@ proc RenderSomeone {w id {norecurse false}} {
 				# this makes some overlapping draw calls, but gets the job done.
 				#
 				# Our (GX,GY) reference point is already at the upper left of the occupied space.
-				set sz [MonsterSizeValue [dict get $MOBdata($id) Size]]
+				set sz [MonsterSizeValue [CreatureDisplayeSize $id]]
 				for {set AoEx 0} {$AoEx <= $sz} {incr AoEx} {
 					_DrawAoeZone $w $id [expr $GX0+$AoEx] $GY0 [expr $GXX+$AoEx] $GYY $aoe_radius $aoe_color radius [list M#$id MA#$id allMOB MAzone]			
 					if {$sz >= 1} {
@@ -5564,12 +5318,20 @@ proc RenderSomeone {w id {norecurse false}} {
     # cached already, before broadcasting a request for one.
     #
     set found_image false
-    DEBUG 3 "Looking up image at zoom $zoom for each of: $image_candidates"
+    if {[dict exists $MOBdata($id) DispSize] \
+     && [set disp_size [dict get $MOBdata($id) DispSize]] ne {} \
+     && [set real_size [dict get $MOBdata($id) Size]] ne $disp_size} {
+	    set disp_zoom [creature_display_zoom $real_size $disp_size $zoom]
+    } else {
+	    set disp_zoom $zoom
+    }
+
+    DEBUG 3 "Looking up image at zoom $disp_zoom for each of: $image_candidates"
 	foreach image_pfx $image_candidates {
 		#
 		# if we already know we have this image, just use it
 		#
-		if {[info exists TILE_SET([tile_id $image_pfx $zoom])]} {
+		if {[info exists TILE_SET([tile_id $image_pfx $disp_zoom])]} {
             DEBUG 3 "- Found $image_pfx, using that"
             set found_image true
 			break
@@ -5582,8 +5344,8 @@ proc RenderSomeone {w id {norecurse false}} {
         DEBUG 3 "No candidate tiles were found. Querying server and checking cache..."
         foreach ip $image_candidates {
             DEBUG 3 "- Trying $ip"
-            FindImage $ip $zoom
-            if {[info exists TILE_SET([tile_id $ip $zoom])]} {
+            FindImage $ip $disp_zoom
+            if {[info exists TILE_SET([tile_id $ip $disp_zoom])]} {
                 DEBUG 3 "-- Found $ip, using that."
                 set image_pfx $ip
                 break
@@ -5595,18 +5357,18 @@ proc RenderSomeone {w id {norecurse false}} {
 	#
 	# if we found a copy of the image, it will now appear in TILE_SET.
 	#
-	if [info exists TILE_SET([tile_id $image_pfx $zoom])] {
-		DEBUG 3 "$image_pfx:$zoom = $TILE_SET([tile_id $image_pfx $zoom])"
+	if [info exists TILE_SET([tile_id $image_pfx $disp_zoom])] {
+		DEBUG 3 "$image_pfx:$disp_zoom = $TILE_SET([tile_id $image_pfx $disp_zoom])"
 		if {!$is_transparent} {
 			$w create oval [expr $x*$iscale] [expr $y*$iscale] [expr ($x+$mob_size)*$iscale] [expr ($y+$mob_size)*$iscale] -fill $fillcolor -tags "mob MF#$id M#$id MN#$id allMOB MB#$id"
 		}
-		$w create image [expr $x*$iscale] [expr $y*$iscale] -anchor nw -image $TILE_SET([tile_id $image_pfx $zoom]) -tags "mob M#$id MN#$id allMOB"
+		$w create image [expr $x*$iscale] [expr $y*$iscale] -anchor nw -image $TILE_SET([tile_id $image_pfx $disp_zoom]) -tags "mob M#$id MN#$id allMOB"
 		set nametag_w "$w.nt_$id"
 		if {[winfo exists $nametag_w]} {
-			$nametag_w configure -font [FontBySize [dict get $MOBdata($id) Size]] -text $mob_name
+			$nametag_w configure -font [FontBySize [CreatureDisplayedSize $id]] -text $mob_name
 		} else {
 			label $nametag_w -background [::tk::Darken [dict get $MOBdata($id) Color] 40] \
-				-foreground white -font [FontBySize [dict get $MOBdata($id) Size]] -text $mob_name 
+				-foreground white -font [FontBySize [CreatureDisplayedSize $id]] -text $mob_name 
 		}
 		# is anyone above me?
 		set nametag_anchor sw
@@ -5626,15 +5388,15 @@ proc RenderSomeone {w id {norecurse false}} {
 		}
 
 		if {[dict get $MOBdata($id) Killed]} {
-			$w create text [expr $x*$iscale] [expr $y*$iscale] -text $mob_name -anchor nw -font [FontBySize [dict get $MOBdata($id) Size]] -fill $textcolor -tags "M#$id MF#$id MT#$id allMOB"
+			$w create text [expr $x*$iscale] [expr $y*$iscale] -text $mob_name -anchor nw -font [FontBySize [CreatureDisplayedSize $id]] -fill $textcolor -tags "M#$id MF#$id MT#$id allMOB"
 		} else {
 			$w create window [expr $x*$iscale] [expr $y*$iscale] -anchor $nametag_anchor -window $nametag_w -tags "M#$id MF#$id MT#$id allMOB"
 		}
 	} else {
-		DEBUG 3 "No $image_pfx:$zoom found in TILE_SET"
+		DEBUG 3 "No $image_pfx:$disp_zoom found in TILE_SET"
 		$w create oval [expr $x*$iscale] [expr $y*$iscale] [expr ($x+$mob_size)*$iscale] [expr ($y+$mob_size)*$iscale] -fill $fillcolor -tags "mob MF#$id M#$id MN#$id MB#id allMOB"
 		$w create text [expr ($x+(.5*$mob_size))*$iscale] [expr ($y+(.5*$mob_size))*$iscale] -fill $textcolor \
-			-font [FontBySize [dict get $MOBdata($id) Size]] -text $mob_name -tags "M#$id MF#$id MN#$id MT#$id allMOB"
+			-font [FontBySize [CreatureDisplayedSize $id]] -text $mob_name -tags "M#$id MF#$id MN#$id MT#$id allMOB"
 	}
 	if {[dict get $MOBdata($id) Killed]} {
 		$w create line [expr $x*$iscale] [expr $y*$iscale] [expr ($x+$mob_size)*$iscale] [expr ($y+$mob_size)*$iscale] \
@@ -5875,7 +5637,7 @@ proc RenderSomeone {w id {norecurse false}} {
 			catch {label $w.z$id -text {} -foreground $textcolor -background $fillcolor}
 		}
 		$w create window [expr ($x+($mob_size))*$iscale] [expr ($y)*$iscale] -tags "M#$id MELEV#$id allMOB" -anchor ne -window $w.z$id 
-		$w.z$id configure -foreground $textcolor -background $fillcolor -text $elev -font [FontBySize [dict get $MOBdata($id) Size]]
+		$w.z$id configure -foreground $textcolor -background $fillcolor -text $elev -font [FontBySize [CreatureDisplayedSize $id]]
 	}
 
 	#
@@ -5887,7 +5649,7 @@ proc RenderSomeone {w id {norecurse false}} {
 		}
 		$w create window [expr ($x+($mob_size))*$iscale] [expr ($y+$mob_size)*$iscale] \
 			-tags "M#$id MT#$id allMOB" -anchor se -window $w.ms$id 
-		$w.ms$id configure -text $noteText -font [FontBySize [dict get $MOBdata($id) Size]]
+		$w.ms$id configure -text $noteText -font [FontBySize [CreatureDisplayedSize $id]]
 	}
 
 	#
@@ -5914,9 +5676,10 @@ proc RenderSomeone {w id {norecurse false}} {
 		foreach threatening_mob_id [array names MOBdata] {
 			DEBUG 1 "Checking who $threatening_mob_id is threatening"
 			if {[dict get $MOBdata($threatening_mob_id) Killed]} continue
-			lassign [ReachMatrix [dict get $MOBdata($threatening_mob_id) Area]] ar re mat
+			lassign [FullCreatureAreaInfo $threatening_mob_id] sz ar re mat _
+#			lassign [ReachMatrix [CreatureDisplayedSize $threatening_mob_id]] ar re mat
 			lassign [MOBCenterPoint $threatening_mob_id] xc yc rc
-			set sz [MonsterSizeValue [dict get $MOBdata($threatening_mob_id) Size]]
+#			set sz [MonsterSizeValue [CreatureDisplayedSize $threatening_mob_id]]
 			DEBUG 1 "-- area $ar reach $re ($xc,$yc) r=$rc"
 			set Xstart [expr ([dict get $MOBdata($threatening_mob_id) Gx] - $re)]
 			set yy [expr ([dict get $MOBdata($threatening_mob_id) Gy] - $re)]
@@ -6065,17 +5828,23 @@ proc RemoveFromSelection {id} {
 proc ClearSelection {} {
 	global MOB_SELECTED canvas
 	foreach id [array names MOB_SELECTED] {
-		set MOB_SELECTED($id) false
-		RenderSomeone $canvas $id
+		catch {
+			set MOB_SELECTED($id) false
+			RenderSomeone $canvas $id
+		}
 	}
 	SetSelectionContextMenu
 	array unset MOB_SELECTED
 }
 
 proc GetSelectionList {} {
-	global MOB_SELECTED
+	global MOB_SELECTED MOBdata
 	set result {}
 	foreach id [array names MOB_SELECTED] {
+		if {![info exists MOBdata($id)] && $MOB_SELECTED($id)} {
+			DEBUG 0 "Removed nonexistent id $id from selection list"
+			set MOB_SELECTED($id) false
+		}
 		if {$MOB_SELECTED($id)} {
 			lappend result $id
 		}
@@ -6107,7 +5876,7 @@ proc ScreenXYToMOBID {w x y} {
 	DEBUG 3 "Looking for object at $x,$y (grid $gx,$gy)..."
 	set mob_list {}
 	foreach id [array names MOBdata] {
-		set msz [expr max(1, [MonsterSizeValue [dict get $MOBdata($id) Size]])]
+		set msz [expr max(1, [MonsterSizeValue [CreatureDisplayedSize $id]])]
 		set mx0 [expr int([dict get $MOBdata($id) Gx])]
 		set mx1 [expr $mx0 + $msz]
 		set my0 [expr int([dict get $MOBdata($id) Gy])]
@@ -6154,7 +5923,7 @@ proc ScreenXYToGridXY {x y args} {
 
 	if {$args ne {-exact} && $MOB_MOVING ne {}} {
 		DEBUG 3 "ScreenXYToGridXY $x $y $args for MOB $MOB_MOVING"
-		set mob_size [MonsterSizeValue [dict get $MOBdata($MOB_MOVING) Size]]
+		set mob_size [MonsterSizeValue [CreatureDisplayedSize $MOB_MOVING]]
 		DEBUG 3 "--size $mob_size"
 		if {$mob_size < 1} {
 			DEBUG 3 "-- calc as [list [expr int([$canvas canvasx $x]/($iscale*$mob_size))*$mob_size] [expr int([$canvas canvasy $y]/($iscale*$mob_size))*$mob_size]]"
@@ -7035,15 +6804,16 @@ proc CreatePolySubMenu {args} {
 }
 
 proc CreateSizeSubMenu {args} {
+	global MOBdata
 	if {[lindex $args 0] == {-mass}} {
 		set mob_id __mass__
 		set mob_list [lindex $args 1]
-		set cmd ChangeSizeAll
+		set cmd ChangeDispSizeAll
 		set sub size.m_
 	} else {
 		set sub [expr [string equal [lindex $args 0] {-deep}] ? {{size.m_}} : {{size_m_}}]
 		set mob_list [set mob_id [lindex $args 1]]
-		set cmd ChangeSize
+		set cmd ChangeDispSize
 	}
 	set mid .contextMenu.$sub$mob_id
 	catch {$mid delete 0 end; destroy $mid}
@@ -7054,7 +6824,6 @@ proc CreateSizeSubMenu {args} {
 		{T t} Tiny
 		{S s} Small
 		{M m} Medium
-		{M20 m20} {Medium (20-ft reach)}
 		l {Large (long)}
 		L {Large (tall)}
 		{L0 l0} {Large (no reach)}
@@ -7064,14 +6833,163 @@ proc CreateSizeSubMenu {args} {
 		G {Gargantuan (tall)}
 		c {Colossal (long)}
 		C {Colossal (tall)}
-		C80 {80-ft (tall)}
 	} {
-		if {[MobStateList $mob_list Size $size_code]} {
-			$mid add command -command [list $cmd $mob_list [lindex $size_code 0]] -label $size_name -foreground #ff0000
-		} else {
-			$mid add command -command [list $cmd $mob_list [lindex $size_code 0]] -label $size_name
+		if {$mob_id ne {__mass__}} {
+			set real_size [dict get $MOBdata($mob_id) Size]
+			set disp_size [CreatureDisplayedSize $mob_id]
+
+			if {[lsearch -exact $size_code $disp_size] >= 0} {
+				$mid add command -command [list $cmd $mob_list [lindex $size_code 0]] -label $size_name -foreground #ff0000
+			} elseif {[lsearch -exact $size_code $real_size] >= 0} {
+				$mid add command -command [list $cmd $mob_list [lindex $size_code 0]] -label $size_name -foreground #0000bb
+			} else {
+				$mid add command -command [list $cmd $mob_list [lindex $size_code 0]] -label $size_name
+			}
 		}
 	}
+	return $mid
+}
+
+
+# CreateReachSubMenu -shallow mob   -> menu .contextMenu.reach_m_(mob) of choices to apply to mob	(only mob involved)
+# CreateReachSubMenu -deep mob      -> menu .contextMenu.reach.m_(mob) of choices to apply to mob	(one of many mobs involved)
+# 	call SetCustomReach [mob...] -setnat|-setext|-incrnat|-incrext|-toggle squares|reach|all
+# CreateReachSubMenu -mass [mob...] -> menu .contextMenu.reach.m___mass__ of choices to apply to all mobs
+# 	call SetCustomReachAll [mob...] -setnat|-setext|-incrnat|-incrext|-toggle squares|reach|all
+proc DefaultCustomReach {size} {
+	set template [ReachMatrix $size]
+	if {$template eq {}} {
+		set template [list 0 0 {}]
+	}
+	return [dict create \
+		Enabled false \
+		Natural [lindex $template 0] \
+		Extended [lindex $template 1] \
+	]
+}
+
+proc SetCustomReach {mob_id mode value} {
+	global MOBdata canvas
+	set d $MOBdata($mob_id)
+	set reach [dict get $d Reach]
+	set custom [dict get $d CustomReach]
+	set size [CreatureDisplayedSize $mob_id]
+	if {$custom eq {}} {
+		set custom [DefaultCustomReach $size]
+	}
+
+	# Apply requested changes
+	switch -exact -- $mode {
+		-setnat { dict set custom Natural $value }
+		-setext { dict set custom Extended $value }
+		-incrnat { dict set custom Natural [expr [dict get $custom Natural] + $value] }
+		-incrext { dict set custom Extended [expr [dict get $custom Extended] + $value] }
+		-toggle {
+			global SCRR SCRN
+			if {$SCRR($mob_id)} {
+				if {$SCRN($mob_id)} {
+					set reach 2
+				} else {
+					set reach 1
+				}
+			} else {
+				set reach 0
+			}
+		}
+	}
+
+	if {[MatchesStandardTemplate $size [dict get $custom Natural] [dict get $custom Extended]] ne {}} {
+		dict set custom Enabled false
+	} else {
+		dict set custom Enabled true
+	}
+	dict set MOBdata($mob_id) CustomReach $custom
+	dict set MOBdata($mob_id) Reach $reach
+
+	RenderSomeone $canvas $mob_id
+	SendMobChanges $mob_id {CustomReach Reach}
+}
+
+proc SetCustomReachAll {mob_list mode value} {
+	foreach mob $mob_list {
+		SetCustomReach $mob $mode $value
+	}
+}
+
+proc CreateReachSubMenu {args} {
+	global MOBdata
+
+	if {[lindex $args 0] == {-mass}} {
+		set mob_id __mass__
+		set mob_list [lindex $args 1]
+		set cmd SetCustomReachAll
+		set sub reach.m_
+	} else {
+		set sub [expr [string equal [lindex $args 0] {-deep}] ? {{reach.m_}} : {{reach_m_}}]
+		set mob_list [set mob_id [lindex $args 1]]
+		set cmd SetCustomReach
+	}
+	set mid .contextMenu.$sub$mob_id
+	catch {$mid.nat delete 0 end; destroy $mid.nat}
+	catch {$mid.ext delete 0 end; destroy $mid.ext}
+	catch {$mid delete 0 end; destroy $mid}
+	menu $mid
+	menu $mid.nat
+	menu $mid.ext
+	foreach {feet code} {
+		0 0
+		5 1
+		10 2
+		15 3
+		20 4
+		25 5
+		30 6
+		35 7
+		40 8
+		45 9
+	} {
+		set this_nat false
+		set this_ext false
+		if {$mob_id ne {__mass__}} {
+			if {[catch {
+				lassign [FullCreatureAreaInfo $mob_id] _ n e _ _
+				set this_nat [expr $n == $code]
+				set this_ext [expr $e == $code]
+			} err]} {
+				DEBUG 0 "Error trying to look up reach zones for $mob_id: $err"
+			}
+		}
+
+		foreach menutype {nat ext} {
+			if {[set this_$menutype]} {
+				$mid.$menutype add command -command [list $cmd $mob_list -set$menutype $code] -label "$feet ft" -foreground #ff0000
+			} else {
+				$mid.$menutype add command -command [list $cmd $mob_list -set$menutype $code] -label "$feet ft"
+			}
+		}
+	}
+	foreach submenu {nat ext} {
+		$mid.$submenu add separator
+		$mid.$submenu add command -command [list $cmd $mob_list -incr$submenu  2] -label "+10 ft"
+		$mid.$submenu add command -command [list $cmd $mob_list -incr$submenu  1] -label "+5 ft"
+		$mid.$submenu add command -command [list $cmd $mob_list -incr$submenu -1] -label "-5 ft"
+		$mid.$submenu add command -command [list $cmd $mob_list -incr$submenu -2] -label "-10 ft"
+	}
+	global SCRR SCRN
+	$mid add checkbutton -onvalue 1 -offvalue 0 -variable SCRR($mob_id) -command [list $cmd $mob_list -toggle reach] -label "Extended Reach"
+	$mid add checkbutton -onvalue 1 -offvalue 0 -variable SCRN($mob_id) -command [list $cmd $mob_list -toggle all] -label "Include Natural Distance"
+
+	if {$mob_id eq {__mass__}} {
+		set SCRR(__mass__) 2
+		set SCRN(__mass__) 2
+	} else {
+		set reach [dict get $MOBdata($mob_id) Reach]
+		set SCRR($mob_id) [expr $reach == 0 ? 0 : 1]
+		set SCRN($mob_id) [expr $reach == 2 ? 1 : 0]
+	}
+
+	$mid add cascade -menu $mid.nat -label "Natural Reach Distance"
+	$mid add cascade -menu $mid.ext -label "Extended Reach Distance"
 	return $mid
 }
 
@@ -7093,7 +7011,7 @@ proc DoContext {x y} {
 		.contextMenu delete 3
 		.contextMenu insert 3 command -command "" -label "Toggle Death" -state disabled
 		.contextMenu delete 4
-		.contextMenu insert 4 command -command "" -label "Cycle Reach" -state disabled
+		.contextMenu insert 4 command -command "" -label "Set Reach" -state disabled
 		.contextMenu delete 5
 		.contextMenu insert 5 command -command "" -label "Toggle Spell Area" -state disabled
 		.contextMenu delete 6
@@ -7120,7 +7038,8 @@ proc DoContext {x y} {
 		.contextMenu delete 3
 		.contextMenu insert 3 command -command "KillPerson $mob_id" -label "Toggle Death for $mob_name"
 		.contextMenu delete 4
-		.contextMenu insert 4 command -command "ToggleReach $mob_id" -label "Cycle Reach for $mob_name"
+#		.contextMenu insert 4 command -command "ToggleReach $mob_id" -label "Cycle Reach for $mob_name"
+		.contextMenu insert 4 cascade -menu [CreateReachSubMenu -shallow $mob_id] -label "Set Reach for $mob_name"
 		.contextMenu delete 5
 		.contextMenu insert 5 command -command "ToggleSpellArea $mob_id" -label "Toggle Spell Area for $mob_name"
 		.contextMenu delete 6
@@ -7156,7 +7075,8 @@ proc DoContext {x y} {
 			set mob_name [dict get $MOBdata($mob_id) Name]
 			.contextMenu.del add command -command "RemovePerson $mob_id; ::gmaproto::clear $mob_id" -label $mob_name
 			.contextMenu.kill add command -command "KillPerson $mob_id" -label $mob_name
-			.contextMenu.reach add command -command "ToggleReach $mob_id" -label $mob_name
+#			.contextMenu.reach add command -command "ToggleReach $mob_id" -label $mob_name
+			.contextMenu.reach add cascade -menu [CreateReachSubMenu -deep $mob_id] -label $mob_name
 			.contextMenu.aoe add command -command "ToggleSpellArea $mob_id" -label $mob_name
 			.contextMenu.poly add cascade -menu [CreatePolySubMenu -deep $mob_id] -label $mob_name
 			.contextMenu.size add cascade -menu [CreateSizeSubMenu -deep $mob_id] -label $mob_name
@@ -7169,6 +7089,7 @@ proc DoContext {x y} {
 		}
 		.contextMenu.del add command -command "RemoveAll $mob_list" -label "(all of the above)"
 		.contextMenu.kill add command -command "KillAll $mob_list" -label "(all of the above)"
+		.contextMenu.reach add cascade -menu [CreateReachSubMenu -mass $mob_list] -label "(all of the above)"
 		.contextMenu.poly add cascade -menu [CreatePolySubMenu -mass $mob_list] -label "(all of the above)"
 		.contextMenu.size add cascade -menu [CreateSizeSubMenu -mass $mob_list] -label "(all of the above)"
 		.contextMenu.tag add cascade -menu [CreateTagSubMenu -mass $mob_list] -label "(all of the above)"
@@ -7180,7 +7101,7 @@ proc DoContext {x y} {
 		.contextMenu delete 3
 		.contextMenu insert 3 cascade -menu .contextMenu.kill -label "Toggle Death"
 		.contextMenu delete 4
-		.contextMenu insert 4 cascade -menu .contextMenu.reach -label "Cycle Reach"
+		.contextMenu insert 4 cascade -menu .contextMenu.reach -label "Set Reach"
 		.contextMenu delete 5
 		.contextMenu insert 5 cascade -menu .contextMenu.aoe -label "Toggle Spell Area"
 		.contextMenu delete 6
@@ -7231,7 +7152,7 @@ menu .contextMenu.tsel -tearoff 0
 .contextMenu add command -command {AddPlayerMenu player} -label {Add Player...}				;# 1
 .contextMenu add command -command {AddPlayerMenu monster} -label {Add Monster...}			;# 2
 .contextMenu add command -command "" -label {Toggle Death} -state disabled				;# 3
-.contextMenu add command -command "" -label {Cycle Reach} -state disabled				;# 4
+.contextMenu add command -command "" -label {Set Reach} -state disabled				;# 4
 .contextMenu add command -command "" -label {Toggle Spell Area} -state disabled				;# 5
 .contextMenu add command -command "" -label {Polymorph} -state disabled					;# 6
 .contextMenu add command -command "" -label {Change Size} -state disabled				;# 7
@@ -7240,27 +7161,27 @@ menu .contextMenu.tsel -tearoff 0
 .contextMenu add command -command "" -label {Elevation} -state disabled					;# 10
 .contextMenu add command -command "" -label {Movement Mode} -state disabled				;# 11
 .contextMenu add separator										;# 12
-.contextMenu add command -command "" -label {Distance from...} -state disabled		 		;# 13 NEW
-.contextMenu add command -command "" -label {Distance from...} -state disabled				;# 14 NEW
-.contextMenu add separator										;# 15 NEW
-.contextMenu add command -command "" -label {Toggle Selection} -state disabled				;# 16 NEW
-.contextMenu add command -command "ClearSelection" -label {Deselect All} -state disabled		;# 17, was 13
-.contextMenu add command -command "FindNearby" -label {Scroll to Visible Objects}			;# 18, was 14
-.contextMenu add command -command "SyncView" -label {Scroll Others' Views to Match Mine}		;# 19, was 15
-.contextMenu add command -command "refreshScreen" -label {Refresh Display}				;# 20, was 16
-.contextMenu add command -command "aboutMapper" -label {About Mapper...}				;# 21, was 17
-.contextMenu add separator										;# 22, was 18
+.contextMenu add command -command "" -label {Distance from...} -state disabled		 		;# 13 
+.contextMenu add command -command "" -label {Distance from...} -state disabled				;# 14 
+.contextMenu add separator										;# 15 
+.contextMenu add command -command "" -label {Toggle Selection} -state disabled				;# 16 
+.contextMenu add command -command "ClearSelection" -label {Deselect All} -state disabled		;# 17
+#.contextMenu add command -command "FindNearby" -label {Scroll to Visible Objects}			;# 18 REMOVED
+#.contextMenu add command -command "SyncView" -label {Scroll Others' Views to Match Mine}		;# 19 REMOVED
+#.contextMenu add command -command "refreshScreen" -label {Refresh Display}				;# 20 REMOVED
+#.contextMenu add command -command "aboutMapper" -label {About Mapper...}				;# 21 REMOVED
+.contextMenu add separator										;# 18; was 22
 
 # AddPlayer name color ?area? ?size? ?id?  defaults to 1x1, generated ID
 proc AddPlayer {name color args} {
 	global MOB_X MOB_Y canvas
 
 	set g [ScreenXYToGridXY $MOB_X $MOB_Y]
-	if {[llength $args] > 0} { set area [lindex $args 0] } else { set area 1 }
+	# deprecated # if {[llength $args] > 0} { set area [lindex $args 0] } else { set area 1 }
 	if {[llength $args] > 1} { set size [lindex $args 1] } else { set size 1 }
 	if {[llength $args] > 2} { set id   [lindex $args 2] } else { set id [new_id] }
 	# XXX check for existing player
-	set d [::gmaproto::new_dict PS Gx [lindex $g 0] Gy [lindex $g 1] Color $color Name [AcceptCreatureImageName $name] Area $area Size $size CreatureType 2 ID $id]
+	set d [::gmaproto::new_dict PS Gx [lindex $g 0] Gy [lindex $g 1] Color $color Name [AcceptCreatureImageName $name] Size $size CreatureType 2 ID $id]
 	DEBUG 3 "PlaceSomeone $canvas $d"
 	PlaceSomeone $canvas $d
 	::gmaproto::place_someone_d [InsertCreatureImageName $d]
@@ -7276,7 +7197,7 @@ proc InsertCreatureImageName {d} {
 
 set MOB_Name {}
 set MOB_SIZE M
-set MOB_AREA M
+# deprecated # set MOB_AREA M
 set MOB_COLOR red
 set MOB_REACH 0
 
@@ -7328,7 +7249,8 @@ proc SetTilePlaceHolder {obj_id width height tile_id} {
 
 proc AddPlayerMenu {type} {
 	global MOB_X MOB_Y canvas check_select_color
-	global MOB_Name MOB_SIZE MOB_AREA MOB_COLOR MOB_REACH
+	global MOB_Name MOB_SIZE MOB_COLOR MOB_REACH
+	# deprecated MOB_AREA
 
 	#catch {destroy .apm}
 
@@ -7341,56 +7263,32 @@ proc AddPlayerMenu {type} {
 	#toplevel .apm -class dialog
 	create_dialog .apm
 	wm title .apm "Add Player or Monster"
-	pack [frame .apm.1] \
-	     [frame .apm.2] \
-		 [frame .apm.3] \
-		 [frame .apm.4] \
-		 [frame .apm.5] \
-		 [frame .apm.6] \
-		 -side top
-	pack [label .apm.1.lab -text {Name:}] \
-	     [entry .apm.1.ent -textvariable MOB_Name -width 20] \
-		 -side left -anchor w
-	pack [label .apm.2.lab -text {Size:}] \
-		 [entry .apm.2.ent -textvariable MOB_SIZE -width 3 -validate key -validatecommand {set MOB_AREA "%P"; return 1}] \
-		 -side left -anchor w
-	pack [label .apm.3.lab -text {Area:}] \
-		 [entry .apm.3.ent -textvariable MOB_AREA -width 3] \
-		 -side left -anchor w
-	pack [label .apm.4.lab -text {Color:}] \
-		 [entry .apm.4.ent -textvariable MOB_COLOR -width 20] \
-		 -side left -anchor w
-	pack [ttk::checkbutton .apm.5.ent -text "Reach?" -variable MOB_REACH] \
-		 -side left -anchor w
-	pack [button .apm.6.apply -command \
-		"AddMobFromMenu [lindex $g 0] [lindex $g 1] \$MOB_COLOR \$MOB_Name \$MOB_AREA \$MOB_SIZE $type \$MOB_REACH" -text Apply] \
-	     [button .apm.6.cancel -command "destroy .apm" -text Cancel] \
-	     [button .apm.6.ok -command \
-		 "AddMobFromMenu [lindex $g 0] [lindex $g 1] \$MOB_COLOR \$MOB_Name \$MOB_AREA \$MOB_SIZE $type \$MOB_REACH; destroy .apm" -text Ok] \
-		 -side right
+
+	grid [label .apm.lab1 -text {Name:}] 			   -row 0 -column 0 -sticky w
+	grid [entry .apm.ent1 -textvariable MOB_Name -width 20] -  -row 0 -column 1 -sticky ew
+	::tooltip::tooltip .apm.lab1 {[<image>=]<name>[ #<n>[-<m>]]}
+	::tooltip::tooltip .apm.ent1 {[<image>=]<name>[ #<n>[-<m>]]}
+	grid [label .apm.lab2 -text {Size Category:}] 		   -row 1 -column 0 -sticky w
+	grid [entry .apm.ent2 -textvariable MOB_SIZE -width 20] -  -row 1 -column 1 -sticky ew
+	::tooltip::tooltip .apm.lab2 {<category>[<natural reach>][-><extended reach>][=<space>]}
+	::tooltip::tooltip .apm.ent2 {<category>[<natural reach>][-><extended reach>][=<space>]}
+	grid [label .apm.lab4 -text {Threat Zone Color:}] 	   -row 2 -column 0 -sticky w
+	grid [entry .apm.ent4 -textvariable MOB_COLOR -width 20] - -row 2 -column 1 -sticky ew
+	grid x [ttk::checkbutton .apm.ent5 -text {Extended Reach Active} -variable MOB_REACH] - -sticky w
+
+	grid [button .apm.apply -command "AddMobFromMenu [lindex $g 0] [lindex $g 1] \$MOB_COLOR \$MOB_Name 0 \$MOB_SIZE $type \$MOB_REACH" -text Apply] -sticky w -row 4 -column 0
+	grid [button .apm.cancel -command "destroy .apm" -text Cancel] -row 4 -column 1
+	grid [button .apm.ok -command "AddMobFromMenu [lindex $g 0] [lindex $g 1] \$MOB_COLOR \$MOB_Name 0 \$MOB_SIZE $type \$MOB_REACH; destroy .apm" -text OK] -sticky e -row 4 -column 2
 }
 
 proc ValidateSizeCode {code} {
-	#
-	# return true if code is valid
-	#
-	if {[string is integer -strict $code]} {return 1}
-	if {$code eq {C80}} {return 1}
-	if {$code eq {m20} || $code eq {M20}} {return 1}
-	if {$code eq {l0} || $code eq {L0}} {return 1}
-	if {[string length $code] != 1} {return 0}
-	if {[string first $code FDTSMLHGCfdtsmlhgc] < 0} {return 0}
-	return 1
+	return [expr [CreatureSizeParams $code] ne {}]
 }
 
-proc AddMobFromMenu {baseX baseY color name area size type reach} {
+proc AddMobFromMenu {baseX baseY color name _ size type reach} {
 	global canvas
 	global PC_IDs
 
-	if {![ValidateSizeCode $area]} {
-		say "Area value $area is not valid.  Specify number of squares or type code (upper-case for tall)."
-		return
-	}
 	if {![ValidateSizeCode $size]} {
 		say "Size value $size is not valid.  Specify number of squares or type code (upper-case for tall)."
 		return
@@ -7410,7 +7308,7 @@ proc AddMobFromMenu {baseX baseY color name area size type reach} {
 			}
 			set apm_id [new_id]
 			DEBUG 3 "Multi-add $i of $multistart-$multiend: ${basename}#$i"
-			set d [::gmaproto::new_dict PS Gx [expr $baseX+$XX] Gy $baseY Color $color Name [AcceptCreatureImageName "${basename}#$i"] Area $area Size $size CreatureType [::gmaproto::to_enum CreatureType $type] ID $apm_id Reach $reach]
+			set d [::gmaproto::new_dict PS Gx [expr $baseX+$XX] Gy $baseY Color $color Name [AcceptCreatureImageName "${basename}#$i"] Size $size CreatureType [::gmaproto::to_enum CreatureType $type] ID $apm_id Reach $reach]
 			PlaceSomeone $canvas $d
 			::gmaproto::place_someone_d [InsertCreatureImageName $d]
 		}
@@ -7426,14 +7324,14 @@ proc AddMobFromMenu {baseX baseY color name area size type reach} {
 		} else {
 			set apm_id [new_id]
 		}
-		set d [::gmaproto::new_dict PS Gx $baseX Gy $baseY Color $color Name $basename Area $area Size $size CreatureType [::gmaproto::to_enum CreatureType $type] ID $apm_id Reach $reach]
+		set d [::gmaproto::new_dict PS Gx $baseX Gy $baseY Color $color Name $basename Size $size CreatureType [::gmaproto::to_enum CreatureType $type] ID $apm_id Reach $reach]
 		PlaceSomeone $canvas $d
 		::gmaproto::place_someone_d [InsertCreatureImageName $d]
 	}
 }
 
 proc RemovePerson id {
-	global canvas MOBdata MOBid
+	global canvas MOBdata MOBid MOB_SELECTED
 
 	DEBUG 3 "RemovePerson $id"
 	$canvas delete M#$id
@@ -7442,6 +7340,9 @@ proc RemovePerson id {
 	catch { destroy $canvas.ms$id }
 	catch { destroy $canvas.z$id }
 	catch {	destroy $canvas.nt_$id }
+	if {[info exists MOB_SELECTED($id)] && $MOB_SELECTED($id)} {
+		set MOB_SELECTED($id) false
+	}
 }
 
 proc KillAll args {
@@ -7455,6 +7356,9 @@ proc RemoveAll args {
 		RemovePerson $mob
 		::gmaproto::clear $mob
 	}
+	# Since this is called when clearing all selected creatures, and those creatures will then cease
+	# to exist, we shouldn't leave the selection list around pointing to bogus creatures.
+	ClearSelection
 }
 
 proc KillPerson id {
@@ -7469,11 +7373,11 @@ proc PolymorphPerson {id skin} {
 	global MOBdata canvas
 	dict set MOBdata($id) Skin $skin
 	if {[llength [dict get $MOBdata($id) SkinSize]] > $skin} {
-		ChangeSize $id [lindex [dict get $MOBdata($id) SkinSize] $skin]
+		ChangeRealSize $id [lindex [dict get $MOBdata($id) SkinSize] $skin]
 	}
 			
 	RenderSomeone $canvas $id
-	SendMobChanges $id Skin
+	SendMobChanges $id {Skin Size DispSize}
 }
 
 proc PolymorphMass {mob_list skin} {
@@ -7482,17 +7386,26 @@ proc PolymorphMass {mob_list skin} {
 	}
 }
 
-proc ChangeSize {id code} {
+proc ChangeDispSize {id code} {
 	global MOBdata canvas
-	dict set MOBdata($id) Size $code
-	dict set MOBdata($id) Area $code
+	if {[string length $code] > 1} {
+		dict set MOBdata($id) CustomReach Enabled false
+	}
+	dict set MOBdata($id) DispSize $code
+
 	RenderSomeone $canvas $id
-	SendMobChanges $id {Size Area}
+	SendMobChanges $id {DispSize}
 }
 
-proc ChangeSizeAll {mob_list code} {
+proc ChangeRealSize {id code} {
+	global MOBdata
+	dict set MOBdata($id) Size $code
+	ChangeDisplaySize $id $code
+}
+
+proc ChangeDispSizeAll {mob_list code} {
 	foreach mob $mob_list {
-		ChangeSize $mob $code
+		ChangeDispSize $mob $code
 	}
 }
 #
@@ -8274,7 +8187,7 @@ proc DoCommandIL {d} {
 proc DoCommandAC {d} {
 	# Add character to the menu
 	global PC_IDs
-	::gmautil::dassign $d Name name ID id Color color Area area Size size
+	::gmautil::dassign $d Name name ID id Color color Size size
 	set creature_name [AcceptCreatureImageName $name]
 	if {[info exists PC_IDs($creature_name)]} {
 		if {$PC_IDs($creature_name) ne $id} {
@@ -8284,7 +8197,7 @@ proc DoCommandAC {d} {
 		}
 	} else {
 		set PC_IDs($creature_name) $id
-		.contextMenu add command -command "AddPlayer $creature_name $color $area $size $id" -label $creature_name 
+		.contextMenu add command -command "AddPlayer $creature_name $color 0 $size $id" -label $creature_name 
 	}
 }
 
@@ -11075,11 +10988,16 @@ proc SetObjectAttribute {id kvlist} {
 	if {[set idlist [ResolveObjectId_OA $id]] eq {}} {
 		return
 	}
+	
 	lassign $idlist a id datatype
 	global $a
 
 	DEBUG 4 "Changing attributes of object $id from $kvlist"
 	foreach {k v} $kvlist {
+		if {$datatype eq "PS" && $k eq "CustomReach"} {
+			set v [::gmaproto::new_dict CustomReach {*}$v]
+		}
+
 		if {$datatype eq "PS" && $k eq "Name"} {
 			# changing creature name: also need to change the ID reverse mapping
 			::gmautil::dassign $MOBdata($id) Name mob_name
@@ -11759,7 +11677,7 @@ proc ConnectToServerByIdx {idx} {
 	refresh_title
 }
 
-# @[00]@| GMA-Mapper 4.9.3
+# @[00]@| GMA-Mapper 4.10-beta.4
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
