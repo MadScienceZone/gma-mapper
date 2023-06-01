@@ -3,7 +3,7 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.10.1-alpha          <!-- @@##@@ -->
+ * This Package Version: 4.10.1          <!-- @@##@@ -->
  * Effective Date: 01-Jun-2023               <!-- @@##@@ -->
 
 ## Compatibility
@@ -16,7 +16,11 @@ The support for old server protocols (<400) and map file formats (<20) will be d
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
-# 4.10-beta
+# 4.10.1
+## Fixes
+ * Corrects several bugs found in the new code that renders creature tokens at various sizes and with various arbitrary threat zones.
+
+# 4.10
 ## Enhancements
 * Now implements server protocol 406
 * Removes `Area` attribute from creatures (affects AC and PS commands and saved files).

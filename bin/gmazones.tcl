@@ -2,8 +2,8 @@
 #  _______  _______  _______                ___        __    _______      __           #
 # (  ____ \(       )(  ___  ) Game         /   )      /  \  (  __   )    /  \          #
 # | (    \/| () () || (   ) | Master's    / /) |      \/) ) | (  )  |    \/) )         #
-# | |      | || || || (___) | Assistant  / (_) (_       | | | | /   |      | |  _____  #
-# | | ____ | |(_)| ||  ___  |           (____   _)      | | | (/ /) |      | | (_____) #
+# | |      | || || || (___) | Assistant  / (_) (_       | | | | /   |      | |         #
+# | | ____ | |(_)| ||  ___  |           (____   _)      | | | (/ /) |      | |         #
 # | | \_  )| |   | || (   ) |                ) (        | | |   / | |      | |         #
 # | (___) || )   ( || )   ( | Mapper         | |   _  __) (_|  (__) | _  __) (_        #
 # (_______)|/     \||/     \| Client         (_)  (_) \____/(_______)(_) \____/        #
@@ -340,7 +340,6 @@ proc FullCreatureAreaInfo {id} {
 	} else {
 		# we do have an active custom set of numbers, so use those
 		# to set szext, sznat
-		DEBUG 0 "creature custom reach is $custom_reach"
 		set sznat [expr [dict get $custom_reach Natural] / 5]
 		set szext [expr [dict get $custom_reach Extended] / 5]
 	}
@@ -349,7 +348,7 @@ proc FullCreatureAreaInfo {id} {
 }
 
 #
-# @[00]@| GMA-Mapper 4.10.1-alpha
+# @[00]@| GMA-Mapper 4.10.1
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

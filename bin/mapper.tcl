@@ -3,8 +3,8 @@
 #  _______  _______  _______                ___        __    _______      __           #
 # (  ____ \(       )(  ___  ) Game         /   )      /  \  (  __   )    /  \          #
 # | (    \/| () () || (   ) | Master's    / /) |      \/) ) | (  )  |    \/) )         #
-# | |      | || || || (___) | Assistant  / (_) (_       | | | | /   |      | |  _____  #
-# | | ____ | |(_)| ||  ___  |           (____   _)      | | | (/ /) |      | | (_____) #
+# | |      | || || || (___) | Assistant  / (_) (_       | | | | /   |      | |         #
+# | | ____ | |(_)| ||  ___  |           (____   _)      | | | (/ /) |      | |         #
 # | | \_  )| |   | || (   ) |                ) (        | | |   / | |      | |         #
 # | (___) || )   ( || )   ( | Mapper         | |   _  __) (_|  (__) | _  __) (_        #
 # (_______)|/     \||/     \| Client         (_)  (_) \____/(_______)(_) \____/        #
@@ -14,7 +14,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.10.1-alpha}     ;# @@##@@
+set GMAMapperVersion {4.10.1}     ;# @@##@@
 set GMAMapperFileFormat {21}        ;# @@##@@
 set GMAMapperProtocol {406}         ;# @@##@@
 set CoreVersionNumber {6.3}            ;# @@##@@
@@ -6891,11 +6891,9 @@ proc SetCustomReach {mob_id mode value} {
 	set d $MOBdata($mob_id)
 	set reach [dict get $d Reach]
 	set custom [dict get $d CustomReach]
-	DEBUG 0 "SetCustomReach($mob_id,$mode,$value): obj=$MOBdata($mob_id)"
 	set size [CreatureDisplayedSize $mob_id]
 	if {$custom eq {}} {
 		set custom [DefaultCustomReach $size]
-		DEBUG 0 "custom=$custom"
 	}
 	set whatchanged {}
 
@@ -6935,13 +6933,11 @@ proc SetCustomReach {mob_id mode value} {
 			set whatchanged Reach
 		}
 	}
-	DEBUG 0 "$whatchanged: $custom"
 
 	switch $whatchanged {
 		Reach {
 			dict set MOBdata($mob_id) Reach $reach
 			SendMobChanges $mob_id {Reach}
-			DEBUG 0 "Reach: $MOBdata($mob_id)"
 		}
 		CustomReach {
 			if {[dict get $custom Natural] > [dict get $custom Extended]} {
@@ -6949,10 +6945,8 @@ proc SetCustomReach {mob_id mode value} {
 			}
 			dict set MOBdata($mob_id) CustomReach $custom
 			SendMobChanges $mob_id {CustomReach}
-			DEBUG 0 "Custom: $MOBdata($mob_id)"
 		}
 	}
-	DEBUG 0 "end: custom=$custom, obj=$MOBdata($mob_id)"
 
 	RenderSomeone $canvas $mob_id
 }
@@ -11727,7 +11721,7 @@ proc ConnectToServerByIdx {idx} {
 	refresh_title
 }
 
-# @[00]@| GMA-Mapper 4.10.1-alpha
+# @[00]@| GMA-Mapper 4.10.1
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
