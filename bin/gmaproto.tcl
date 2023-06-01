@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___        _____      ______               #
-# (  ____ \(       )(  ___  ) Game         /   )      / ___ \    / ___  \              #
-# | (    \/| () () || (   ) | Master's    / /) |     ( (   ) )   \/   \  \             #
-# | |      | || || || (___) | Assistant  / (_) (_    ( (___) |      ___) /             #
-# | | ____ | |(_)| ||  ___  |           (____   _)    \____  |     (___ (              #
-# | | \_  )| |   | || (   ) |                ) (           ) |         ) \             #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\____) ) _ /\___/  /             #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/ (_)\______/              #
+#  _______  _______  _______                ___        __    _______         ______    #
+# (  ____ \(       )(  ___  ) Game         /   )      /  \  (  __   )       (  ___ \ ( #
+# | (    \/| () () || (   ) | Master's    / /) |      \/) ) | (  )  |       | (   ) )| #
+# | |      | || || || (___) | Assistant  / (_) (_       | | | | /   | _____ | (__/ / | #
+# | | ____ | |(_)| ||  ___  |           (____   _)      | | | (/ /) |(_____)|  __ (  | #
+# | | \_  )| |   | || (   ) |                ) (        | | |   / | |       | (  \ \ | #
+# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_|  (__) |       | )___) )| #
+# (_______)|/     \||/     \| Client         (_)  (_) \____/(_______)       |/ \___/ ( #
 #                                                                                      #
 ########################################################################################
 #
@@ -57,9 +57,9 @@ package require base64 2.4.2
 package require uuid 1.0.1
 
 namespace eval ::gmaproto {
-	variable protocol 405
+	variable protocol 406
 	variable min_protocol 333
-	variable max_protocol 405
+	variable max_protocol 406
 	variable max_max_protocol 499
 	variable debug_f {}
 	variable legacy false
@@ -118,9 +118,8 @@ namespace eval ::gmaproto {
 		update_status_marker      DSM
 		update_turn               I
 	}
-		#AC      {Name s ObjID s Color s Area s Size s}
 	array set _message_payload {
-		AC      {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l Elev i Color s Note s Size s Area s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i}
+		AC      {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i CustomReach {o {Enabled ? Natural i Extended i}}}
 		ACCEPT  {Messages l}
 		AI      {Name s Sizes {a {File s ImageData b IsLocalFile ? Zoom f}}}
 		AI?	{Name s Sizes {a {Zoom f}}}
@@ -163,7 +162,7 @@ namespace eval ::gmaproto {
 		PRIV    {Command s Reason s}
 		POLO    {}
 		PROGRESS {OperationID s Title s Value i MaxValue i IsDone ?}
-		PS      {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l Elev i Color s Note s Size s Area s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ?}
+		PS      {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}}}
 		READY   {}
 		ROLL    {Sender s Recipients l MessageID i ToAll ? ToGM ? Title s Result {o {InvalidRequest ? ResultSuppressed ? Result i Details {a {Type s Value s}}}} RequestID s MoreResults ?}
 		SYNC    {}
@@ -175,6 +174,7 @@ namespace eval ::gmaproto {
 		/CONN   {}
 		Health  {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}
 		Font	{Family s Size f Weight i Slant i}
+		CustomReach {Enabled ? Natural i Extended i}
 	}
 	variable all_messages {}
 	foreach {_ v} [array get _message_map] {lappend all_messages $v}
@@ -418,6 +418,25 @@ proc ::gmaproto::_protocol_encode {oldcommand kvdict} {
 	return $message
 }
 
+proc ::gmaproto::_protocol_encode_struct {oldcommand kvdict} {
+	set command [::gmaproto::GMATypeToProtocolCommand $oldcommand]
+	#
+	# encode as JSON, eliminating zero fields and ones not mentioned in the protocol spec
+	#
+	if {![info exists ::gmaproto::_message_payload($command)]} {
+		error "protocol command $command is not valid"
+	}
+
+	if {[llength $::gmaproto::_message_payload($command)] == 0} {
+		set message {}
+	} else {
+		::json::write aligned false
+		::json::write indented false
+		set message [::gmaproto::_encode_payload $kvdict $::gmaproto::_message_payload($command)]
+	}
+	return $message
+}
+
 # attrname internal_value -> jsonified_value
 proc ::gmaproto::_attribute_encode {k v} {
 	switch -exact -- $k {
@@ -465,7 +484,8 @@ proc ::gmaproto::_attribute_encode {k v} {
 		StatusList { return [::json::write array {*}[lmap s $v {json::write string $s}]] }
 
 		Font   -
-		Health { return [::gmaproto::_protocol_encode $k $v] }
+		CustomReach -
+		Health { return [::gmaproto::_protocol_encode_struct $k $v] }
 
 		Points {
 			set plist {}
@@ -580,6 +600,7 @@ proc ::gmaproto::_backport_attribute {k v} {
 				[dict get $v HPBlur]\
 			]
 		}
+
 		Font {
 			set fontspec [list [dict get $v Family] [dict get $v Size]]
 			if {[dict get $v Weight] == 1} { lappend fontspec bold }
@@ -868,7 +889,7 @@ proc ::gmaproto::_backport_message {new_message} {
 			set nparams [list [dict get $params ID] \
 				       [dict get $params Color] \
 				       [dict get $params Name] \
-				       [dict get $params Area] \
+				       [dict get $params Size] \
 				       [dict get $params Size] \
 				       $ptype \
 				       [dict get $params Gx] \
@@ -1325,18 +1346,17 @@ proc ::gmaproto::place_someone_d {d} {
 	::gmaproto::_protocol_send PS {*}$d
 }
 
-proc ::gmaproto::place_someone {obj_id color name area size obj_type gx gy reach health skin skin_sizes elevation note status_list aoe move_mode killed dim {hidden false}} {
-	if {$obj_type eq "monster"} {
-		set ct 1
-	} elseif {$obj_type eq "player"} {
-		set ct 2
-	} else {
-		error "invalid object type $obj_type for place_someone"
-	}
-
-
-	::gmaproto::_protocol_send PS ID $obj_id Name $name Gx $gx Gy $gy Reach $reach Area $area Size $size Color $color CreatureType $ct Health $health Skin $skin SkinSize $skin_sizes Elev $elevation Note $note StatusList $status_list AoE $aoe MoveMode $move_mode Killed $killed Dim $dim Hidden $hidden
-}
+#proc ::gmaproto::place_someone {obj_id color name size obj_type gx gy reach health skin skin_sizes elevation note status_list aoe move_mode killed dim {hidden false} {custom_reach {}}} {
+#	if {$obj_type eq "monster"} {
+#		set ct 1
+#	} elseif {$obj_type eq "player"} {
+#		set ct 2
+#	} else {
+#		error "invalid object type $obj_type for place_someone"
+#	}
+#
+#	::gmaproto::_protocol_send PS ID $obj_id Name $name Gx $gx Gy $gy Reach $reach Size $size Color $color CreatureType $ct Health $health Skin $skin SkinSize $skin_sizes Elev $elevation Note $note StatusList $status_list AoE $aoe MoveMode $move_mode Killed $killed Dim $dim Hidden $hidden CustomReach $custom_reach
+#}
 
 proc ::gmaproto::polo {} {
 	::gmaproto::_protocol_send POLO
@@ -1530,7 +1550,7 @@ proc ::gmaproto::_repackage_legacy_packet {cmd params} {
 		AC {
 			# AC name id color area size
 			::gmautil::rdist 5 5 AC $params n i c a s
-			return [list "AC {\"Name\":[json::write string $n],\"ID\":[json::write string $i],\"Color\":[json::write string $c],\"Area\":[json::write string $a],\"Size\":[json::write string $s]}"]
+			return [list "AC {\"Name\":[json::write string $n],\"ID\":[json::write string $i],\"Color\":[json::write string $c],\"Size\":[json::write string $s]}"]
 		}
 		AI {
 			# AI name size
@@ -1747,7 +1767,7 @@ proc ::gmaproto::_repackage_legacy_packet {cmd params} {
 			} else {
 				set t 0
 			}
-			return [list "PS {\"ID\":[json::write string $i],\"Name\":[json::write string $n],\"Gx\":$x,\"Gy\":$y,\"Color\":[json::write string $c],\"Size\":[json::write string $s],\"Area\":[json::write string $a],\"Reach\":$r,\"CreatureType\":$t}"]
+			return [list "PS {\"ID\":[json::write string $i],\"Name\":[json::write string $n],\"Gx\":$x,\"Gy\":$y,\"Color\":[json::write string $c],\"Size\":[json::write string $s],\"Reach\":$r,\"CreatureType\":$t}"]
 		}
 		ROLL {
 			# ROLL from reciplist title result structuredlist messageID
@@ -2144,7 +2164,8 @@ proc ::gmaproto::GMATypeToProtocolCommand {gt} {
 	}
 	return $gt
 }
-# @[00]@| GMA-Mapper 4.9.3
+
+# @[00]@| GMA-Mapper 4.10-beta.4
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
