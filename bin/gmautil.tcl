@@ -273,7 +273,8 @@ proc ::gmautil::upgrade {destination_dir_list tmp_path source_base_url source_ba
 
 	array unset checklist
 	set msg_pfx "Upgrade from $old_version to $new_version:"
-	$msg_callback "Beginning upgrade from version $old_version to $new_version..." -progress [incr pi] -display
+	$msg_callback "Beginning upgrade..." -progress [incr pi] -display
+	update
 	#puts "dest ($destination_dir_list) tmp ($tmp_path) url ($source_base_url) file ($source_base_file) old ($old_version) new ($new_version) pfx ($strip_prefix) launch ($launch) msg ($msg_callback) proxy ($curl_proxy) curl ($curl_path)"
 
 	if {[set comp [::gmautil::version_compare $old_version $new_version]] == 0} {
@@ -293,6 +294,7 @@ proc ::gmautil::upgrade {destination_dir_list tmp_path source_base_url source_ba
 	}
 
 	$msg_callback "$msg_pfx preparing directories..." -progress [incr pi] -display
+	update
 	#
 	# Ensure target dir is created and empty
 	# Ensure that temp directory is created
@@ -321,7 +323,8 @@ proc ::gmautil::upgrade {destination_dir_list tmp_path source_base_url source_ba
 
 		file mkdir $tmp_path
 
-		$msg_callback "$msg_pfx downloading $new_version from $source_base_url..." -progress [incr pi] -display
+		$msg_callback "$msg_pfx downloading..." -progress [incr pi] -display
+		$msg_callback "$msg_pfx downloading $new_version from $source_base_url..." 
 		foreach suffix {tar.gz tar.gz.sig} {
 			if [catch {
 				if {$curl_proxy ne {}} {
@@ -348,7 +351,7 @@ proc ::gmautil::upgrade {destination_dir_list tmp_path source_base_url source_ba
 		}
 
 		$msg_callback "$msg_pfx verifying..." -progress [incr pi] -display
-		$msg_callback "$msg_pfx verifying integrity and authenticity of downloaded file (reading)..." -progress [incr pi]
+		update
 		set source_file_path [file join $tmp_path "${source_base_file}.tar.gz"]
 		set source_sig_path  [file join $tmp_path "${source_base_file}.tar.gz.sig"]
 		set source_file [open $source_file_path rb]
@@ -358,7 +361,8 @@ proc ::gmautil::upgrade {destination_dir_list tmp_path source_base_url source_ba
 		close $source_file
 		close $source_sig
 
-		$msg_callback "$msg_pfx verifying integrity and authenticity of downloaded file (checking)..." -progress [incr pi]
+		$msg_callback "$msg_pfx verifying integrity..." -progress [incr pi]
+		update
 		if {![::gmautil::verify $source_data $sig_data]} {
 			tk_messageBox -type ok -icon error -title "File integrity error" \
 				-message "The downloaded file does not appear to be genuine or is corrupt."\
@@ -368,9 +372,11 @@ proc ::gmautil::upgrade {destination_dir_list tmp_path source_base_url source_ba
 		}
 
 		$msg_callback "$msg_pfx unpacking files..." -progress [incr pi] -display
+		update
 		::ustar::gzip_extract $source_file_path "::gmautil::_install_file [list $destination_dir_list $strip_prefix ${msg_callback} ${msg_pfx}]"
 
 		$msg_callback "$msg_pfx checking file integrity..." -progress [incr pi] -display
+		update
 		set pi 0
 		set namelist [array names checklist :stat:*]
 		set nameqty [llength $namelist]
@@ -405,6 +411,7 @@ proc ::gmautil::upgrade {destination_dir_list tmp_path source_base_url source_ba
 		}
 
 		$msg_callback "$msg_pfx cleaning up..." -done -display
+		update
 		file delete -- $source_file_path $source_sig_path
 	} err]} {
 		tk_messageBox -type ok -icon error -title "Installation error" \
@@ -420,6 +427,7 @@ proc ::gmautil::upgrade {destination_dir_list tmp_path source_base_url source_ba
 		set exec_path [file join {*}$destination_dir_list $launch]
 		$msg_callback "$msg_pfx launching $new_version ..." -display
 		$msg_callback "$msg_pfx launching $new_version from $exec_path..."
+		update
 		tk_messageBox -type ok -icon info -title "Installation Complete" \
 			-message "We are about to attempt to launch version $new_version now. If this doesn't work, quit this program and run the new one from $exec_path." \
 			-detail "The complete command will be $exec_path $::argv"
@@ -434,7 +442,7 @@ proc ::gmautil::upgrade {destination_dir_list tmp_path source_base_url source_ba
 			}
 		}
 				
-		$msg_callback "$msg_pfx Exiting in 5 seconds"
+		$msg_callback "$msg_pfx Exiting in 5 seconds" -display
 		after 1000 [list ::gmautil::_countdown 4 $msg_callback $msg_pfx]
 	}
 }
@@ -491,13 +499,13 @@ proc ::gmautil::_install_file {destination_dir_list prefix callback pfx header d
 
 proc ::gmautil::_countdown {sec cb pfx} {
 	if {$sec <= 0} {
-		$cb "$pfx Exiting now"
+		$cb "$pfx Exiting now" -display
 		exit 0
 	}
 	if {$sec < 2} {
-		$cb "$pfx Exiting in $sec second"
+		$cb "$pfx Exiting in $sec second" -display
 	} else {
-		$cb "$pfx Exiting in $sec seconds"
+		$cb "$pfx Exiting in $sec seconds" -display
 	}
 	after 1000 [list ::gmautil::_countdown [expr $sec - 1] $cb $pfx]
 }

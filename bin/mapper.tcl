@@ -8670,7 +8670,7 @@ proc checkForUpdates {} {
 			grid [label $w.l2 -text "This version is what your GM recommends."] - - -sticky w
 		} elseif {$comp < 0} {
 			grid [label $w.l2 -text "Your GM's recommendation:"] [label $w.v2 -text $upgrade_to]\
-			     [button $w.b2 -text "Upgrade now" -command {UpgradeAvailable $ServerAvailableVersion}] -sticky w
+			     [button $w.b2 -text "Upgrade now from local server" -command {UpgradeAvailable $ServerAvailableVersion}] -sticky w
 		} else {
 			grid [label $w.l2 -text "Your GM's recommendation:"] [label $w.v2 -text $upgrade_to] - -sticky w
 			grid [label $w.ll2 -text "Your mapper is already newer than your GM's recommendation."] - - -sticky w
@@ -8697,7 +8697,7 @@ proc checkForUpdates {} {
 			set gcomp [::gmautil::version_compare $GMAMapperVersion $tag_value]
 			if {$gcomp < 0} {
 				grid [label $w.l3 -text "Latest public release:"] [label $w.v3 -text $tag] \
-				     [button $w.b3 -text "Upgrade now" -command "UpgradeAvailable -github [list $tag]"] -sticky w
+				     [button $w.b3 -text "Upgrade now to PUBLIC release" -command "UpgradeAvailable -github [list $tag]"] -sticky w
 			} elseif {$gcomp == 0} {
 				grid [label $w.l3 -text "This version is the latest public release."] - - -sticky w
 			} else {
@@ -8736,7 +8736,6 @@ proc UpgradeAvailable {args} {
 		return
 	}
 
-	DEBUG 0 "XXX Checking for $d from $_UpdateURL"
 	::gmautil::dassign $d Version new_version Token upgrade_file OS os Arch arch
 	set comp [::gmautil::version_compare $GMAMapperVersion $new_version]
 	if {$os eq {}} {
@@ -8799,6 +8798,7 @@ proc UpgradeAvailable {args} {
 						-message "This client is running from $BIN_DIR. Should I install the new one in [file join {*}$target_dirs]?"\
 						-detail "If you click YES, the new client will be installed in the recommended location to make it easier to maintain all the versions of the mapper you have on your system.\nIf you click NO, you will be prompted to choose the installation directory of your choice.\nIt you click CANCEL, we won't install the new version at this time at all."]
 					if {$answer eq {yes}} {
+						INFO "Initiating upgrade from $GMAMapperVersion to $new_version from $_UpdateURL"
 						::gmautil::upgrade $target_dirs $path_tmp $_UpdateURL $upgrade_file $GMAMapperVersion $new_version mapper bin/mapper.tcl ::INFO $CURLproxy $CURLpath
 					} elseif {$answer eq {no}} {
 						set chosen_dir [tk_chooseDirectory -initialdir [file join {*}$target_dirs] \
