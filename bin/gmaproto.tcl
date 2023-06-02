@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___        __    _______      __           #
-# (  ____ \(       )(  ___  ) Game         /   )      /  \  (  __   )    /  \          #
-# | (    \/| () () || (   ) | Master's    / /) |      \/) ) | (  )  |    \/) )         #
-# | |      | || || || (___) | Assistant  / (_) (_       | | | | /   |      | |         #
-# | | ____ | |(_)| ||  ___  |           (____   _)      | | | (/ /) |      | |         #
-# | | \_  )| |   | || (   ) |                ) (        | | |   / | |      | |         #
-# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_|  (__) | _  __) (_        #
-# (_______)|/     \||/     \| Client         (_)  (_) \____/(_______)(_) \____/        #
+#  _______  _______  _______                ___        __     __                       #
+# (  ____ \(       )(  ___  ) Game         /   )      /  \   /  \                      #
+# | (    \/| () () || (   ) | Master's    / /) |      \/) )  \/) )                     #
+# | |      | || || || (___) | Assistant  / (_) (_       | |    | |                     #
+# | | ____ | |(_)| ||  ___  |           (____   _)      | |    | |                     #
+# | | \_  )| |   | || (   ) |                ) (        | |    | |                     #
+# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_ __) (_                    #
+# (_______)|/     \||/     \| Client         (_)  (_) \____/ \____/                    #
 #                                                                                      #
 ########################################################################################
 #
@@ -1905,8 +1905,9 @@ proc ::gmaproto::_login {} {
 					::DEBUG 0 "The server speaks a protocol too new for me; checking for available updates..."
 					::DEBUG 0 "It may be possible to proceed with this client but not all commands may work as expected."
 				}
-				::gmaproto::DEBUG "Connected to server version [dict get $params ServerVersion] with protocol $::gmaproto::protocol"
-				::report_progress "Connected to server version [dict get $params ServerVersion] with protocol $::gmaproto::protocol"
+				set ::gmaproto::server_version [dict get $params ServerVersion]
+				::gmaproto::DEBUG "Connected to server version $::gmaproto::server_version with protocol $::gmaproto::protocol"
+				::report_progress "Connected to server version $::gmaproto::server_version with protocol $::gmaproto::protocol"
 				if {$challenge ne {}} {
 					::gmaproto::DEBUG "Authenticating to server"
 					if {$::gmaproto::password eq {?}} {
@@ -2165,7 +2166,7 @@ proc ::gmaproto::GMATypeToProtocolCommand {gt} {
 	return $gt
 }
 
-# @[00]@| GMA-Mapper 4.10.1
+# @[00]@| GMA-Mapper 4.11
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
