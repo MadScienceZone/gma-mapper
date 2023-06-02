@@ -1905,8 +1905,9 @@ proc ::gmaproto::_login {} {
 					::DEBUG 0 "The server speaks a protocol too new for me; checking for available updates..."
 					::DEBUG 0 "It may be possible to proceed with this client but not all commands may work as expected."
 				}
-				::gmaproto::DEBUG "Connected to server version [dict get $params ServerVersion] with protocol $::gmaproto::protocol"
-				::report_progress "Connected to server version [dict get $params ServerVersion] with protocol $::gmaproto::protocol"
+				set ::gmaproto::server_version [dict get $params ServerVersion]
+				::gmaproto::DEBUG "Connected to server version $::gmaproto::server_version with protocol $::gmaproto::protocol"
+				::report_progress "Connected to server version $::gmaproto::server_version with protocol $::gmaproto::protocol"
 				if {$challenge ne {}} {
 					::gmaproto::DEBUG "Authenticating to server"
 					if {$::gmaproto::password eq {?}} {
