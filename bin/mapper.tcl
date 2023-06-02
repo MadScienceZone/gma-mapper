@@ -1,20 +1,21 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___        __    _______      __           #
-# (  ____ \(       )(  ___  ) Game         /   )      /  \  (  __   )    /  \          #
-# | (    \/| () () || (   ) | Master's    / /) |      \/) ) | (  )  |    \/) )         #
-# | |      | || || || (___) | Assistant  / (_) (_       | | | | /   |      | |         #
-# | | ____ | |(_)| ||  ___  |           (____   _)      | | | (/ /) |      | |         #
-# | | \_  )| |   | || (   ) |                ) (        | | |   / | |      | |         #
-# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_|  (__) | _  __) (_        #
-# (_______)|/     \||/     \| Client         (_)  (_) \____/(_______)(_) \____/        #
+#  _______  _______  _______                ___        __     __                       #
+# (  ____ \(       )(  ___  ) Game         /   )      /  \   /  \                      #
+# | (    \/| () () || (   ) | Master's    / /) |      \/) )  \/) )                     #
+# | |      | || || || (___) | Assistant  / (_) (_       | |    | |                     #
+# | | ____ | |(_)| ||  ___  |           (____   _)      | |    | |                     #
+# | | \_  )| |   | || (   ) |                ) (        | |    | |                     #
+# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_ __) (_                    #
+# (_______)|/     \||/     \| Client         (_)  (_) \____/ \____/                    #
 #                                                                                      #
 ########################################################################################
 #
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.10.1}     ;# @@##@@
+set GMAMapperVersion {4.11}     ;# @@##@@
+set GMAMapperVersion {4.11}     ;# @@##@@
 set GMAMapperFileFormat {21}        ;# @@##@@
 set GMAMapperProtocol {406}         ;# @@##@@
 set CoreVersionNumber {6.3}            ;# @@##@@
@@ -912,6 +913,7 @@ if {[::gmautil::version_compare [info patchlevel] 8.7] >= 0} {
 set connmenuidx 8
 menu $mm.help
 $mm.help add command -command {aboutMapper} -label "About Mapper..."
+$mm.help add command -command {checkForUpdates} -label "Check for Updates..."
 
 #
 # The existence of the preferences dictionary is a relative latecomer
@@ -1128,6 +1130,7 @@ proc usage {} {
 	puts $stderr {        [--mkdir-path path] [--nc-path path] [--no-animate] [--no-blur-all]}
 	puts $stderr {        [--preferences path] [--scp-dest dir]}
 	puts $stderr {        [--scp-path path] [--scp-server hostname] [--ssh-path path] [--update-url url]}
+	puts $stderr {        [--recursionlimit n]}
 	puts $stderr {Each option and its argument must appear in separate CLI parameters (words).}
 	puts $stderr {   -A, --animate:     Enable animation of drawing onto the map}
 	puts $stderr {   -a, --no-animate:  Suppress animation of drawing onto the map}
@@ -1151,6 +1154,7 @@ proc usage {} {
 	puts $stderr {   -n, --no-chat:		Do not display incoming chat messages}
 	puts $stderr {   -P, --password:    Password to log in to the map service}
 	puts $stderr {   -p, --port:        Port for initiative tracker [2323]}
+	puts $stderr {       --recursionlimit: set runtime recursion limit}
 	puts $stderr {   -S, --select:      Select server profile (but don't make it the default)}
 	puts $stderr {   -t, --transcript:  Specify file to record a transcript of chat messages and die rolls.}
 	puts $stderr {   -u, --username:    Set the name you go by on your game server}
@@ -1301,6 +1305,11 @@ for {set argi 0} {$argi < $optc} {incr argi} {
 		--update-url      { set UpdateURL [getarg --update-url] }
 		--upgrade-notice  { set UpgradeNotice true }
 		--preferences     { getarg --preferences }
+		--recursionlimit  { 
+			set oldlimit [interp recursionlimit {}]
+			set newlimit [interp recursionlimit {} [getarg --recursionlimit]]
+			INFO "recurion limit changed from $oldlimit to $newlimit"
+		}
 		default {
 			if {[string range $option 0 0] eq "-"} {
 				usage
@@ -8025,6 +8034,65 @@ proc fetch_map_file {id} {
 	return $cache_filename
 }
 
+proc fetch_url {localdir local url} {
+	global CURLproxy CURLpath CURLserver
+	global my_stdout
+
+	if {![file isdirectory $localdir]} {
+		if {[file exists $localdir]} {
+			tk_messageBox -type ok -icon error -title "Conflicting File Exists" \
+				-message "We cannot complete the operation you requested becuase of a conflicting file."\
+				-detail "We need to access the directory [file nativename $localdir], but it appears there is already a file with that name, so we can't make the directory we need."
+			return {}
+		} else {
+			if {[catch {
+				file mkdir $localdir
+			} err]} {
+				tk_messageBox -type ok -icon error -title "Unable to Create Directory" \
+					-message "We cannot complete the operation you requested because we could not create a directory called [file nativename $localdir]."\
+					-detail $err
+				return {}
+			}
+		}
+	}
+
+	set dest [file join $localdir $local]
+	if [catch {
+		if {$CURLproxy ne {}} {
+			DEBUG 3 "Running $CURLpath --output [file nativename $dest] --proxy $CURLproxy -f $url"
+			exec $CURLpath --output [file nativename $dest] --proxy $CURLproxy -f $url >&@$my_stdout
+		} else {
+			DEBUG 3 "Running $CURLpath --output [file nativename $dest] -f $url"
+			exec $CURLpath --output [file nativename $dest] -f $url >&@$my_stdout
+		}
+	} err options] {
+		set i [dict get $options -errorcode]
+		if {[llength $i] >= 3 && [lindex $i 0] eq {CHILDSTATUS} && [lindex $i 2] == 22} {
+			DEBUG 0 "Requested map file ID $id was not found on the server."
+			tk_messageBox -type ok -icon error -title "Error Accessing Remote File" \
+				-message "We cannot complete the operation you requested because we could not retrieve a remote file."\
+				-detail "File not found."
+			return {}
+		} else {
+			tk_messageBox -type ok -icon error -title "Error Accessing Remote File" \
+				-message "We cannot complete the operation you requested because we could not retrieve a remote file."\
+				-detail $err
+			return {}
+		}
+	}
+	if {[catch {
+		set f [open $dest r]
+		set d [read $f]
+		close $f
+	} err]} {
+		tk_messageBox -type ok -icon error -title "Error Accessing Remote File" \
+			-message "We cannot complete the operation you requested because we could not read the data we retrieved from the remote site."\
+			-detail $err
+		return {}
+	}
+	return $d
+}
+
 proc send_file_to_server {id local_file} {
 	global SCPserver SCPdest SCPproxy SCPpath SSHpath NCpath SERVER_MKDIRpath
 	global my_stdout
@@ -8578,9 +8646,95 @@ proc DoCommandError {cmd d err} {
 	DEBUG 0 "Unable to execute command $cmd from server: $err (with payload $d)"
 }
 
-proc UpgradeAvailable {d} {
+set ServerAvailableVersion {}
+proc checkForUpdates {} {
+	global ServerAvailableVersion
+	global GMAMapperVersion
+	global path_tmp dialogbg
+	set trynow false
+
+	if {[winfo exists .upgradecheck]} {
+		INFO "A Check for Updates window is already open."
+		return
+	}
+	toplevel [set w .upgradecheck] 
+	wm title $w "Checking for Upgrades"
+	grid [label $w.title -text "Checking for mapper versions newer than the v$GMAMapperVersion you are running now."] - - -sticky w
+	grid [label $w.s0]
+	grid [label $w.l1 -text "Your current mapper version:"] [label $w.v1 -text $GMAMapperVersion] - -sticky w
+	grid [label $w.s1]
+
+	if {$ServerAvailableVersion ne {}} {
+		set comp [::gmautil::version_compare $GMAMapperVersion [set upgrade_to [dict get $ServerAvailableVersion Version]]]
+		if {$comp == 0} {
+			grid [label $w.l2 -text "This version is what your GM recommends."] - - -sticky w
+		} elseif {$comp < 0} {
+			grid [label $w.l2 -text "Your GM's recommendation:"] [label $w.v2 -text $upgrade_to]\
+			     [button $w.b2 -text "Upgrade now from local server" -command {UpgradeAvailable $ServerAvailableVersion}] -sticky w
+		} else {
+			grid [label $w.l2 -text "Your GM's recommendation:"] [label $w.v2 -text $upgrade_to] - -sticky w
+			grid [label $w.ll2 -text "Your mapper is already newer than your GM's recommendation."] - - -sticky w
+		}
+	} else {
+		grid [label $w.l2 -text "Your GM has not designated a required version for you to use"] - - -sticky w
+		grid [label $w.ll2 -text "(or we were unable to get that information from the game server at this time)."] - - -sticky w
+	}
+	grid [label $w.s2]
+
+	set github_info [fetch_url $path_tmp gma_mapper_current_release https://api.github.com/repos/MadScienceZone/gma-mapper/releases/latest]
+	if {$github_info eq {}} {
+		grid [label $w.l3 -text "We were not able to obtain the latest release information from github."] - - -sticky w
+	} else {
+		if {[catch {
+			set d [json::json2dict $github_info]
+			set tag [dict get $d tag_name]
+			set tag_pfx [string range $tag 0 0]
+			set tag_value [string range $tag 1 end]
+		} err]} {
+			grid [label $w.l3 -text "We were unable to obtain the latest release information from github."] - - -sticky w
+			grid [label $w.ll3 -text "($err)."] - - -sticky w
+		} else {
+			set gcomp [::gmautil::version_compare $GMAMapperVersion $tag_value]
+			if {$gcomp < 0} {
+				grid [label $w.l3 -text "Latest public release:"] [label $w.v3 -text $tag] \
+				     [button $w.b3 -text "Upgrade now to PUBLIC release" -command "UpgradeAvailable -github [list $tag]"] -sticky w
+			} elseif {$gcomp == 0} {
+				grid [label $w.l3 -text "This version is the latest public release."] - - -sticky w
+			} else {
+				grid [label $w.l3 -text "Latest public release:"] [label $w.v3 -text $tag] - -sticky w
+				grid [label $w.ll3 -text "Your mapper is already newer than the latest public release."] - - -sticky w
+			}
+		}
+	}
+	grid [label $w.s3]
+	grid [button $w.exit -text OK -command "destroy $w"] - -
+}
+
+# UpgradeAvailable -github tag
+# UpgradeAvailable upgrade_dict
+proc UpgradeAvailable {args} {
 	global GMAMapperVersion BIN_DIR path_install_base
 	global UpdateURL path_tmp CURLproxy CURLpath
+	global ServerAvailableVersion
+
+	if {[llength $args] == 2 && [lindex $args 0] eq {-github}} {
+		# fetch from github directly
+		set tag [lindex $args 1]
+		if {[string range $tag 0 0] eq {v}} {
+			set tag [string range $tag 1 end]
+		}
+		set _UpdateURL https://raw.githubusercontent.com/MadScienceZone/gma-mapper/main/signed-releases
+		set d [dict create Version $tag Token "mapper-$tag" OS {} Arch {}]
+		set from_github true
+	} elseif {[llength $args] == 1} {
+		# fetch from wherever we configured (possibly local) updates to come from
+		set ServerAvailableVersion [set d [lindex $args 0]]
+		set _UpdateURL $UpdateURL
+		set from_github false
+	} else {
+		DEBUG 0 "UpgradeAvailable $args: usage error"
+		return
+	}
 
 	::gmautil::dassign $d Version new_version Token upgrade_file OS os Arch arch
 	set comp [::gmautil::version_compare $GMAMapperVersion $new_version]
@@ -8594,24 +8748,30 @@ proc UpgradeAvailable {d} {
 	} else {
 		append for "for $arch machines"
 	}
-	
+
+	if {$from_github} {
+		set recommendation "You are currently running version $GMAMapperVersion.\nThe most recent public release $for is $new_version."
+	} else {
+		set recommendation "You are currently running version $GMAMapperVersion.\nYour game server says that the currently-recommended version $for (as incidated by your GM) is $new_version."
+	}
+
 	if {$comp < 0} {
 		if {[::gmautil::is_git $BIN_DIR]} {
 			tk_messageBox -type ok -icon info \
 				-title "Mapper version $new_version is available"\
 				-message "There is a new mapper version, $new_version, available for use. Update your Git repository." \
-				-detail "You are currently running version $GMAMapperVersion.\nYour server says that the currently-recommended version $for (as incidated by your GM) is $new_version.\nHowever, since you are running this client from $BIN_DIR, which is inside a Git repository working tree, you should upgrade it by running \"git pull\" rather than using the built-in upgrade feature."
+				-detail "$recommendation\nHowever, since you are running this client from $BIN_DIR, which is inside a Git repository working tree, you should upgrade it by running \"git pull\" rather than using the built-in upgrade feature."
 		} else {
-			if {$UpdateURL eq {}} {
+			if {$_UpdateURL eq {}} {
 				tk_messageBox -type ok -icon info \
 					-title "Mapper version $new_version is available"\
 					-message "There is a new mapper version, $new_version, available for use." \
-					-detail "You are currently running version $GMAMapperVersion.\nYour server says that the currently-recommended version $for (as incidated by your GM) is $new_version.\nIf you add an update-url value to your mapper configuration file or include an --update-url option when running mapper, this update may be installed automatically for you. Ask your GM for the correct value for that setting."
+					-detail "$recommendation\nIf you add an update-url value to your mapper configuration file or include an --update-url option when running mapper, this update may be installed automatically for you. Ask your GM for the correct value for that setting."
 			} else {
 				set answer [tk_messageBox -type yesno -icon question \
 					-title "Mapper version $new_version is available"\
 					-message "There is a new mapper version, $new_version, available for use. Do you wish to upgrade now?" \
-					-detail "You are currently running version $GMAMapperVersion.\nYour server says that the currently-recommended version $for (as incidated by your GM) is $new_version.\n\nIf you click YES, the new mapper will be downloaded from your GM's server, installed on your computer, and then launched. You will then be using the version $new_version client."]
+					-detail "$recommendation\n\nIf you click YES, the new mapper will be downloaded and installed on your computer, and then launched. You will then be using the version $new_version client."]
 				if {$answer eq {yes}} {
 					# Figure out if $BIN_DIR has the format <install_base>/mapper/<version>/bin
 					set install_dirs [file split $BIN_DIR]
@@ -8638,7 +8798,8 @@ proc UpgradeAvailable {d} {
 						-message "This client is running from $BIN_DIR. Should I install the new one in [file join {*}$target_dirs]?"\
 						-detail "If you click YES, the new client will be installed in the recommended location to make it easier to maintain all the versions of the mapper you have on your system.\nIf you click NO, you will be prompted to choose the installation directory of your choice.\nIt you click CANCEL, we won't install the new version at this time at all."]
 					if {$answer eq {yes}} {
-						::gmautil::upgrade $target_dirs $path_tmp $UpdateURL $upgrade_file $GMAMapperVersion $new_version mapper bin/mapper.tcl ::INFO $CURLproxy $CURLpath
+						INFO "Initiating upgrade from $GMAMapperVersion to $new_version from $_UpdateURL"
+						::gmautil::upgrade $target_dirs $path_tmp $_UpdateURL $upgrade_file $GMAMapperVersion $new_version mapper bin/mapper.tcl ::INFO $CURLproxy $CURLpath
 					} elseif {$answer eq {no}} {
 						set chosen_dir [tk_chooseDirectory -initialdir [file join {*}$target_dirs] \
 							-mustexist true \
@@ -8650,7 +8811,7 @@ proc UpgradeAvailable {d} {
 								-title "Confirm Installation Directory" \
 								-message "Are you sure you wish to install into $chosen_dir?"\
 								-detail "If you click YES, we will install the new mapper client into $chosen_dir."] eq {yes}} {
-								::gmautil::upgrade [file split $chosen_dir] $path_tmp $UpdateURL $upgrade_file $GMAMapperVersion $new_version mapper bin/mapper.tcl ::INFO $CURLproxy $CURLpath
+								::gmautil::upgrade [file split $chosen_dir] $path_tmp $_UpdateURL $upgrade_file $GMAMapperVersion $new_version mapper bin/mapper.tcl ::INFO $CURLproxy $CURLpath
 							} else {
 								say "Installation of version $new_version cancelled."
 							}
@@ -8662,7 +8823,11 @@ proc UpgradeAvailable {d} {
 			}; # end of "have UpdateURL"
 		}; # end of (not) in git area
 	} elseif {$comp > 0} {
-		INFO "You appear to be running a newer mapper ($GMAMapperVersion) than the latest version offered by your server ($new_version $for). If this isn't expected, you may want to nudge your GM and/or system administrator to update the server's advertised version."
+		if {$from_github} {
+			INFO "You appear to be running a newer mapper ($GMAMapperVersion) than the latest public release ($new_version $for). If this isn't expected, you may want to nudge your GM and/or system administrator to update the server's advertised version, or follow their advice on which version you should be running."
+		} else {
+			INFO "You appear to be running a newer mapper ($GMAMapperVersion) than the latest version offered by your server ($new_version $for). If this isn't expected, you may want to nudge your GM and/or system administrator to update the server's advertised version."
+		}
 	}
 }
 		
@@ -10879,9 +11044,24 @@ proc SyncView {} {
 
 proc aboutMapper {} {
 	global GMAMapperVersion GMAMapperFileFormat GMAMapperProtocol CoreVersionNumber
+	set connection_info {}
+	if {[::gmaproto::is_enabled]} {
+		if {[::gmaproto::is_connected]} {
+			if {[::gmaproto::is_ready]} {
+				set connection_info "Connected to $::gmaproto::host as $::gmaproto::username. The server is version $::gmaproto::server_version and speaks protocol $::gmaproto::protocol."
+			} else {
+				set connection_info "This mapper is negotiating its connection to $::gmaproto::host."
+			}
+		} else {
+			set connection_info "This mapper wants to connect to $::gmaproto::host, but it has not yet connected."
+		}
+	} else {
+		set connection_info "This mapper is running offline."
+	}
+
 
 	tk_messageBox -type ok -icon info -title "About Mapper" \
-		-message "GMA Mapper Client, Version $GMAMapperVersion, for GMA $CoreVersionNumber.\n\nCopyright \u00A9 Steve Willoughby, Aloha, Oregon, USA. All Rights Reserved. Distributed under the terms and conditions of the 3-Clause BSD License.\n\nThis client supports file format $GMAMapperFileFormat and server protocol $GMAMapperProtocol."
+		-message "GMA Mapper Client, Version $GMAMapperVersion, for GMA $CoreVersionNumber.\n\nCopyright \u00A9 Steve Willoughby, Aloha, Oregon, USA. All Rights Reserved. Distributed under the terms and conditions of the 3-Clause BSD License.\n\nThis client supports file format $GMAMapperFileFormat and server protocol $GMAMapperProtocol." -detail $connection_info
 }
 
 proc SyncAllClientsToMe {} {
@@ -11721,7 +11901,7 @@ proc ConnectToServerByIdx {idx} {
 	refresh_title
 }
 
-# @[00]@| GMA-Mapper 4.10.1
+# @[00]@| GMA-Mapper 4.11
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
