@@ -15,6 +15,7 @@
 #
 # Auto-configure values
 set GMAMapperVersion {4.10.2-alpha.1}     ;# @@##@@
+set GMAMapperVersion {4.10}     ;# @@##@@
 set GMAMapperFileFormat {21}        ;# @@##@@
 set GMAMapperProtocol {406}         ;# @@##@@
 set CoreVersionNumber {6.3}            ;# @@##@@
@@ -8649,28 +8650,40 @@ set ServerAvailableVersion {}
 proc checkForUpdates {} {
 	global ServerAvailableVersion
 	global GMAMapperVersion
-	global path_tmp
+	global path_tmp dialogbg
 	set trynow false
 
-	set results [list "You are running mapper version $GMAMapperVersion."]
+	if {[winfo exists .upgradecheck]} {
+		INFO "A Check for Updates window is already open."
+		return
+	}
+	toplevel [set w .upgradecheck] 
+	wm title $w "Checking for Upgrades"
+	grid [label $w.title -text "Checking for mapper versions newer than the v$GMAMapperVersion you are running now."] - - -sticky w
+	grid [label $w.s0]
+	grid [label $w.l1 -text "Your current mapper version:"] [label $w.v1 -text $GMAMapperVersion] - -sticky w
+	grid [label $w.s1]
+
 	if {$ServerAvailableVersion ne {}} {
 		set comp [::gmautil::version_compare $GMAMapperVersion [set upgrade_to [dict get $ServerAvailableVersion Version]]]
 		if {$comp == 0} {
-			lappend results "You are running the version your GM has directed for users of this game server."
+			grid [label $w.l2 -text "This version is what your GM recommends."] - - -sticky w
 		} elseif {$comp < 0} {
-			lappend results "Your GM recommends upgrading to version $upgrade_to."
-			lappend results "To do this, type 'git pull' if you have a clone of the repository; otherwise the mapper will prompt you to auto-upgrade when you start it."
-			set trynow true
+			grid [label $w.l2 -text "Your GM's recommendation:"] [label $w.v2 -text $upgrade_to]\
+			     [button $w.b2 -text "Upgrade now" -command {UpgradeAvailable $ServerAvailableVersion}] -sticky w
 		} else {
-			lappend results "You are already running a newer mapper than version $upgrade_to recommended by your GM."
+			grid [label $w.l2 -text "Your GM's recommendation:"] [label $w.v2 -text $upgrade_to] - -sticky w
+			grid [label $w.ll2 -text "Your mapper is already newer than your GM's recommendation."] - - -sticky w
 		}
 	} else {
-		lappend results "Your GM has not designated a required version for you to use (or we were unable to get that information from the game server at this time)."
+		grid [label $w.l2 -text "Your GM has not designated a required version for you to use"] - - -sticky w
+		grid [label $w.ll2 -text "(or we were unable to get that information from the game server at this time)."] - - -sticky w
 	}
+	grid [label $w.s2]
 
 	set github_info [fetch_url $path_tmp gma_mapper_current_release https://api.github.com/repos/MadScienceZone/gma-mapper/releases/latest]
 	if {$github_info eq {}} {
-		lappend results "We were not able to obtain the latest release information from github."
+		grid [label $w.l3 -text "We were not able to obtain the latest release information from github."] - - -sticky w
 	} else {
 		if {[catch {
 			set d [json::json2dict $github_info]
@@ -8678,36 +8691,52 @@ proc checkForUpdates {} {
 			set tag_pfx [string range $tag 0 0]
 			set tag_value [string range $tag 1 end]
 		} err]} {
-			lappend results "We were unable to obtain the latest release information from github ($err)."
+			grid [label $w.l3 -text "We were unable to obtain the latest release information from github."] - - -sticky w
+			grid [label $w.ll3 -text "($err)."] - - -sticky w
 		} else {
 			set gcomp [::gmautil::version_compare $GMAMapperVersion $tag_value]
 			if {$gcomp < 0} {
-				lappend results "A newer version, $tag, is available from Github."
-				lappend results "To update, run 'git pull' if you have a clone of the repository, or download from github.com/MadScienceZone/gma-mapper in the signed-releases folder."
+				grid [label $w.l3 -text "Latest public release:"] [label $w.v3 -text $tag] \
+				     [button $w.b3 -text "Upgrade now" -command "UpgradeAvailable -github [list $tag]"] -sticky w
 			} elseif {$gcomp == 0} {
-				lappend results "You are running the latest released mapper according to the Github repo data."
+				grid [label $w.l3 -text "This version is the latest public release."] - - -sticky w
 			} else {
-				lappend results "You are running a version of the mapper newer than the latest released version on Github ($tag)."
+				grid [label $w.l3 -text "Latest public release:"] [label $w.v3 -text $tag] - -sticky w
+				grid [label $w.ll3 -text "Your mapper is already newer than the latest public release."] - - -sticky w
 			}
 		}
 	}
-
-	tk_messageBox -type ok -icon info -title "Available Upgrade Information" \
-		-message [join $results "\n\n"]
-
-	if {$trynow} {
-		if {[tk_messageBox -type yesno -default no -icon question -title "Attempt Auto-upgrade now?" -message "Do you want me to try to upgrade to the version recommended by your GM now?"]} {
-			UpgradeAvailable $ServerAvailableVersion
-		}
-	}
+	grid [label $w.s3]
+	grid [button $w.exit -text OK -command "destroy $w"] - -
 }
 
-proc UpgradeAvailable {d} {
+# UpgradeAvailable -github tag
+# UpgradeAvailable upgrade_dict
+proc UpgradeAvailable {args} {
 	global GMAMapperVersion BIN_DIR path_install_base
 	global UpdateURL path_tmp CURLproxy CURLpath
 	global ServerAvailableVersion
 
-	set ServerAvailableVersion $d
+	if {[llength $args] == 2 && [lindex $args 0] eq {-github}} {
+		# fetch from github directly
+		set tag [lindex $args 1]
+		if {[string range $tag 0 0] eq {v}} {
+			set tag [string range $tag 1 end]
+		}
+		set _UpdateURL https://raw.githubusercontent.com/MadScienceZone/gma-mapper/main/signed-releases
+		set d [dict create Version $tag Token "mapper-$tag" OS {} Arch {}]
+		set from_github true
+	} elseif {[llength $args] == 1} {
+		# fetch from wherever we configured (possibly local) updates to come from
+		set ServerAvailableVersion [set d [lindex $args 0]]
+		set _UpdateURL $UpdateURL
+		set from_github false
+	} else {
+		DEBUG 0 "UpgradeAvailable $args: usage error"
+		return
+	}
+
+	DEBUG 0 "XXX Checking for $d from $_UpdateURL"
 	::gmautil::dassign $d Version new_version Token upgrade_file OS os Arch arch
 	set comp [::gmautil::version_compare $GMAMapperVersion $new_version]
 	if {$os eq {}} {
@@ -8720,24 +8749,30 @@ proc UpgradeAvailable {d} {
 	} else {
 		append for "for $arch machines"
 	}
-	
+
+	if {$from_github} {
+		set recommendation "You are currently running version $GMAMapperVersion.\nThe most recent public release $for is $new_version."
+	} else {
+		set recommendation "You are currently running version $GMAMapperVersion.\nYour game server says that the currently-recommended version $for (as incidated by your GM) is $new_version."
+	}
+
 	if {$comp < 0} {
 		if {[::gmautil::is_git $BIN_DIR]} {
 			tk_messageBox -type ok -icon info \
 				-title "Mapper version $new_version is available"\
 				-message "There is a new mapper version, $new_version, available for use. Update your Git repository." \
-				-detail "You are currently running version $GMAMapperVersion.\nYour server says that the currently-recommended version $for (as incidated by your GM) is $new_version.\nHowever, since you are running this client from $BIN_DIR, which is inside a Git repository working tree, you should upgrade it by running \"git pull\" rather than using the built-in upgrade feature."
+				-detail "$recommendation\nHowever, since you are running this client from $BIN_DIR, which is inside a Git repository working tree, you should upgrade it by running \"git pull\" rather than using the built-in upgrade feature."
 		} else {
-			if {$UpdateURL eq {}} {
+			if {$_UpdateURL eq {}} {
 				tk_messageBox -type ok -icon info \
 					-title "Mapper version $new_version is available"\
 					-message "There is a new mapper version, $new_version, available for use." \
-					-detail "You are currently running version $GMAMapperVersion.\nYour server says that the currently-recommended version $for (as incidated by your GM) is $new_version.\nIf you add an update-url value to your mapper configuration file or include an --update-url option when running mapper, this update may be installed automatically for you. Ask your GM for the correct value for that setting."
+					-detail "$recommendation\nIf you add an update-url value to your mapper configuration file or include an --update-url option when running mapper, this update may be installed automatically for you. Ask your GM for the correct value for that setting."
 			} else {
 				set answer [tk_messageBox -type yesno -icon question \
 					-title "Mapper version $new_version is available"\
 					-message "There is a new mapper version, $new_version, available for use. Do you wish to upgrade now?" \
-					-detail "You are currently running version $GMAMapperVersion.\nYour server says that the currently-recommended version $for (as incidated by your GM) is $new_version.\n\nIf you click YES, the new mapper will be downloaded from your GM's server, installed on your computer, and then launched. You will then be using the version $new_version client."]
+					-detail "$recommendation\n\nIf you click YES, the new mapper will be downloaded and installed on your computer, and then launched. You will then be using the version $new_version client."]
 				if {$answer eq {yes}} {
 					# Figure out if $BIN_DIR has the format <install_base>/mapper/<version>/bin
 					set install_dirs [file split $BIN_DIR]
@@ -8764,7 +8799,7 @@ proc UpgradeAvailable {d} {
 						-message "This client is running from $BIN_DIR. Should I install the new one in [file join {*}$target_dirs]?"\
 						-detail "If you click YES, the new client will be installed in the recommended location to make it easier to maintain all the versions of the mapper you have on your system.\nIf you click NO, you will be prompted to choose the installation directory of your choice.\nIt you click CANCEL, we won't install the new version at this time at all."]
 					if {$answer eq {yes}} {
-						::gmautil::upgrade $target_dirs $path_tmp $UpdateURL $upgrade_file $GMAMapperVersion $new_version mapper bin/mapper.tcl ::INFO $CURLproxy $CURLpath
+						::gmautil::upgrade $target_dirs $path_tmp $_UpdateURL $upgrade_file $GMAMapperVersion $new_version mapper bin/mapper.tcl ::INFO $CURLproxy $CURLpath
 					} elseif {$answer eq {no}} {
 						set chosen_dir [tk_chooseDirectory -initialdir [file join {*}$target_dirs] \
 							-mustexist true \
@@ -8776,7 +8811,7 @@ proc UpgradeAvailable {d} {
 								-title "Confirm Installation Directory" \
 								-message "Are you sure you wish to install into $chosen_dir?"\
 								-detail "If you click YES, we will install the new mapper client into $chosen_dir."] eq {yes}} {
-								::gmautil::upgrade [file split $chosen_dir] $path_tmp $UpdateURL $upgrade_file $GMAMapperVersion $new_version mapper bin/mapper.tcl ::INFO $CURLproxy $CURLpath
+								::gmautil::upgrade [file split $chosen_dir] $path_tmp $_UpdateURL $upgrade_file $GMAMapperVersion $new_version mapper bin/mapper.tcl ::INFO $CURLproxy $CURLpath
 							} else {
 								say "Installation of version $new_version cancelled."
 							}
@@ -8788,7 +8823,11 @@ proc UpgradeAvailable {d} {
 			}; # end of "have UpdateURL"
 		}; # end of (not) in git area
 	} elseif {$comp > 0} {
-		INFO "You appear to be running a newer mapper ($GMAMapperVersion) than the latest version offered by your server ($new_version $for). If this isn't expected, you may want to nudge your GM and/or system administrator to update the server's advertised version."
+		if {$from_github} {
+			INFO "You appear to be running a newer mapper ($GMAMapperVersion) than the latest public release ($new_version $for). If this isn't expected, you may want to nudge your GM and/or system administrator to update the server's advertised version, or follow their advice on which version you should be running."
+		} else {
+			INFO "You appear to be running a newer mapper ($GMAMapperVersion) than the latest version offered by your server ($new_version $for). If this isn't expected, you may want to nudge your GM and/or system administrator to update the server's advertised version."
+		}
 	}
 }
 		
