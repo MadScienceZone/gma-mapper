@@ -18,6 +18,7 @@ versions.
 
 # 4.10.2-alpha
  * Adds a command-line option `--recursionlimit` *n* which sets the runtime recursion limit to the given value. It will then be an error if we nest function calls more than *n* calls deep. The default is 1000. This is to help debug the issue that occasionally pops up where we exceed the default limit.
+ * Adds "Check for Updates" menu option which queries github for the latest version of gma-mapper as well as looking at what the GM set on the server configuration.
 
 # 4.10.1
 ## Fixes
