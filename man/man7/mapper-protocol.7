@@ -1,5 +1,5 @@
 '\" t
-'\" *** 406 ***
+'\" *** 407 ***
 '\" <<ital-is-var>>
 '\" <<bold-is-fixed>>
 .TH MAPPER-PROTOCOL 7 "GMA-Mapper 4.3.4" 16-Mar-2023 "Games" \" @@mp@@
@@ -75,7 +75,7 @@ MAY
 be implemented to wait synchronously for a server
 response during the authentication negotiation stage.
 .LP
-This describes protocol version 406. These notes are intended to be 
+This describes protocol version 407. These notes are intended to be 
 detailed enough to implement a client from and should be considered
 the definitive standard reference to the protocol.
 .LP
@@ -412,6 +412,39 @@ with any previously defined sizes for the same image name.
 Each element of this list is an object with the following fields:
 '\" <<list>>
 .RS
+.TP
+'\" <</ital-is-var>>
+.BI Animation " (object)"
+'\" <<ital-is-var>>
+If this value is given and non-null, this image is to be animated
+from individual frames. If the consumer is capable of animating
+multi-frame files, the base filename can be used directly. Otherwise,
+individual frame files are available by prefixing the base filename
+with 
+.RB \*(lq :\fIn\fP: \*(rq
+where
+.I n
+is the frame number, starting with 0.
+'\" <<list>>
+.RS
+.TP
+'\" <</ital-is-var>>
+.BI Frames " (int)"
+'\" <<ital-is-var>>
+The number of frames in the animation.
+.TP
+'\" <</ital-is-var>>
+.BI FrameSpeed " (int)"
+'\" <<ital-is-var>>
+The number of milliseconds to delay between frames.
+.TP
+'\" <</ital-is-var>>
+.BI Loops " (int)"
+'\" <<ital-is-var>>
+If present and non-zero, the animation will play this many times before stopping. Otherwise,
+the animation plays forever.
+.RE
+'\" <</>>
 .TP
 .B File
 The filename or server ID by which the image can be retrieved.
@@ -2659,7 +2692,11 @@ John Mechalas (elevation and movement modes).
 .SH HISTORY
 .LP
 '\" <<New>>
-This document defines map protocol version 406,
+This document defines map protocol version 407,
+which added the image animation features.
+'\" <</New>>
+.LP
+This document also defines map protocol version 406,
 which dropped the
 .B Area
 attribute from creatures and added the
@@ -2669,7 +2706,6 @@ attribute and the expanded syntax for the
 attribute, as well as the new
 .B DispSize
 attribute.
-'\" <</New>>
 .LP
 Protocol version 405
 introduced the
