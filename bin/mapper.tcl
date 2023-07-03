@@ -1,20 +1,20 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___        __     __        __             #
-# (  ____ \(       )(  ___  ) Game         /   )      /  \   /  \      /  \            #
-# | (    \/| () () || (   ) | Master's    / /) |      \/) )  \/) )     \/) )           #
-# | |      | || || || (___) | Assistant  / (_) (_       | |    | |       | |           #
-# | | ____ | |(_)| ||  ___  |           (____   _)      | |    | |       | |           #
-# | | \_  )| |   | || (   ) |                ) (        | |    | |       | |           #
-# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_ __) (_ _  __) (_          #
-# (_______)|/     \||/     \| Client         (_)  (_) \____/ \____/(_) \____/          #
+#  _______  _______  _______                ___        __    _______                   #
+# (  ____ \(       )(  ___  ) Game         /   )      /  \  / ___   )                  #
+# | (    \/| () () || (   ) | Master's    / /) |      \/) ) \/   )  |                  #
+# | |      | || || || (___) | Assistant  / (_) (_       | |     /   )                  #
+# | | ____ | |(_)| ||  ___  |           (____   _)      | |   _/   /                   #
+# | | \_  )| |   | || (   ) |                ) (        | |  /   _/                    #
+# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_(   (__/\                  #
+# (_______)|/     \||/     \| Client         (_)  (_) \____/\_______/                  #
 #                                                                                      #
 ########################################################################################
 #
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.11.1}     ;# @@##@@
+set GMAMapperVersion {4.12}     ;# @@##@@
 set GMAMapperFileFormat {21}        ;# @@##@@
 set GMAMapperProtocol {406}         ;# @@##@@
 set CoreVersionNumber {6.3}            ;# @@##@@
@@ -838,81 +838,96 @@ set MajorGuideLineOffset {0 0}
 #set rscale 100.0
 
 frame .toolbar2
-set toolbar2_menu [menubutton .toolbar2.menu -relief raised -menu .toolbar2.menu.main_menu]
-set mm .toolbar2.menu.main_menu
-::tooltip::tooltip .toolbar2.menu "Main Application Menu"
-menu $mm
-$mm add cascade -menu $mm.file -label File
-$mm add cascade -menu $mm.edit -label Edit
-$mm add cascade -menu $mm.view -label View
-$mm add cascade -menu $mm.play -label Play
-$mm add cascade -menu $mm.help -label Help
-menu $mm.file
-$mm.file add command -command {loadfile {}} -label "Load Map File..."
-$mm.file add command -command {loadfile {} -merge} -label "Merge Map File..."
-$mm.file add command -command savefile -label "Save Map File..."
-$mm.file add separator
-$mm.file add command -command exitchk -label Exit
-menu $mm.edit
-$mm.edit add command -command playtool -label "Normal Play Mode"
-$mm.edit add separator
-$mm.edit add command -command {cleargrid; ::gmaproto::clear E*} -label "Clear All Map Elements"
-$mm.edit add command -command {clearplayers monster; ::gmaproto::clear M*} -label "Clear All Monsters"
-$mm.edit add command -command {clearplayers player; ::gmaproto::clear P*} -label "Clear All Players"
-$mm.edit add command -command {clearplayers *; ::gmaproto::clear P*; ::gmaproto::clear M*} -label "Clear All Creatures"
-$mm.edit add command -command {cleargrid; clearplayers *; ::gmaproto::clear *} -label "Clear All Objects"
-$mm.edit add separator
-$mm.edit add command -command linetool -label "Draw Lines"
-$mm.edit add command -command recttool -label "Draw Rectangles"
-$mm.edit add command -command polytool -label "Draw Polygons"
-$mm.edit add command -command circtool -label "Draw Circles/Ellipses"
-$mm.edit add command -command arctool  -label "Draw Arcs"
-$mm.edit add command -command texttool -label "Add Text..."
-$mm.edit add command -command killtool -label "Remove Objects"
-$mm.edit add command -command movetool -label "Move Objects"
-$mm.edit add command -command stamptool -label "Stamp Objects"
-$mm.edit add separator
-$mm.edit add command -command toggleNoFill -label "Toggle Fill/No-Fill"
-$mm.edit add command -command {colorpick fill} -label "Choose Fill Color..."
-$mm.edit add command -command {colorpick line} -label "Choose Outline Color..."
-$mm.edit add separator
-$mm.edit add command -command gridsnap -label "Cycle Grid Snap"
-$mm.edit add command -command setwidth -label "Cycle Line Thickness"
-$mm.edit add separator
-$mm.edit add command -command {unloadfile {}} -label "Remove Elements from File..."
-$mm.edit add separator
-$mm.edit add command -command {editPreferences} -label "Preferences..."
-menu $mm.view
-$mm.view add command -command {toolBarState 0} -label "Hide Toolbar"
-$mm.view add command -command {toggleGridEnable} -label "Toggle Grid"
-$mm.view add command -command {toggleShowHealthStats} -label "Toggle Health Stats"
-$mm.view add separator
-$mm.view add command -command {zoomInBy 2} -label "Zoom In"
-$mm.view add command -command {zoomInBy 0.5} -label "Zoom Out"
-$mm.view add command -command {resetZoom} -label "Restore Zoom"
-$mm.view add separator
-$mm.view add command -command {FindNearby} -label "Scroll to Visible Objects"
-$mm.view add command -command {SyncView} -label "Scroll Others' Views to Match Mine"
-$mm.view add command -command {refreshScreen} -label "Refresh Display"
-menu $mm.play
-menu $mm.play.servers
-$mm.play add command -command {togglecombat} -label "Toggle Combat Mode"
-$mm.play add command -command {aoetool} -label "Indicate Area of Effect"
-$mm.play add command -command {rulertool} -label "Measure Distance Along Line(s)"
-$mm.play add command -command {DisplayChatMessage {}} -label "Show Chat/Die-roll Window"
-$mm.play add command -command {display_initiative_clock} -label "Show Initiative Clock"
-$mm.play add separator
-$mm.play add command -command {ClearSelection} -label "Deselect All"
-$mm.play add separator
-if {[::gmautil::version_compare [info patchlevel] 8.7] >= 0} {
-	$mm.play add cascade -menu $mm.play.servers -state disabled -label "Connect to"
-} else {
-	$mm.play add cascade -menu $mm.play.servers -label "Connect to"
+set MAIN_MENU {}
+proc create_main_menu {use_button} {
+	global MAIN_MENU connmenuidx
+	if {$MAIN_MENU ne {}} {
+		return
+	}
+	if {$use_button} {
+		set MAIN_MENU .toolbar2.menu.main_menu
+		set toolbar2_menu [menubutton .toolbar2.menu -relief raised -menu $MAIN_MENU]
+		menu $MAIN_MENU
+		::tooltip::tooltip .toolbar2.menu "Main Application Menu"
+		grid $toolbar2_menu -row 0 -column 0 -sticky w
+	} else {
+		set MAIN_MENU .menu
+		menu $MAIN_MENU
+		. configure -menu $MAIN_MENU
+	}
+	set mm $MAIN_MENU
+	$mm add cascade -menu $mm.file -label File
+	$mm add cascade -menu $mm.edit -label Edit
+	$mm add cascade -menu $mm.view -label View
+	$mm add cascade -menu $mm.play -label Play
+	$mm add cascade -menu $mm.help -label Help
+	menu $mm.file
+	$mm.file add command -command {loadfile {}} -label "Load Map File..."
+	$mm.file add command -command {loadfile {} -merge} -label "Merge Map File..."
+	$mm.file add command -command savefile -label "Save Map File..."
+	$mm.file add separator
+	$mm.file add command -command exitchk -label Exit
+	menu $mm.edit
+	$mm.edit add command -command playtool -label "Normal Play Mode"
+	$mm.edit add separator
+	$mm.edit add command -command {cleargrid; ::gmaproto::clear E*} -label "Clear All Map Elements"
+	$mm.edit add command -command {clearplayers monster; ::gmaproto::clear M*} -label "Clear All Monsters"
+	$mm.edit add command -command {clearplayers player; ::gmaproto::clear P*} -label "Clear All Players"
+	$mm.edit add command -command {clearplayers *; ::gmaproto::clear P*; ::gmaproto::clear M*} -label "Clear All Creatures"
+	$mm.edit add command -command {cleargrid; clearplayers *; ::gmaproto::clear *} -label "Clear All Objects"
+	$mm.edit add separator
+	$mm.edit add command -command linetool -label "Draw Lines"
+	$mm.edit add command -command recttool -label "Draw Rectangles"
+	$mm.edit add command -command polytool -label "Draw Polygons"
+	$mm.edit add command -command circtool -label "Draw Circles/Ellipses"
+	$mm.edit add command -command arctool  -label "Draw Arcs"
+	$mm.edit add command -command texttool -label "Add Text..."
+	$mm.edit add command -command killtool -label "Remove Objects"
+	$mm.edit add command -command movetool -label "Move Objects"
+	$mm.edit add command -command stamptool -label "Stamp Objects"
+	$mm.edit add separator
+	$mm.edit add command -command toggleNoFill -label "Toggle Fill/No-Fill"
+	$mm.edit add command -command {colorpick fill} -label "Choose Fill Color..."
+	$mm.edit add command -command {colorpick line} -label "Choose Outline Color..."
+	$mm.edit add separator
+	$mm.edit add command -command gridsnap -label "Cycle Grid Snap"
+	$mm.edit add command -command setwidth -label "Cycle Line Thickness"
+	$mm.edit add separator
+	$mm.edit add command -command {unloadfile {}} -label "Remove Elements from File..."
+	$mm.edit add separator
+	$mm.edit add command -command {editPreferences} -label "Preferences..."
+	menu $mm.view
+	$mm.view add command -command {toolBarState 0} -label "Hide Toolbar"
+	$mm.view add command -command {toggleGridEnable} -label "Toggle Grid"
+	$mm.view add command -command {toggleShowHealthStats} -label "Toggle Health Stats"
+	$mm.view add separator
+	$mm.view add command -command {zoomInBy 2} -label "Zoom In"
+	$mm.view add command -command {zoomInBy 0.5} -label "Zoom Out"
+	$mm.view add command -command {resetZoom} -label "Restore Zoom"
+	$mm.view add separator
+	$mm.view add command -command {FindNearby} -label "Scroll to Visible Objects"
+	$mm.view add command -command {SyncView} -label "Scroll Others' Views to Match Mine"
+	$mm.view add command -command {refreshScreen} -label "Refresh Display"
+	menu $mm.play
+	menu $mm.play.servers
+	$mm.play add command -command {togglecombat} -label "Toggle Combat Mode"
+	$mm.play add command -command {aoetool} -label "Indicate Area of Effect"
+	$mm.play add command -command {rulertool} -label "Measure Distance Along Line(s)"
+	$mm.play add command -command {DisplayChatMessage {}} -label "Show Chat/Die-roll Window"
+	$mm.play add command -command {display_initiative_clock} -label "Show Initiative Clock"
+	$mm.play add separator
+	$mm.play add command -command {ClearSelection} -label "Deselect All"
+	$mm.play add separator
+	if {[::gmautil::version_compare [info patchlevel] 8.7] >= 0} {
+		$mm.play add cascade -menu $mm.play.servers -state disabled -label "Connect to"
+	} else {
+		$mm.play add cascade -menu $mm.play.servers -label "Connect to"
+	}
+	set connmenuidx 8
+	menu $mm.help
+	$mm.help add command -command {aboutMapper} -label "About Mapper..."
+	$mm.help add command -command {checkForUpdates} -label "Check for Updates..."
 }
-set connmenuidx 8
-menu $mm.help
-$mm.help add command -command {aboutMapper} -label "About Mapper..."
-$mm.help add command -command {checkForUpdates} -label "Check for Updates..."
 
 #
 # The existence of the preferences dictionary is a relative latecomer
@@ -1011,11 +1026,12 @@ proc ApplyPreferences {data args} {
 	if {$username ne {}} {
 		set local_user $username
 	}
+	create_main_menu [dict get $data menu_button]
 	UpdateConnectionMenu [::gmaprofile::list_server_names $data]
 }
 proc UpdateConnectionMenu {names} {
-	global connmenuidx
-	set mm .toolbar2.menu.main_menu.play
+	global connmenuidx MAIN_MENU
+	set mm ${MAIN_MENU}.play
 	$mm.servers delete 0 end
 	set idx 0
 	foreach name $names {
@@ -1109,6 +1125,8 @@ if {[file exists $preferences_path]} {
 	set _preferences $PreferencesData
 	set allowLegacy true
 }
+
+create_main_menu [dict get $PreferencesData menu_button]
 
 #
 # Runtime Argument Processing
@@ -1635,6 +1653,10 @@ foreach icon_name {
 	}
 }
 
+catch {
+	.toolbar2.menu configure -image $icon_menu
+}
+
 set canvas [canvas .c -height $canh -width $canw -scrollregion [list 0 0 $cansw $cansh] -xscrollcommand {.xs set} -yscrollcommand {.ys set}]
 
 grid [frame .toolbar] -sticky ew
@@ -1700,13 +1722,17 @@ proc battleGridLabels {} {
 
 
 proc toolBarState {state} {
-    global toolbar_current_state
+    global toolbar_current_state MAIN_MENU
 	if {$state} {
 		grid configure .toolbar -row 0 -column 0 -sticky ew
-        .toolbar2.menu.main_menu.view entryconfigure *Toolbar -label "Hide Toolbar" -command {toolBarState 0}
+		if {$MAIN_MENU ne {}} {
+			${MAIN_MENU}.view entryconfigure *Toolbar -label "Hide Toolbar" -command {toolBarState 0}
+		}
 	} else {
 		grid forget .toolbar 
-        .toolbar2.menu.main_menu.view entryconfigure *Toolbar -label "Show Toolbar" -command {toolBarState 1}
+		if {$MAIN_MENU ne {}} {
+			${MAIN_MENU}.view entryconfigure *Toolbar -label "Show Toolbar" -command {toolBarState 1}
+		}
 	}
 }
 
@@ -1756,8 +1782,6 @@ grid \
 	 [button .toolbar.save -image $icon_save -command savefile] \
 	 [button .toolbar.exit -image $icon_exit -command exitchk] 
 
-grid $toolbar2_menu -row 0 -column 0 -sticky w
-$toolbar2_menu configure -image $icon_menu
 grid [label   .toolbar2.clock -anchor w -font {Helvetica 18} -textvariable ClockDisplay]         -row 0 -column 1 -sticky we 
 grid [ttk::progressbar .toolbar2.progbar -orient horizontal -length 200 -variable ClockProgress] -row 0 -column 2 -sticky e
 grid columnconfigure .toolbar2 1 -weight 2
@@ -11905,7 +11929,7 @@ proc ConnectToServerByIdx {idx} {
 	refresh_title
 }
 
-# @[00]@| GMA-Mapper 4.11.1
+# @[00]@| GMA-Mapper 4.12
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
