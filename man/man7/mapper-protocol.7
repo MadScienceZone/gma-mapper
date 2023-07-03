@@ -399,19 +399,7 @@ commands as of protocol version 400.)
 The payload is a JSON object with the following fields:
 '\" <<list>>
 .RS
-.TP
-.B Name
-The name of the image as known within the mapper.
-.TP
-'\" <</ital-is-var>>
-.BI Sizes " (list of objects)"
-'\" <<ital-is-var>>
-A list of sizes available for this object. This will be
-.I merged
-with any previously defined sizes for the same image name.
-Each element of this list is an object with the following fields:
-'\" <<list>>
-.RS
+'\" <<New>>
 .TP
 '\" <</ital-is-var>>
 .BI Animation " (object)"
@@ -424,7 +412,7 @@ with
 .RB \*(lq :\fIn\fP: \*(rq
 where
 .I n
-is the frame number, starting with 0.
+is the frame number, starting with 0. It has the following fields:
 '\" <<list>>
 .RS
 .TP
@@ -445,6 +433,20 @@ If present and non-zero, the animation will play this many times before stopping
 the animation plays forever.
 .RE
 '\" <</>>
+'\" <</New>>
+.TP
+.B Name
+The name of the image as known within the mapper.
+.TP
+'\" <</ital-is-var>>
+.BI Sizes " (list of objects)"
+A list of sizes available for this object. This will be
+.I merged
+'\" <<ital-is-var>>
+with any previously defined sizes for the same image name.
+Each element of this list is an object with the following fields:
+'\" <<list>>
+.RS
 .TP
 .B File
 The filename or server ID by which the image can be retrieved.
@@ -1373,7 +1375,6 @@ If it begins with
 (e.g., 
 .RB \*(lq ..blue \*(rq),
 then the effect is the same, but the dashes are shorter.
-'\" <<New>>
 .RE
 .TP
 '\" <</ital-is-var>>
@@ -1382,7 +1383,6 @@ then the effect is the same, but the dashes are shorter.
 If true, the creature token should be displayed in a semi-transparent
 form whenever it has this condition
 (added in protocol 404).
-'\" <</New>>
 .TP
 .B Description
 A description of the effects on the character of having that condition
@@ -2087,12 +2087,10 @@ server configuration), it is an indicator that the server's main event loop is d
 .BI ServerTime " (RFC 3339-formatted datetime string)"
 The current wall-clock time on the server. This provides an accurate point of reference
 to determine how long ago the other server time values occurred.
-'\" <<New>>
 .TP
 .B ServerVersion
 The server's version number.
 (Added in protocol 405.)
-'\" <</New>>
 '\" <<ital-is-var>>
 '\" <</>>
 .RE
@@ -2217,12 +2215,10 @@ is 10, then hit points are displayed only in 10% increments.
 '\" <</>>
 .RE
 .TP
-'\" <<New>>
 '\" <</ital-is-var>>
 .BI Hidden " (bool)"
 If true, this creature token is hidden from player view, although the GM can still see it.
 Added in protocol 404.
-'\" <</New>>
 .TP
 .BI Gx " (float)"
 The grid 
@@ -2264,7 +2260,6 @@ A note to attach to the creature token to indicate special conditions or status.
 .BI Size
 The tactical size category of the creature.
 '\" <<ital-is-var>>
-'\" <<New>>
 This has the general form
 .RS
 .RS
@@ -2294,7 +2289,6 @@ to the given size category and should be displayed as such.
 The value is otherwise identical to
 .BR Size .
 (Added in 406.)
-'\" <</New>>
 .TP
 '\" <</ital-is-var>>
 .BI StatusList " (list of strings)"
@@ -2360,7 +2354,6 @@ should be de-emphasized compared to the one with initiative.
 The specific type of creature. This may be 0 if the type is unknown, 1 for
 monsters, or 2 for players. Clients MUST NOT set this field to a value other
 than 1 or 2.
-'\" <<New>>
 .TP
 '\" <</ital-is-var>>
 .BI CustomReach " (object)"
@@ -2385,7 +2378,6 @@ but indicates the distance for reach weapons.
 .RE
 .LP
 (Added in protocol 406.)
-'\" <</New>>
 '\" <</>>
 .RE
 .TP
