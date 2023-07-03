@@ -3,7 +3,7 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.11.1          <!-- @@##@@ -->
+ * This Package Version: 4.12          <!-- @@##@@ -->
  * Effective Date: 03-Jul-2023               <!-- @@##@@ -->
 
 ## Compatibility
@@ -15,6 +15,10 @@
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.12
+## Adds
+ * Now provides a preferences setting to select whether to display the main menu as an application menu bar or on a menu button. (Previously it was only on a menu button).
 
 # 4.11.1
 ## Adds
