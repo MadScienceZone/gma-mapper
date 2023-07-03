@@ -3,8 +3,8 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.11          <!-- @@##@@ -->
- * Effective Date: 02-Jun-2023               <!-- @@##@@ -->
+ * This Package Version: 4.11.1          <!-- @@##@@ -->
+ * Effective Date: 03-Jul-2023               <!-- @@##@@ -->
 
 ## Compatibility
  * GMA Core API Library Version: 6.3 <!-- @@##@@ -->
@@ -16,7 +16,7 @@ The support for old server protocols (<400) and map file formats (<20) will be d
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
-# Unreleased
+# 4.11.1
 ## Adds
  * Warning dialog if the mapper is using a legacy `mapper.conf` file which is now deprecated.
 
