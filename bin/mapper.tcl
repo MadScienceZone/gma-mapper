@@ -1,21 +1,20 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___        __     __                       #
-# (  ____ \(       )(  ___  ) Game         /   )      /  \   /  \                      #
-# | (    \/| () () || (   ) | Master's    / /) |      \/) )  \/) )                     #
-# | |      | || || || (___) | Assistant  / (_) (_       | |    | |                     #
-# | | ____ | |(_)| ||  ___  |           (____   _)      | |    | |                     #
-# | | \_  )| |   | || (   ) |                ) (        | |    | |                     #
-# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_ __) (_                    #
-# (_______)|/     \||/     \| Client         (_)  (_) \____/ \____/                    #
+#  _______  _______  _______                ___        __     __        __             #
+# (  ____ \(       )(  ___  ) Game         /   )      /  \   /  \      /  \            #
+# | (    \/| () () || (   ) | Master's    / /) |      \/) )  \/) )     \/) )           #
+# | |      | || || || (___) | Assistant  / (_) (_       | |    | |       | |           #
+# | | ____ | |(_)| ||  ___  |           (____   _)      | |    | |       | |           #
+# | | \_  )| |   | || (   ) |                ) (        | |    | |       | |           #
+# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_ __) (_ _  __) (_          #
+# (_______)|/     \||/     \| Client         (_)  (_) \____/ \____/(_) \____/          #
 #                                                                                      #
 ########################################################################################
 #
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.11}     ;# @@##@@
-set GMAMapperVersion {4.11}     ;# @@##@@
+set GMAMapperVersion {4.11.1}     ;# @@##@@
 set GMAMapperFileFormat {21}        ;# @@##@@
 set GMAMapperProtocol {406}         ;# @@##@@
 set CoreVersionNumber {6.3}            ;# @@##@@
@@ -1090,6 +1089,7 @@ for {set i 0} {$i < $argc} {incr i} {
 	}
 }
 
+set allowLegacy false
 if {[file exists $preferences_path]} {
 	if [catch {
 		set PreferencesData [::gmaprofile::load $preferences_path]
@@ -1107,6 +1107,7 @@ if {[file exists $preferences_path]} {
 	set PreferencesData [::gmaprofile::default_preferences]
 	set CurrentProfileName {}
 	set _preferences $PreferencesData
+	set allowLegacy true
 }
 
 #
@@ -1192,7 +1193,7 @@ proc getarg {opt} {
 #
 # Load from mapper.conf ONLY if we didn't already find a new-style preferences file first
 #
-if {$PreferencesData eq {} && [file exists $default_config]} {
+if {$allowLegacy && [file exists $default_config]} {
 	set optc [expr $optc + 2]
 	set optlist [linsert $optlist 0 --config $default_config]
 }
@@ -1211,6 +1212,9 @@ for {set argi 0} {$argi < $optc} {incr argi} {
 		-b - --blur-hp  { set blur_pct [expr max(0, min(100, [getarg -b]))] }
 		-C - --config {
 			set config_filename [getarg -C]
+			tk_messageBox -type ok -icon info -title "Legacy config file"\
+				-parent . -message "The usage of legacy configuration files such as $config_filename is deprecated. Please transition your settings using \"Edit > Preferences...\" from the main menu.\n\nSupport for legacy configuration files will be removed in the future."
+
 			set config_file [open $config_filename]
 			while {[gets $config_file config_line] >= 0} {
 				if {[string range $config_line 0 0] eq {#}} {
@@ -11901,7 +11905,7 @@ proc ConnectToServerByIdx {idx} {
 	refresh_title
 }
 
-# @[00]@| GMA-Mapper 4.11
+# @[00]@| GMA-Mapper 4.11.1
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
