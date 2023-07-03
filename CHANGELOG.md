@@ -16,6 +16,13 @@ The support for old server protocols (<400) and map file formats (<20) will be d
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
+# Unreleased
+## Adds
+ * Warning dialog if the mapper is using a legacy `mapper.conf` file which is now deprecated.
+
+## Fixes
+ * Corrects error in detecting and loading the legacy `mapper.conf` file on startup if no `preferences.json` file is present.
+
 # 4.11
  * Adds a command-line option `--recursionlimit` *n* which sets the runtime recursion limit to the given value. It will then be an error if we nest function calls more than *n* calls deep. The default is 1000. This is to help debug the issue that occasionally pops up where we exceed the default limit.
  * Adds "Check for Updates" menu option which queries github for the latest version of gma-mapper as well as looking at what the GM set on the server configuration. This allows users to upgrade manually independent of their GM offering downloads or recommending a particular version.
