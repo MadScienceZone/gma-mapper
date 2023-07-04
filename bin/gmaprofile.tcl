@@ -1,17 +1,17 @@
 ########################################################################################
-#  _______  _______  _______                ___        __     __                       #
-# (  ____ \(       )(  ___  ) Game         /   )      /  \   /  \                      #
-# | (    \/| () () || (   ) | Master's    / /) |      \/) )  \/) )                     #
-# | |      | || || || (___) | Assistant  / (_) (_       | |    | |                     #
-# | | ____ | |(_)| ||  ___  |           (____   _)      | |    | |                     #
-# | | \_  )| |   | || (   ) |                ) (        | |    | |                     #
-# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_ __) (_                    #
-# (_______)|/     \||/     \| Client         (_)  (_) \____/ \____/                    #
+#  _______  _______  _______                ___        __    _______                   #
+# (  ____ \(       )(  ___  ) Game         /   )      /  \  / ___   )                  #
+# | (    \/| () () || (   ) | Master's    / /) |      \/) ) \/   )  |                  #
+# | |      | || || || (___) | Assistant  / (_) (_       | |     /   )                  #
+# | | ____ | |(_)| ||  ___  |           (____   _)      | |   _/   /                   #
+# | | \_  )| |   | || (   ) |                ) (        | |  /   _/                    #
+# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_(   (__/\                  #
+# (_______)|/     \||/     \| Client         (_)  (_) \____/\_______/                  #
 #                                                                                      #
 ########################################################################################
 # Profile editor
 
-package provide gmaprofile 1.0
+package provide gmaprofile 1.1
 package require gmacolors
 package require json 1.3.3
 package require json::write 1.0.3
@@ -27,6 +27,8 @@ namespace eval ::gmaprofile {
 	variable font_catalog
 	variable font_repository
 	variable _default_color_table
+	variable minimum_file_version 1
+	variable maximum_file_version 2
 	array set _default_color_table {
 		fg,light           #000000
 		normal_fg,light    #000000
@@ -107,6 +109,7 @@ namespace eval ::gmaprofile {
 		}}
 		image_format s
 		keep_tools ?
+		menu_button ?
 		preload ?
 		profiles {a {
 		        name s
@@ -283,6 +286,7 @@ namespace eval ::gmaprofile {
 			]\
 			image_format png\
 			keep_tools   false\
+			menu_button  false\
 			preload      false\
 			profiles     [list [empty_server_profile offline]]\
 			fonts        [default_fonts]\
@@ -494,7 +498,7 @@ namespace eval ::gmaprofile {
 
 		json::write indented true
 		json::write aligned true
-		dict set data GMA_Mapper_preferences_version 1
+		dict set data GMA_Mapper_preferences_version 2
 		set f [open $filename w]
 		puts $f [::gmaproto::_encode_payload $data $_file_format]
 		close $f
@@ -504,9 +508,19 @@ namespace eval ::gmaprofile {
 
 	proc load {filename} {
 		variable _file_format
+		variable minimum_file_version 
+		variable maximum_file_version 
+
 
 		set f [open $filename r]
 		set data [::gmaproto::_construct [json::json2dict [read $f]] $_file_format]
+		set v [dict get $data GMA_Mapper_preferences_version]
+		if {$v < $minimum_file_version} {
+			tk_messageBox -type ok -icon error -title "Outdated Preferences" -message "Your saved preferences file is of a format too old to be read by this version of the mapper." -detail "$filename is version $v, but the minimum version supported is $minimum_file_version." -parent .
+		}
+		if {$v > $maximum_file_version} {
+			tk_messageBox -type ok -icon error -title "Unsuppored Preferences" -message "Your saved preferences file is of a format newer than what this version of the mapper is designed to use." -detail "$filename is version $v, but the maximum version supported is $maximum_file_version." -parent .
+		}
 		close $f
 		if {![dict exists $data fonts] || [dict size [dict get $data fonts]] == 0} {
 			puts "** Preferences data is missing font list; setting to default **"
@@ -538,7 +552,7 @@ namespace eval ::gmaprofile {
 	}
 	proc _save {} {
 		global animate colorize_die_rolls button_size bsizetext dark image_format keep_tools preload
-		global imgtext debug_level debug_proto curl_path profiles
+		global imgtext debug_level debug_proto curl_path profiles menu_button
 		global major_interval major_offset_x major_offset_y
 		global minor_interval minor_offset_x minor_offset_y
 		variable _profile
@@ -568,6 +582,7 @@ namespace eval ::gmaprofile {
 				]\
 			]\
 			image_format $image_format \
+			menu_button $menu_button\
 			keep_tools $keep_tools \
 			preload $preload \
 		]
@@ -716,7 +731,7 @@ namespace eval ::gmaprofile {
 
 	proc editor {w d} {
 		global animate button_size bsizetext colorize_die_rolls dark image_format keep_tools preload
-		global imgtext debug_proto debug_level curl_path profiles 
+		global imgtext debug_proto debug_level curl_path profiles menu_button
 		global major_interval major_offset_x major_offset_y
 		global minor_interval minor_offset_x minor_offset_y
 		global s_hostname s_port s_user s_pass s_blur_hp
@@ -739,6 +754,7 @@ namespace eval ::gmaprofile {
 			guide_lines guides \
 			image_format image_format \
 			keep_tools keep_tools \
+			menu_button menu_button \
 			preload preload \
 			profiles profiles \
 			current_profile current_profile
@@ -746,6 +762,7 @@ namespace eval ::gmaprofile {
 		set animate [::gmaproto::int_bool $animate]
 		set colorize_die_rolls [::gmaproto::int_bool $colorize_die_rolls]
 		set dark [::gmaproto::int_bool $dark]
+		set menu_button [::gmaproto::int_bool $menu_button]
 		set keep_tools [::gmaproto::int_bool $keep_tools]
 		set preload [::gmaproto::int_bool $preload]
 		set debug_proto [::gmaproto::int_bool $debug_proto]
@@ -1021,6 +1038,7 @@ namespace eval ::gmaprofile {
 		grid [ttk::checkbutton $w.n.a.animate -text "Animate updates" -variable animate] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.cdr -text "Enable colors in die-roll titles" -variable colorize_die_rolls] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.dark -text "Dark theme" -variable dark] - - - - - - -sticky w
+		grid [ttk::checkbutton $w.n.a.menu_button -text "Use menu button instead of menu bar" -variable menu_button] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.keep -text "Keep toolbar visible" -variable keep_tools] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.preload -text "Pre-load all cached images" -variable preload] - - - - - - -sticky w
 		grid [ttk::menubutton $w.n.a.imgfmt -textvariable imgtext -menu $w.n.a.m_imgfmt] - - - - - - -sticky w
