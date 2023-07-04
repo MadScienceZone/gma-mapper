@@ -14,8 +14,8 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.12}     ;# @@##@@
-set GMAMapperFileFormat {21}        ;# @@##@@
+set GMAMapperVersion {4.13-alpha}     ;# @@##@@
+set GMAMapperFileFormat {22}        ;# @@##@@
 set GMAMapperProtocol {406}         ;# @@##@@
 set CoreVersionNumber {6.3}            ;# @@##@@
 encoding system utf-8
@@ -332,10 +332,10 @@ proc say {msg} {
 # to facilitate this, the following functions will take an input creature
 # name, and:
 #	SplitCreatureImageName:  return a list of two elements: bare name and
-#							 image name (or just bare name if there was no
-#                            separate image given).
+#				 image name (or just bare name if there was no
+#                                separate image given).
 #	AcceptCreatureImageName: return the bare name, storing the image name 
-#							 in MOB_IMAGE if one was specified.
+#				 in MOB_IMAGE if one was specified.
 # 
 #
 proc SplitCreatureImageName {name} {
@@ -8203,7 +8203,7 @@ proc fetch_image {name zoom id} {
 	}
 	global tcl_platform
 	if {$tcl_platform(os) eq "Windows NT"} {
-		set CreateOpt -s
+	set CreateOpt -s
 	} else {
 		set CreateOpt --create-dirs
 	}
@@ -11928,6 +11928,85 @@ proc ConnectToServerByIdx {idx} {
 	WaitForConnectToServer
 	refresh_title
 }
+
+#
+# NEW: Animation support
+#   In the cache dir, static images are $cache/_X/name@zoom.ext where X is character 4 of name (may be empty if name is short)
+#   PROPOSED: animated images are $cache/_X/name@zoom/:frame:name@zoom.ext
+#   PROPOSED: store animated metadata in $cache/_X/name@zoom/name@zoom.meta with image definition json dict
+#   PROPOSED: store static metadata in $cache/_X/name@zoom.meta with image definition json dict
+#   PROPOSED: TILE_ANIMATION(<tileID>,frames) total number of frames
+#   PROPOSED: TILE_ANIMATION(<tileID>,current) current frame number in [0,frames)
+#   PROPOSED: TILE_ANIMATION(<tileID>,id,<frame>) canvas ID of frame
+#   PROPOSED: TILE_ANIMATION(<tileID>,delay) delay between frames in mS
+#   PROPOSED: TILE_ANIMATION(<tileID>,loops) max loops or 0
+#   PROPOSED: TILE_ANIMATION(<tileID>,loop) current loop in [0,loops)
+#   PROPOSED: TILE_ANIMATION(<tileID>,task) task ID managing the animation or empty if stopped
+#
+#   PROPOSED: animate by creating the stack of images with the same Z on the canvas then cycling through by running
+#   		<canvas> raise <nextframeIDorTag> <previousframeIDorTag> (remember the ID is returned by canvas create)
+#
+#   PROPOSED: animation_create <canvas> <x> <y> <imagedef-dict> ?-start?
+#   PROPOSED: animation_start <canvas> -tile <tileiD> | -all
+#   PROPOSED: animation_stop <canvas>  -tile <tileiD> | -all
+#
+#   PROPOSED: update all of the following to do the right thing w/r/t fetching and caching animated images
+#
+# TILE_SET(<tileID>) -> tk_image
+# TILE_ID(<tileID>) -> server_ID
+# ImageFormat -> gif | png
+#
+# fetch_url <localdir> <local> <url> -> <data>
+# 	uses curl to download <url> to <localdir>/<local>, read contents and return them
+#
+# incoming AI -> DoCommandAI dict
+# 	opens file directly if local or embeeded else fetch_image <name> <zoom> <id>
+# 	TILE_SET([tile_id <name> <zoom>]) <- image create photo <data>
+# 	
+# fetch_image <name> <zoom> <id>
+# 	create_image_from_file if usable cache file found
+# 	run curl to get file from server then create_image_from_file
+# 	
+# tile_id <name> <zoom> -> "name:zoom" with zoom as %.2f
+# cache_filename <imagepfx> <zoom> -> path where image file should be located
+# cache_info <filename> -> exists? days name zoom
+# create_image_from_file <tileID> <cache_path_name> (updates TILE_SET with cached data; error if file can't be read)
+# load_cached_images (reads all NEWish cached files via create_image_from_file)
+# loadfile <file> ... 
+# 	for IMG records, 
+# 		server images
+#	 		calls fetch_image <imageID> <zoom> <serverID>
+# 			updates TILE_ID
+# 		local images
+# 			reads data, creates tk_image
+# 			updates TILE_SET
+# 		-> AI to other clients
+# RefreshGrid
+# 	tile objects
+# 		using tileID from FindImage (object.Image) at overall zoom
+# 		create canvas image if in TILE_SET already else draw placeholder for it
+# UpdateObjectDisplay
+# 	tile objects
+# 		using tileID from FindImage (object.Image) at overall zoom
+# 		itemconfigure canvas object with tkimage from TILE_SET, possibly updating coordinates
+# 		
+# StartObj
+# 	tile objects
+# 		create canvas image from TILE_SET tkimage
+#
+# FindImage <imagepfx> <zoom>
+# 	using tileID from tile_id <imagepfx> <zoom>
+# 	if not in TILE_SET, call create_image_from_file [cache_filename]
+# 	call ::gmaproto::query_image if needed
+#
+# RenderSomeone <w> <id> [<norecurse?>]
+# 	looks for candidate images in TILE_SET; if not there, try FindImage then see if in TILE_SET
+# 	creates canvas image frim TILE_SET
+# 	
+#
+# cache file 
+#   .../<name>@<zoom>.<ext>
+#   .../<name>.map
 
 # @[00]@| GMA-Mapper 4.12
 # @[01]@|
