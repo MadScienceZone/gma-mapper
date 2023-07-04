@@ -406,15 +406,20 @@ The payload is a JSON object with the following fields:
 '\" <<ital-is-var>>
 If this value is given and non-null, this image is to be animated
 from individual frames. If the consumer is capable of animating
-multi-frame files, the base filename can be used directly. Otherwise,
-individual frame files are available by prefixing the base filename
+multi-frame files, the base filename can be used directly. 
+Servers offering this file SHOULD provide the animated image in
+a variety of formats, but MUST provide single-frame files in all
+formats. Clients using it MUST allow for the possibility
+that only a single format is available as a single animated file.
+.RS
+.LP
+Individual frame files are available by prefixing the base filename
 with 
 .RB \*(lq :\fIn\fP: \*(rq
 where
 .I n
 is the frame number, starting with 0. It has the following fields:
 '\" <<list>>
-.RS
 .TP
 '\" <</ital-is-var>>
 .BI Frames " (int)"
