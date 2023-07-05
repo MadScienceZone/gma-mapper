@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___        __    _______                   #
-# (  ____ \(       )(  ___  ) Game         /   )      /  \  / ___   )                  #
-# | (    \/| () () || (   ) | Master's    / /) |      \/) ) \/   )  |                  #
-# | |      | || || || (___) | Assistant  / (_) (_       | |     /   )                  #
-# | | ____ | |(_)| ||  ___  |           (____   _)      | |   _/   /                   #
-# | | \_  )| |   | || (   ) |                ) (        | |  /   _/                    #
-# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_(   (__/\                  #
-# (_______)|/     \||/     \| Client         (_)  (_) \____/\_______/                  #
+#  _______  _______  _______                ___        __    ______          _______   #
+# (  ____ \(       )(  ___  ) Game         /   )      /  \  / ___  \        (  ___  )( #
+# | (    \/| () () || (   ) | Master's    / /) |      \/) ) \/   \  \       | (   ) || #
+# | |      | || || || (___) | Assistant  / (_) (_       | |    ___) / _____ | (___) || #
+# | | ____ | |(_)| ||  ___  |           (____   _)      | |   (___ ( (_____)|  ___  || #
+# | | \_  )| |   | || (   ) |                ) (        | |       ) \       | (   ) || #
+# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_/\___/  /       | )   ( || #
+# (_______)|/     \||/     \| Client         (_)  (_) \____/\______/        |/     \|( #
 #                                                                                      #
 ########################################################################################
 #
@@ -16,8 +16,8 @@
 # Auto-configure values
 set GMAMapperVersion {4.13-alpha}     ;# @@##@@
 set GMAMapperFileFormat {22}        ;# @@##@@
-set GMAMapperProtocol {406}         ;# @@##@@
-set CoreVersionNumber {6.3}            ;# @@##@@
+set GMAMapperProtocol {407}         ;# @@##@@
+set CoreVersionNumber {6.4-alpha}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -1423,17 +1423,38 @@ proc tile_id {name zoom} {
 #
 # cache file name from name and zoom
 #
-proc cache_filename {name zoom} {
+proc cache_filename {name zoom {frameno -1}} {
 	global tcl_platform path_cache ImageFormat
 
 	if {$tcl_platform(os) eq "Windows NT"} {
 		file mkdir $path_cache
 		file mkdir [file nativename [file join $path_cache _[string range $name 4 4]]]
+		if {$frameno >= 0} {
+			file mkdir [file nativename [file join $path_cache _[string range $name 4 4] "$name@[normalize_zoom $zoom]"]]
+		}
 	}
-	return [file nativename [file join $path_cache _[string range $name 4 4] "$name@[normalize_zoom $zoom].$ImageFormat"]]
+	if {$frameno >= 0} {
+		return [file nativename \
+			[file join $path_cache \
+				_[string range $name 4 4] \
+				"$name@[normalize_zoom $zoom]"\
+				":$frameno:$name@[normalize_zoom $zoom].$ImageFormat"\
+			]\
+		]
+	} else {
+		return [file nativename [file join $path_cache _[string range $name 4 4] "$name@[normalize_zoom $zoom].$ImageFormat"]]
+	}
 }
-proc cache_file_dir {name} {
+proc cache_file_dir {name {zoom 1} {frameno -1}} {
 	global path_cache
+	if {$frameno >= 0} {
+		return [file nativename \
+			[file join $path_cache \
+				_[string range $name 4 4] \
+				"$name@[normalize_zoom $zoom]"\
+			]\
+		]
+	}
 	return [file nativename [file join $path_cache _[string range $name 4 4]]]
 }
 proc cache_map_filename {id} {
@@ -8240,19 +8261,85 @@ proc send_file_to_server {id local_file} {
 #
 # load an image file from cache or the web server
 #
-proc fetch_image {name zoom id {age {}}} {
+proc fetch_image {name zoom id} {
 	global ClockDisplay
 	global ImageFormat
 	global CURLproxy CURLpath CURLserver
 	global cache_too_old_days
 	global my_stdout
 
-	if {$age eq {}} {
-		set age $cache_too_old_days
-	}
-
+	set age $cache_too_old_days
 	set oldcd $ClockDisplay
 	set ClockDisplay "Getting image @$zoom from [string range $id 0 5]..."
+	update
+
+	set tile_id [tile_id $name $zoom]
+	set cache_filename [cache_filename $name $zoom]
+	set cache_stats [cache_info $cache_filename]
+	set cache_age 0
+	set cache_newer_than 0
+	#
+	# is the image already in our cache? If so, just load that unless
+	# the cache is too old.
+	#
+	DEBUG 2 "Fetching image $name at zoom $zoom, id=$id"
+	if [lindex $cache_stats 0] {
+		set cache_age [lindex $cache_stats 1]
+		DEBUG 3 "Found cache file for this image in $cache_filename, age=$cache_age"
+		if {$cache_age < $age} {
+			DEBUG 3 "Cache is $cache_age days old, so we'll just use that"
+			create_image_from_file $tile_id $cache_filename
+			set ClockDisplay $oldcd
+			return
+		}
+		set cache_newer_than [file mtime $cache_filename]
+		DEBUG 3 "Cache is [lindex $cache_stats 1] days old, so we'll fetch a fresh copy if newer than [clock format $cache_newer_than]"
+	} else {
+		DEBUG 3 "No cache file found, fetching from server"
+	}
+	global tcl_platform
+	if {$tcl_platform(os) eq "Windows NT"} {
+	set CreateOpt -s
+	} else {
+		set CreateOpt --create-dirs
+	}
+	set url "$CURLserver/[string range $id 0 0]/[string range $id 0 1]/$id.$ImageFormat"
+	if [catch {
+		if {$CURLproxy ne {}} {
+			DEBUG 3 "Running $CURLpath $CreateOpt --output [file nativename $cache_filename] --proxy $CURLproxy -f -z [clock format $cache_newer_than] $url"
+			exec $CURLpath $CreateOpt --output [file nativename $cache_filename] --proxy $CURLproxy -f -z [clock format $cache_newer_than] $url >&@$my_stdout
+		} else {
+			DEBUG 3 "Running $CURLpath $CreateOpt --output [file nativename $cache_filename] -f -z [clock format $cache_newer_than] $url"
+			exec $CURLpath $CreateOpt --output [file nativename $cache_filename] -f -z [clock format $cache_newer_than] $url >&@$my_stdout
+		}
+		DEBUG 3 "Updating cache file time"
+        file mtime [file nativename $cache_filename] [clock seconds]
+	} err options] {
+		set i [dict get $options -errorcode]
+		if {[llength $i] >= 3 && [lindex $i 0] eq {CHILDSTATUS} && [lindex $i 2] == 22} {
+			DEBUG 0 "Requested image file ID $id was not found on the server."
+		} else {
+			DEBUG 0 "Error running $CURLpath to get $url into $cache_filename: $err"
+		}
+	}
+	create_image_from_file $tile_id $cache_filename
+	set ClockDisplay $oldcd
+	refreshScreen
+}
+
+#
+# load an animated image file from cache or the web server
+#
+proc fetch_animated_image {name zoom id frames speed loops} {
+	global ClockDisplay
+	global ImageFormat
+	global CURLproxy CURLpath CURLserver
+	global cache_too_old_days
+	global my_stdout
+
+	set age $cache_too_old_days
+	set oldcd $ClockDisplay
+	set ClockDisplay "Getting animated image @$zoom id [string range $id 0 5]..."
 	update
 
 	set tile_id [tile_id $name $zoom]
@@ -8419,14 +8506,130 @@ proc DoCommandAC {d} {
 	}
 }
 
+proc animation_create {args} {error "animation_create not implemented"}
+proc animation_newid {args} {error "animation_newid not implemented"}
+proc animation_start {args} {error "animation_start not implemented"}
+
+# destroy all information about the given animated images
+# TODO and remove from canvas?
+proc animation_destroy {opt args} {
+	global TILE_ANIMATION
+
+	if {$opt eq "-tile"} {
+		set idlist $args
+	} elseif {$opt eq "-all"} {
+		set idlist {}
+		foreach k [array names TILE_ANIMATION -glob "*,frames"] {
+			lappend idlist [string range $k 0 end-7]
+		}
+	} else {
+		error "animation_destroy: invalid option $opt: must be -tile or -all"
+	}
+
+	foreach id $idlist {
+		animation_clear_frames $id
+		array unset TILE_ANIMATION "$id,*"
+	}
+}
+
+proc animation_stop {opt args} {
+	global TILE_ANIMATION
+
+	if {$opt eq "-tile"} {
+		set idlist $args
+	} elseif {$opt eq "-all"} {
+		set idlist {}
+		foreach k [array names TILE_ANIMATION -glob "*,task"] {
+			lappend idlist [string range $k 0 end-5]
+		}
+	} else {
+		error "animation_stop: invalid option $opt: must be -tile or -all"
+	}
+
+	foreach id $idlist {
+		if {[info exists TILE_ANIMATION($id,task)] && [set task $TILE_ANIMATION($id,task)] ne {}} {
+			after cancel $task
+			set TILE_ANIMATION($id,task) {}
+		}
+	}
+}
+
+# destroy all tk images for a given animated tile
+proc animation_clear_frames {tileID} {
+	global TILE_ANIMATION
+
+	animation_stop -tile $tileID
+	foreach k [array names TILE_ANIMATION -glob "$tileID,img,*"] {
+		image delete $TILE_ANIMATION($k)
+		set TILE_ANIMATION($k) {}
+	}
+}
+
+# add tk image for frame n
+proc animation_add_frame {tileID n img} {
+	global TILE_ANIMATION
+
+	if {[info exists TILE_ANIMATION($tileID,img,$n)] && [set tki $TILE_ANIMATION($tileID,img,$n)] ne {}} {
+		image delete $tki
+	}
+	set TILE_ANIMATION($tileID,img,$n) $img
+}
+
+proc animation_init {tileID frames speed loops} {
+	global TILE_ANIMATION
+
+	animation_stop -tile $tileID
+	unset TILE_ANIMATION "$tileID,*"
+	set TILE_ANIMATION($tileID,frames) $frames
+	set TILE_ANIMATION($tileID,current) 0
+	set TILE_ANIMATION($tileID,delay) $speed
+	set TILE_ANIMATION($tileID,loops) $loops
+	set TILE_ANIMATION($tileID,loop) 0
+	set TILE_ANIMATION($tileID,task) {}
+	for {set n 0} {$n < $frames} {incr n} {
+		set TILE_ANIMATION($tileID,id,$n) {}
+		set TILE_ANIMATION($tileID,img,$n) {}
+	}
+}
+
+proc _load_local_animated_file {path name zoom aframes aspeed aloops} {
+	global TILE_SET ImageFormat
+
+	set path_components [file split $path]
+	set t_id [tile_id $name $zoom]
+	animation_init $t_id $aframes $aspeed $aloops
+	animation_clear_frames $t_id
+
+	for {set n 0} {$n < $aframes} {incr n} {
+		if {[catch {
+			set fname [file join {*}[lrange $path_components 0 end-1] ":$n:[lindex $path_components end]"]
+			DEBUG 2 "Opening local animation frame file $fname"
+			set f [open $fname r]
+			fconfigure $f -encoding binary -translation binary
+			set raw_data [read $f]
+			close $f
+		} err]} {
+			error "Unable to load image file :$n:$path: $err"
+		}
+		animation_add_frame $t_id $n [image create photo -format $ImageFormat -data $raw_data]
+	}
+}
+
 proc DoCommandAI {d} {
 	# add image
 	global ImageFormat
-	set name [dict get $d Name]
+	::gmautil::dassign $d Name name {Animation Frames} aframes {Animation FrameSpeed} aspeed {Animation Loops} aloops
 	foreach instance [dict get $d Sizes] {
 		::gmautil::dassign $instance File server_id ImageData raw_data IsLocalFile localp Zoom zoom
+		if {$raw_data ne {} && $aframes > 0} {
+			error "incoming image $server_id: inline data not supported for animated images"
+		}
 		if {$raw_data eq {} && $localp} {
 			DEBUG 2 "Loading local image file $server_id for $name @$zoom"
+			if {$aframes > 0} {
+				_load_local_animated_file $server_id $name $zoom $aframes $aspeed $aloops
+				continue
+			}
 			if [catch {
 				set f [open $server_id r]
 				fconfigure $f -encoding binary -translation binary
@@ -8435,7 +8638,8 @@ proc DoCommandAI {d} {
 			} err] {
 				error "Unable to load image file $server_id: $err"
 			}
-		}
+		} 
+
 		if {$raw_data ne {}} {
 			DEBUG 2 "Received binary image data for $name @$zoom"
 
@@ -8450,7 +8654,11 @@ proc DoCommandAI {d} {
 			DEBUG 3 "Defined bitmap for $name at $zoom: $TILE_SET($t_id)"
 		} else {
 			DEBUG 2 "Caching copy of server image $server_id for $name @$zoom"
-			fetch_image $name $zoom $server_id
+			if {$aframes > 0} {
+				fetch_animated_image $name $zoom $server_id $aframes $aspeed $aloops
+			} else {
+				fetch_image $name $zoom $server_id
+			}
 		}
 	}
 	update
@@ -12020,6 +12228,7 @@ proc ConnectToServerByIdx {idx} {
 #   PROPOSED: TILE_ANIMATION(<tileID>,frames) total number of frames
 #   PROPOSED: TILE_ANIMATION(<tileID>,current) current frame number in [0,frames)
 #   PROPOSED: TILE_ANIMATION(<tileID>,id,<frame>) canvas ID of frame
+#   PROPOSED: TILE_ANIMATION(<tileID>,img,<frame>) tk image of frame (as TILE_SET is for static images)
 #   PROPOSED: TILE_ANIMATION(<tileID>,delay) delay between frames in mS
 #   PROPOSED: TILE_ANIMATION(<tileID>,loops) max loops or 0
 #   PROPOSED: TILE_ANIMATION(<tileID>,loop) current loop in [0,loops)
@@ -12029,30 +12238,38 @@ proc ConnectToServerByIdx {idx} {
 #   		<canvas> raise <nextframeIDorTag> <previousframeIDorTag> (remember the ID is returned by canvas create)
 #   		better due to alpha transparency: <canvas> itemconfigure <frameIDorTag> -state hidden|normal
 #
+#   --DONE--: animation_destroy -tile <tileID>... | -all
+#   --DONE--: animation_init <tileID> <frames> <speed> <loops>			set up in system
+#   --DONE--: animation_clear_frames <tilID>					remove all tk images
+#   --DONE--: animation_add_frame <tilID> <n> <image>				add tk image
 #   PROPOSED: animation_create <canvas> <x> <y> <imagedef-dict> ?-start?
 #   PROPOSED: animation_newid <tileID> <newCanvasID>
-#   PROPOSED: animation_start <canvas> -tile <tileiD> | -all | -unexpired
-#   PROPOSED: animation_stop <canvas>  -tile <tileiD> | -all
+#   PROPOSED: animation_start <canvas> -tile <tileiD>... | -all | -unexpired
+#   --DONE--: animation_stop  -tile <tileiD>... | -all
+#   
+#   --DONE--: _load_local_animated_file <path> <name> <zoom> <frames> <speed> <loop>
 #
 #   PROPOSED: update all of the following to do the right thing w/r/t fetching and caching animated images
 #
-# TILE_SET(<tileID>) -> tk_image
+# TILE_SET(<tileID>) -> tk_image (static)
 # TILE_ID(<tileID>) -> server_ID
 # ImageFormat -> gif | png
 #
 # fetch_url <localdir> <local> <url> -> <data>
 # 	uses curl to download <url> to <localdir>/<local>, read contents and return them
 #
-# incoming AI -> DoCommandAI dict
+# --DONE-- incoming AI -> DoCommandAI dict
 # 	opens file directly if local or embeeded else fetch_image <name> <zoom> <id>
 # 	TILE_SET([tile_id <name> <zoom>]) <- image create photo <data>
 # 	
+# PROPOSED fetch_animated_image <name> <zoom> <id> <frames> <speed> <loops>
 # fetch_image <name> <zoom> <id>
 # 	create_image_from_file if usable cache file found
 # 	run curl to get file from server then create_image_from_file
 # 	
 # tile_id <name> <zoom> -> "name:zoom" with zoom as %.2f
-# cache_filename <imagepfx> <zoom> -> path where image file should be located
+# --DONE-- cache_filename <imagepfx> <zoom> [<frame#>] -> path where image file should be located
+# --DONE-- cache_file_dir <imagepfx> [<zoom>] [<frame#>] -> directory where cache_filename is to be located
 # cache_info <filename> -> exists? days name zoom
 # create_image_from_file <tileID> <cache_path_name> (updates TILE_SET with cached data; error if file can't be read)
 # load_cached_images (reads all NEWish cached files via create_image_from_file)
@@ -12092,7 +12309,7 @@ proc ConnectToServerByIdx {idx} {
 #   .../<name>@<zoom>.<ext>
 #   .../<name>.map
 
-# @[00]@| GMA-Mapper 4.12
+# @[00]@| GMA-Mapper 4.13-alpha
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
