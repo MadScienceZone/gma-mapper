@@ -11945,9 +11945,11 @@ proc ConnectToServerByIdx {idx} {
 #
 #   PROPOSED: animate by creating the stack of images with the same Z on the canvas then cycling through by running
 #   		<canvas> raise <nextframeIDorTag> <previousframeIDorTag> (remember the ID is returned by canvas create)
+#   		better due to alpha transparency: <canvas> itemconfigure <frameIDorTag> -state hidden|normal
 #
 #   PROPOSED: animation_create <canvas> <x> <y> <imagedef-dict> ?-start?
-#   PROPOSED: animation_start <canvas> -tile <tileiD> | -all
+#   PROPOSED: animation_newid <tileID> <newCanvasID>
+#   PROPOSED: animation_start <canvas> -tile <tileiD> | -all | -unexpired
 #   PROPOSED: animation_stop <canvas>  -tile <tileiD> | -all
 #
 #   PROPOSED: update all of the following to do the right thing w/r/t fetching and caching animated images
