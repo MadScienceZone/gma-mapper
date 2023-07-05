@@ -635,6 +635,25 @@ set ChatHistoryFile {}
 set ChatHistoryFileHandle {}
 set ChatHistoryFileDirection {}
 set ChatHistoryLastMessageID 0
+
+proc ResetChatHistory {loadqty} {
+	global ChatHistoryFile ChatHistoryFileHandle ChatHistoryLastMessageID ChatHistoryLimit ChatHistoryFileDirection
+
+	catch {
+		close $ChatHistoryFileHandle
+	}
+	set ChatHistoryFileHandle {}
+	set ChatHistoryFileDirection {}
+	INFO "Removing chat cache file $ChatHistoryFile"
+	file delete -- $ChatHistoryFile
+	set ChatHistoryLastMessageID 0
+	INFO "Resetting chat history"
+	set ch $ChatHistoryLimit
+	set ChatHistoryLimit $loadqty
+	InitializeChatHistory
+	set ChatHistoryLimit $ch
+}
+
 # We only use ChatHistoryLastMessageID while loading the saved data. From that point on
 # we get the messages in real time and don't ask the server to catch us up again, (or
 # if we do, we can look at our in-memory history for that instead of taking time to update
@@ -731,7 +750,7 @@ proc InitializeChatHistory {} {
 			if {$ChatHistoryLimit > 0} {
 				DEBUG 1 "We don't have any loaded history; asking server for up to $ChatHistoryLimit messages."
 				::gmaproto::sync_chat -$ChatHistoryLimit
-			} else {
+			} elseif {$ChatHistoryLimit == 0} {
 				DEBUG 1 "We don't have any loaded history; asking server all messages."
 				::gmaproto::sync_chat 0
 			}
@@ -860,6 +879,7 @@ proc create_main_menu {use_button} {
 	$mm add cascade -menu $mm.edit -label Edit
 	$mm add cascade -menu $mm.view -label View
 	$mm add cascade -menu $mm.play -label Play
+	$mm add cascade -menu $mm.tools -label Tools
 	$mm add cascade -menu $mm.help -label Help
 	menu $mm.file
 	$mm.file add command -command {loadfile {}} -label "Load Map File..."
@@ -924,9 +944,24 @@ proc create_main_menu {use_button} {
 		$mm.play add cascade -menu $mm.play.servers -label "Connect to"
 	}
 	set connmenuidx 8
+	menu $mm.tools
+	$mm.tools add command -command {checkForUpdates} -label "Check for Updates..."
+	$mm.tools add separator
+	$mm.tools add command -command {ResetChatHistory -1} -label "Clear Chat History"
+	$mm.tools add cascade -menu $mm.tools.rch -label "Reset Chat History"
+	$mm.tools add separator
+	$mm.tools add command -command {CleanupImageCache 0} -label "Clear Image Cache"
+	$mm.tools add command -command {CleanupImageCache 60} -label "Clear Image Cache (over 60 days)"
+	$mm.tools add command -command {CleanupImageCache -update} -label "Update Cached Images from Server..."
+
+	menu $mm.tools.rch
+	$mm.tools.rch add command -command {ResetChatHistory 50} -label "...and load 50 messages"
+	$mm.tools.rch add command -command {ResetChatHistory 100} -label "...and load 100 messages"
+	$mm.tools.rch add command -command {ResetChatHistory 500} -label "...and load 500 messages"
+	$mm.tools.rch add command -command {ResetChatHistory 0} -label "...and load all"
+
 	menu $mm.help
 	$mm.help add command -command {aboutMapper} -label "About Mapper..."
-	$mm.help add command -command {checkForUpdates} -label "Check for Updates..."
 }
 
 #
@@ -1466,6 +1501,45 @@ proc create_image_from_file {tile_id filename} {
 		DEBUG 0 "Can't use data read from image file $filename ($tile_id): $err"
 		return
 	}
+}
+
+proc CleanupImageCache {daysOld} {
+	global path_cache ImageFormat cache_too_old_days
+	set deleted 0
+	set total 0
+
+	if {$daysOld eq {-update}} {
+		INFO "Freshening cached images..."
+	} else {
+		INFO "Removing cached images older than $daysOld days..."
+	}
+
+	foreach cache_dir [glob -nocomplain -directory $path_cache _*] {
+		INFO "Scanning $cache_dir..."
+		update
+		foreach cache_filename [glob -nocomplain -directory $cache_dir *.$ImageFormat] {
+			incr total
+			set cache_stats [cache_info $cache_filename]
+			lassign $cache_stats image_exists image_age image_name image_zoom
+			if {$daysOld eq {-update}} {
+				INFO "Cached image $image_name at $image_zoom age $image_age"
+				update
+				if {$image_age <= $cache_too_old_days} {
+					file delete $cache_filename
+					INFO "--Removing cache file $cache_filename to force refresh"
+					incr deleted
+					update
+				}
+				::gmaproto::query_image $image_name $image_zoom
+			} elseif {$image_age >= $daysOld} {
+				INFO "--Removing cache file $cache_filename"
+				file delete $cache_filename
+				incr deleted
+			}
+		}
+	}
+	INFO [format "Removed %d of %d cache file%s" $deleted $total [expr $total==1? {{}} : {{s}}]]
+	update
 }
 
 #
@@ -8166,12 +8240,16 @@ proc send_file_to_server {id local_file} {
 #
 # load an image file from cache or the web server
 #
-proc fetch_image {name zoom id} {
+proc fetch_image {name zoom id {age {}}} {
 	global ClockDisplay
 	global ImageFormat
 	global CURLproxy CURLpath CURLserver
 	global cache_too_old_days
 	global my_stdout
+
+	if {$age eq {}} {
+		set age $cache_too_old_days
+	}
 
 	set oldcd $ClockDisplay
 	set ClockDisplay "Getting image @$zoom from [string range $id 0 5]..."
@@ -8190,7 +8268,7 @@ proc fetch_image {name zoom id} {
 	if [lindex $cache_stats 0] {
 		set cache_age [lindex $cache_stats 1]
 		DEBUG 3 "Found cache file for this image in $cache_filename, age=$cache_age"
-		if {$cache_age < $cache_too_old_days} {
+		if {$cache_age < $age} {
 			DEBUG 3 "Cache is $cache_age days old, so we'll just use that"
 			create_image_from_file $tile_id $cache_filename
 			set ClockDisplay $oldcd
@@ -11527,12 +11605,16 @@ global socks_idlist
 }
 # ---END-SOCKS5-CODE---
 
+proc TRACE args {
+	puts "[info level 0]"
+}
 
 proc connectToServer {} {
 	global ITport IThost
 	global ITproxy ITproxyuser ITproxypass ITproxyport
 	global local_user ITpassword GMAMapperVersion
 
+	#trace add execution ::gmaproto::_background_poll enterstep TRACE
 	::gmaproto::dial $IThost $ITport $local_user $ITpassword $ITproxy $ITproxyport $ITproxyuser $ITproxypass "mapper $GMAMapperVersion"
 }
 
