@@ -8507,9 +8507,8 @@ proc DoCommandAC {d} {
 }
 
 # Create animated image stack on the canvas with the first frame visible
-# animation_create canvas x y tid ?-start?
-# TODO need mapper objID for the tile
-proc animation_create {canvas x y tileID args} {
+# animation_create canvas x y tid oid ?-start?
+proc animation_create {canvas x y tileID objID args} {
 	global TILE_ANIMATION
 
 	if {![info exists TILE_ANIMATION($tileID,img,0)] || $TILE_ANIMATION($tileID,img,0) eq {}} {
@@ -12314,7 +12313,7 @@ proc ConnectToServerByIdx {idx} {
 #   --DONE--: animation_init <tileID> <frames> <speed> <loops>			set up in system
 #   --DONE--: animation_clear_frames <tilID>					remove all tk images
 #   --DONE--: animation_add_frame <tilID> <n> <image>				add tk image
-#   --DONE--: animation_create <canvas> <x> <y> <tileID> ?-start?
+#   --DONE--: animation_create <canvas> <x> <y> <tileID> <objID> ?-start?
 #   --DONE--: animation_newid <tileID> <frame#> <newCanvasID>
 #   --DONE--: animation_start <canvas> -tile <tileiD>... | -all | -unexpired
 #   --DONE--: animation_stop  -tile <tileiD>... | -all
@@ -12342,7 +12341,7 @@ proc ConnectToServerByIdx {idx} {
 # tile_id <name> <zoom> -> "name:zoom" with zoom as %.2f
 # --DONE-- cache_filename <imagepfx> <zoom> [<frame#>] -> path where image file should be located
 # --DONE-- cache_file_dir <imagepfx> [<zoom>] [<frame#>] -> directory where cache_filename is to be located
-# cache_info <filename> -> exists? days name zoom
+#          cache_info <filename> -> exists? days name zoom
 # create_image_from_file <tileID> <cache_path_name> (updates TILE_SET with cached data; error if file can't be read)
 # load_cached_images (reads all NEWish cached files via create_image_from_file)
 # loadfile <file> ... 
