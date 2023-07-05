@@ -8506,9 +8506,81 @@ proc DoCommandAC {d} {
 	}
 }
 
-proc animation_create {args} {error "animation_create not implemented"}
-proc animation_newid {args} {error "animation_newid not implemented"}
-proc animation_start {args} {error "animation_start not implemented"}
+# Create animated image stack on the canvas with the first frame visible
+# animation_create canvas x y tid ?-start?
+# TODO need mapper objID for the tile
+proc animation_create {canvas x y tileID args} {
+	global TILE_ANIMATION
+
+	if {![info exists TILE_ANIMATION($tileID,img,0)] || $TILE_ANIMATION($tileID,img,0) eq {}} {
+		DEBUG 1 "Unable to create non-existent animated image $tileID"
+		return
+	}
+	for {set n 0} {$n < $TILE_ANIMATION($tileID,frames)} {incr n} {
+		set TILE_ANIMATION($tileID,id,$n) [\
+			$canvas create image $x $y -anchor nw -image $TILE_ANIMATION($tileID,img,$n) \
+				-tags [list tiles obj$objID allOBJ animatedTiles]\
+				-state [expr $n == 0 ? {{normal}} : {{hidden}}]\
+		]
+	}
+	if {[lsearch -exact $args "-start"]} {
+		animation_start -tile $tileID
+	}
+}
+
+proc animation_newid {tileID frameno canID} {
+	global TILE_ANIMATION
+	set TILE_ANIMATION($tileID,id,$frameno) $canID
+}
+
+proc animation_start {canvas opt args} {
+	global TILE_ANIMATION
+
+	if {$opt eq "-tile"} {
+		set idlist $args
+	} elseif {$opt eq "-all"} {
+		set idlist {}
+		foreach k [array names TILE_ANIMATION -glob "*,frames"] {
+			lappend idlist [string range $k 0 end-7]
+		}
+	} elseif {$opt eq "-unexpired"} {
+		set idlist {}
+		foreach k [array names TILE_ANIMATION -glob "*,frames"] {
+			set id [string range $k 0 end-7]
+			if {$TILE_ANIMATION($id,loops) == 0 || $TITLE_ANIMATION($id,loop) < $TITLE_ANIMATION($id,loops)} {
+				lappend idlist $id
+			}
+		}
+	} else {
+		error "animation_destroy: invalid option $opt: must be -tile or -all"
+	}
+
+	foreach id $idlist {
+		if {$TITLE_ANIMATION($id,task) eq {}} {
+			set TITLE_ANIMATION($id,current) 0
+			set TITLE_ANIMATION($id,loop) 0
+			set TITLE_ANIMATION($id,task) [after $TITLE_ANIMATION($id,delay) "_animation_next_frame [list $id $canvas]"]
+		}
+	}
+}
+
+proc _animation_next_frame {id canvas} {
+	global TITLE_ANIMATION
+	if {$TITLE_ANIMATION($id,task) ne {}} {
+		$canvas itemconfigure $TITLE_ANIMATION($id,id,$TITLE_ANIMATION($id,current)) -state hidden
+		if {[incr TITLE_ANIMATION($id,current)] >= $TITLE_ANIMATION($id,frames)} {
+			set TITLE_ANIMATION($id,current) 0
+			if {$TITLE_ANIMATION($id,loops) > 0 && [incr TITLE_ANIMATION($id,loop)] >= $TITLE_ANIMATION($id,loops)} {
+				# stop here
+				$canvas itemconfigure $TITLE_ANIMATION($id,id,0) -state normal
+				set TITLE_ANIMATION($id,task) {}
+				return
+			}
+		}
+		$canvas itemconfigure $TITLE_ANIMATION($id,id,$TITLE_ANIMATION($id,current)) -state normal
+		set TITLE_ANIMATION($id,task) [after $TITLE_ANIMATION($id,delay) "_animation_next_frame [list $id $canvas]"]
+	}
+}
 
 # destroy all information about the given animated images
 # TODO and remove from canvas?
@@ -12225,16 +12297,16 @@ proc ConnectToServerByIdx {idx} {
 #   PROPOSED: animated images are $cache/_X/name@zoom/:frame:name@zoom.ext
 #   PROPOSED: store animated metadata in $cache/_X/name@zoom/name@zoom.meta with image definition json dict
 #   PROPOSED: store static metadata in $cache/_X/name@zoom.meta with image definition json dict
-#   PROPOSED: TILE_ANIMATION(<tileID>,frames) total number of frames
-#   PROPOSED: TILE_ANIMATION(<tileID>,current) current frame number in [0,frames)
-#   PROPOSED: TILE_ANIMATION(<tileID>,id,<frame>) canvas ID of frame
-#   PROPOSED: TILE_ANIMATION(<tileID>,img,<frame>) tk image of frame (as TILE_SET is for static images)
-#   PROPOSED: TILE_ANIMATION(<tileID>,delay) delay between frames in mS
-#   PROPOSED: TILE_ANIMATION(<tileID>,loops) max loops or 0
-#   PROPOSED: TILE_ANIMATION(<tileID>,loop) current loop in [0,loops)
-#   PROPOSED: TILE_ANIMATION(<tileID>,task) task ID managing the animation or empty if stopped
+#   --DONE--: TILE_ANIMATION(<tileID>,frames) total number of frames
+#   --DONE--: TILE_ANIMATION(<tileID>,current) current frame number in [0,frames)
+#   --DONE--: TILE_ANIMATION(<tileID>,id,<frame>) canvas ID of frame
+#   --DONE--: TILE_ANIMATION(<tileID>,img,<frame>) tk image of frame (as TILE_SET is for static images)
+#   --DONE--: TILE_ANIMATION(<tileID>,delay) delay between frames in mS
+#   --DONE--: TILE_ANIMATION(<tileID>,loops) max loops or 0
+#   --DONE--: TILE_ANIMATION(<tileID>,loop) current loop in [0,loops)
+#   --DONE--: TILE_ANIMATION(<tileID>,task) task ID managing the animation or empty if stopped
 #
-#   PROPOSED: animate by creating the stack of images with the same Z on the canvas then cycling through by running
+#   --DONE--: animate by creating the stack of images with the same Z on the canvas then cycling through by running
 #   		<canvas> raise <nextframeIDorTag> <previousframeIDorTag> (remember the ID is returned by canvas create)
 #   		better due to alpha transparency: <canvas> itemconfigure <frameIDorTag> -state hidden|normal
 #
@@ -12242,9 +12314,9 @@ proc ConnectToServerByIdx {idx} {
 #   --DONE--: animation_init <tileID> <frames> <speed> <loops>			set up in system
 #   --DONE--: animation_clear_frames <tilID>					remove all tk images
 #   --DONE--: animation_add_frame <tilID> <n> <image>				add tk image
-#   PROPOSED: animation_create <canvas> <x> <y> <imagedef-dict> ?-start?
-#   PROPOSED: animation_newid <tileID> <newCanvasID>
-#   PROPOSED: animation_start <canvas> -tile <tileiD>... | -all | -unexpired
+#   --DONE--: animation_create <canvas> <x> <y> <tileID> ?-start?
+#   --DONE--: animation_newid <tileID> <frame#> <newCanvasID>
+#   --DONE--: animation_start <canvas> -tile <tileiD>... | -all | -unexpired
 #   --DONE--: animation_stop  -tile <tileiD>... | -all
 #   
 #   --DONE--: _load_local_animated_file <path> <name> <zoom> <frames> <speed> <loop>
