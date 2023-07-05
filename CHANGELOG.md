@@ -16,6 +16,10 @@ The support for old server protocols (<400) and map file formats (<20) will be d
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
+# 4.13
+## Adds
+ * Controls to remove and update cached data.
+
 # 4.12
 ## Adds
  * Now provides a preferences setting to select whether to display the main menu as an application menu bar or on a menu button. (Previously it was only on a menu button).
