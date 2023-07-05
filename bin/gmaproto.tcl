@@ -57,9 +57,9 @@ package require base64 2.4.2
 package require uuid 1.0.1
 
 namespace eval ::gmaproto {
-	variable protocol 406
+	variable protocol 407
 	variable min_protocol 333
-	variable max_protocol 406
+	variable max_protocol 407
 	variable max_max_protocol 499
 	variable debug_f {}
 	variable legacy false
@@ -121,7 +121,7 @@ namespace eval ::gmaproto {
 	array set _message_payload {
 		AC      {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i CustomReach {o {Enabled ? Natural i Extended i}}}
 		ACCEPT  {Messages l}
-		AI      {Name s Sizes {a {File s ImageData b IsLocalFile ? Zoom f}}}
+		AI      {Name s Sizes {a {File s ImageData b IsLocalFile ? Zoom f}} Animation {o {Frames i FrameSpeed i Loops i}}}
 		AI?	{Name s Sizes {a {Zoom f}}}
 		ALLOW   {Features l}
 		AUTH    {Client s Response b User s}
@@ -1330,8 +1330,8 @@ proc ::gmaproto::query_dice_presets {} {
 	::gmaproto::_protocol_send DR
 }
 
-proc ::gmaproto::add_image {name sizes} {
-	::gmaproto::_protocol_send AI Name $name Sizes $sizes
+proc ::gmaproto::add_image {name sizes {frames 0} {speed 0} {loops 0}} {
+	::gmaproto::_protocol_send AI Name $name Sizes $sizes Animation [dict create Frames $frames FrameSpeed $speed Loops $loops]
 }
 
 proc ::gmaproto::query_image {name size} {
