@@ -108,7 +108,7 @@ set ClockProgress 0
 set progress_stack {}
 set is_GM false
 proc begin_progress { id title max args } {
-    if [catch {
+    if {[catch {
         DEBUG 1 "begin_progress [list $id $title $max $args]"
         global ClockProgress progress_stack progress_data ClockDisplay
         if {$id eq "*"} {
@@ -136,7 +136,7 @@ proc begin_progress { id title max args } {
         set progress_data($id:max) $max
         set ClockDisplay $title
         update
-    } err] {
+    } err]} {
         DEBUG 0 "begin_progress $id: $err"
     }
     return $id
@@ -148,7 +148,7 @@ proc TopLeftGridLabel {} {
 }
 
 proc LetterLabelToGridXY {label} {
-	if [regexp {^([A-Z]+)([0-9]+)$} [string toupper $label] _ xlabel ylabel] {
+	if {[regexp {^([A-Z]+)([0-9]+)$} [string toupper $label] _ xlabel ylabel]} {
 		set x -1
 		foreach letter [split $xlabel {}] {
 			incr x
@@ -174,10 +174,10 @@ proc ScrollToGridXY {gx gy} {
 }
 
 proc ScrollToGridLabel {label} {
-	if [catch {
+	if {[catch {
 		lassign [LetterLabelToGridXY $label] gx gy
 		ScrollToGridXY $gx $gy
-	} err] {
+	} err]} {
 		DEBUG 0 "Unable to scroll to $label: $err"
 	}
 }
@@ -186,7 +186,7 @@ proc ScrollToGridLabel {label} {
 # update_progress id value newmax|* ?-send?
 #
 proc update_progress { id value newmax args } {
-    if [catch {
+    if {[catch {
         DEBUG 1 "update_progress [list $id $value $newmax $args]"
         global ClockProgress progress_stack progress_data ClockDisplay
         if {$args eq {-send}} {
@@ -221,7 +221,7 @@ proc update_progress { id value newmax args } {
             }
             update
         }
-    } err] {
+    } err]} {
         DEBUG 0 "update_progress $id: $err"
     }
 }
@@ -230,7 +230,7 @@ proc update_progress { id value newmax args } {
 # end_progress id ?-send?
 #    
 proc end_progress {id args} {
-    if [catch {
+    if {[catch {
         global ClockProgress progress_stack progress_data ClockDisplay
         if {$args eq {-send}} {
 			::gmaproto::update_progress $id {} {} {} true
@@ -257,7 +257,7 @@ proc end_progress {id args} {
             set ClockProgress $progress_data([lindex $progress_stack end]:value)
         }
         update
-    } err] {
+    } err]} {
         DEBUG 0 "end_progress $id: $err"
     }
 }
@@ -274,13 +274,13 @@ proc report_progress {msg} {
 
 proc setDarkMode {enabled} {
 	global dark_mode colortheme _preferences
-	if $enabled {
+	if {$enabled} {
 		set dark_mode 1
 		set colortheme dark
 		dict set _preferences dark true
 		catch {
 			set ::tooltip::labelOpts [list -highlightthickness 0 -relief solid -bd 1 -background blue -foreground white]
-			if [winfo exists $::tooltip::G(TOPLEVEL)] {
+			if {[winfo exists $::tooltip::G(TOPLEVEL)]} {
 				$::tooltip::G(TOPLEVEL) configure -background blue
 				$::tooltip::G(TOPLEVEL).label configure -background blue -foreground white
 			}
@@ -291,7 +291,7 @@ proc setDarkMode {enabled} {
 		dict set _preferences dark false
 		catch {
 			set ::tooltip::labelOpts [list -highlightthickness 0 -relief solid -bd 1 -background lightyellow -foreground black]
-			if [winfo exists $::tooltip::G(TOPLEVEL)] {
+			if {[winfo exists $::tooltip::G(TOPLEVEL)]} {
 				$::tooltip::G(TOPLEVEL) configure -background lightyellow
 				$::tooltip::G(TOPLEVEL).label configure -background lightyellow -foreground black
 			}
@@ -319,7 +319,7 @@ set default_config    [file normalize [file join ~ .gma mapper mapper.conf]]
 #set default_style_cfg [file normalize [file join ~ .gma mapper style.conf]]
 set path_install_base [file normalize [file join ~ .gma mapper]]
 
-if [catch {set local_user $::tcl_platform(user)}] {set local_user __unknown__}
+if {[catch {set local_user $::tcl_platform(user)}]} {set local_user __unknown__}
 set ChatTranscript 	{}
 
 proc say {msg} {
@@ -379,7 +379,7 @@ proc TkFontToGMAFont {tkfont} {
 
 proc ScaleFont {fontspec factor} {
 	array set _base_font_info [font actual $fontspec]
-	if [info exists _base_font_info(-size)] {
+	if {[info exists _base_font_info(-size)]} {
 		set _base_font_info(-size) [expr int($_base_font_info(-size) * $factor)]
 		return [array get _base_font_info]
 	}
@@ -564,7 +564,7 @@ proc DEBUG {level msg args} {
 		}
 
 		foreach k [array names DEBUGfgcolor] {
-			if [string is alpha $k] {
+			if {[string is alpha $k]} {
 				.debugwindow.text tag configure level$k -foreground $DEBUGfgcolor($k) -background $DEBUGbgcolor($k)
 			}
 		}
@@ -638,6 +638,7 @@ set ChatHistoryLastMessageID 0
 
 proc ResetChatHistory {loadqty} {
 	global ChatHistoryFile ChatHistoryFileHandle ChatHistoryLastMessageID ChatHistoryLimit ChatHistoryFileDirection
+	global ChatHistory
 
 	catch {
 		close $ChatHistoryFileHandle
@@ -650,6 +651,8 @@ proc ResetChatHistory {loadqty} {
 	INFO "Resetting chat history"
 	set ch $ChatHistoryLimit
 	set ChatHistoryLimit $loadqty
+	set ChatHistory {}
+	BlankChatHistoryDisplay
 	InitializeChatHistory
 	set ChatHistoryLimit $ch
 }
@@ -674,13 +677,13 @@ proc InitializeChatHistory {} {
 		if {! [file exists $ChatHistoryFile]} {
 			DEBUG 1 "-Creating new file; did not find an existing one"
 		} else {
-			if [catch {set ChatHistoryFileHandle [open $ChatHistoryFile]} err] {
+			if {[catch {set ChatHistoryFileHandle [open $ChatHistoryFile]} err]} {
 				DEBUG 0 "Unable to read chat history file $ChatHistoryFile ($err). We will try asking the server for a new history download."
 				set ChatHistoryFileHandle {}
 				set ChatHistoryFileDirection {}
 			} else {
 				set ChatHistoryFileDirection r
-				if [catch {
+				if {[catch {
 					while {[gets $ChatHistoryFileHandle msg] >= 0} {
 						DEBUG 2 "read $msg from cache"
 						if {[lindex $msg 0] eq {CHAT}} {
@@ -712,7 +715,7 @@ proc InitializeChatHistory {} {
 						}
 						lappend ChatHistory [list $ctype $d $mid]
 					}
-				} err] {
+				} err]} {
 					# error reading cache file; don't leave it open
 					DEBUG 0 "Error loading chat history from cache: $err"
 				}
@@ -722,7 +725,7 @@ proc InitializeChatHistory {} {
 
 				if {$ChatHistoryLimit > 0 && [llength $ChatHistory] > $ChatHistoryLimit} {
 					DEBUG 1 "Chat history contains [llength $ChatHistory] items; trimming it back to $ChatHistoryLimit."
-					if [catch {set ChatHistoryFileHandle [open $ChatHistoryFile w]} err] {
+					if {[catch {set ChatHistoryFileHandle [open $ChatHistoryFile w]} err]} {
 						DEBUG 0 "Unable to overwrite the chat history in $ChatHistoryFile ($err). No history will be kept now."
 						set ChatHistoryFileHandle {}
 					} else {
@@ -739,7 +742,7 @@ proc InitializeChatHistory {} {
 
 		set ChatHistoryFileDirection a
 		if {$ChatHistoryFileHandle eq {}} {
-			if [catch {set ChatHistoryFileHandle [open $ChatHistoryFile a]} err] {
+			if {[catch {set ChatHistoryFileHandle [open $ChatHistoryFile a]} err]} {
 				DEBUG 0 "Unable to append to or create chat history file $ChatHistoryFile ($err). No history will be kept."
 				set ChatHistoryFileHandle {}
 				set ChatHistoryFileDirection {}
@@ -1142,11 +1145,11 @@ for {set i 0} {$i < $argc} {incr i} {
 
 set allowLegacy false
 if {[file exists $preferences_path]} {
-	if [catch {
+	if {[catch {
 		set PreferencesData [::gmaprofile::load $preferences_path]
 		::gmaprofile::fix_missing PreferencesData
 		ApplyPreferences $PreferencesData
-	} err] {
+	} err]} {
 		tk_messageBox -type ok -icon error -title "Unable to load preferences" -message "The preferences settings could not be loaded from \"$preferences_path\"." -detail $err
 		set PreferencesData [::gmaprofile::default_preferences]
 		set CurrentProfileName {}
@@ -1473,26 +1476,29 @@ proc cache_map_file_dir {id} {
 
 #
 # get cache file info
-#   pathname -> {exists? age(days) name zoom}
+#   pathname -> {exists? age(days) name zoom frame}
 #   if the name is in an invalid format, name and zoom are empty strings
 #
 proc cache_info {cache_filename} {
 	global ImageFormat
 
-	if [regexp [format "%s%s" {/([^/]+)@([0-9.]+)\.} $ImageFormat] $cache_filename x image_name image_zoom] {
-		if [file exists $cache_filename] {
-			return [list 1 [expr ([clock seconds] - [file mtime $cache_filename]) / (24*60*60)] $image_name $image_zoom]
+	if {[regexp [format "%s%s" {/(:[0-9]+:)?([^/]+)@([0-9.]+)\.} $ImageFormat] $cache_filename _ image_frame image_name image_zoom]} {
+		if {[file exists $cache_filename]} {
+			return [list 1 [expr ([clock seconds] - [file mtime $cache_filename]) / (24*60*60)] $image_name $image_zoom $image_frame]
 		}
-		return [list 0 0 $image_name $image_zoom]
+		return [list 0 0 $image_name $image_zoom $image_frame]
 	}
-	if [regexp {/([^/]+)\.map} $cache_filename x map_name] {
-		if [file exists $cache_filename] {
-			return [list 1 [expr ([clock seconds] - [file mtime $cache_filename]) / (24*60*60)] $map_name {}]
+	if {[regexp {/([^/]+)@([0-9.]+)$} $cache_filename _ image_name image_zoom] && [file isdirectory $cache_filename]} {
+		return [list 1 0 $image_name $image_zoom -dir]
+	}
+	if {[regexp {/([^/]+)\.map} $cache_filename x map_name]} {
+		if {[file exists $cache_filename]} {
+			return [list 1 [expr ([clock seconds] - [file mtime $cache_filename]) / (24*60*60)] $map_name {} {}]
 		}
-		return [list 0 0 $map_name {}]
+		return [list 0 0 $map_name {} {}]
 	}
 		
-	return [list 0 0 {} {}]
+	return [list 0 0 {} {} {}]
 }
 
 #
@@ -1502,26 +1508,44 @@ proc create_image_from_file {tile_id filename} {
 	global TILE_SET
 	global ImageFormat
 
-	if [catch {set image_file [open $filename r]} err] {
+	if {[catch {set image_file [open $filename r]} err]} {
 		DEBUG 0 "Can't open image file $filename ($tile_id): $err"
 		return
 	}
 	fconfigure $image_file -encoding binary -translation binary
-	if [catch {set image_data [read $image_file]} err] {
+	if {[catch {set image_data [read $image_file]} err]} {
 		DEBUG 0 "Can't read data from image file $filename ($tile_id): $err"
 		close $image_file
 		return
 	}
 	close $image_file
-	if [info exists TILE_SET($tile_id)] {
+	if {[info exists TILE_SET($tile_id)]} {
 		DEBUG 1 "Replacing existing image $TILE_SET($tile_id) for $tile_id"
 		image delete $TILE_SET($tile_id)
 		unset TILE_SET($tile_id)
 	}
-	if [catch {set TILE_SET($tile_id) [image create photo -format $ImageFormat -data $image_data]} err] {
+	if {[catch {set TILE_SET($tile_id) [image create photo -format $ImageFormat -data $image_data]} err]} {
 		DEBUG 0 "Can't use data read from image file $filename ($tile_id): $err"
 		return
 	}
+}
+
+proc create_animated_frame_from_file {tile_id frameno filename} {
+	global TILE_ANIMATION
+	global ImageFormat
+
+	if {[catch {set image_file [open $filename r]} err]} {
+		DEBUG 0 "Can't open image file $filename ($tile_id, frame $frameno): $err"
+		return
+	}
+	fconfigure $image_file -encoding binary -translation binary
+	if {[catch {set image_data [read $image_file]} err]} {
+		DEBUG 0 "Can't read data from image file $filename ($tile_id, frame $frameno): $err"
+		close $image_file
+		return
+	}
+	close $image_file
+	animation_add_frame $tile_id $frameno $image_data
 }
 
 proc CleanupImageCache {daysOld} {
@@ -1541,21 +1565,49 @@ proc CleanupImageCache {daysOld} {
 		foreach cache_filename [glob -nocomplain -directory $cache_dir *.$ImageFormat] {
 			incr total
 			set cache_stats [cache_info $cache_filename]
-			lassign $cache_stats image_exists image_age image_name image_zoom
-			if {$daysOld eq {-update}} {
-				INFO "Cached image $image_name at $image_zoom age $image_age"
-				update
-				if {$image_age <= $cache_too_old_days} {
-					file delete $cache_filename
-					INFO "--Removing cache file $cache_filename to force refresh"
-					incr deleted
-					update
+			if {[lindex $cache_stats 4] eq "-dir"} {
+				# animated image (directory of frame files)
+				set delall false
+				foreach cache_frame [glob -nocomplain -directory $cache_filename *.$ImageFormat] {
+					incr total
+					lassign [cache_info $cache_frame] frame_exists frame_age frame_name frame_zoom frame_frame
+					if {$daysOld eq {-update}} {
+						INFO "Cached image frame $frame_name at $frame_zoom frame $frame_frame age $frame_age"
+						update
+						if {$frame_age <= $cache_too_old_days} {
+							file delete $cache_frame
+							INFO "--Removing cache file $cache_frame to force refresh"
+							incr deleted
+							update
+						}
+					} elseif {$frame_age >= $daysOld} {
+						set delall true
+						break
+					}
 				}
-				::gmaproto::query_image $image_name $image_zoom
-			} elseif {$image_age >= $daysOld} {
-				INFO "--Removing cache file $cache_filename"
-				file delete $cache_filename
-				incr deleted
+				if {$delall} {
+					INFO "--Removing all frames of $cache_filename"
+					update
+					file delete -force -- $cache_filename
+					incr deleted
+				}
+			} else {
+				lassign $cache_stats image_exists image_age image_name image_zoom
+				if {$daysOld eq {-update}} {
+					INFO "Cached image $image_name at $image_zoom age $image_age"
+					update
+					if {$image_age <= $cache_too_old_days} {
+						file delete $cache_filename
+						INFO "--Removing cache file $cache_filename to force refresh"
+						incr deleted
+						update
+					}
+					::gmaproto::query_image $image_name $image_zoom
+				} elseif {$image_age >= $daysOld} {
+					INFO "--Removing cache file $cache_filename"
+					file delete $cache_filename
+					incr deleted
+				}
 			}
 		}
 	}
@@ -1650,7 +1702,7 @@ if {[file exists $path_cache]} {
 		DEBUG 2 "-$cache_filename"
 		if {[clock seconds] - [file mtime $cache_filename] > 15552000} {
 			DEBUG 2 "-$cache_filename is older than 6 months, removing it"
-			if [catch {file delete $cache_filename} err] {
+			if {[catch {file delete $cache_filename} err]} {
 				DEBUG 0 "Unable to delete old cache file $cache_filename: $err"
 			}
 		}
@@ -1664,7 +1716,7 @@ if {[file exists $path_log_dir]} {
 		foreach log_filename [glob -nocomplain -types f -directory $path_log_dir $log_pattern] {
 			if {[clock seconds] - [file mtime $log_filename] > 15552000} {
 				DEBUG 2 "-$log_filename is older than 6 months, removing it"
-				if [catch {file delete $log_filename} err] {
+				if {[catch {file delete $log_filename} err]} {
 					DEBUG 0 "Unable to delete old log file $log_filename: $err"
 				}
 			}
@@ -1736,7 +1788,7 @@ foreach icon_name {
 	}
 	set icon_$icon_name [image create photo -format $_icon_format -file $icon_filename]
 
-	if $all_sizes {
+	if {$all_sizes} {
 		foreach {sz fsz} {16 {} 30 _30 40 _40} {
 			if {$dark_mode && [file exists "${ICON_DIR}/d_${icon_name}${fsz}.$_icon_format"]} {
 				set icon_filename "${ICON_DIR}/d_${icon_name}${fsz}.$_icon_format"
@@ -1906,7 +1958,7 @@ set SafMode 0
 proc toggleSafMode {} {
 	global SafMode icon_blank icon_saf_group_go
 	playtool
-	if [set SafMode [expr !$SafMode]] {
+	if {[set SafMode [expr !$SafMode]]} {
 		# SaF mode: you can't draw things in this mode
 		foreach btn {line rect poly circ arc text mode mode2 mode3 stamp aoe aoebound} {
 			.toolbar.$btn configure -image $icon_blank -state disabled
@@ -2047,10 +2099,10 @@ proc blur_hp {maxhp lethal} {
 	if {$blur_pct <= 0 || $maxhp <= $lethal} {
 		return [expr $maxhp - $lethal]
 	} else {
-		if [catch {
+		if {[catch {
 			set mf [expr $maxhp * ($blur_pct / 100.0)]
 			set res [expr max(1, int(int(($maxhp - $lethal) / $mf) * $mf))]
-		} err] {
+		} err]} {
 			DEBUG 0 "Error calculating blurred HP total: $err; falling back on true value"
 			return [expr $maxhp - $lethal]
 		}
@@ -2273,7 +2325,7 @@ set OBJ_FILE "untitled"
 #
 # interacts with the user and returns true if successful
 proc map_modtime {filename desc} {
-	if [catch {set f [open $filename]} err] {
+	if {[catch {set f [open $filename]} err]} {
 		tk_messageBox -type ok -icon error -title "Error opening file"\
 			-message "Unable to open $desc: $err" -parent .
 		return -1
@@ -2296,19 +2348,19 @@ proc saf_loadfile {file oldcd args} {
 
 	set server_id [cache_map_id $file]
 	if {$args ne {-nocheck}} {
-		if [catch {set cache_filename [fetch_map_file $server_id]} err] {
+		if {[catch {set cache_filename [fetch_map_file $server_id]} err]} {
 			DEBUG 1 "saf_loadfile: fetch_map_file $server_id failed: $err"
 			if {$err eq {NOSUCH}} {
 				# not on server yet
 				set ClockDisplay "$file not yet on server. Sending..."
 				update
-				if [catch {send_file_to_server $server_id $file} err] {
+				if {[catch {send_file_to_server $server_id $file} err]} {
 					tk_messageBox -type ok -icon error -title "Error sending file"\
 						-message "Unable to send $file to server: $err" -parent .
 					set ClockDisplay $oldcd
 					return 0
 				}
-				if [catch {set cache_filename [fetch_map_file $server_id]} err] {
+				if {[catch {set cache_filename [fetch_map_file $server_id]} err]} {
 					tk_messageBox -type ok -icon error -title "Error sending file"\
 						-message "Uploaded $file but still can't get it from the server: $err" -parent .
 					set ClockDisplay $oldcd
@@ -2338,13 +2390,13 @@ proc saf_loadfile {file oldcd args} {
 		set ClockDisplay "Sending new copy to server..."
 		DEBUG 1 "Cached file $cache_mtime, source $source_mtime"
 		update
-		if [catch {send_file_to_server $server_id $file} err] {
+		if {[catch {send_file_to_server $server_id $file} err]} {
 			tk_messageBox -type ok -icon error -title "Error sending file"\
 				-message "Unable to send $file to server: $err" -parent .
 			set ClockDisplay $oldcd
 			return 0
 		}
-		if [catch {set cache_filename [fetch_map_file $server_id]} err] {
+		if {[catch {set cache_filename [fetch_map_file $server_id]} err]} {
 			tk_messageBox -type ok -icon error -title "Error sending file"\
 				-message "Uploaded $file but still can't get it from the server: $err" -parent .
 			set ClockDisplay $oldcd
@@ -2433,10 +2485,10 @@ proc loadfile {file args} {
 		cleargrid
 	}
 
-	if [catch {
+	if {[catch {
 		set file_data [::gmafile::load_from_file $f]
 		close $f
-	} err] {
+	} err]} {
 		say "Error loading map data from file: $err"
 		catch {close $f}
 		return
@@ -2448,7 +2500,7 @@ proc loadfile {file args} {
 
 	set progress_id [begin_progress * "Loading map data" [llength $record_data] $sendflag]
 	set progress_i 0
-	if [catch {
+	if {[catch {
 		foreach record $record_data {
 			update_progress $progress_id [incr progress_i] [llength $record_data] $sendflag
 			lassign $record element_type d
@@ -2538,7 +2590,7 @@ proc loadfile {file args} {
 			}
 		}
 		end_progress $progress_id $sendflag
-	} err] {
+	} err]} {
 		say "Failed to import data: $err"
 		return
 	}
@@ -2609,10 +2661,10 @@ proc unloadfile {file args} {
 		}
 	}
 
-	if [catch {
+	if {[catch {
 		set file_data [::gmafile::load_from_file $f]
 		close $f
-	} err] {
+	} err]} {
 		say "Error unloading map data from file: $err"
 		catch {close $f}
 		return
@@ -2717,7 +2769,7 @@ proc RemoveObject id {
 	global OBJdata OBJtype canvas animatePlacement
 
 	$canvas delete obj$id
-	if $animatePlacement update
+	if {$animatePlacement} update
 	catch { unset OBJdata($id) }
 	catch { unset OBJtype($id) }
 }
@@ -3265,7 +3317,7 @@ set ARCMODE pieslice
 proc cmp_obj_attr_z {a b} {
 	global OBJdata
 	set z [expr [dict get $OBJdata($a) Z] - [dict get $OBJdata($b) Z]]
-	if $z {
+	if {$z} {
 		return $z
 	}
 	return [string compare $a $b]
@@ -3279,7 +3331,7 @@ proc cmp_obj_attr_z {a b} {
 proc cmp_obj_attr_z_img {a b} {
 	global OBJdata
 	set z [expr [dict get $OBJdata($a) Z] - [dict get $OBJdata($b) Z]]
-	if $z {
+	if {$z} {
 		return $z
 	}
 	return [string compare $a $b]
@@ -3324,7 +3376,7 @@ proc RefreshGrid {show} {
 	#
 	set display_list [lsort -integer -command cmp_obj_attr_z_img [array names OBJdata]]
 	foreach id $display_list {
-	  if [catch {
+	  if {[catch {
 		if {[info exists OBJtype($id)]} {
 			$canvas delete obj$id
 			if $animatePlacement update
@@ -3428,7 +3480,7 @@ proc RefreshGrid {show} {
 				update
 			}
 		}
-	  } err] {
+	  } err]} {
 		say "ERROR: Unable to render object $id: $err"
 	  }
 	}
@@ -3474,7 +3526,7 @@ proc UpdateObjectDisplay {id} {
 		}
 	}
 
-	if [catch {
+	if {[catch {
 		switch $OBJtype($id) {
 			arc {
 				$canvas coords obj$id "$X $Y $Points"
@@ -3537,7 +3589,7 @@ proc UpdateObjectDisplay {id} {
 				say "ERROR: weird object $id; type=$OBJtype($id)"
 			}
 		}
-    } err] {
+    } err]} {
         say "ERROR: Unable to render object $id: $err"
     }
 	$canvas raise grid
@@ -3689,7 +3741,7 @@ proc StartObj {w x y} {
 	#
 	# set up new element object in storage
 	#
-	if $NoFill {
+	if {$NoFill} {
 		set fill_color {}
 	} else {
 		set fill_color $OBJ_COLOR(fill)
@@ -3845,7 +3897,7 @@ proc StartObj {w x y} {
 			}
 			if {[llength $CurrentStampTile] > 0} {
 				set iid [lindex $CurrentStampTile 0]
-				if [info exists TILE_SET($iid)] {
+				if {[info exists TILE_SET($iid)]} {
 					$canvas create image [SnapCoord $x] [SnapCoord $y] -anchor nw -image $TILE_SET($iid) -tags "tiles obj$OBJ_CURRENT"
 				} else {
 					say "Unable to load image $CurrentStampTile. Be sure to define and upload it."
@@ -3892,7 +3944,7 @@ proc StartObj {w x y} {
 	bind . <Key-Escape> "EndObj $canvas"
 
 	$canvas raise grid
-	if $animatePlacement update
+	if {$animatePlacement} update
 }
 
 proc ZoomVector { args } {
@@ -4508,7 +4560,7 @@ proc EndObj w {
 proc send_element {id} {
 	global OBJtype OBJdata
 
-	if [info exists OBJtype($id)] {
+	if {[info exists OBJtype($id)]} {
 		::gmaproto::ls [::gmaproto::ObjTypeToGMAType $OBJtype($id)] $OBJdata($id)
 	}
 }
@@ -4536,7 +4588,7 @@ proc SquareGrid {w xx yy show} {
 			set SGw  1
 		}
 		$w create line [expr $x*$iscale] 0 [expr $x*$iscale] $yy -fill $SGfc -tags "grid" -width $SGw
-		if $show update
+		if {$show} update
 	}
 	for {set y 0} {($y * $iscale) < $yy} {incr y} {
 		if {$MajorGuideLines > 0 && (($y - [lindex $MajorGuideLineOffset 1]) % $MajorGuideLines) == 0} {
@@ -4550,7 +4602,7 @@ proc SquareGrid {w xx yy show} {
 			set SGw  1
 		}
 		$w create line 0 [expr $y*$iscale] $xx [expr $y*$iscale] -fill $SGfc -tags "grid" -width $SGw
-		if $show update
+		if {$show} update
 	}
 		
 #	for {set x 0} {($x * $iscale) < $xx} {incr x} {
@@ -4638,7 +4690,7 @@ proc PlaceSomeone {w d} {
 proc MoveSomeone {w id x y} {
 	global MOBdata
 
-	if [info exists MOBdata($id)] {
+	if {[info exists MOBdata($id)]} {
 		dict set MOBdata($id) Gx $x
 		dict set MOBdata($id) Gy $y
 		RenderSomeone $w $id
@@ -5005,13 +5057,13 @@ proc CreatureStatusConditions {id calc_condition} {
 	#  normal/{} flat staggered unconscious stable disabled dying
 	# dying: half-slash through the token
 	set conditions $calc_condition
-	if [info exists MOBdata($id)] {
+	if {[info exists MOBdata($id)]} {
 		if {[dict get $MOBdata($id) Health] ne {}} {
 			if {[set condition [dict get $MOBdata($id) Health Condition]] ne {}} {
 				lappend conditions $condition
 			}
-			if [dict get $MOBdata($id) Health IsFlatFooted] {lappend conditions flat-footed}
-			if [dict get $MOBdata($id) Health IsStable]     {lappend conditions stable}
+			if {[dict get $MOBdata($id) Health IsFlatFooted]} {lappend conditions flat-footed}
+			if {[dict get $MOBdata($id) Health IsStable]}     {lappend conditions stable}
 		}
 		foreach condition [dict get $MOBdata($id) StatusList] {
 			lappend conditions $condition
@@ -5337,7 +5389,7 @@ proc RenderSomeone {w id {norecurse false}} {
 		set ctype monster
 	}
 	if {$MOB_COMBATMODE && ![dict get $MOBdata($id) Killed]} {
-		if [dict get $MOBdata($id) Dim] {
+		if {[dict get $MOBdata($id) Dim]} {
 			$w create arc [expr ($x-$mob_area)*$iscale] [expr ($y-$mob_area)*$iscale] \
 				[expr ($x+$mob_size+$mob_area)*$iscale] [expr ($y+$mob_area+$mob_size)*$iscale] \
 				-outline [dict get $MOBdata($id) Color] \
@@ -5415,9 +5467,9 @@ proc RenderSomeone {w id {norecurse false}} {
 	# nametag
 	global MOB_IMAGE
 	set mob_name [set mob_img_name [dict get $MOBdata($id) Name]]
-	if [info exists MOB_IMAGE($mob_name)] {
+	if {[info exists MOB_IMAGE($mob_name)]} {
 		set mob_img_name $MOB_IMAGE($mob_name)
-	} elseif [regexp {^(.*) #\d+$} $mob_name mob_full_name mob_creature_name mob_sequence] {
+	} elseif {[regexp {^(.*) #\d+$} $mob_name mob_full_name mob_creature_name mob_sequence]} {
 		set mob_img_name $mob_creature_name
 	}
 
@@ -5503,7 +5555,7 @@ proc RenderSomeone {w id {norecurse false}} {
 	#
 	# if we found a copy of the image, it will now appear in TILE_SET.
 	#
-	if [info exists TILE_SET([tile_id $image_pfx $disp_zoom])] {
+	if {[info exists TILE_SET([tile_id $image_pfx $disp_zoom])]} {
 		DEBUG 3 "$image_pfx:$disp_zoom = $TILE_SET([tile_id $image_pfx $disp_zoom])"
 		if {!$is_transparent} {
 			$w create oval [expr $x*$iscale] [expr $y*$iscale] [expr ($x+$mob_size)*$iscale] [expr ($y+$mob_size)*$iscale] -fill $fillcolor -tags "mob MF#$id M#$id MN#$id allMOB MB#$id"
@@ -5814,7 +5866,7 @@ proc RenderSomeone {w id {norecurse false}} {
 	# each other.  We'll draw arrows tangent to the nametag ovals between
 	# threatener and threatenee.
 	#
-	if $MOB_COMBATMODE {
+	if {$MOB_COMBATMODE} {
 		global PI
 		$w delete "MArrows"
 		DEBUG 4 "Deleting arrows, redrawing them"
@@ -5844,7 +5896,7 @@ proc RenderSomeone {w id {norecurse false}} {
 				foreach col $row {
 					DEBUG 1 "--- @($xx,$yy) m=$col"
 					if {$col & $matbit} {
-						if [info exists WhereIsMOB($xx,$yy)] {
+						if {[info exists WhereIsMOB($xx,$yy)]} {
 							DEBUG 1 "---- something is here: $WhereIsMOB($xx,$yy)"
 							foreach target_id $WhereIsMOB($xx,$yy) {
 								if {$target_id ne $threatening_mob_id
@@ -6099,7 +6151,7 @@ set OBJ_MOVING {}
 set OBJ_MOVING_SELECTED {}
 proc MoveObjById {w id} {
 	global OBJdata OBJ_MOVING OBJ_MOVING_SELECTED ClockDisplay OBJtype
-	if [info exists OBJdata($id)] {
+	if {[info exists OBJdata($id)]} {
 		if {$OBJtype($id) eq {aoe} || $OBJtype($id) eq {saoe}} {
 			say "Moving spell area of effect is not yet implemented."
 			set OBJ_MOVING {}
@@ -6667,7 +6719,7 @@ proc CreateMovementModeSubMenu {args} {
 	catch {$mid delete 0 end; destroy $mid}
 	menu $mid -tearoff 0
 	foreach {value label} {{} Land burrow Burrow climb Climb fly Fly swim Swim} {
-		if [MobState $mob_list MoveMode [::gmaproto::to_enum MoveMode $value]] {
+		if {[MobState $mob_list MoveMode [::gmaproto::to_enum MoveMode $value]]} {
 			$mid add command -command [list $cmd $mob_list $value] -label $label -foreground #ff0000
 		} else {
 			$mid add command -command [list $cmd $mob_list $value] -label $label
@@ -7362,7 +7414,7 @@ proc AddPlayer {name color args} {
 
 proc InsertCreatureImageName {d} {
 	global MOB_IMAGE
-	if [info exists MOB_IMAGE([dict get $d Name])] {
+	if {[info exists MOB_IMAGE([dict get $d Name])]} {
 		return [dict replace $d Name "$MOB_IMAGE([dict get $d Name])=[dict get $d Name]"]
 	}
 	return $d
@@ -7636,7 +7688,7 @@ proc ToggleReach id {
 proc clearplayers {pattern} {
 	global MOBdata
 	foreach id [array names MOBdata] {
-		if [string match $pattern [::gmaproto::from_enum CreatureType [dict get $MOBdata($id) CreatureType]]] {
+		if {[string match $pattern [::gmaproto::from_enum CreatureType [dict get $MOBdata($id) CreatureType]]]} {
 			RemovePerson $id
 		}
 	}
@@ -7745,9 +7797,9 @@ proc KillObjUnderMouse {w x y} {
 		.killmultiple delete 0 end
 		foreach id $candidates {
 			lassign [obj_line_fill_width $id] line fill width
-			if [dict exists $OBJdata($id) Text] {
+			if {[dict exists $OBJdata($id) Text]} {
 				set desc " \"[dict get $OBJdata($id) Text]\""
-			} elseif [dict exists $OBJdata($id) Image] {
+			} elseif {[dict exists $OBJdata($id) Image]} {
 				set desc " \"[dict get $OBJdata($id) Image]\""
 			} else {
 				set desc ""
@@ -7760,7 +7812,7 @@ proc KillObjUnderMouse {w x y} {
 	
 proc obj_line_fill_width {id} {
 	global OBJdata
-	if [info exists OBJdata($id)] {
+	if {[info exists OBJdata($id)]} {
 		::gmautil::dassign $OBJdata($id) Line l Fill f Width w
 		if {$l eq {}} {set l {no line}}
 		if {$f eq {}} {set f {no fill}}
@@ -7780,7 +7832,7 @@ proc NudgeObject {w dx dy} {
 		set ClockDisplay "No current object to move; move one with mouse first"
 		return
 	}
-	if [info exists OBJdata($MO_last_obj)] {
+	if {[info exists OBJdata($MO_last_obj)]} {
 		if {$OBJtype($MO_last_obj) eq {aoe} || $OBJtype($MO_last_obj) eq {saoe}} {
 			say "Nudging spell area of effect is not yet implemented."
 			return
@@ -7836,7 +7888,7 @@ proc NudgeObjectZ {w adj} {
 	if {$min_z eq {nil}} {set min_z 0}
 	if {$max_z eq {nil}} {set max_z 0}
 
-	if [info exists OBJdata($MO_last_obj)] {
+	if {[info exists OBJdata($MO_last_obj)]} {
 		set z [dict get $OBJdata($MO_last_obj) Z]
 		switch -exact -- $adj {
 			up { 
@@ -8050,7 +8102,7 @@ proc blinkMob {w t s} {
 	} else {
 		catch {
 			foreach tt $t {
-				if [dict get $MOBdata($tt) Dim] {
+				if {[dict get $MOBdata($tt) Dim]} {
 					$w itemconfigure MC#$tt -outline [dict get $MOBdata($tt) Color]
 				} else {
 					$w itemconfigure MC#$tt -outline yellow
@@ -8076,7 +8128,7 @@ proc blinkMob {w t s} {
 # cache_map_id filename					-> server-side id expected for given filename
 # cache_filename name zoom				-> expected path to cached image file
 # cache_map_filename id					-> expected path to cached map file
-# cache_info filename					-> {exists? age_in_days img_name/map_id zoom}
+# cache_info filename					-> {exists? age_in_days img_name/map_id zoom frame}
 # load_cached_images					-- loads up all images from the cache unless too old
 proc cache_map_id {filename} {
 	# generate id from filename
@@ -8105,7 +8157,7 @@ proc fetch_map_file {id} {
 	# Maybe the map is already here and recent enough...
 	#
 	DEBUG 2 "Fetching map file from server, id=$id"
-	if [lindex $cache_stats 0] {
+	if {[lindex $cache_stats 0]} {
 		set cache_age [lindex $cache_stats 1]
 		DEBUG 3 "Found cache file for this map in $cache_filename, age=$cache_age"
 		if {$cache_age < $cache_too_old_days} {
@@ -8130,7 +8182,7 @@ proc fetch_map_file {id} {
 	if {$tcl_platform(os) ne "Windows NT"} {
 		set CreateOpt --create-dirs
 	}
-	if [catch {
+	if {[catch {
 		if {$CURLproxy ne {}} {
 			DEBUG 3 "Running $CURLpath $CreateOpt --output [file nativename $cache_filename] --proxy $CURLproxy -f -z [clock format $cache_newer_than] $url"
 			exec $CURLpath $CreateOpt --output [file nativename $cache_filename] --proxy $CURLproxy -f -z [clock format $cache_newer_than] $url >&@$my_stdout
@@ -8140,7 +8192,7 @@ proc fetch_map_file {id} {
 		}
 		DEBUG 3 "Updating cache file time"
         file mtime [file nativename $cache_filename] [clock seconds]
-	} err options] {
+	} err options]} {
 		set i [dict get $options -errorcode]
 		if {[llength $i] >= 3 && [lindex $i 0] eq {CHILDSTATUS} && [lindex $i 2] == 22} {
 			DEBUG 0 "Requested map file ID $id was not found on the server."
@@ -8180,7 +8232,7 @@ proc fetch_url {localdir local url} {
 	}
 
 	set dest [file join $localdir $local]
-	if [catch {
+	if {[catch {
 		if {$CURLproxy ne {}} {
 			DEBUG 3 "Running $CURLpath --output [file nativename $dest] --proxy $CURLproxy -f $url"
 			exec $CURLpath --output [file nativename $dest] --proxy $CURLproxy -f $url >&@$my_stdout
@@ -8188,7 +8240,7 @@ proc fetch_url {localdir local url} {
 			DEBUG 3 "Running $CURLpath --output [file nativename $dest] -f $url"
 			exec $CURLpath --output [file nativename $dest] -f $url >&@$my_stdout
 		}
-	} err options] {
+	} err options]} {
 		set i [dict get $options -errorcode]
 		if {[llength $i] >= 3 && [lindex $i 0] eq {CHILDSTATUS} && [lindex $i 2] == 22} {
 			DEBUG 0 "Requested map file ID $id was not found on the server."
@@ -8228,7 +8280,7 @@ proc send_file_to_server {id local_file} {
 	set destdir "${SCPdest}/[string range $id 0 0]/[string range $id 0 1]"
 	set destpath "${SCPserver}:${destdir}/$id.map"
 
-	if [catch {
+	if {[catch {
 		set st [file attributes $local_file -permissions]
 		if {$st & 0111} {
 			say "$local_file has execute permissions. Removing them and setting world read access."
@@ -8237,11 +8289,11 @@ proc send_file_to_server {id local_file} {
 			say "$local_file isn't world-readable. Changing that now."
 			file attributes $local_file -permissions 0644
 		}
-	} err] {
+	} err]} {
 		say "Failed to read or update file attributes for $local_file ($err). Proceeding but the transfer operation may fail as a result."
 	}
 
-	if [catch {
+	if {[catch {
 		if {$SCPproxy ne {}} {
 			DEBUG 1 "exec: $SSHpath -o \"ProxyCommand $NCpath -X 5 -x $SCPproxy %h %p\" $SCPserver $SERVER_MKDIRpath -p $destdir"
 			exec $SSHpath -o "ProxyCommand $NCpath -X 5 -x $SCPproxy %h %p" $SCPserver $SERVER_MKDIRpath -p $destdir >&@$my_stdout
@@ -8253,7 +8305,7 @@ proc send_file_to_server {id local_file} {
 			DEBUG 1 "exec: $SCPpath $local_file $destpath"
 			exec $SCPpath $local_file $destpath >&@$my_stdout
 		}
-	} err] {
+	} err]} {
 		DEBUG 0 "Error running $SSHpath or $SCPpath for $local_file -> $destdir: $err"
 	}
 }
@@ -8283,7 +8335,7 @@ proc fetch_image {name zoom id} {
 	# the cache is too old.
 	#
 	DEBUG 2 "Fetching image $name at zoom $zoom, id=$id"
-	if [lindex $cache_stats 0] {
+	if {[lindex $cache_stats 0]} {
 		set cache_age [lindex $cache_stats 1]
 		DEBUG 3 "Found cache file for this image in $cache_filename, age=$cache_age"
 		if {$cache_age < $age} {
@@ -8304,7 +8356,7 @@ proc fetch_image {name zoom id} {
 		set CreateOpt --create-dirs
 	}
 	set url "$CURLserver/[string range $id 0 0]/[string range $id 0 1]/$id.$ImageFormat"
-	if [catch {
+	if {[catch {
 		if {$CURLproxy ne {}} {
 			DEBUG 3 "Running $CURLpath $CreateOpt --output [file nativename $cache_filename] --proxy $CURLproxy -f -z [clock format $cache_newer_than] $url"
 			exec $CURLpath $CreateOpt --output [file nativename $cache_filename] --proxy $CURLproxy -f -z [clock format $cache_newer_than] $url >&@$my_stdout
@@ -8314,7 +8366,7 @@ proc fetch_image {name zoom id} {
 		}
 		DEBUG 3 "Updating cache file time"
         file mtime [file nativename $cache_filename] [clock seconds]
-	} err options] {
+	} err options]} {
 		set i [dict get $options -errorcode]
 		if {[llength $i] >= 3 && [lindex $i 0] eq {CHILDSTATUS} && [lindex $i 2] == 22} {
 			DEBUG 0 "Requested image file ID $id was not found on the server."
@@ -8337,61 +8389,70 @@ proc fetch_animated_image {name zoom id frames speed loops} {
 	global cache_too_old_days
 	global my_stdout
 
+
 	set age $cache_too_old_days
 	set oldcd $ClockDisplay
 	set ClockDisplay "Getting animated image @$zoom id [string range $id 0 5]..."
 	update
 
 	set tile_id [tile_id $name $zoom]
-	set cache_filename [cache_filename $name $zoom]
-	set cache_stats [cache_info $cache_filename]
 	set cache_age 0
 	set cache_newer_than 0
+	
+	# TODO check if already exists??
+	animation_init $tile_id $frames $speed $loops
 	#
 	# is the image already in our cache? If so, just load that unless
 	# the cache is too old.
 	#
-	DEBUG 2 "Fetching image $name at zoom $zoom, id=$id"
-	if [lindex $cache_stats 0] {
-		set cache_age [lindex $cache_stats 1]
-		DEBUG 3 "Found cache file for this image in $cache_filename, age=$cache_age"
-		if {$cache_age < $age} {
-			DEBUG 3 "Cache is $cache_age days old, so we'll just use that"
-			create_image_from_file $tile_id $cache_filename
-			set ClockDisplay $oldcd
-			return
-		}
-		set cache_newer_than [file mtime $cache_filename]
-		DEBUG 3 "Cache is [lindex $cache_stats 1] days old, so we'll fetch a fresh copy if newer than [clock format $cache_newer_than]"
-	} else {
-		DEBUG 3 "No cache file found, fetching from server"
-	}
-	global tcl_platform
-	if {$tcl_platform(os) eq "Windows NT"} {
-	set CreateOpt -s
-	} else {
-		set CreateOpt --create-dirs
-	}
-	set url "$CURLserver/[string range $id 0 0]/[string range $id 0 1]/$id.$ImageFormat"
-	if [catch {
-		if {$CURLproxy ne {}} {
-			DEBUG 3 "Running $CURLpath $CreateOpt --output [file nativename $cache_filename] --proxy $CURLproxy -f -z [clock format $cache_newer_than] $url"
-			exec $CURLpath $CreateOpt --output [file nativename $cache_filename] --proxy $CURLproxy -f -z [clock format $cache_newer_than] $url >&@$my_stdout
+	set cache_dirname [cache_file_dir $name $zoom 0]
+
+	for {set n 0} {$n < $frames} {incr n} {
+		set cache_filename [cache_filename $name $zoom $n]
+		set cache_stats [cache_info $cache_filename]
+		DEBUG 2 "Fetching image $name, frame $n at zoom $zoom, id=$id"
+
+		if {[lindex $cache_stats 0]} {
+			set cache_age [lindex $cache_stats 1]
+			DEBUG 3 "Found cache file for this image frame in $cache_filename, age=$cache_age"
+
+			if {$cache_age < $age} {
+				DEBUG 3 "Cache is $cache_age days old, so we'll just use that"
+				create_animated_frame_from_file $tile_id $n $cache_filename
+				continue
+			}
+			set cache_newer_than [file mtime $cache_filename]
+			DEBUG 3 "Cache is [lindex $cache_stats 1] days old, so we'll fetch a fresh copy if newer than [clock format $cache_newer_than]"
 		} else {
-			DEBUG 3 "Running $CURLpath $CreateOpt --output [file nativename $cache_filename] -f -z [clock format $cache_newer_than] $url"
-			exec $CURLpath $CreateOpt --output [file nativename $cache_filename] -f -z [clock format $cache_newer_than] $url >&@$my_stdout
+			DEBUG 3 "No cache file found, fetching from server"
 		}
-		DEBUG 3 "Updating cache file time"
-        file mtime [file nativename $cache_filename] [clock seconds]
-	} err options] {
-		set i [dict get $options -errorcode]
-		if {[llength $i] >= 3 && [lindex $i 0] eq {CHILDSTATUS} && [lindex $i 2] == 22} {
-			DEBUG 0 "Requested image file ID $id was not found on the server."
+		global tcl_platform
+		if {$tcl_platform(os) eq "Windows NT"} {
+		set CreateOpt -s
 		} else {
-			DEBUG 0 "Error running $CURLpath to get $url into $cache_filename: $err"
+			set CreateOpt --create-dirs
 		}
+		set url "$CURLserver/[string range $id 0 0]/[string range $id 0 1]/$id.$ImageFormat"
+		if {[catch {
+			if {$CURLproxy ne {}} {
+				DEBUG 3 "Running $CURLpath $CreateOpt --output [file nativename $cache_filename] --proxy $CURLproxy -f -z [clock format $cache_newer_than] $url"
+				exec $CURLpath $CreateOpt --output [file nativename $cache_filename] --proxy $CURLproxy -f -z [clock format $cache_newer_than] $url >&@$my_stdout
+			} else {
+				DEBUG 3 "Running $CURLpath $CreateOpt --output [file nativename $cache_filename] -f -z [clock format $cache_newer_than] $url"
+				exec $CURLpath $CreateOpt --output [file nativename $cache_filename] -f -z [clock format $cache_newer_than] $url >&@$my_stdout
+			}
+			DEBUG 3 "Updating cache file time"
+			file mtime [file nativename $cache_filename] [clock seconds]
+		} err options]} {
+			set i [dict get $options -errorcode]
+			if {[llength $i] >= 3 && [lindex $i 0] eq {CHILDSTATUS} && [lindex $i 2] == 22} {
+				DEBUG 0 "Requested image file ID $id was not found on the server."
+			} else {
+				DEBUG 0 "Error running $CURLpath to get $url into $cache_filename: $err"
+			}
+		}
+		create_animated_frame_from_file $tile_id $n $cache_filename
 	}
-	create_image_from_file $tile_id $cache_filename
 	set ClockDisplay $oldcd
 	refreshScreen
 }
@@ -8516,7 +8577,7 @@ proc animation_create {canvas x y tileID objID args} {
 		return
 	}
 	for {set n 0} {$n < $TILE_ANIMATION($tileID,frames)} {incr n} {
-		set TILE_ANIMATION($tileID,id,$n) [\
+		set TILE_ANIMATION($tileID,id,$objID,$n) [\
 			$canvas create image $x $y -anchor nw -image $TILE_ANIMATION($tileID,img,$n) \
 				-tags [list tiles obj$objID allOBJ animatedTiles]\
 				-state [expr $n == 0 ? {{normal}} : {{hidden}}]\
@@ -8527,9 +8588,9 @@ proc animation_create {canvas x y tileID objID args} {
 	}
 }
 
-proc animation_newid {tileID frameno canID} {
+proc animation_newid {tileID frameno objID canID} {
 	global TILE_ANIMATION
-	set TILE_ANIMATION($tileID,id,$frameno) $canID
+	set TILE_ANIMATION($tileID,id,$objID,$frameno) $canID
 }
 
 proc animation_start {canvas opt args} {
@@ -8546,7 +8607,7 @@ proc animation_start {canvas opt args} {
 		set idlist {}
 		foreach k [array names TILE_ANIMATION -glob "*,frames"] {
 			set id [string range $k 0 end-7]
-			if {$TILE_ANIMATION($id,loops) == 0 || $TITLE_ANIMATION($id,loop) < $TITLE_ANIMATION($id,loops)} {
+			if {$TILE_ANIMATION($id,loops) == 0 || $TILE_ANIMATION($id,loop) < $TILE_ANIMATION($id,loops)} {
 				lappend idlist $id
 			}
 		}
@@ -8555,34 +8616,46 @@ proc animation_start {canvas opt args} {
 	}
 
 	foreach id $idlist {
-		if {$TITLE_ANIMATION($id,task) eq {}} {
-			set TITLE_ANIMATION($id,current) 0
-			set TITLE_ANIMATION($id,loop) 0
-			set TITLE_ANIMATION($id,task) [after $TITLE_ANIMATION($id,delay) "_animation_next_frame [list $id $canvas]"]
+		if {$TILE_ANIMATION($id,task) eq {}} {
+			set TILE_ANIMATION($id,current) 0
+			set TILE_ANIMATION($id,loop) 0
+			set TILE_ANIMATION($id,task) [after $TILE_ANIMATION($id,delay) "_animation_next_frame [list $id $canvas]"]
 		}
 	}
 }
 
 proc _animation_next_frame {id canvas} {
-	global TITLE_ANIMATION
-	if {$TITLE_ANIMATION($id,task) ne {}} {
-		$canvas itemconfigure $TITLE_ANIMATION($id,id,$TITLE_ANIMATION($id,current)) -state hidden
-		if {[incr TITLE_ANIMATION($id,current)] >= $TITLE_ANIMATION($id,frames)} {
-			set TITLE_ANIMATION($id,current) 0
-			if {$TITLE_ANIMATION($id,loops) > 0 && [incr TITLE_ANIMATION($id,loop)] >= $TITLE_ANIMATION($id,loops)} {
+	global TILE_ANIMATION
+	if {$TILE_ANIMATION($id,task) ne {}} {
+		foreach k [array names TILE_ANIMATION "$id,id,*,$TILE_ANIMATION($id,current)"] {
+			$canvas itemconfigure $TILE_ANIMATION($k) -state hidden
+		}
+		if {[incr TILE_ANIMATION($id,current)] >= $TILE_ANIMATION($id,frames)} {
+			set TILE_ANIMATION($id,current) 0
+			if {$TILE_ANIMATION($id,loops) > 0 && [incr TILE_ANIMATION($id,loop)] >= $TILE_ANIMATION($id,loops)} {
 				# stop here
-				$canvas itemconfigure $TITLE_ANIMATION($id,id,0) -state normal
-				set TITLE_ANIMATION($id,task) {}
+				foreach k [array names TILE_ANIMATION "$id,id,*,0"] {
+					$canvas itemconfigure $TILE_ANIMATION($k) -state normal
+				}
+				set TILE_ANIMATION($id,task) {}
 				return
 			}
 		}
-		$canvas itemconfigure $TITLE_ANIMATION($id,id,$TITLE_ANIMATION($id,current)) -state normal
-		set TITLE_ANIMATION($id,task) [after $TITLE_ANIMATION($id,delay) "_animation_next_frame [list $id $canvas]"]
+		foreach k [array names TILE_ANIMATION "$id,id,*,$TILE_ANIMATION($id,current)"] {
+			$canvas itemconfigure $TILE_ANIMATION($k) -state normal
+		}
+		set TILE_ANIMATION($id,task) [after $TILE_ANIMATION($id,delay) "_animation_next_frame [list $id $canvas]"]
 	}
 }
 
 # destroy all information about the given animated images
-# TODO and remove from canvas?
+proc animation_destroy_instance {canvas tileID objID} {
+	global TILE_ANIMATION
+
+	$canvas delete {*}[lmap {k v} [array get TILE_ANIMATION "$tileID,id,$objID,*"] {set v}]
+	array unset TILE_ANIMATION "$tileID,id,$objID,*"
+}
+
 proc animation_destroy {opt args} {
 	global TILE_ANIMATION
 
@@ -8658,7 +8731,6 @@ proc animation_init {tileID frames speed loops} {
 	set TILE_ANIMATION($tileID,loop) 0
 	set TILE_ANIMATION($tileID,task) {}
 	for {set n 0} {$n < $frames} {incr n} {
-		set TILE_ANIMATION($tileID,id,$n) {}
 		set TILE_ANIMATION($tileID,img,$n) {}
 	}
 }
@@ -8701,12 +8773,12 @@ proc DoCommandAI {d} {
 				_load_local_animated_file $server_id $name $zoom $aframes $aspeed $aloops
 				continue
 			}
-			if [catch {
+			if {[catch {
 				set f [open $server_id r]
 				fconfigure $f -encoding binary -translation binary
 				set raw_data [read $f]
 				close $f
-			} err] {
+			} err]} {
 				error "Unable to load image file $server_id: $err"
 			}
 		} 
@@ -8716,7 +8788,7 @@ proc DoCommandAI {d} {
 
 			global TILE_SET
 			set t_id [tile_id $name $zoom]
-			if [info exists TILE_SET($t_id)] {
+			if {[info exists TILE_SET($t_id)]} {
 				DEBUG 1 "Replacing existing image $TILE_SET($t_id) for ${name} x$zoom"
 				image delete $TILE_SET($t_id)
 				unset TILE_SET($t_id)
@@ -8742,7 +8814,7 @@ proc DoCommandAI? {d} {
 	set name [dict get $d Name]
 	foreach instance [dict get $d Sizes] {
 		set zoom [dict get $instance Zoom]
-		if [info exists TILE_ID([tile_id $name $zoom])] {
+		if {[info exists TILE_ID([tile_id $name $zoom])]} {
 			# yes, we do! let everyone else know
 			::gmaproto::add_image $name [list [dict create \
 				File        $TILE_ID([tile_id $name $zoom]) \
@@ -8755,7 +8827,7 @@ proc DoCommandAI? {d} {
 
 proc DoCommandCC {d} {
 	# clear chat history
-	if [dict get $d DoSilently] {
+	if {[dict get $d DoSilently]} {
 		set by {}
 	} else {
 		set by [dict get $d RequestedBy]
@@ -8767,10 +8839,10 @@ proc DoCommandCC {d} {
 }
 
 proc DoCommandCLR@ {d} {
-	if [dict get $d IsLocalFile] {
+	if {[dict get $d IsLocalFile]} {
 		set cache_filename [dict get $d File]
 	} else {
-		if [catch {set cache_filename [fetch_map_file [dict get $d File]]} err] {
+		if {[catch {set cache_filename [fetch_map_file [dict get $d File]]} err]} {
 			if {$err eq {NOSUCH}} {
 				DEBUG 0 "WARNING: Requested unload of File ID [dict get $d File] but the server doesn't have it."
 			} else {
@@ -8781,7 +8853,7 @@ proc DoCommandCLR@ {d} {
 	}
 
 	global SafMode
-	if $SafMode {
+	if {$SafMode} {
 		toggleSafMode
 	}
 	unloadfile $cache_filename -nosend -force
@@ -8822,7 +8894,7 @@ proc DoCommandDD= {d} {
 	global SuppressChat dice_preset_data
 
 	if {! $SuppressChat} {
-		if [catch {
+		if {[catch {
 			DisplayChatMessage {}; # force window open
 			set wp [sframe content .chatwindow.p.preset.sf]
 			for {set i 0} {$i < [array size dice_preset_data]} {incr i} {
@@ -8836,7 +8908,7 @@ proc DoCommandDD= {d} {
 				set dice_preset_data([dict get $preset Name]) $preset
 			}
 			_render_die_roller $wp 0 0 preset -noclear
-		} err] {
+		} err]} {
 			DEBUG 0 "Error updating die preset info: $err"
 		}
 	}
@@ -8881,9 +8953,9 @@ proc DoCommandI {d} {
 				}
 			}
 		} else {
-			if [info exists MOBdata($actor)] {
+			if {[info exists MOBdata($actor)]} {
 				set mob_id $actor;		# actor is the mob ID
-			} elseif [info exists MOBid($actor)] {
+			} elseif {[info exists MOBid($actor)]} {
 				set mob_id $MOBid($actor);	# actor is the mob name
 			} elseif {[string range $actor 0 0] eq {/}} {
 				set mob_id {};			# actor is a regex of names
@@ -8911,13 +8983,13 @@ proc DoCommandI {d} {
 
 proc DoCommandL {d} {
 	# load map file
-	if [dict get $d CacheOnly] {
+	if {[dict get $d CacheOnly]} {
 		# just make sure we have a copy on hand (M?)
-		if [dict get $d IsLocalFile] {
+		if {[dict get $d IsLocalFile]} {
 			DEBUG 0 "Server asked us to cache [dict get $d File], but it's a local file (request ignored)"
 			return
 		}
-		if [catch {fetch_map_file [dict get $d File]} err] {
+		if {[catch {fetch_map_file [dict get $d File]} err]} {
 			if {$err eq {NOSUCH}} {
 				DEBUG 0 "WARNING: Requested pre-load of server file ID [dict get $d File] but the server doesn't have it."
 			} else {
@@ -8931,7 +9003,7 @@ proc DoCommandL {d} {
 		set file_to_load [dict get $d File]
 	} else {
 		# fetch server file (unless we already have it cached) (M@)
-		if [catch {set file_to_load [fetch_map_file [dict get $d File]]} err] {
+		if {[catch {set file_to_load [fetch_map_file [dict get $d File]]} err]} {
 			if {$err eq {NOSUCH}} {
 				DEBUG 0 "WARNING: Requested load of server file ID [dict get $d File] but the server doesn't have it."
 			} else {
@@ -8945,7 +9017,7 @@ proc DoCommandL {d} {
 		toggleSafMode
 	}
 
-	if [dict get $d Merge] {
+	if {[dict get $d Merge]} {
 		loadfile $file_to_load -force -merge -nosend;	# M@ M
 	} else {
 		loadfile $file_to_load -force -nosend;		# L
@@ -8975,7 +9047,7 @@ proc DoCommandPROGRESS {d} {
 	global progress_data
 
 	set id [dict get $d OperationID]
-	if [dict get $d IsDone] {
+	if {[dict get $d IsDone]} {
 		end_progress $id
 		return
 	}
@@ -9251,9 +9323,9 @@ proc format_with_style {value format} {
 
 	if {[dict exists $_preferences styles dierolls components $format format]
 	&&  [set fmt [dict get $_preferences styles dierolls components $format format]] ne {}} {
-		if [catch {
+		if {[catch {
 			set value [format $fmt $value]
-		} err] {
+		} err]} {
 			DEBUG 0 "style formatting error (using $format format=$fmt): $err"
 		}
 	}
@@ -9304,7 +9376,7 @@ proc DisplayDieRoll {d} {
 	ChatAttribution $w.1.text $from $recipientlist [dict get $d ToAll] [dict get $d ToGM]
 	if {$title != {}} {
 		global _preferences colortheme
-		if [catch {
+		if {[catch {
 			foreach title_block [split $title "\u2016"] {
 				set title_parts [split $title_block "\u2261"]
 				switch [llength $title_parts] {
@@ -9330,18 +9402,18 @@ proc DisplayDieRoll {d} {
 				label $wt -padx 2 -pady 2 -relief groove -foreground $title_fg -background $title_bg -font [dict get $_preferences styles dierolls components title font] -borderwidth 2 -text [lindex $title_parts 0]
 				$w.1.text window create end -align bottom -window $wt -padx 2
 			}
-		} err] {
+		} err]} {
 			DEBUG 0 "unable to set title block: $err"
 			$w.1.text insert end [format_with_style $title title] title 
 		}
 	}
 #				critspec  {$w.1.text insert end "  [lindex $tuple 1]" [lindex $tuple 0]}
-	if [catch {
+	if {[catch {
 		foreach dd $details {
 			$w.1.text insert end [format_with_style [dict get $dd Value] [dict get $dd Type]] [dict get $dd Type]
 			DEBUG 3 "DisplayDieRoll: $dd"
 		}
-	} err] {
+	} err]} {
 		DEBUG 0 $err
 	}
 	$w.1.text insert end "\n"
@@ -9625,12 +9697,12 @@ proc _resize_die_roller {w width height type} {
 	if {$resize_task($type) eq NO} {
 		return
 	}
-	if [catch {
+	if {[catch {
 		global last_known_size
 		_render_die_roller $w $width $height $type
 		set last_known_size($type,width) $width
 		set last_known_size($type,height) $height
-	} err] {
+	} err]} {
 		DEBUG 0 "_render_die_roller($w, $width, $height, $type) failed with error '$err'"
 	}
 	set resize_task($type) {}
@@ -9641,7 +9713,7 @@ proc EditDieRollPresets {} {
 	global tmp_presets
 	global icon_fill
 
-	if [winfo exists .edrp] {
+	if {[winfo exists .edrp]} {
 		DEBUG 0 "There is already a die roll preset editor window open; not making another."
 		return
 	}
@@ -9824,9 +9896,9 @@ proc ECBT_ok {w} {
 	set parts {}
 	foreach t $titles {
 		set txt [dict get $t Text]
-		if [dict get $t FGen] {
+		if {[dict get $t FGen]} {
 			append txt "\u2261[::gmacolors::rgb_name [dict get $t Foreground]]"
-			if [dict get $t BGen] {
+			if {[dict get $t BGen]} {
 				append txt "\u2261[::gmacolors::rgb_name [dict get $t Background]]"
 			}
 		}
@@ -9847,7 +9919,7 @@ proc ECBT_ok {w} {
 proc ECBT_fgen {w i} {
 	global ECBTstate
 	global global_bg_color
-	if $ECBTstate($w,$i,fgen) {
+	if {$ECBTstate($w,$i,fgen)} {
 		$w.fg$i configure -state normal
 		$w.bgen$i configure -state normal
 	} else {
@@ -9863,7 +9935,7 @@ proc ECBT_fgen {w i} {
 proc ECBT_bgen {w i} {
 	global ECBTstate
 	global global_bg_color
-	if $ECBTstate($w,$i,bgen) {
+	if {$ECBTstate($w,$i,bgen)} {
 		$w.bg$i configure -state normal
 	} else {
 		$w.bg$i configure -state disabled -text auto -background $global_bg_color
@@ -9919,8 +9991,8 @@ proc ECBT_put_titles {w titles} {
 	set i 0
 	foreach title $titles {
 		incr i
-		if [dict get $title FGen] {
-			if [dict get $title BGen] {
+		if {[dict get $title FGen]} {
+			if {[dict get $title BGen]} {
 				set c [list [dict get $title Text] [dict get $title Foreground] [dict get $title Background]]
 			} else {
 				set c [list [dict get $title Text] [dict get $title Foreground]]
@@ -10380,7 +10452,7 @@ proc PresetLists {arrayname args} {
 	set rolls {}
 	set custom {}
 	set seq 0
-	if $export {
+	if {$export} {
 		array unset DieRollPresetState
 		set DieRollPresetState(apply_order) {}
 	}
@@ -10428,7 +10500,7 @@ proc PresetLists {arrayname args} {
 			}
 
 			lappend mods $d
-			if $export {
+			if {$export} {
 				if {[set varname [string trim [dict get $d Variable]]] ne {}} {
 					if {[string is alpha -strict [string range $varname 0 0]] &&
 					([string length $varname] == 1 ||
@@ -10507,7 +10579,7 @@ proc DisplayChatMessage {d args} {
 		lassign {} from recipientlist message
 	}
 
-	if $SuppressChat return
+	if {$SuppressChat} return
 	if {![::gmaproto::is_connected]} {
 		tk_messageBox -type ok -icon error -title "No Connection to Server" \
 			-message "Your client must be connected to the map server to use this function."
@@ -10850,11 +10922,11 @@ proc ParseRecipientList {r type args} {
 			dict lappend d Recipients $recip
 		}
 	}
-	if [dict get $d ToGM] {
+	if {[dict get $d ToGM]} {
 		dict set d ToAll false
 		dict set d Recipients {}
 	}
-	if [dict get $d ToAll] {
+	if {[dict get $d ToAll]} {
 		dict set d Recipients {}
 	}
 	return $d
@@ -10892,6 +10964,14 @@ proc ClearChatHistory {d} {
 	}
 }
 
+proc BlankChatHistoryDisplay {} {
+	catch {
+		.chatwindow.p.chat.1.text configure -state normal
+		.chatwindow.p.chat.1.text delete 1.0 end
+		.chatwindow.p.chat.1.text configure -state disabled
+		update
+	}
+}
 #
 # Load up the chat window with what's in our in-memory chat history list.
 #
@@ -10949,7 +11029,7 @@ proc _log_transcription {message} {
 
 	if {$ChatTranscript ne {}} {
 		if {$chat_transcript_file eq {}} {
-			if [catch {set chat_transcript_file [open [clock format [clock seconds] -format "$ChatTranscript"] a]} err] {
+			if {[catch {set chat_transcript_file [open [clock format [clock seconds] -format "$ChatTranscript"] a]} err]} {
 				DEBUG 0 "Error writing to chat transcript file $ChatTranscript: $err. No further attempts will be made."
 				set ChatTranscript {}
 				return
@@ -10975,7 +11055,7 @@ proc TranscribeDieRoll {from recipientlist title result details toall togm {is_b
 		if {$title ne {}} {
 			append message "$title: "
 		}
-		if [catch {
+		if {[catch {
 			foreach dd $details {
 				# operator 	"op"
 				# label    	" text"
@@ -11010,7 +11090,7 @@ proc TranscribeDieRoll {from recipientlist title result details toall togm {is_b
 					default 	{append message [dict get $dd Value]}
 				}
 			}
-		} err] {
+		} err]} {
 			DEBUG 0 "Error transcribing die roll: $err"
 			return
 		}
@@ -11079,14 +11159,14 @@ proc SaveDieRollPresets {w} {
 		}
 	}
 
-	if [catch {
+	if {[catch {
 		set plist {}
 		foreach {_ d} [array get dice_preset_data] {
 			lappend plist $d
 		}
 		::gmafile::save_dice_presets_to_file $f [list [dict create] $plist]
 		close $f
-	} err] {
+	} err]} {
 		say "Error saving dice presets: $err"
 		catch {close $f}
 	}
@@ -11120,7 +11200,7 @@ proc LoadDieRollPresets {w} {
 		}
 	}
 
-	if [catch {
+	if {[catch {
 		lassign [::gmafile::load_dice_presets_from_file $f] meta plist
 		close $f
 		DEBUG 1 "Loaded dice presets from version [dict get $meta FileVersion] file created [dict get $meta DateTime]; [dict get $meta Comment]"
@@ -11128,7 +11208,7 @@ proc LoadDieRollPresets {w} {
 		foreach p $plist {
 			set new_preset_list([dict get $p Name]) $p
 		}
-	} err] {
+	} err]} {
 		tk_messageBox -type ok -icon error -title "Error Loading Preset File" \
 			-message "Error loading file: $err" -parent $w
 		catch {close $f}
@@ -11195,7 +11275,7 @@ proc UpdatePeerList {} {
 	global PeerList CHAT_TO LastKnownPeers check_menu_color
 
 	DEBUG 3 "UpdatePeerList: PeerList=$PeerList, CHAT_TO=[array get CHAT_TO]"
-	if [catch {
+	if {[catch {
 		.chatwindow.p.chat.2.to.menu delete 2 end
 		foreach name [lsort -dictionary -unique $PeerList] {
 			if {$name ne {GM}} {
@@ -11205,7 +11285,7 @@ proc UpdatePeerList {} {
 				}
 			}
 		}
-	} err] {
+	} err]} {
 		DEBUG 1 "UpdatePeerList failed: $err"
 	}
 
@@ -11453,9 +11533,9 @@ proc SyncAllClientsToMe {} {
 	global SafMode GMAMapperFileFormat OBJdata OBJtype MOBdata ClockDisplay MOB_IMAGE
 
 	set oldcd $ClockDisplay
-	if [tk_messageBox -type yesno -icon question -title "Push map data to other clients?" \
+	if {[tk_messageBox -type yesno -icon question -title "Push map data to other clients?" \
 			-message "This will push your map data to all other peers, replacing their map contents.  Are you sure?" \
-			-default no] {
+			-default no]} {
 		if {$SafMode} {
 			# SafMode:
 			# (1) Save file to temporary location
@@ -11463,23 +11543,23 @@ proc SyncAllClientsToMe {} {
 			# (3) Issue command for clients to download it
 			set ClockDisplay "Saving state to temporary file..."
 			update
-			if [catch {
+			if {[catch {
 				set temp_file [file tempfile temp_name /tmp/mapper_sync_.map]
 				file attributes $temp_name -permissions 0644
-			} err] {
+			} err]} {
 				tk_messageBox -type ok -icon error -title "Error writing file"\
 					-message "Unable to open temporary file: $err" -parent .
 				set ClockDisplay $oldcd
 				return
 			}
 
-			if [catch {
+			if {[catch {
 				::gmafile::save_arrays_to_file $temp_file [dict create \
 					Comment "Dynamic push of map data from one client to the others" \
 					Location "Full-map sync" \
 					] OBJdata OBJtype MOBdata MOB_IMAGE
 				close $temp_file
-			} err] {
+			} err]} {
 				tk_messageBox -type ok -icon error -title "Error writing file"\
 					-message "Unable to save temporary file: $err" -parent .
 				set ClockDisplay $oldcd
@@ -11501,7 +11581,7 @@ proc SyncAllClientsToMe {} {
 			::gmaproto::clear *
 			DEBUG 3 "SyncAllClientsToMe: sending all objects"
 
-			if [catch {
+			if {[catch {
 				foreach obj_id [array names OBJdata] {
 					send_element $obj_id
 				}
@@ -11509,7 +11589,7 @@ proc SyncAllClientsToMe {} {
 				foreach mob_id [array names MOBdata] {
 					::gmaproto::place_someone_d [InsertCreatureImageName $MOBdata($mob_id)]
 				}
-			} err] {
+			} err]} {
 				tk_messageBox -type ok -icon error -title "Error sending data"\
 					-message "Unable to send data to clients : $err" -parent .\
 					-detail "Partial data may have been sent before the error occurred. In any case, you will need to try again to send the data."
@@ -11567,21 +11647,21 @@ proc ResolveObjectId_OA {id} {
 	if {[string range $id 0 0] eq {@}} {
 		# @name instead of id
 		set key [AcceptCreatureImageName [string range $id 1 end]]
-		if [info exists MOBid($key)] {
+		if {[info exists MOBid($key)]} {
 			return [list MOBdata $MOBid($key) PS]
 		}
 		DEBUG 1 "Attempt to change attribute of non-existent creature $key (IGNORED)"
 		return {}
-	} elseif [info exists OBJtype($id)] {
+	} elseif {[info exists OBJtype($id)]} {
 		set a OBJdata
-		if [catch {set t [::gmaproto::ObjTypeToGMAType $OBJtype($id)]} err] {
+		if {[catch {set t [::gmaproto::ObjTypeToGMAType $OBJtype($id)]} err]} {
 			DEBUG 1 "object $id is of type $OBJtype($id) but we don't have a struct type for that. ($err)"
 			return {} 
 		}
-	} elseif [info exists MOBdata($id)] {
+	} elseif {[info exists MOBdata($id)]} {
 		set a MOBdata
 		set t PS
-	} elseif [info exists MOBid($id)] {
+	} elseif {[info exists MOBid($id)]} {
 		set a MOBdata
 		set id $MOBid($id)
 		set t PS
@@ -11660,15 +11740,15 @@ proc ClearObjectById {id} {
 		clearplayers player
 	} elseif {$id eq "E*"} {
 		cleargrid
-	} elseif [info exists OBJtype($id)] {
+	} elseif {[info exists OBJtype($id)]} {
 		RemoveObject $id
-	} elseif [info exists MOBdata($id)] {
+	} elseif {[info exists MOBdata($id)]} {
 		RemovePerson $id
-	} elseif [info exists MOBid($id)] {
+	} elseif {[info exists MOBid($id)]} {
 		RemovePerson $MOBid($id)
 	} else {
 		set name [AcceptCreatureImageName $id]
-		if [info exists MOBid($name)] {
+		if {[info exists MOBid($name)]} {
 			RemovePerson $MOBid($name)
 		} else {
 			DEBUG 1 "Warning: Received request to delete object $id which does not exist."
@@ -11913,12 +11993,12 @@ proc WaitForConnectToServer {} {
 #
 if {! $dark_mode } {
 	after 500 {
-		if [catch {
+		if {[catch {
 			set dark_mode [tk::unsupported::MacWindowStyle isdark .]
-		}] {
+		}]} {
 			set dark_mode 0 
 		}
-		if $dark_mode {
+		if {$dark_mode} {
 			.toolbar2.clock configure -foreground white
 			refreshScreen
 			set colortheme dark
@@ -12298,7 +12378,7 @@ proc ConnectToServerByIdx {idx} {
 #   PROPOSED: store static metadata in $cache/_X/name@zoom.meta with image definition json dict
 #   --DONE--: TILE_ANIMATION(<tileID>,frames) total number of frames
 #   --DONE--: TILE_ANIMATION(<tileID>,current) current frame number in [0,frames)
-#   --DONE--: TILE_ANIMATION(<tileID>,id,<frame>) canvas ID of frame
+#   --DONE--: TILE_ANIMATION(<tileID>,id,<objid>,<frame>) canvas ID of frame
 #   --DONE--: TILE_ANIMATION(<tileID>,img,<frame>) tk image of frame (as TILE_SET is for static images)
 #   --DONE--: TILE_ANIMATION(<tileID>,delay) delay between frames in mS
 #   --DONE--: TILE_ANIMATION(<tileID>,loops) max loops or 0
@@ -12309,7 +12389,8 @@ proc ConnectToServerByIdx {idx} {
 #   		<canvas> raise <nextframeIDorTag> <previousframeIDorTag> (remember the ID is returned by canvas create)
 #   		better due to alpha transparency: <canvas> itemconfigure <frameIDorTag> -state hidden|normal
 #
-#   --DONE--: animation_destroy -tile <tileID>... | -all
+#   --DONE--: animation_destroy -tile <tileID>... | -all			destroy images from TILE_ANIMATION and tkimage
+#   --DONE--: animation_destroy_instance <canvas> <tileID> <objID>		remove frame instances from canvas and TILE_ANIMATION
 #   --DONE--: animation_init <tileID> <frames> <speed> <loops>			set up in system
 #   --DONE--: animation_clear_frames <tilID>					remove all tk images
 #   --DONE--: animation_add_frame <tilID> <n> <image>				add tk image
@@ -12333,16 +12414,18 @@ proc ConnectToServerByIdx {idx} {
 # 	opens file directly if local or embeeded else fetch_image <name> <zoom> <id>
 # 	TILE_SET([tile_id <name> <zoom>]) <- image create photo <data>
 # 	
-# PROPOSED fetch_animated_image <name> <zoom> <id> <frames> <speed> <loops>
-# fetch_image <name> <zoom> <id>
-# 	create_image_from_file if usable cache file found
-# 	run curl to get file from server then create_image_from_file
+# --DONE-- fetch_animated_image <name> <zoom> <id> <frames> <speed> <loops>
+# --DONE-- create_animated_frame_from_file <tileID> <frame> <filename>
+#          fetch_image <name> <zoom> <id>
+# 		create_image_from_file if usable cache file found
+# 		run curl to get file from server then create_image_from_file
 # 	
-# tile_id <name> <zoom> -> "name:zoom" with zoom as %.2f
+#          tile_id <name> <zoom> -> "name:zoom" with zoom as %.2f
 # --DONE-- cache_filename <imagepfx> <zoom> [<frame#>] -> path where image file should be located
 # --DONE-- cache_file_dir <imagepfx> [<zoom>] [<frame#>] -> directory where cache_filename is to be located
 #          cache_info <filename> -> exists? days name zoom
-# create_image_from_file <tileID> <cache_path_name> (updates TILE_SET with cached data; error if file can't be read)
+#          create_image_from_file <tileID> <cache_path_name> (updates TILE_SET with cached data; error if file can't be read)
+#
 # load_cached_images (reads all NEWish cached files via create_image_from_file)
 # loadfile <file> ... 
 # 	for IMG records, 
@@ -12378,6 +12461,7 @@ proc ConnectToServerByIdx {idx} {
 #
 # cache file 
 #   .../<name>@<zoom>.<ext>
+#   .../<name>@<zoom>/:<frame>:<name>@<zoom>.<ext>
 #   .../<name>.map
 
 # @[00]@| GMA-Mapper 4.13-alpha
