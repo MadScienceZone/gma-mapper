@@ -1621,7 +1621,7 @@ proc CleanupImageCache {daysOld} {
 proc load_cached_images {} {
 	global cache_too_old_days path_cache ImageFormat
 
-	DEBUG 1 "Loading cached images"
+DEBUG 1 "Loading cached images"
 	puts "preloading cached images..."
 	set i 0
 	foreach cache_dir [glob -nocomplain -directory $path_cache _*] {
@@ -1637,6 +1637,33 @@ proc load_cached_images {} {
 			}
 			if {![lindex $cache_stats 0]} {
 				DEBUG 0 "Cache file $cache_filename disappeared!"
+				continue
+			}
+			if {[lindex $cache_stats 4] eq "-dir"} {
+				DEBUG 2 "$cache_filename is an animated image directory"
+				set frame_path_parts [file split $cache_filename]
+				set frame0_path [file join $cache_filename ":0:[lindex $frame_path_parts end].$ImageFormat"]
+				set frame0_stats [cache_info $frame0_path]
+				if {[lindex $frame0_stats 2] eq {} || [lindex $frame0_stats 3] eq {}} {
+					DEBUG 0 "Cache frame 0 of $cache_filename not recognized (ignoring, but it shouldn't be there.)"
+					continue
+				}
+				if {[lindex $frame0_stats 1] >= $cache_too_old_days} {
+					DEBUG 2 "Not pre-loading cache file $cache_filename for [lindex $frame0_stats 2] at zoom [lindex $frame0_stats 3] because it is [lindex $frame0_stats 1] days old."
+					continue
+				}
+				DEBUG 2 "Pre-loading cacheed animated image files $cache_filename/... for [lindex $cache_stats 2] at zoom [lindex $cache_stats 3]."
+				if {[catch {
+					set animation_meta [animation_read_metadata $cache_filename \
+									[lindex $cache_stats 2] \
+									[lindex $cache_stats 3]]
+					_load_local_animated_file $cache_filename [lindex $cache_stats 2] [lindex $cache_stats 3]\
+						[dict get $animation_meta Animation Frames]\
+						[dict get $animation_meta Animation FrameSpeed]\
+						[dict get $animation_meta Animation Loops]
+				} err]} {
+					DEBUG 0 "Cached animated file $cache_filename could not be loaded: $err"
+				}
 				continue
 			}
 			if {[lindex $cache_stats 2] eq {} || [lindex $cache_stats 3] eq {}} {
@@ -2513,38 +2540,61 @@ proc loadfile {file args} {
 						if {![dict get $instance IsLocalFile]} {
 							DEBUG 3 "Image is supposed to be on the server. Retrieving..."
 							::gmautil::dassign $instance Zoom image_zoom File image_filename
-							fetch_image $image_id $image_zoom $image_filename
-							set TILE_ID([tile_id $image_id $image_zoom]) $image_filename
+							if {[dict get $d Animation Frames] > 0} {
+								DEBUG 3 "Image is animated"
+								::gmautil::dassign $d {Animation Frames} aframes \
+										      {Animation FrameSpeed} aspeed \
+										      {Animation Loops} aloops
+								fetch_animated_image $image_id $image_zoom $image_filename $aframes $aspeed $aloops
+								animation_init [tile_id $image_id $image_zoom] $aframes $aspeed $aloops
+							} else {
+								fetch_image $image_id $image_zoom $image_filename
+								set TILE_ID([tile_id $image_id $image_zoom]) $image_filename
+							}
 						} else {
-							if {[catch {set image_file [open $image_filename r]} err]} {
-								DEBUG 0 "Can't open image file $image_filename for $image_id at zoom $image_zoom: $err"
-								continue
-							}
-							fconfigure $image_file -encoding binary -translation binary
-							if [catch {set image_data [read $image_file]} err] {
-								DEBUG 0 "Can't read data from image file $image_filename: $err"
+							if {[dict get $d Animation Frames] > 0} {
+								DEBUG 3 "Image is animated"
+								::gmautil::dassign $d {Animation Frames} aframes \
+										      {Animation FrameSpeed} aspeed \
+										      {Animation Loops} aloops
+								if {[catch {
+									_load_local_animated_file $image_filename $image_id \
+										$image_zoom $aframes $aspeed $aloops
+								} err]} {
+									DEBUG 0 "Can't open $image_filename: $err"
+									continue
+								}
+							} else {
+								if {[catch {set image_file [open $image_filename r]} err]} {
+									DEBUG 0 "Can't open image file $image_filename for $image_id at zoom $image_zoom: $err"
+									continue
+								}
+								fconfigure $image_file -encoding binary -translation binary
+								if [catch {set image_data [read $image_file]} err] {
+									DEBUG 0 "Can't read data from image file $image_filename: $err"
+									close $image_file
+									continue
+								}
 								close $image_file
-								continue
-							}
-							close $image_file
 
-							if [info exists TILE_SET([tile_id $image_id $image_zoom])] {
-								DEBUG 1 "Replacing existing image $TILE_SET([tile_id $image_id $image_zoom]) for ${image_id} x$image_zoom"
-								image delete $TILE_SET([tile_id $image_id $image_zoom])
-								unset TILE_SET([tile_id $image_id $image_zoom])
-							}
-							if [catch {set TILE_SET([tile_id $image_id $image_zoom]) [image create photo -format $ImageFormat -data $image_data]} err] {
-								DEBUG 0 "Can't use data read from image file $image_filename: $err"
-								continue
-							}
-							DEBUG 3 "Created image $TILE_SET([tile_id $image_id $image_zoom]) for $image_id, zoom $image_zoom len=[string length $image_data]"
-							#
-							# Looks like the image is valid.  Send it to everyone else too...
-							# This is deprecated but we'll do it anyway for now.
-							#
-							if {$sendp} {
-								DEBUG 0 "Sending raw image data like this is deprecated. You should upload image files to the server instead and just refernce them in map files."
-								::gmaproto::add_image $image_id [list [dict create ImageData $image_data Zoom $image_zoom]]
+								if [info exists TILE_SET([tile_id $image_id $image_zoom])] {
+									DEBUG 1 "Replacing existing image $TILE_SET([tile_id $image_id $image_zoom]) for ${image_id} x$image_zoom"
+									image delete $TILE_SET([tile_id $image_id $image_zoom])
+									unset TILE_SET([tile_id $image_id $image_zoom])
+								}
+								if [catch {set TILE_SET([tile_id $image_id $image_zoom]) [image create photo -format $ImageFormat -data $image_data]} err] {
+									DEBUG 0 "Can't use data read from image file $image_filename: $err"
+									continue
+								}
+								DEBUG 3 "Created image $TILE_SET([tile_id $image_id $image_zoom]) for $image_id, zoom $image_zoom len=[string length $image_data]"
+								#
+								# Looks like the image is valid.  Send it to everyone else too...
+								# This is deprecated but we'll do it anyway for now.
+								#
+								if {$sendp} {
+									DEBUG 0 "Sending raw image data like this is deprecated. You should upload image files to the server instead and just refernce them in map files."
+									::gmaproto::add_image $image_id [list [dict create ImageData $image_data Zoom $image_zoom]]
+								}
 							}
 						}
 					}
@@ -8453,6 +8503,20 @@ proc fetch_animated_image {name zoom id frames speed loops} {
 		}
 		create_animated_frame_from_file $tile_id $n $cache_filename
 	}
+	set mf [open [file join $cache_dirname "${name}@${zoom}.meta"] w]
+	puts $mf [::gmaproto::json_from_dict AI [dict create \
+		Name $name \
+		Sizes [list [dict create \
+			File $cache_dirname \
+			Zoom $zoom \
+		]] \
+		Animation [dict create \
+			Frames $frames \
+			FrameSpeed $speed \
+			Loops $loops \
+		]\
+	]]
+	close $mf
 	set ClockDisplay $oldcd
 	refreshScreen
 }
@@ -8565,6 +8629,14 @@ proc DoCommandAC {d} {
 		set PC_IDs($creature_name) $id
 		.contextMenu add command -command "AddPlayer $creature_name $color 0 $size $id" -label $creature_name 
 	}
+}
+
+# read animation metadata from cache file
+proc animation_read_metadata {cachedir name zoom} {
+	set f [open [file join $cachedir "${name}@[normalize_zoom ${zoom}].meta"] r]
+	set d [::gmaproto::new_dict_from_json AI [read $f]]
+	close $f
+	return $f
 }
 
 # Create animated image stack on the canvas with the first frame visible
@@ -8736,7 +8808,7 @@ proc animation_init {tileID frames speed loops} {
 }
 
 proc _load_local_animated_file {path name zoom aframes aspeed aloops} {
-	global TILE_SET ImageFormat
+	global ImageFormat
 
 	set path_components [file split $path]
 	set t_id [tile_id $name $zoom]
@@ -12389,6 +12461,7 @@ proc ConnectToServerByIdx {idx} {
 #   		<canvas> raise <nextframeIDorTag> <previousframeIDorTag> (remember the ID is returned by canvas create)
 #   		better due to alpha transparency: <canvas> itemconfigure <frameIDorTag> -state hidden|normal
 #
+#   --DONE--: animation_read_metadata <cachedir> <name> <zoom>			reads <cachedir>/X.meta -> dict
 #   --DONE--: animation_destroy -tile <tileID>... | -all			destroy images from TILE_ANIMATION and tkimage
 #   --DONE--: animation_destroy_instance <canvas> <tileID> <objID>		remove frame instances from canvas and TILE_ANIMATION
 #   --DONE--: animation_init <tileID> <frames> <speed> <loops>			set up in system
@@ -12423,11 +12496,11 @@ proc ConnectToServerByIdx {idx} {
 #          tile_id <name> <zoom> -> "name:zoom" with zoom as %.2f
 # --DONE-- cache_filename <imagepfx> <zoom> [<frame#>] -> path where image file should be located
 # --DONE-- cache_file_dir <imagepfx> [<zoom>] [<frame#>] -> directory where cache_filename is to be located
-#          cache_info <filename> -> exists? days name zoom
+#          cache_info <filename> -> exists? days name zoom {}|frame|-dir
 #          create_image_from_file <tileID> <cache_path_name> (updates TILE_SET with cached data; error if file can't be read)
 #
-# load_cached_images (reads all NEWish cached files via create_image_from_file)
-# loadfile <file> ... 
+# --DONE-- load_cached_images (reads all NEWish cached files via create_image_from_file)
+# --DONE-- loadfile <file> ... 
 # 	for IMG records, 
 # 		server images
 #	 		calls fetch_image <imageID> <zoom> <serverID>

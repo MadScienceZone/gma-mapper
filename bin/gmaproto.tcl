@@ -1121,6 +1121,13 @@ proc ::gmaproto::_parse_data_packet {raw_line} {
 proc ::gmaproto::new_dict {command args} {
 	return [::gmaproto::_construct [dict create {*}$args] $::gmaproto::_message_payload($command)]
 }
+
+proc ::gmaproto::new_dict_from_json {command jsondata} {
+	return [::gmaproto::_construct [::json::json2dict $jsondata] $::gmaproto::_message_payload($command)]
+}
+proc ::gmaproto::json_from_dict {command d} {
+	return [::gmaproto::_encode_payload $d $::gmaproto::_message_payload($command)]
+}
 #
 # _construct input_dict type_dict
 # returns a dict with the fields specified in type_dict defaulted to zero values
