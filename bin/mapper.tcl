@@ -192,7 +192,7 @@ proc update_progress { id value newmax args } {
         if {$args eq {-send}} {
 			::gmaproto::update_progress $id {} $value $newmax false
         }
-        if [info exists progress_data($id:title)] {
+        if {[info exists progress_data($id:title)]} {
             if {$newmax eq "*" || $newmax == 0} {
 		if {$progress_data($id:max) ne "*"} {
 			# switching to indeterminate mode
@@ -2570,19 +2570,19 @@ proc loadfile {file args} {
 									continue
 								}
 								fconfigure $image_file -encoding binary -translation binary
-								if [catch {set image_data [read $image_file]} err] {
+								if {[catch {set image_data [read $image_file]} err]} {
 									DEBUG 0 "Can't read data from image file $image_filename: $err"
 									close $image_file
 									continue
 								}
 								close $image_file
 
-								if [info exists TILE_SET([tile_id $image_id $image_zoom])] {
+								if {[info exists TILE_SET([tile_id $image_id $image_zoom])]} {
 									DEBUG 1 "Replacing existing image $TILE_SET([tile_id $image_id $image_zoom]) for ${image_id} x$image_zoom"
 									image delete $TILE_SET([tile_id $image_id $image_zoom])
 									unset TILE_SET([tile_id $image_id $image_zoom])
 								}
-								if [catch {set TILE_SET([tile_id $image_id $image_zoom]) [image create photo -format $ImageFormat -data $image_data]} err] {
+								if {[catch {set TILE_SET([tile_id $image_id $image_zoom]) [image create photo -format $ImageFormat -data $image_data]} err]} {
 									DEBUG 0 "Can't use data read from image file $image_filename: $err"
 									continue
 								}
@@ -2605,10 +2605,10 @@ proc loadfile {file args} {
 				MAP {
 					set map_id [dict get $d File]
 					DEBUG 2 "Defining map file $map_id"
-					if [catch {
+					if {[catch {
 						set cache_filename [fetch_map_file $map_id]
 						DEBUG 1 "Pre-load: map ID $map_id cached as $cache_filename"
-					} err] {
+					} err]} {
 						if {$err eq {NOSUCH}} {
 							DEBUG 0 "We were asked to pre-load map file with ID $map_id but the server doesn't have it"
 						} else {
@@ -2627,7 +2627,7 @@ proc loadfile {file args} {
 					}
 				}
 				default {
-					if [catch {set etype [::gmaproto::GMATypeToObjType $element_type]} err] {
+					if {[catch {set etype [::gmaproto::GMATypeToObjType $element_type]} err]} {
 						DEBUG 0 "Can't load element of unknown type $element_type ($err)."
 						continue
 					}
@@ -3502,13 +3502,15 @@ proc RefreshGrid {show} {
 						-justify left -text $Text -tags [list obj$id allOBJ]
 				}
 				tile {
-					global TILE_SET
+					global TILE_SET TILE_ANIMATION
 					# TYPE tile
 					# X,Y  upper left corner
 					# IMAGE image ID
 					set tile_id [FindImage [dict get $OBJdata($id) Image] $zoom]
-					if [info exists TILE_SET($tile_id)] {
+					if {[info exists TILE_SET($tile_id)]} {
 						$canvas create image $X $Y -anchor nw -image $TILE_SET($tile_id) -tags [list obj$id tiles allOBJ]
+					} elseif {[info exists TILE_ANIMATION($tile_id,frames)]} {
+						animation_create $canvas $X $Y $tile_id $id -start
 					} else {
 						DEBUG 1 "Warning: no image $tile_id for [dict get $OBJdata($id) Image] @ $zoom available. Looking for it..."
 						global TILE_ATTR
@@ -3624,16 +3626,23 @@ proc UpdateObjectDisplay {id} {
 					-justify left -text $Text
 			}
 			tile {
-				global TILE_SET
+				global TILE_SET TILE_ANIMATION
 				# TYPE tile
 				# X,Y  upper left corner
 				# IMAGE image ID
 				set tile_id [FindImage [dict get $OBJdata($id) Image] $zoom]
-				if [info exists TILE_SET($tile_id)] {
+				if {[info exists TILE_SET($tile_id)]} {
 					$canvas coords obj$id $X $Y
 					$canvas itemconfigure obj$id -image $TILE_SET($tile_id)
 					$canvas delete bbox$id
-				} 
+				} elseif {[info exists TILE_ANIMATION($tile_id,frames)]} {
+					for {set frameno 0} {$frameno < $TILE_ANIMATION($tile_id,frames)} {incr frameno} {
+						set cid $TILE_ANIMATION($tile_id,id,$id,$frameno)
+						$canvas coords $cid $X $Y
+						$canvas itemconfigure $cid -image $TILE_ANIMATION($tile_id,img,$frameno)
+					}
+					$canvas delete bbox$id
+				}
 			}
 			default {
 				say "ERROR: weird object $id; type=$OBJtype($id)"
@@ -3941,7 +3950,7 @@ proc StartObj {w x y} {
 				Layer $layer \
 			]
 
-			global CurrentStampTile TILE_SET
+			global CurrentStampTile TILE_SET TILE_ANIMATION
 			if {[llength $CurrentStampTile] == 0} {
 				SelectTile $x $y
 			}
@@ -3949,6 +3958,9 @@ proc StartObj {w x y} {
 				set iid [lindex $CurrentStampTile 0]
 				if {[info exists TILE_SET($iid)]} {
 					$canvas create image [SnapCoord $x] [SnapCoord $y] -anchor nw -image $TILE_SET($iid) -tags "tiles obj$OBJ_CURRENT"
+				} elseif {[info exists TILE_ANIMATION($iid,frames)]} {
+					animation_create $canvas [SnapCoord $x] [SnapCoord $y] $iid $OBJ_CURRENT -start
+
 				} else {
 					say "Unable to load image $CurrentStampTile. Be sure to define and upload it."
 					create_dialog .stbx
@@ -4761,28 +4773,41 @@ proc MOBCenterPoint {id} {
 }
 
 proc FindImage {image_pfx zoom} {
-	global TILE_SET TILE_RETRY
+	global TILE_SET TILE_RETRY TILE_ANIMATION
 
 	set tile_id [tile_id $image_pfx $zoom]
-	if {! [info exists TILE_SET($tile_id)]} {
+	if {! [info exists TILE_SET($tile_id)] && ! [info exists TILE_ANIMATION($tile_id,frames)]} {
 		DEBUG 1 "Asked for image $image_pfx at zoom $zoom, but that image isn't already loaded."
 		set cache_filename [cache_filename $image_pfx $zoom]
-		if {[lindex [cache_info $cache_filename] 0]} {
+		if {[lindex [set cache_stats [cache_info $cache_filename]] 0]} {
 			DEBUG 1 "--Cache file $cache_filename exists, using that..."
-			create_image_from_file $tile_id $cache_filename
+			if {[lindex $cache_stats 4] eq "-dir"} {
+				DEBUG 1 "--and it's animated"
+				if {[catch {
+					set animation_meta [animation_read_metadata $cache_filename $image_pfx $zoom]
+					_load_local_animated_file $cache_filename $image_pfx $zoom \
+						[dict get $animation_meta Animation Frames]\
+						[dict get $animation_meta Animation FrameSpeed]\
+						[dict get $animation_meta Animation Loops]
+				} err]} {
+					DEBUG 0 "Error loading image $cache_filename: $err"
+				}
+			} else {
+				create_image_from_file $tile_id $cache_filename
+			}
 		} else {
 			DEBUG 1 "--No cached copy exists, either. Asking for help..."
-            if {![info exists TILE_RETRY($tile_id)]} {
-                # first reference: ask now and wait for 10
-                set TILE_RETRY($tile_id) 10
+			if {![info exists TILE_RETRY($tile_id)]} {
+				# first reference: ask now and wait for 10
+				set TILE_RETRY($tile_id) 10
 				::gmaproto::query_image $image_pfx $zoom
-            } elseif {$TILE_RETRY($tile_id) <= 0} {
-                # subsequent times: ask every 50
+			} elseif {$TILE_RETRY($tile_id) <= 0} {
+				# subsequent times: ask every 50
 				::gmaproto::query_image $image_pfx $zoom
-                set TILE_RETRY($tile_id) 50
-            } else {
-                incr TILE_RETRY($tile_id) -1
-            }
+				set TILE_RETRY($tile_id) 50
+			} else {
+				incr TILE_RETRY($tile_id) -1
+			}
 		}
 	}
 
@@ -12444,6 +12469,7 @@ proc ConnectToServerByIdx {idx} {
 
 #
 # NEW: Animation support
+# TODO: clear old canvas ids when items are deleted from canvas
 #   In the cache dir, static images are $cache/_X/name@zoom.ext where X is character 4 of name (may be empty if name is short)
 #   PROPOSED: animated images are $cache/_X/name@zoom/:frame:name@zoom.ext
 #   PROPOSED: store animated metadata in $cache/_X/name@zoom/name@zoom.meta with image definition json dict
@@ -12509,25 +12535,25 @@ proc ConnectToServerByIdx {idx} {
 # 			reads data, creates tk_image
 # 			updates TILE_SET
 # 		-> AI to other clients
-# RefreshGrid
+# --DONE-- RefreshGrid
 # 	tile objects
 # 		using tileID from FindImage (object.Image) at overall zoom
 # 		create canvas image if in TILE_SET already else draw placeholder for it
-# UpdateObjectDisplay
+# --DONE-- UpdateObjectDisplay
 # 	tile objects
 # 		using tileID from FindImage (object.Image) at overall zoom
 # 		itemconfigure canvas object with tkimage from TILE_SET, possibly updating coordinates
 # 		
-# StartObj
+# --DONE-- StartObj
 # 	tile objects
 # 		create canvas image from TILE_SET tkimage
 #
-# FindImage <imagepfx> <zoom>
+# --DONE-- FindImage <imagepfx> <zoom>
 # 	using tileID from tile_id <imagepfx> <zoom>
 # 	if not in TILE_SET, call create_image_from_file [cache_filename]
 # 	call ::gmaproto::query_image if needed
 #
-# RenderSomeone <w> <id> [<norecurse?>]
+# --TODO-- RenderSomeone <w> <id> [<norecurse?>]
 # 	looks for candidate images in TILE_SET; if not there, try FindImage then see if in TILE_SET
 # 	creates canvas image frim TILE_SET
 # 	
