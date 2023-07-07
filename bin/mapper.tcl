@@ -1,4 +1,5 @@
 #!/usr/bin/env wish
+# TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
 ########################################################################################
 #  _______  _______  _______                ___        __    ______          _______   #
 # (  ____ \(       )(  ___  ) Game         /   )      /  \  / ___  \        (  ___  )( #
@@ -940,6 +941,8 @@ proc create_main_menu {use_button} {
 	$mm.view add command -command {GoToGridCoords} -label "Go to Map Location..."
 	$mm.view add separator
 	$mm.view add command -command {refreshScreen} -label "Refresh Display"
+	$mm.view add separator
+	$mm.view add command -command {animation_stop -all} -label "Stop Animations"
 	menu $mm.play
 	menu $mm.play.servers
 	$mm.play add command -command {togglecombat} -label "Toggle Combat Mode"
@@ -1554,7 +1557,7 @@ proc create_animated_frame_from_file {tile_id frameno filename} {
 		return
 	}
 	close $image_file
-	animation_add_frame $tile_id $frameno $image_data
+	animation_add_frame $tile_id $frameno [image create photo -format $ImageFormat -data $image_data]
 }
 
 proc CleanupImageCache {daysOld} {
@@ -2828,9 +2831,13 @@ proc colorpick {type} {
 }
 
 proc RemoveObject id {
-	global OBJdata OBJtype canvas animatePlacement
+	global OBJdata OBJtype canvas animatePlacement TILE_ANIMATION
 
-	$canvas delete obj$id
+	if {[animation_obj_exists $id]} {
+		animation_destroy_instance $canvas * $id
+	} else {
+		$canvas delete obj$id
+	}
 	if {$animatePlacement} update
 	catch { unset OBJdata($id) }
 	catch { unset OBJtype($id) }
@@ -3440,7 +3447,11 @@ proc RefreshGrid {show} {
 	foreach id $display_list {
 	  if {[catch {
 		if {[info exists OBJtype($id)]} {
-			$canvas delete obj$id
+			if {[animation_obj_exists $id]} {
+				animation_destroy_instance $canvas * $id
+			} else {
+				$canvas delete obj$id
+			}
 			if $animatePlacement update
 			#DEBUG 3 "rendering object $id $OBJ(TYPE:$id)"
 			#
@@ -6263,7 +6274,11 @@ proc MoveObjDrag {w x y} {
 		foreach {xx yy} $old_coords {
 			lappend new_coords [expr $xx + $dx] [expr $yy + $dy]
 		}
-		$w coords obj$id $new_coords
+		if {[animation_obj_exists $id]} {
+			animation_move_instance $w * $id $new_coords
+		} else {
+			$w coords obj$id $new_coords
+		}
 		DEBUG 3 "MoveObjDrag $w $x $y for object $id: dx=$dx, dy=$dy; $old_coords -> $new_coords"
 	}
 }
@@ -7932,7 +7947,11 @@ proc NudgeObject {w dx dy} {
 			lappend new_coords [expr $xx + $dx] [expr $yy + $dy]
 			lappend new_cobj [dict create X [expr $xx + $dx] Y [expr $yy + $dy]]
 		}
-		$w coords obj$MO_last_obj $new_coords
+		if {[animation_obj_exists $MO_last_obj]} {
+			animation_move_instance $w * $MO_last_obj $new_coords
+		} else {
+			$w coords obj$MO_last_obj $new_coords
+		}
 		dict set OBJdata($MO_last_obj) Points [lrange $new_cobj 1 end]
 		SendObjChanges $MO_last_obj {X Y Points}
 	} else {
@@ -8541,7 +8560,7 @@ proc fetch_animated_image {name zoom id frames speed loops} {
 		create_animated_frame_from_file $tile_id $n $cache_filename
 	}
 	if {[catch {
-		set mf [open [file join $cache_dirname "${name}@${zoom}.meta"] w]
+		set mf [open [file join $cache_dirname "${name}@[normalize_zoom ${zoom}].meta"] w]
 		puts $mf [::gmaproto::json_from_dict AI [dict create \
 			Name $name \
 			Sizes [list [dict create \
@@ -8698,8 +8717,8 @@ proc animation_create {canvas x y tileID objID args} {
 				-state [expr $n == 0 ? {{normal}} : {{hidden}}]\
 		]
 	}
-	if {[lsearch -exact $args "-start"]} {
-		animation_start -tile $tileID
+	if {[lsearch -exact $args "-start"] >= 0} {
+		animation_start $canvas -tile $tileID
 	}
 }
 
@@ -8727,7 +8746,7 @@ proc animation_start {canvas opt args} {
 			}
 		}
 	} else {
-		error "animation_destroy: invalid option $opt: must be -tile or -all"
+		error "animation_start: invalid option $opt: must be -tile, -unexpired, or -all"
 	}
 
 	foreach id $idlist {
@@ -8763,12 +8782,24 @@ proc _animation_next_frame {id canvas} {
 	}
 }
 
+proc animation_obj_exists {objID} {
+	global TILE_ANIMATION
+	return [expr [llength [array names TILE_ANIMATION "*,id,$objID,*"]] != 0]
+}
+
 # destroy all information about the given animated images
 proc animation_destroy_instance {canvas tileID objID} {
 	global TILE_ANIMATION
 
 	$canvas delete {*}[lmap {k v} [array get TILE_ANIMATION "$tileID,id,$objID,*"] {set v}]
 	array unset TILE_ANIMATION "$tileID,id,$objID,*"
+}
+
+proc animation_move_instance {canvas tileID objID new_coords} {
+	global TILE_ANIMATION
+	foreach {k v} [array get TILE_ANIMATION "$tileID,id,$objID,*"] {
+		$canvas coords $v $new_coords
+	}
 }
 
 proc animation_destroy {opt args} {
@@ -12494,7 +12525,6 @@ proc ConnectToServerByIdx {idx} {
 
 #
 # NEW: Animation support
-# TODO: clear old canvas ids when items are deleted from canvas
 #   In the cache dir, static images are $cache/_X/name@zoom.ext where X is character 4 of name (may be empty if name is short)
 #   PROPOSED: animated images are $cache/_X/name@zoom/:frame:name@zoom.ext
 #   PROPOSED: store animated metadata in $cache/_X/name@zoom/name@zoom.meta with image definition json dict
