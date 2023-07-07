@@ -3,13 +3,13 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.12          <!-- @@##@@ -->
- * Effective Date: 03-Jul-2023               <!-- @@##@@ -->
+ * This Package Version: 4.13          <!-- @@##@@ -->
+ * Effective Date: 07-Jul-2023               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.3 <!-- @@##@@ -->
- * GMA Mapper File Format: 21	     <!-- @@##@@ -->
- * GMA Mapper Protocol: 406        <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.4-alpha <!-- @@##@@ -->
+ * GMA Mapper File Format: 22	     <!-- @@##@@ -->
+ * GMA Mapper Protocol: 407        <!-- @@##@@ -->
 
 ## DEPRECATION NOTICE
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
@@ -19,6 +19,7 @@ versions.
 # 4.13
 ## Adds
  * Controls to remove and update cached data.
+ * Menu option to move the mapper view to any arbitrary map location by label (e.g., "AA42").
 
 # 4.12
 ## Adds
