@@ -14,7 +14,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.13-alpha}     ;# @@##@@
+set GMAMapperVersion {4.13-alpha.1}     ;# @@##@@
 set GMAMapperFileFormat {21}        ;# @@##@@
 set GMAMapperProtocol {406}         ;# @@##@@
 set CoreVersionNumber {6.3}            ;# @@##@@
@@ -173,6 +173,13 @@ proc ScrollToGridXY {gx gy} {
 	$canvas yview moveto [expr double($y)/$y2]
 }
 
+
+proc GoToGridCoords {} {
+	global GoToGrid__label
+	if {[::getstring::tk_getString .goToGridPrompt GoToGrid__label {Map Coordinates:}]} {
+		ScrollToGridLabel $GoToGrid__label
+	}
+}
 proc ScrollToGridLabel {label} {
 	if [catch {
 		lassign [LetterLabelToGridXY $label] gx gy
@@ -927,6 +934,8 @@ proc create_main_menu {use_button} {
 	$mm.view add separator
 	$mm.view add command -command {FindNearby} -label "Scroll to Visible Objects"
 	$mm.view add command -command {SyncView} -label "Scroll Others' Views to Match Mine"
+	$mm.view add command -command {GoToGridCoords} -label "Go to Map Location..."
+	$mm.view add separator
 	$mm.view add command -command {refreshScreen} -label "Refresh Display"
 	menu $mm.play
 	menu $mm.play.servers
