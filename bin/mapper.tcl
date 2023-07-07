@@ -8668,9 +8668,10 @@ proc DoCommandAC {d} {
 # read animation metadata from cache file
 proc animation_read_metadata {cachedir name zoom} {
 	set f [open [file join $cachedir "${name}@[normalize_zoom ${zoom}].meta"] r]
-	set d [::gmaproto::new_dict_from_json AI [read $f]]
+	set data [read $f]
 	close $f
-	return $f
+	puts "calling new_dict_from_json command=AI data=($data)"
+	return [::gmaproto::new_dict_from_json AI $data]
 }
 
 # Create animated image stack on the canvas with the first frame visible
