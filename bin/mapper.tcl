@@ -2543,6 +2543,9 @@ proc loadfile {file args} {
 			switch -exact -- $element_type {
 				IMG {
 					DEBUG 2 "Defining image $d"
+					set aframes 0
+					set aspeed 0
+					set aloops 0
 					set image_id [dict get $d Name]
 					foreach instance [dict get $d Sizes] {
 						DEBUG 2 "... $instance"
@@ -2608,7 +2611,7 @@ proc loadfile {file args} {
 						}
 					}
 					if {$sendp} {
-						::gmaproto::add_image $image_id [dict get $d Sizes]
+						::gmaproto::add_image $image_id [dict get $d Sizes] $aframes $aspeed $aloops
 					}
 				}
 				MAP {
@@ -8516,7 +8519,7 @@ proc fetch_animated_image {name zoom id frames speed loops} {
 		} else {
 			set CreateOpt --create-dirs
 		}
-		set url "$CURLserver/[string range $id 0 0]/[string range $id 0 1]/$id.$ImageFormat"
+		set url "$CURLserver/[string range $id 0 0]/[string range $id 0 1]/:$n:$id.$ImageFormat"
 		if {[catch {
 			if {$CURLproxy ne {}} {
 				DEBUG 3 "Running $CURLpath $CreateOpt --output [file nativename $cache_filename] --proxy $CURLproxy -f -z [clock format $cache_newer_than] $url"
@@ -8530,27 +8533,32 @@ proc fetch_animated_image {name zoom id frames speed loops} {
 		} err options]} {
 			set i [dict get $options -errorcode]
 			if {[llength $i] >= 3 && [lindex $i 0] eq {CHILDSTATUS} && [lindex $i 2] == 22} {
-				DEBUG 0 "Requested image file ID $id was not found on the server."
+				DEBUG 0 "Requested image file ID :$n:$id was not found on the server."
 			} else {
 				DEBUG 0 "Error running $CURLpath to get $url into $cache_filename: $err"
 			}
 		}
 		create_animated_frame_from_file $tile_id $n $cache_filename
 	}
-	set mf [open [file join $cache_dirname "${name}@${zoom}.meta"] w]
-	puts $mf [::gmaproto::json_from_dict AI [dict create \
-		Name $name \
-		Sizes [list [dict create \
-			File $cache_dirname \
-			Zoom $zoom \
-		]] \
-		Animation [dict create \
-			Frames $frames \
-			FrameSpeed $speed \
-			Loops $loops \
-		]\
-	]]
-	close $mf
+	if {[catch {
+		set mf [open [file join $cache_dirname "${name}@${zoom}.meta"] w]
+		puts $mf [::gmaproto::json_from_dict AI [dict create \
+			Name $name \
+			Sizes [list [dict create \
+				File $cache_dirname \
+				Zoom $zoom \
+				IsLocalFile true \
+			]] \
+			Animation [dict create \
+				Frames $frames \
+				FrameSpeed $speed \
+				Loops $loops \
+			]\
+		]]
+		close $mf
+	} err]} {
+		DEBUG 0 "Error writing cache metadata for $name at $zoom: $err"
+	}
 	set ClockDisplay $oldcd
 	refreshScreen
 }
@@ -8830,7 +8838,7 @@ proc animation_init {tileID frames speed loops} {
 	global TILE_ANIMATION
 
 	animation_stop -tile $tileID
-	unset TILE_ANIMATION "$tileID,*"
+	array unset TILE_ANIMATION "$tileID,*"
 	set TILE_ANIMATION($tileID,frames) $frames
 	set TILE_ANIMATION($tileID,current) 0
 	set TILE_ANIMATION($tileID,delay) $speed
