@@ -19,6 +19,7 @@ versions.
 # 4.13
 ## Adds
  * Controls to remove and update cached data.
+ * Menu option to move the mapper view to any arbitrary map location by label (e.g., "AA42").
 
 # 4.12
 ## Adds
