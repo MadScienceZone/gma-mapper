@@ -49,7 +49,6 @@
 # @[50]@| This software is not intended for any use or application in which
 # @[51]@| the safety of lives or property would be at risk due to failure or
 # @[52]@| defect of the software.
->>>>>>> develop
 #
 # Mapper JSON data handling functions.
 # Steve Willoughby <steve@madscience.zone>

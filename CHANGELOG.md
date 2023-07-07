@@ -3,7 +3,7 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.13-alpha          <!-- @@##@@ -->
+ * This Package Version: 4.14-alpha          <!-- @@##@@ -->
  * Effective Date: 05-Jul-2023               <!-- @@##@@ -->
 
 ## Compatibility
@@ -15,6 +15,10 @@
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# Unreleased
+## Adds
+ * Support for animated images.
 
 # 4.13
 ## Adds
