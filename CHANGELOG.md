@@ -4,7 +4,7 @@
 
 ## Current Version Information
  * This Package Version: 4.14-alpha          <!-- @@##@@ -->
- * Effective Date: 05-Jul-2023               <!-- @@##@@ -->
+ * Effective Date: 07-Jul-2023               <!-- @@##@@ -->
 
 ## Compatibility
  * GMA Core API Library Version: 6.4-alpha <!-- @@##@@ -->
@@ -16,7 +16,7 @@ The support for old server protocols (<400) and map file formats (<20) will be d
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
-# Unreleased
+# Unreleased 4.14
 ## Adds
  * Support for animated images.
 
