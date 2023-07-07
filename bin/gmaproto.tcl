@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___        __    ______                    #
-# (  ____ \(       )(  ___  ) Game         /   )      /  \  / ___  \                   #
-# | (    \/| () () || (   ) | Master's    / /) |      \/) ) \/   \  \                  #
-# | |      | || || || (___) | Assistant  / (_) (_       | |    ___) /                  #
-# | | ____ | |(_)| ||  ___  |           (____   _)      | |   (___ (                   #
-# | | \_  )| |   | || (   ) |                ) (        | |       ) \                  #
-# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_/\___/  /                  #
-# (_______)|/     \||/     \| Client         (_)  (_) \____/\______/                   #
+#  _______  _______  _______                ___        __    ______          _______   #
+# (  ____ \(       )(  ___  ) Game         /   )      /  \  / ___  \        (  ___  )( #
+# | (    \/| () () || (   ) | Master's    / /) |      \/) ) \/   \  \       | (   ) || #
+# | |      | || || || (___) | Assistant  / (_) (_       | |    ___) / _____ | (___) || #
+# | | ____ | |(_)| ||  ___  |           (____   _)      | |   (___ ( (_____)|  ___  || #
+# | | \_  )| |   | || (   ) |                ) (        | |       ) \       | (   ) || #
+# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_/\___/  /       | )   ( || #
+# (_______)|/     \||/     \| Client         (_)  (_) \____/\______/        |/     \|( #
 #                                                                                      #
 ########################################################################################
 #
@@ -57,9 +57,9 @@ package require base64 2.4.2
 package require uuid 1.0.1
 
 namespace eval ::gmaproto {
-	variable protocol 406
+	variable protocol 407
 	variable min_protocol 333
-	variable max_protocol 406
+	variable max_protocol 407
 	variable max_max_protocol 499
 	variable debug_f {}
 	variable legacy false
@@ -121,7 +121,7 @@ namespace eval ::gmaproto {
 	array set _message_payload {
 		AC      {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i CustomReach {o {Enabled ? Natural i Extended i}}}
 		ACCEPT  {Messages l}
-		AI      {Name s Sizes {a {File s ImageData b IsLocalFile ? Zoom f}}}
+		AI      {Name s Sizes {a {File s ImageData b IsLocalFile ? Zoom f}} Animation {o {Frames i FrameSpeed i Loops i}}}
 		AI?	{Name s Sizes {a {Zoom f}}}
 		ALLOW   {Features l}
 		AUTH    {Client s Response b User s}
@@ -172,6 +172,7 @@ namespace eval ::gmaproto {
 		UPDATES {Packages {a {Name s Instances {a {OS s Arch s Version s Token s}}}}}
 		WORLD   {Calendar s}
 		/CONN   {}
+		Animation {Frames i FrameSpeed i Loops i}
 		Health  {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}
 		Font	{Family s Size f Weight i Slant i}
 		CustomReach {Enabled ? Natural i Extended i}
@@ -1059,7 +1060,7 @@ proc ::gmaproto::_encode_payload {input_dict type_dict} {
 					}
 				}
 				default {
-					error "bug: unrecognized type code $t"
+					error "bug: unrecognized type code \"$t\""
 				}
 			}
 		}
@@ -1120,6 +1121,13 @@ proc ::gmaproto::_parse_data_packet {raw_line} {
 
 proc ::gmaproto::new_dict {command args} {
 	return [::gmaproto::_construct [dict create {*}$args] $::gmaproto::_message_payload($command)]
+}
+
+proc ::gmaproto::new_dict_from_json {command jsondata} {
+	return [::gmaproto::_construct [::json::json2dict $jsondata] $::gmaproto::_message_payload($command)]
+}
+proc ::gmaproto::json_from_dict {command d} {
+	return [::gmaproto::_encode_payload $d $::gmaproto::_message_payload($command)]
 }
 #
 # _construct input_dict type_dict
@@ -1277,7 +1285,7 @@ proc ::gmaproto::_construct {input types} {
 			}
 
 			default {
-				error "bug: unrecognized type code $t"
+				error "bug: unrecognized type code \"$t\""
 			}
 		}
 	}
@@ -1330,8 +1338,8 @@ proc ::gmaproto::query_dice_presets {} {
 	::gmaproto::_protocol_send DR
 }
 
-proc ::gmaproto::add_image {name sizes} {
-	::gmaproto::_protocol_send AI Name $name Sizes $sizes
+proc ::gmaproto::add_image {name sizes {frames 0} {speed 0} {loops 0}} {
+	::gmaproto::_protocol_send AI Name $name Sizes $sizes Animation [dict create Frames $frames FrameSpeed $speed Loops $loops]
 }
 
 proc ::gmaproto::query_image {name size} {
@@ -2166,7 +2174,7 @@ proc ::gmaproto::GMATypeToProtocolCommand {gt} {
 	return $gt
 }
 
-# @[00]@| GMA-Mapper 4.13
+# @[00]@| GMA-Mapper 4.13-alpha
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

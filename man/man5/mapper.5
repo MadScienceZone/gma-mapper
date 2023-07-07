@@ -1,12 +1,12 @@
 '\" t
 '\" <<ital-is-var>>
 '\" <<bold-is-fixed>>
-.TH MAPPER 5 "GMA-Mapper 4.13" 07-Jul-2023 "File Formats" \" @@mp@@
+.TH MAPPER 5 "GMA-Mapper 4.13-alpha" 05-Jul-2023 "File Formats" \" @@mp@@
 .SH NAME
 mapper \- battle grid save file format
 .SH DESCRIPTION
 .LP
-The version 21 file format for the
+The version 22 file format for the
 .BR mapper (6)
 battle grid program is described in this document.
 .LP
@@ -133,7 +133,7 @@ these assumptions.
 .SH EXAMPLE
 '\" <<TeX>>
 '\" \begin{Coding}
-'\" |__MAPPER__:21|\\
+'\" |__MAPPER__:22|\\
 '\" \guillemotleft|__META__|\guillemotright{}| {|\\
 '\" |  "Timestamp": 1650611775,|\\
 '\" |  "DateTime": "Fri Apr 22 00:16:15 PDT 2022",|\\
@@ -178,7 +178,7 @@ these assumptions.
 .nf
 .na
 \fB
-__MAPPER__:21
+__MAPPER__:22
 \[Fo]__META__\[Fc] {
   "Timestamp": 1650611775,
   "DateTime": "Fri Apr 22 00:16:15 PDT 2022",
@@ -441,6 +441,12 @@ key/value line sequence.
 .LP
 The fields for creatures have been changed as documented in
 .BR mapper-protocol (7).
+.SS "Changes as of File Format 22"
+.LP
+Animation support introduced in protocol 407 alters the format
+of the
+.B IMG
+records in this file correspondingly.
 .SH AUTHORS
 .LP
 Steve Willoughby / steve@madscience.zone;
