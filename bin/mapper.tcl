@@ -2540,7 +2540,7 @@ proc loadfile {file args} {
 						if {![dict get $instance IsLocalFile]} {
 							DEBUG 3 "Image is supposed to be on the server. Retrieving..."
 							::gmautil::dassign $instance Zoom image_zoom File image_filename
-							if {[dict get $d Animation Frames] > 0} {
+							if {[dict get $d Animation] ne {} && [dict get $d Animation Frames] > 0} {
 								DEBUG 3 "Image is animated"
 								::gmautil::dassign $d {Animation Frames} aframes \
 										      {Animation FrameSpeed} aspeed \
@@ -2552,7 +2552,7 @@ proc loadfile {file args} {
 								set TILE_ID([tile_id $image_id $image_zoom]) $image_filename
 							}
 						} else {
-							if {[dict get $d Animation Frames] > 0} {
+							if {[dict get $d Animation] ne {} && [dict get $d Animation Frames] > 0} {
 								DEBUG 3 "Image is animated"
 								::gmautil::dassign $d {Animation Frames} aframes \
 										      {Animation FrameSpeed} aspeed \
@@ -8858,7 +8858,14 @@ proc _load_local_animated_file {path name zoom aframes aspeed aloops} {
 proc DoCommandAI {d} {
 	# add image
 	global ImageFormat
-	::gmautil::dassign $d Name name {Animation Frames} aframes {Animation FrameSpeed} aspeed {Animation Loops} aloops
+	if {[dict get $d Animation] eq {}} {
+		set aframes 0
+		set aspeed 0
+		set aloops 0
+	} else {
+		::gmautil::dassign $d {Animation Frames} aframes {Animation FrameSpeed} aspeed {Animation Loops} aloops
+	}
+	::gmautil::dassign $d Name name
 	foreach instance [dict get $d Sizes] {
 		::gmautil::dassign $instance File server_id ImageData raw_data IsLocalFile localp Zoom zoom
 		if {$raw_data ne {} && $aframes > 0} {
