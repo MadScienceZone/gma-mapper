@@ -1120,16 +1120,13 @@ proc ::gmaproto::_parse_data_packet {raw_line} {
 }
 
 proc ::gmaproto::new_dict {command args} {
-	puts "new_dict command=$command args=($args)"
 	return [::gmaproto::_construct [dict create {*}$args] $::gmaproto::_message_payload($command)]
 }
 
 proc ::gmaproto::new_dict_from_json {command jsondata} {
-	puts "new_dict_from_json command=$command jsondata=($jsondata)"
 	return [::gmaproto::_construct [::json::json2dict $jsondata] $::gmaproto::_message_payload($command)]
 }
 proc ::gmaproto::json_from_dict {command d} {
-	puts "json_from_dict command=$command d=($d)"
 	return [::gmaproto::_encode_payload $d $::gmaproto::_message_payload($command)]
 }
 #
@@ -1166,7 +1163,6 @@ proc ::gmaproto::int_bool {b} {
 	}
 }
 proc ::gmaproto::_construct {input types} {
-	puts "_construct input=$input types=$types;"
 	foreach {field t} $types {
 		switch -exact -- [lindex $t 0] {
 			s {
