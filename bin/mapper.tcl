@@ -2439,7 +2439,7 @@ proc loadfile {file args} {
 	if [catch {
 		foreach record $record_data {
 			update_progress $progress_id [incr progress_i] [llength $record_data] $sendflag
-			update idletasks
+			update
 			lassign $record element_type d
 			switch -exact -- $element_type {
 				IMG {

@@ -214,6 +214,7 @@ proc ::gmaproto::DEBUG {msg} {
 	if {$::gmaproto::debug_f != {}} {
 		$::gmaproto::debug_f $msg
 	}
+	update; #no, this isn't a mistake. putting these here breaks up the work done by the event loop enough to avoid problems.
 }
 
 proc ::gmaproto::dial {host port user pass proxy proxyport proxyuser proxypass client} {
@@ -342,7 +343,7 @@ proc ::gmaproto::_dispatch_to_app {cmd params} {
 	if [catch {::DoCommand$cmd $params} err opts] {
 		::DEBUG 0 "err=$err; opts=$opts"
 		catch {::DoCommandError $cmd $params $err}
-		update idletasks
+		update
 	}
 }
 
