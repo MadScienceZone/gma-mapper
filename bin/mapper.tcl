@@ -2835,9 +2835,8 @@ proc RemoveObject id {
 
 	if {[animation_obj_exists $id]} {
 		animation_destroy_instance $canvas * $id
-	} else {
-		$canvas delete obj$id
-	}
+	} 
+	$canvas delete obj$id
 	if {$animatePlacement} update
 	catch { unset OBJdata($id) }
 	catch { unset OBJtype($id) }
@@ -3449,9 +3448,8 @@ proc RefreshGrid {show} {
 		if {[info exists OBJtype($id)]} {
 			if {[animation_obj_exists $id]} {
 				animation_destroy_instance $canvas * $id
-			} else {
-				$canvas delete obj$id
-			}
+			} 
+			$canvas delete obj$id
 			if $animatePlacement update
 			#DEBUG 3 "rendering object $id $OBJ(TYPE:$id)"
 			#
@@ -6289,9 +6287,8 @@ proc MoveObjDrag {w x y} {
 		}
 		if {[animation_obj_exists $id]} {
 			animation_move_instance $w * $id $new_coords
-		} else {
-			$w coords obj$id $new_coords
-		}
+		} 
+		$w coords obj$id $new_coords
 		DEBUG 3 "MoveObjDrag $w $x $y for object $id: dx=$dx, dy=$dy; $old_coords -> $new_coords"
 	}
 }
@@ -7679,9 +7676,8 @@ proc RemovePerson id {
 	DEBUG 3 "RemovePerson $id"
 	if {[animation_obj_exists $id]} {
 		animation_destroy_instance $canvas * $id
-	} else {
-		$canvas delete M#$id
-	}
+	} 
+	$canvas delete M#$id
 	catch { unset MOBid([dict get $MOBdata($id) Name]) }
 	catch { unset MOBdata($id) }
 	catch { destroy $canvas.ms$id }
@@ -7966,9 +7962,8 @@ proc NudgeObject {w dx dy} {
 		}
 		if {[animation_obj_exists $MO_last_obj]} {
 			animation_move_instance $w * $MO_last_obj $new_coords
-		} else {
-			$w coords obj$MO_last_obj $new_coords
-		}
+		} 
+		$w coords obj$MO_last_obj $new_coords
 		dict set OBJdata($MO_last_obj) Points [lrange $new_cobj 1 end]
 		SendObjChanges $MO_last_obj {X Y Points}
 	} else {
