@@ -342,6 +342,7 @@ proc ::gmaproto::_dispatch_to_app {cmd params} {
 	if [catch {::DoCommand$cmd $params} err opts] {
 		::DEBUG 0 "err=$err; opts=$opts"
 		catch {::DoCommandError $cmd $params $err}
+		update idletasks
 	}
 }
 
