@@ -5439,6 +5439,9 @@ proc RenderSomeone {w id {norecurse false}} {
 		dict set MOBdata($id) Gy $y
 	}
 
+	if {[animation_obj_exists $id]} {
+		animation_destroy_instance $w * $id
+	} 
 	$w delete "M#$id"
 
 	if {[dict get $MOBdata($id) Hidden] && !$is_GM} {
@@ -5606,7 +5609,7 @@ proc RenderSomeone {w id {norecurse false}} {
 	}
 
 	global zoom 
-	global TILE_SET
+	global TILE_SET TILE_ANIMATION
 	#set tile_id [FindImage $image_pfx $zoom]
 	
     #
@@ -5627,7 +5630,8 @@ proc RenderSomeone {w id {norecurse false}} {
 		#
 		# if we already know we have this image, just use it
 		#
-		if {[info exists TILE_SET([tile_id $image_pfx $disp_zoom])]} {
+		if {[info exists TILE_SET([tile_id $image_pfx $disp_zoom])]
+		||  [info exists TILE_ANIMATION([tile_id $image_pfx $disp_zoom],frames)]} {
             DEBUG 3 "- Found $image_pfx, using that"
             set found_image true
 			break
@@ -5641,7 +5645,8 @@ proc RenderSomeone {w id {norecurse false}} {
         foreach ip $image_candidates {
             DEBUG 3 "- Trying $ip"
             FindImage $ip $disp_zoom
-            if {[info exists TILE_SET([tile_id $ip $disp_zoom])]} {
+            if {[info exists TILE_SET([tile_id $ip $disp_zoom])]
+	    ||  [info exists TILE_ANIMATION([tile_id $ip $disp_zoom],frames)]} {
                 DEBUG 3 "-- Found $ip, using that."
                 set image_pfx $ip
                 break
@@ -5653,12 +5658,20 @@ proc RenderSomeone {w id {norecurse false}} {
 	#
 	# if we found a copy of the image, it will now appear in TILE_SET.
 	#
-	if {[info exists TILE_SET([tile_id $image_pfx $disp_zoom])]} {
-		DEBUG 3 "$image_pfx:$disp_zoom = $TILE_SET([tile_id $image_pfx $disp_zoom])"
+        set mob_token_tile_id [tile_id $image_pfx $disp_zoom]
+	if {[info exists TILE_SET($mob_token_tile_id)]
+	|| [info exists TILE_ANIMATION($mob_token_tile_id,frames)]} {
+		DEBUG 3 "$image_pfx:$disp_zoom"
 		if {!$is_transparent} {
 			$w create oval [expr $x*$iscale] [expr $y*$iscale] [expr ($x+$mob_size)*$iscale] [expr ($y+$mob_size)*$iscale] -fill $fillcolor -tags "mob MF#$id M#$id MN#$id allMOB MB#$id"
 		}
-		$w create image [expr $x*$iscale] [expr $y*$iscale] -anchor nw -image $TILE_SET([tile_id $image_pfx $disp_zoom]) -tags "mob M#$id MN#$id allMOB"
+
+		if {[info exists TILE_SET($mob_token_tile_id)]} {
+			$w create image [expr $x*$iscale] [expr $y*$iscale] -anchor nw -image $TILE_SET([tile_id $image_pfx $disp_zoom]) -tags "mob M#$id MN#$id allMOB"
+		} else {
+			animation_create $w [expr $x*$iscale] [expr $y*$iscale] $mob_token_tile_id $id -start
+		}
+
 		set nametag_w "$w.nt_$id"
 		if {[winfo exists $nametag_w]} {
 			$nametag_w configure -font [FontBySize [CreatureDisplayedSize $id]] -text $mob_name
@@ -7664,7 +7677,11 @@ proc RemovePerson id {
 	global canvas MOBdata MOBid MOB_SELECTED
 
 	DEBUG 3 "RemovePerson $id"
-	$canvas delete M#$id
+	if {[animation_obj_exists $id]} {
+		animation_destroy_instance $canvas * $id
+	} else {
+		$canvas delete M#$id
+	}
 	catch { unset MOBid([dict get $MOBdata($id) Name]) }
 	catch { unset MOBdata($id) }
 	catch { destroy $canvas.ms$id }
@@ -8729,6 +8746,11 @@ proc animation_newid {tileID frameno objID canID} {
 
 proc animation_start {canvas opt args} {
 	global TILE_ANIMATION
+	global _preferences
+
+	if {[dict get $_preferences never_animate]} {
+		return
+	}
 
 	if {$opt eq "-tile"} {
 		set idlist $args
@@ -8760,6 +8782,13 @@ proc animation_start {canvas opt args} {
 
 proc _animation_next_frame {id canvas} {
 	global TILE_ANIMATION
+	global _preferences
+
+	if {[dict get $_preferences never_animate]} {
+		animation_stop -all
+		return
+	}
+
 	if {$TILE_ANIMATION($id,task) ne {}} {
 		foreach k [array names TILE_ANIMATION "$id,id,*,$TILE_ANIMATION($id,current)"] {
 			$canvas itemconfigure $TILE_ANIMATION($k) -state hidden
