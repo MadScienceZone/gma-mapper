@@ -28,7 +28,7 @@ namespace eval ::gmaprofile {
 	variable font_repository
 	variable _default_color_table
 	variable minimum_file_version 1
-	variable maximum_file_version 2
+	variable maximum_file_version 3
 	array set _default_color_table {
 		fg,light           #000000
 		normal_fg,light    #000000
@@ -110,6 +110,7 @@ namespace eval ::gmaprofile {
 		image_format s
 		keep_tools ?
 		menu_button ?
+		never_animate ?
 		preload ?
 		profiles {a {
 		        name s
@@ -287,6 +288,7 @@ namespace eval ::gmaprofile {
 			image_format png\
 			keep_tools   false\
 			menu_button  false\
+			never_animate false\
 			preload      false\
 			profiles     [list [empty_server_profile offline]]\
 			fonts        [default_fonts]\
@@ -498,7 +500,7 @@ namespace eval ::gmaprofile {
 
 		json::write indented true
 		json::write aligned true
-		dict set data GMA_Mapper_preferences_version 2
+		dict set data GMA_Mapper_preferences_version 3
 		set f [open $filename w]
 		puts $f [::gmaproto::_encode_payload $data $_file_format]
 		close $f
@@ -552,7 +554,7 @@ namespace eval ::gmaprofile {
 	}
 	proc _save {} {
 		global animate colorize_die_rolls button_size bsizetext dark image_format keep_tools preload
-		global imgtext debug_level debug_proto curl_path profiles menu_button
+		global imgtext debug_level debug_proto curl_path profiles menu_button never_animate
 		global major_interval major_offset_x major_offset_y
 		global minor_interval minor_offset_x minor_offset_y
 		variable _profile
@@ -583,6 +585,7 @@ namespace eval ::gmaprofile {
 			]\
 			image_format $image_format \
 			menu_button $menu_button\
+			never_animate $never_animate\
 			keep_tools $keep_tools \
 			preload $preload \
 		]
@@ -731,7 +734,7 @@ namespace eval ::gmaprofile {
 
 	proc editor {w d} {
 		global animate button_size bsizetext colorize_die_rolls dark image_format keep_tools preload
-		global imgtext debug_proto debug_level curl_path profiles menu_button
+		global imgtext debug_proto debug_level curl_path profiles menu_button never_animate
 		global major_interval major_offset_x major_offset_y
 		global minor_interval minor_offset_x minor_offset_y
 		global s_hostname s_port s_user s_pass s_blur_hp
@@ -755,6 +758,7 @@ namespace eval ::gmaprofile {
 			image_format image_format \
 			keep_tools keep_tools \
 			menu_button menu_button \
+			never_animate never_animate\
 			preload preload \
 			profiles profiles \
 			current_profile current_profile
@@ -763,6 +767,7 @@ namespace eval ::gmaprofile {
 		set colorize_die_rolls [::gmaproto::int_bool $colorize_die_rolls]
 		set dark [::gmaproto::int_bool $dark]
 		set menu_button [::gmaproto::int_bool $menu_button]
+		set never_animate [::gmaproto::int_bool $never_animate]
 		set keep_tools [::gmaproto::int_bool $keep_tools]
 		set preload [::gmaproto::int_bool $preload]
 		set debug_proto [::gmaproto::int_bool $debug_proto]
@@ -1039,6 +1044,7 @@ namespace eval ::gmaprofile {
 		grid [ttk::checkbutton $w.n.a.cdr -text "Enable colors in die-roll titles" -variable colorize_die_rolls] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.dark -text "Dark theme" -variable dark] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.menu_button -text "Use menu button instead of menu bar" -variable menu_button] - - - - - - -sticky w
+		grid [ttk::checkbutton $w.n.a.never_animate -text "Never play animated images" -variable never_animate] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.keep -text "Keep toolbar visible" -variable keep_tools] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.preload -text "Pre-load all cached images" -variable preload] - - - - - - -sticky w
 		grid [ttk::menubutton $w.n.a.imgfmt -textvariable imgtext -menu $w.n.a.m_imgfmt] - - - - - - -sticky w
