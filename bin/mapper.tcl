@@ -15,8 +15,8 @@
 #
 # Auto-configure values
 set GMAMapperVersion {4.13.1}     ;# @@##@@
-set GMAMapperFileFormat {22}        ;# @@##@@
-set GMAMapperProtocol {407}         ;# @@##@@
+set GMAMapperFileFormat {21}        ;# @@##@@
+set GMAMapperProtocol {406}         ;# @@##@@
 set CoreVersionNumber {6.4-alpha}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
