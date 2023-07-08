@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___        __    ______                    #
-# (  ____ \(       )(  ___  ) Game         /   )      /  \  / ___  \                   #
-# | (    \/| () () || (   ) | Master's    / /) |      \/) ) \/   \  \                  #
-# | |      | || || || (___) | Assistant  / (_) (_       | |    ___) /                  #
-# | | ____ | |(_)| ||  ___  |           (____   _)      | |   (___ (                   #
-# | | \_  )| |   | || (   ) |                ) (        | |       ) \                  #
-# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_/\___/  /                  #
-# (_______)|/     \||/     \| Client         (_)  (_) \____/\______/                   #
+#  _______  _______  _______                ___        __    ______       __           #
+# (  ____ \(       )(  ___  ) Game         /   )      /  \  / ___  \     /  \          #
+# | (    \/| () () || (   ) | Master's    / /) |      \/) ) \/   \  \    \/) )         #
+# | |      | || || || (___) | Assistant  / (_) (_       | |    ___) /      | |         #
+# | | ____ | |(_)| ||  ___  |           (____   _)      | |   (___ (       | |         #
+# | | \_  )| |   | || (   ) |                ) (        | |       ) \      | |         #
+# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_/\___/  / _  __) (_        #
+# (_______)|/     \||/     \| Client         (_)  (_) \____/\______/ (_) \____/        #
 #                                                                                      #
 ########################################################################################
 #
@@ -214,6 +214,7 @@ proc ::gmaproto::DEBUG {msg} {
 	if {$::gmaproto::debug_f != {}} {
 		$::gmaproto::debug_f $msg
 	}
+	update; #no, this isn't a mistake. putting these here breaks up the work done by the event loop enough to avoid problems.
 }
 
 proc ::gmaproto::dial {host port user pass proxy proxyport proxyuser proxypass client} {
@@ -342,6 +343,7 @@ proc ::gmaproto::_dispatch_to_app {cmd params} {
 	if [catch {::DoCommand$cmd $params} err opts] {
 		::DEBUG 0 "err=$err; opts=$opts"
 		catch {::DoCommandError $cmd $params $err}
+		update
 	}
 }
 
@@ -2166,7 +2168,7 @@ proc ::gmaproto::GMATypeToProtocolCommand {gt} {
 	return $gt
 }
 
-# @[00]@| GMA-Mapper 4.13
+# @[00]@| GMA-Mapper 4.13.1
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

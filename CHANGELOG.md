@@ -3,8 +3,8 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.13          <!-- @@##@@ -->
- * Effective Date: 07-Jul-2023               <!-- @@##@@ -->
+ * This Package Version: 4.13.1          <!-- @@##@@ -->
+ * Effective Date: 08-Jul-2023               <!-- @@##@@ -->
 
 ## Compatibility
  * GMA Core API Library Version: 6.4-alpha <!-- @@##@@ -->
@@ -15,6 +15,15 @@
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.13.1
+## Fixes
+This patch attempts to fix an occasional problem whereby the mapper client triggers a set of 
+"too many nested evaluations (infinite loop?)" exceptions. On the theory that the real issue here is a burst
+of too many operations being given at one time to the tk event loop, it's just exceeding its capacity and triggering
+that error (as opposed to errant recursion in the mapper code). To address this, we added a number of `update` commands
+throughout the functions involved in those operations to let Tk catch its breath enough along the way. So far this
+does appear to have stopped those exeptions from occurring.
 
 # 4.13
 ## Adds
