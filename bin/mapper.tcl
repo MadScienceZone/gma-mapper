@@ -1,20 +1,20 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___        __    ______                    #
-# (  ____ \(       )(  ___  ) Game         /   )      /  \  / ___  \                   #
-# | (    \/| () () || (   ) | Master's    / /) |      \/) ) \/   \  \                  #
-# | |      | || || || (___) | Assistant  / (_) (_       | |    ___) /                  #
-# | | ____ | |(_)| ||  ___  |           (____   _)      | |   (___ (                   #
-# | | \_  )| |   | || (   ) |                ) (        | |       ) \                  #
-# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_/\___/  /                  #
-# (_______)|/     \||/     \| Client         (_)  (_) \____/\______/                   #
+#  _______  _______  _______                ___        __    ______       __           #
+# (  ____ \(       )(  ___  ) Game         /   )      /  \  / ___  \     /  \          #
+# | (    \/| () () || (   ) | Master's    / /) |      \/) ) \/   \  \    \/) )         #
+# | |      | || || || (___) | Assistant  / (_) (_       | |    ___) /      | |         #
+# | | ____ | |(_)| ||  ___  |           (____   _)      | |   (___ (       | |         #
+# | | \_  )| |   | || (   ) |                ) (        | |       ) \      | |         #
+# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_/\___/  / _  __) (_        #
+# (_______)|/     \||/     \| Client         (_)  (_) \____/\______/ (_) \____/        #
 #                                                                                      #
 ########################################################################################
 #
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.13}     ;# @@##@@
+set GMAMapperVersion {4.13.1}     ;# @@##@@
 set GMAMapperFileFormat {22}        ;# @@##@@
 set GMAMapperProtocol {407}         ;# @@##@@
 set CoreVersionNumber {6.4-alpha}            ;# @@##@@
@@ -2439,6 +2439,7 @@ proc loadfile {file args} {
 	if [catch {
 		foreach record $record_data {
 			update_progress $progress_id [incr progress_i] [llength $record_data] $sendflag
+			update
 			lassign $record element_type d
 			switch -exact -- $element_type {
 				IMG {
@@ -12020,7 +12021,7 @@ proc ConnectToServerByIdx {idx} {
 	refresh_title
 }
 
-# @[00]@| GMA-Mapper 4.13
+# @[00]@| GMA-Mapper 4.13.1
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
