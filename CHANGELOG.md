@@ -20,6 +20,15 @@ versions.
 ## Adds
  * Support for animated images.
 
+# 4.13.1
+## Fixes
+This patch attempts to fix an occasional problem whereby the mapper client triggers a set of 
+"too many nested evaluations (infinite loop?)" exceptions. On the theory that the real issue here is a burst
+of too many operations being given at one time to the tk event loop, it's just exceeding its capacity and triggering
+that error (as opposed to errant recursion in the mapper code). To address this, we added a number of `update` commands
+throughout the functions involved in those operations to let Tk catch its breath enough along the way. So far this
+does appear to have stopped those exeptions from occurring.
+
 # 4.13
 ## Adds
  * Controls to remove and update cached data.
