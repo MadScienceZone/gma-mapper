@@ -842,6 +842,7 @@ namespace eval ::gmaprofile {
 			foreach theme {light dark} {
 				set color [dict get $_profile styles dialogs $fld $theme]
 				grid configure [button $st.d.$wp$theme -bg $color -text [::gmacolors::rgb_name $color] \
+					-highlightcolor $color -highlightbackground $color -highlightthickness 2 \
 					-command "::gmaprofile::_set_dialog_color [list $st $st.d.$wp$theme $theme $name $fld]"]\
 					-column $col -row $row -padx 1 -pady 1 -sticky we
 				incr col
@@ -871,6 +872,7 @@ namespace eval ::gmaprofile {
 			foreach theme {light dark} {
 				set color [dict get $_profile styles dialogs $fld $theme]
 				grid configure [button $st.c.$wp$theme -bg $color -text [::gmacolors::rgb_name $color] \
+					-highlightcolor $color -highlightbackground $color -highlightthickness 2 \
 					-command "::gmaprofile::_set_dialog_color [list $st $st.c.$wp$theme $theme $name $fld]"]\
 					-column $col -row $row -padx 1 -pady 1 -sticky we
 				incr col
@@ -908,6 +910,7 @@ namespace eval ::gmaprofile {
 			foreach theme {light dark} {
 				set color [dict get $_profile styles clocks $fld $theme]
 				grid configure [button $st.cl.$wp$theme -bg $color -text [::gmacolors::rgb_name $color] \
+					-highlightcolor $color -highlightbackground $color -highlightthickness 2 \
 					-command "::gmaprofile::_set_clock_color [list $st $st.cl.$wp$theme $theme $name $fld]"]\
 					-column $col -row $row -padx 1 -pady 1 -sticky we
 				incr col
@@ -1315,8 +1318,10 @@ namespace eval ::gmaprofile {
 		set d [default_styles]
 		dict set _profile styles dialogs $key light [set lt [dict get $d dialogs $key light]]
 		dict set _profile styles dialogs $key dark [set dk [dict get $d dialogs $key dark]]
-		${btn}light configure -bg $lt -text [::gmacolors::rgb_name $lt]
-		${btn}dark configure -bg $dk -text [::gmacolors::rgb_name $dk]
+		${btn}light configure -bg $lt -text [::gmacolors::rgb_name $lt] \
+			-highlightcolor $color -highlightbackground $color -highlightthickness 2 
+		${btn}dark configure -bg $dk -text [::gmacolors::rgb_name $dk] \
+			-highlightcolor $color -highlightbackground $color -highlightthickness 2 
 		_refresh_dialog_examples $st
 		_refresh_dieroller_examples $st
 	}
@@ -1325,14 +1330,17 @@ namespace eval ::gmaprofile {
 		set d [default_styles]
 		dict set _profile styles clocks $key light [set lt [dict get $d clocks $key light]]
 		dict set _profile styles clocks $key dark [set dk [dict get $d clocks $key dark]]
-		${btn}light configure -bg $lt -text [::gmacolors::rgb_name $lt]
-		${btn}dark configure -bg $dk -text [::gmacolors::rgb_name $dk]
+		${btn}light configure -bg $lt -text [::gmacolors::rgb_name $lt] \
+			-highlightcolor $color -highlightbackground $color -highlightthickness 2 
+		${btn}dark configure -bg $dk -text [::gmacolors::rgb_name $dk] \
+			-highlightcolor $color -highlightbackground $color -highlightthickness 2 
 	}
 	proc _set_dialog_color {st btn theme style key} {
 		variable _profile
 		if {[set chosencolor [tk_chooseColor -initialcolor [dict get $_profile styles dialogs $key $theme] -parent $btn -title "Choose color for $style ($theme mode)"]] ne {}} {
 			dict set _profile styles dialogs $key $theme $chosencolor
-			$btn configure -bg $chosencolor -text [::gmacolors::rgb_name $chosencolor]
+			$btn configure -bg $chosencolor -text [::gmacolors::rgb_name $chosencolor] \
+				-highlightcolor $chosencolor -highlightbackground $chosencolor -highlightthickness 2 
 		}
 		_refresh_dialog_examples $st
 		_refresh_dieroller_examples $st
@@ -1341,7 +1349,8 @@ namespace eval ::gmaprofile {
 		variable _profile
 		if {[set chosencolor [tk_chooseColor -initialcolor [dict get $_profile styles clocks $key $theme] -parent $btn -title "Choose color for $style ($theme mode)"]] ne {}} {
 			dict set _profile styles clocks $key $theme $chosencolor
-			$btn configure -bg $chosencolor -text [::gmacolors::rgb_name $chosencolor]
+			$btn configure -bg $chosencolor -text [::gmacolors::rgb_name $chosencolor] \
+				-highlightcolor $chosencolor -highlightbackground $chosencolor -highlightthickness 2 
 		}
 	}
 
@@ -1495,18 +1504,24 @@ namespace eval ::gmaprofile {
 				$st.r.fgdk configure -text {} -background $neutral_bg -state disabled
 			} else {
 				set PEsFGen 1
-				$st.r.fglt configure -text [::gmacolors::rgb_name $fgcolor_l] -bg $fgcolor_l -state normal
-				$st.r.fgdk configure -text [::gmacolors::rgb_name $fgcolor_d] -bg $fgcolor_d -state normal
+				$st.r.fglt configure -text [::gmacolors::rgb_name $fgcolor_l] -bg $fgcolor_l -state normal\
+					-highlightcolor $fgcolor_l -highlightbackground $fgcolor_l -highlightthickness 2 
+				$st.r.fgdk configure -text [::gmacolors::rgb_name $fgcolor_d] -bg $fgcolor_d -state normal\
+					-highlightcolor $fgcolor_d -highlightbackground $fgcolor_d -highlightthickness 2 
 			}
 
 			if {$bgcolor_l eq {} && $bgcolor_d eq {}} {
 				set PEsBGen 0
-				$st.r.bglt configure -text {} -background $neutral_bg -state disabled
-				$st.r.bgdk configure -text {} -background $neutral_bg -state disabled
+				$st.r.bglt configure -text {} -background $neutral_bg -state disabled\
+					-highlightcolor $neutral_bg -highlightbackground $neutral_bg -highlightthickness 2 
+				$st.r.bgdk configure -text {} -background $neutral_bg -state disabled\
+					-highlightcolor $neutral_bg -highlightbackground $neutral_bg -highlightthickness 2 
 			} else {
 				set PEsBGen 1
-				$st.r.bglt configure -text [::gmacolors::rgb_name $bgcolor_l] -bg $bgcolor_l -state normal
-				$st.r.bgdk configure -text [::gmacolors::rgb_name $bgcolor_d] -bg $bgcolor_d -state normal
+				$st.r.bglt configure -text [::gmacolors::rgb_name $bgcolor_l] -bg $bgcolor_l -state normal\
+					-highlightcolor $bgcolor_l -highlightbackground $bgcolor_l -highlightthickness 2 
+				$st.r.bgdk configure -text [::gmacolors::rgb_name $bgcolor_d] -bg $bgcolor_d -state normal\
+					-highlightcolor $bgcolor_d -highlightbackground $bgcolor_d -highlightthickness 2 
 			}
 			$st.r.description configure -state disabled
 			$st.r.fmfmt delete 0 end
@@ -1560,7 +1575,8 @@ namespace eval ::gmaprofile {
 		}
 		if {[set chosencolor [tk_chooseColor -initialcolor [dict get $_profile styles dierolls components $stylename $key $theme] -parent $btn -title "Choose color for $stylename ($theme mode)"]] ne {}} {
 			dict set _profile styles dierolls components $stylename $key $theme $chosencolor
-			$btn configure -background $chosencolor -text [::gmacolors::rgb_name $chosencolor]
+			$btn configure -background $chosencolor -text [::gmacolors::rgb_name $chosencolor]\
+				-highlightcolor $chosencolor -highlightbackground $chosencolor -highlightthickness 2 
 			_refresh_dieroller_examples $st
 		}
 	}
