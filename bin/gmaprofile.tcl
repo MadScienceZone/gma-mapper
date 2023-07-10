@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___        __    ______       __           #
-# (  ____ \(       )(  ___  ) Game         /   )      /  \  / ___  \     /  \          #
-# | (    \/| () () || (   ) | Master's    / /) |      \/) ) \/   \  \    \/) )         #
-# | |      | || || || (___) | Assistant  / (_) (_       | |    ___) /      | |         #
-# | | ____ | |(_)| ||  ___  |           (____   _)      | |   (___ (       | |         #
-# | | \_  )| |   | || (   ) |                ) (        | |       ) \      | |         #
-# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_/\___/  / _  __) (_        #
-# (_______)|/     \||/     \| Client         (_)  (_) \____/\______/ (_) \____/        #
+#  _______  _______  _______                ___        __       ___                    #
+# (  ____ \(       )(  ___  ) Game         /   )      /  \     /   )                   #
+# | (    \/| () () || (   ) | Master's    / /) |      \/) )   / /) |                   #
+# | |      | || || || (___) | Assistant  / (_) (_       | |  / (_) (_                  #
+# | | ____ | |(_)| ||  ___  |           (____   _)      | | (____   _)                 #
+# | | \_  )| |   | || (   ) |                ) (        | |      ) (                   #
+# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_     | |                   #
+# (_______)|/     \||/     \| Client         (_)  (_) \____/     (_)                   #
 #                                                                                      #
 ########################################################################################
 # Profile editor
@@ -28,7 +28,7 @@ namespace eval ::gmaprofile {
 	variable font_repository
 	variable _default_color_table
 	variable minimum_file_version 1
-	variable maximum_file_version 2
+	variable maximum_file_version 3
 	array set _default_color_table {
 		fg,light           #000000
 		normal_fg,light    #000000
@@ -110,6 +110,7 @@ namespace eval ::gmaprofile {
 		image_format s
 		keep_tools ?
 		menu_button ?
+		never_animate ?
 		preload ?
 		profiles {a {
 		        name s
@@ -287,6 +288,7 @@ namespace eval ::gmaprofile {
 			image_format png\
 			keep_tools   false\
 			menu_button  false\
+			never_animate false\
 			preload      false\
 			profiles     [list [empty_server_profile offline]]\
 			fonts        [default_fonts]\
@@ -498,7 +500,7 @@ namespace eval ::gmaprofile {
 
 		json::write indented true
 		json::write aligned true
-		dict set data GMA_Mapper_preferences_version 2
+		dict set data GMA_Mapper_preferences_version 3
 		set f [open $filename w]
 		puts $f [::gmaproto::_encode_payload $data $_file_format]
 		close $f
@@ -552,7 +554,7 @@ namespace eval ::gmaprofile {
 	}
 	proc _save {} {
 		global animate colorize_die_rolls button_size bsizetext dark image_format keep_tools preload
-		global imgtext debug_level debug_proto curl_path profiles menu_button
+		global imgtext debug_level debug_proto curl_path profiles menu_button never_animate
 		global major_interval major_offset_x major_offset_y
 		global minor_interval minor_offset_x minor_offset_y
 		variable _profile
@@ -583,6 +585,7 @@ namespace eval ::gmaprofile {
 			]\
 			image_format $image_format \
 			menu_button $menu_button\
+			never_animate $never_animate\
 			keep_tools $keep_tools \
 			preload $preload \
 		]
@@ -731,7 +734,7 @@ namespace eval ::gmaprofile {
 
 	proc editor {w d} {
 		global animate button_size bsizetext colorize_die_rolls dark image_format keep_tools preload
-		global imgtext debug_proto debug_level curl_path profiles menu_button
+		global imgtext debug_proto debug_level curl_path profiles menu_button never_animate
 		global major_interval major_offset_x major_offset_y
 		global minor_interval minor_offset_x minor_offset_y
 		global s_hostname s_port s_user s_pass s_blur_hp
@@ -755,6 +758,7 @@ namespace eval ::gmaprofile {
 			image_format image_format \
 			keep_tools keep_tools \
 			menu_button menu_button \
+			never_animate never_animate\
 			preload preload \
 			profiles profiles \
 			current_profile current_profile
@@ -763,6 +767,7 @@ namespace eval ::gmaprofile {
 		set colorize_die_rolls [::gmaproto::int_bool $colorize_die_rolls]
 		set dark [::gmaproto::int_bool $dark]
 		set menu_button [::gmaproto::int_bool $menu_button]
+		set never_animate [::gmaproto::int_bool $never_animate]
 		set keep_tools [::gmaproto::int_bool $keep_tools]
 		set preload [::gmaproto::int_bool $preload]
 		set debug_proto [::gmaproto::int_bool $debug_proto]
@@ -837,6 +842,7 @@ namespace eval ::gmaprofile {
 			foreach theme {light dark} {
 				set color [dict get $_profile styles dialogs $fld $theme]
 				grid configure [button $st.d.$wp$theme -bg $color -text [::gmacolors::rgb_name $color] \
+					-highlightcolor $color -highlightbackground $color -highlightthickness 2 \
 					-command "::gmaprofile::_set_dialog_color [list $st $st.d.$wp$theme $theme $name $fld]"]\
 					-column $col -row $row -padx 1 -pady 1 -sticky we
 				incr col
@@ -866,6 +872,7 @@ namespace eval ::gmaprofile {
 			foreach theme {light dark} {
 				set color [dict get $_profile styles dialogs $fld $theme]
 				grid configure [button $st.c.$wp$theme -bg $color -text [::gmacolors::rgb_name $color] \
+					-highlightcolor $color -highlightbackground $color -highlightthickness 2 \
 					-command "::gmaprofile::_set_dialog_color [list $st $st.c.$wp$theme $theme $name $fld]"]\
 					-column $col -row $row -padx 1 -pady 1 -sticky we
 				incr col
@@ -903,6 +910,7 @@ namespace eval ::gmaprofile {
 			foreach theme {light dark} {
 				set color [dict get $_profile styles clocks $fld $theme]
 				grid configure [button $st.cl.$wp$theme -bg $color -text [::gmacolors::rgb_name $color] \
+					-highlightcolor $color -highlightbackground $color -highlightthickness 2 \
 					-command "::gmaprofile::_set_clock_color [list $st $st.cl.$wp$theme $theme $name $fld]"]\
 					-column $col -row $row -padx 1 -pady 1 -sticky we
 				incr col
@@ -1039,6 +1047,7 @@ namespace eval ::gmaprofile {
 		grid [ttk::checkbutton $w.n.a.cdr -text "Enable colors in die-roll titles" -variable colorize_die_rolls] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.dark -text "Dark theme" -variable dark] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.menu_button -text "Use menu button instead of menu bar" -variable menu_button] - - - - - - -sticky w
+		grid [ttk::checkbutton $w.n.a.never_animate -text "Never play animated images" -variable never_animate] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.keep -text "Keep toolbar visible" -variable keep_tools] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.preload -text "Pre-load all cached images" -variable preload] - - - - - - -sticky w
 		grid [ttk::menubutton $w.n.a.imgfmt -textvariable imgtext -menu $w.n.a.m_imgfmt] - - - - - - -sticky w
@@ -1309,8 +1318,10 @@ namespace eval ::gmaprofile {
 		set d [default_styles]
 		dict set _profile styles dialogs $key light [set lt [dict get $d dialogs $key light]]
 		dict set _profile styles dialogs $key dark [set dk [dict get $d dialogs $key dark]]
-		${btn}light configure -bg $lt -text [::gmacolors::rgb_name $lt]
-		${btn}dark configure -bg $dk -text [::gmacolors::rgb_name $dk]
+		${btn}light configure -bg $lt -text [::gmacolors::rgb_name $lt] \
+			-highlightcolor $color -highlightbackground $color -highlightthickness 2 
+		${btn}dark configure -bg $dk -text [::gmacolors::rgb_name $dk] \
+			-highlightcolor $color -highlightbackground $color -highlightthickness 2 
 		_refresh_dialog_examples $st
 		_refresh_dieroller_examples $st
 	}
@@ -1319,14 +1330,17 @@ namespace eval ::gmaprofile {
 		set d [default_styles]
 		dict set _profile styles clocks $key light [set lt [dict get $d clocks $key light]]
 		dict set _profile styles clocks $key dark [set dk [dict get $d clocks $key dark]]
-		${btn}light configure -bg $lt -text [::gmacolors::rgb_name $lt]
-		${btn}dark configure -bg $dk -text [::gmacolors::rgb_name $dk]
+		${btn}light configure -bg $lt -text [::gmacolors::rgb_name $lt] \
+			-highlightcolor $color -highlightbackground $color -highlightthickness 2 
+		${btn}dark configure -bg $dk -text [::gmacolors::rgb_name $dk] \
+			-highlightcolor $color -highlightbackground $color -highlightthickness 2 
 	}
 	proc _set_dialog_color {st btn theme style key} {
 		variable _profile
 		if {[set chosencolor [tk_chooseColor -initialcolor [dict get $_profile styles dialogs $key $theme] -parent $btn -title "Choose color for $style ($theme mode)"]] ne {}} {
 			dict set _profile styles dialogs $key $theme $chosencolor
-			$btn configure -bg $chosencolor -text [::gmacolors::rgb_name $chosencolor]
+			$btn configure -bg $chosencolor -text [::gmacolors::rgb_name $chosencolor] \
+				-highlightcolor $chosencolor -highlightbackground $chosencolor -highlightthickness 2 
 		}
 		_refresh_dialog_examples $st
 		_refresh_dieroller_examples $st
@@ -1335,7 +1349,8 @@ namespace eval ::gmaprofile {
 		variable _profile
 		if {[set chosencolor [tk_chooseColor -initialcolor [dict get $_profile styles clocks $key $theme] -parent $btn -title "Choose color for $style ($theme mode)"]] ne {}} {
 			dict set _profile styles clocks $key $theme $chosencolor
-			$btn configure -bg $chosencolor -text [::gmacolors::rgb_name $chosencolor]
+			$btn configure -bg $chosencolor -text [::gmacolors::rgb_name $chosencolor] \
+				-highlightcolor $chosencolor -highlightbackground $chosencolor -highlightthickness 2 
 		}
 	}
 
@@ -1489,18 +1504,24 @@ namespace eval ::gmaprofile {
 				$st.r.fgdk configure -text {} -background $neutral_bg -state disabled
 			} else {
 				set PEsFGen 1
-				$st.r.fglt configure -text [::gmacolors::rgb_name $fgcolor_l] -bg $fgcolor_l -state normal
-				$st.r.fgdk configure -text [::gmacolors::rgb_name $fgcolor_d] -bg $fgcolor_d -state normal
+				$st.r.fglt configure -text [::gmacolors::rgb_name $fgcolor_l] -bg $fgcolor_l -state normal\
+					-highlightcolor $fgcolor_l -highlightbackground $fgcolor_l -highlightthickness 2 
+				$st.r.fgdk configure -text [::gmacolors::rgb_name $fgcolor_d] -bg $fgcolor_d -state normal\
+					-highlightcolor $fgcolor_d -highlightbackground $fgcolor_d -highlightthickness 2 
 			}
 
 			if {$bgcolor_l eq {} && $bgcolor_d eq {}} {
 				set PEsBGen 0
-				$st.r.bglt configure -text {} -background $neutral_bg -state disabled
-				$st.r.bgdk configure -text {} -background $neutral_bg -state disabled
+				$st.r.bglt configure -text {} -background $neutral_bg -state disabled\
+					-highlightcolor $neutral_bg -highlightbackground $neutral_bg -highlightthickness 2 
+				$st.r.bgdk configure -text {} -background $neutral_bg -state disabled\
+					-highlightcolor $neutral_bg -highlightbackground $neutral_bg -highlightthickness 2 
 			} else {
 				set PEsBGen 1
-				$st.r.bglt configure -text [::gmacolors::rgb_name $bgcolor_l] -bg $bgcolor_l -state normal
-				$st.r.bgdk configure -text [::gmacolors::rgb_name $bgcolor_d] -bg $bgcolor_d -state normal
+				$st.r.bglt configure -text [::gmacolors::rgb_name $bgcolor_l] -bg $bgcolor_l -state normal\
+					-highlightcolor $bgcolor_l -highlightbackground $bgcolor_l -highlightthickness 2 
+				$st.r.bgdk configure -text [::gmacolors::rgb_name $bgcolor_d] -bg $bgcolor_d -state normal\
+					-highlightcolor $bgcolor_d -highlightbackground $bgcolor_d -highlightthickness 2 
 			}
 			$st.r.description configure -state disabled
 			$st.r.fmfmt delete 0 end
@@ -1554,7 +1575,8 @@ namespace eval ::gmaprofile {
 		}
 		if {[set chosencolor [tk_chooseColor -initialcolor [dict get $_profile styles dierolls components $stylename $key $theme] -parent $btn -title "Choose color for $stylename ($theme mode)"]] ne {}} {
 			dict set _profile styles dierolls components $stylename $key $theme $chosencolor
-			$btn configure -background $chosencolor -text [::gmacolors::rgb_name $chosencolor]
+			$btn configure -background $chosencolor -text [::gmacolors::rgb_name $chosencolor]\
+				-highlightcolor $chosencolor -highlightbackground $chosencolor -highlightthickness 2 
 			_refresh_dieroller_examples $st
 		}
 	}

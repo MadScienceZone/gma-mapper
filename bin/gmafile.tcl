@@ -1,16 +1,16 @@
 ########################################################################################
-#  _______  _______  _______                ___        __    ______       __           #
-# (  ____ \(       )(  ___  ) Game         /   )      /  \  / ___  \     /  \          #
-# | (    \/| () () || (   ) | Master's    / /) |      \/) ) \/   \  \    \/) )         #
-# | |      | || || || (___) | Assistant  / (_) (_       | |    ___) /      | |         #
-# | | ____ | |(_)| ||  ___  |           (____   _)      | |   (___ (       | |         #
-# | | \_  )| |   | || (   ) |                ) (        | |       ) \      | |         #
-# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_/\___/  / _  __) (_        #
-# (_______)|/     \||/     \| Client         (_)  (_) \____/\______/ (_) \____/        #
+#  _______  _______  _______                ___        __       ___                    #
+# (  ____ \(       )(  ___  ) Game         /   )      /  \     /   )                   #
+# | (    \/| () () || (   ) | Master's    / /) |      \/) )   / /) |                   #
+# | |      | || || || (___) | Assistant  / (_) (_       | |  / (_) (_                  #
+# | | ____ | |(_)| ||  ___  |           (____   _)      | | (____   _)                 #
+# | | \_  )| |   | || (   ) |                ) (        | |      ) (                   #
+# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_     | |                   #
+# (_______)|/     \||/     \| Client         (_)  (_) \____/     (_)                   #
 #                                                                                      #
 ########################################################################################
 #
-# @[00]@| GMA-Mapper 4.13.1
+# @[00]@| GMA-Mapper 4.14
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
@@ -62,12 +62,12 @@ package require gmaproto 1.0
 package require Tcl 8.5
 
 namespace eval ::gmafile {
-	variable version 21
+	variable version 22
 	variable dice_version 2
 	variable min_dice_version 1
 	variable max_dice_version 2
 	variable min_version 16
-	variable max_version 21
+	variable max_version 22
 
 	array set _data_payload {
 		__META__ {Timestamp i DateTime s Comment s Location s}
@@ -75,7 +75,7 @@ namespace eval ::gmafile {
 		ARC      {ArcMode i Start f Extent f ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		CIRC     {ArcMode i Start f Extent f ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		CREATURE {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}}}
-		IMG      {Name s Sizes {a {File s ImageData b IsLocalFile ? Zoom f}}}
+		IMG      {Name s Sizes {a {File s ImageData b IsLocalFile ? Zoom f}} Animation {o {Frames i FrameSpeed i Loops i}}}
 		LINE     {Arrow i ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		MAP      {File s IsLocalFile ? CacheOnly ? Merge ?}
 		POLY     {Spline i Join i ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
@@ -321,7 +321,7 @@ proc ::gmafile::load_legacy_map_data {vlist meta} {
 	::DEBUG 3 "read images: [dict size $imagedict] elements: [llength $file_data]"
 
 	foreach image_id [dict keys $imagedict] {
-		set image_data [dict create Name $image_id]
+		set image_data [dict create Name $image_id Animation {}]
 		foreach image_size [dict keys [dict get $imagedict $image_id]] {
 			set filename [dict get $imagedict $image_id $image_size]
 			if {[string range $filename 0 0] eq "@"} {
@@ -721,3 +721,42 @@ proc ::gmafile::load_legacy_preset_file {f vid oldmeta} {
 	}
 	return [list $meta $plist]
 }
+# @[00]@| GMA-Mapper 4.14
+# @[01]@|
+# @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
+# @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
+# @[12]@| Aloha, Oregon, USA. All Rights Reserved.
+# @[13]@| Distributed under the terms and conditions of the BSD-3-Clause
+# @[14]@| License as described in the accompanying LICENSE file distributed
+# @[15]@| with GMA.
+# @[16]@|
+# @[20]@| Redistribution and use in source and binary forms, with or without
+# @[21]@| modification, are permitted provided that the following conditions
+# @[22]@| are met:
+# @[23]@| 1. Redistributions of source code must retain the above copyright
+# @[24]@|    notice, this list of conditions and the following disclaimer.
+# @[25]@| 2. Redistributions in binary form must reproduce the above copy-
+# @[26]@|    right notice, this list of conditions and the following dis-
+# @[27]@|    claimer in the documentation and/or other materials provided
+# @[28]@|    with the distribution.
+# @[29]@| 3. Neither the name of the copyright holder nor the names of its
+# @[30]@|    contributors may be used to endorse or promote products derived
+# @[31]@|    from this software without specific prior written permission.
+# @[32]@|
+# @[33]@| THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
+# @[34]@| CONTRIBUTORS “AS IS” AND ANY EXPRESS OR IMPLIED WARRANTIES,
+# @[35]@| INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+# @[36]@| MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# @[37]@| DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS
+# @[38]@| BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY,
+# @[39]@| OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# @[40]@| PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+# @[41]@| PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+# @[42]@| THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR
+# @[43]@| TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+# @[44]@| THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+# @[45]@| SUCH DAMAGE.
+# @[46]@|
+# @[50]@| This software is not intended for any use or application in which
+# @[51]@| the safety of lives or property would be at risk due to failure or
+# @[52]@| defect of the software.
