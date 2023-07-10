@@ -3,8 +3,8 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.14-beta          <!-- @@##@@ -->
- * Effective Date: 07-Jul-2023               <!-- @@##@@ -->
+ * This Package Version: 4.14          <!-- @@##@@ -->
+ * Effective Date: 10-Jul-2023               <!-- @@##@@ -->
 
 ## Compatibility
  * GMA Core API Library Version: 6.4-alpha <!-- @@##@@ -->
@@ -16,9 +16,25 @@ The support for old server protocols (<400) and map file formats (<20) will be d
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
-# Unreleased 4.14
+# 4.14
 ## Adds
  * Support for animated images.
+ * Now supports mapper file format 22.
+ * Now supports preferences file format 3.
+ * Now supports server protocol version 407.
+ * Changed the back-end socket reading code used to get messages from the server. This should mitigate the issue we've seen where getting too much data from the server caused the mapper to fail to process it all, resulting in missing chat messages and map contents.
+ * Added ability damage condition marker to the built-in status marker set.
+
+
+## Fixes
+ * Corrects UI cosmetic annoyances on the Mac platform, especially when in dark mode.
+ * Fixes a bug which caused an exception when advancing the initiative clock under certain circumstances. ([Issue #127](https://github.com/MadScienceZone/gma-mapper/issues/127))
+ * Corrects condition tooltip text that conflicted with the core Pathfinder rules.
+ * Corrects issue where not all conditions (i.e., those dynamically computed by the mapper) were displayed in the tooltip. ([Issue #12](https://github.com/MadScienceZone/gma-mapper/issues/12)).
+ * Adds braces around conditional expressions, in the hopes that this gives a tiny optimization improvement to the program, since the Tcl bytecode compiler will parse that more efficiently.
+ * Wrapped float font size value in `int()` because Tk was unhappy with non-integer font sizes there.
+ * Fixed a bug in the code that draws spell areas of effect.
+
 
 # 4.13.1
 ## Fixes
