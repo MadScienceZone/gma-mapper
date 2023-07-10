@@ -359,7 +359,7 @@ proc SplitCreatureImageName {name} {
 # Stirge #1
 
 proc GMAFontToTkFont {gfont} {
-	set font [list [dict get $gfont Family] [dict get $gfont Size]]
+	set font [list [dict get $gfont Family] [expr int([dict get $gfont Size])]]
 	if {[dict get $gfont Weight] == 1} {
 		lappend font "bold"
 	}
@@ -1820,7 +1820,7 @@ foreach icon_name {
 		set all_sizes false
 	}
 
-	if {$dark_mode && [file exists "${ICON_DIR}/d_${icon_name}${icon_size}.$_icon_format"]} {
+	if {$tcl_platform(os) ne "Darwin" && $dark_mode && [file exists "${ICON_DIR}/d_${icon_name}${icon_size}.$_icon_format"]} {
 		set icon_filename "${ICON_DIR}/d_${icon_name}${icon_size}.$_icon_format"
 	} else {
 		set icon_filename "${ICON_DIR}/${icon_name}${icon_size}.$_icon_format"
