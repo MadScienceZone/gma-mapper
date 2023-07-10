@@ -1,5 +1,5 @@
 '\" t
-'\" *** 406 ***
+'\" *** 407 ***
 '\" <<ital-is-var>>
 '\" <<bold-is-fixed>>
 .TH MAPPER-PROTOCOL 7 "GMA-Mapper 4.3.4" 16-Mar-2023 "Games" \" @@mp@@
@@ -75,7 +75,7 @@ MAY
 be implemented to wait synchronously for a server
 response during the authentication negotiation stage.
 .LP
-This describes protocol version 406. These notes are intended to be 
+This describes protocol version 407. These notes are intended to be 
 detailed enough to implement a client from and should be considered
 the definitive standard reference to the protocol.
 .LP
@@ -399,15 +399,56 @@ commands as of protocol version 400.)
 The payload is a JSON object with the following fields:
 '\" <<list>>
 .RS
+'\" <<New>>
+.TP
+'\" <</ital-is-var>>
+.BI Animation " (object)"
+'\" <<ital-is-var>>
+If this value is given and non-null, this image is to be animated
+from individual frames. If the client is capable of animating
+multi-frame files, the base filename can be used directly. 
+Servers offering this file SHOULD provide the multi-frame animated image file in
+a variety of formats, and SHOULD provide single-frame files in all
+formats in which they provide static images. 
+.RS
+.LP
+Individual frame files are available by prefixing the base filename
+with 
+.RB \*(lq :\fIn\fP: \*(rq
+where
+.I n
+is the frame number, starting with 0. The
+.B Animation
+object has the following fields:
+'\" <<list>>
+.TP
+'\" <</ital-is-var>>
+.BI Frames " (int)"
+'\" <<ital-is-var>>
+The number of frames in the animation.
+.TP
+'\" <</ital-is-var>>
+.BI FrameSpeed " (int)"
+'\" <<ital-is-var>>
+The number of milliseconds to delay between frames.
+.TP
+'\" <</ital-is-var>>
+.BI Loops " (int)"
+'\" <<ital-is-var>>
+If present and non-zero, the animation will play this many times before stopping. Otherwise,
+the animation plays forever.
+.RE
+'\" <</>>
+'\" <</New>>
 .TP
 .B Name
 The name of the image as known within the mapper.
 .TP
 '\" <</ital-is-var>>
 .BI Sizes " (list of objects)"
-'\" <<ital-is-var>>
 A list of sizes available for this object. This will be
 .I merged
+'\" <<ital-is-var>>
 with any previously defined sizes for the same image name.
 Each element of this list is an object with the following fields:
 '\" <<list>>
@@ -1340,7 +1381,6 @@ If it begins with
 (e.g., 
 .RB \*(lq ..blue \*(rq),
 then the effect is the same, but the dashes are shorter.
-'\" <<New>>
 .RE
 .TP
 '\" <</ital-is-var>>
@@ -1349,7 +1389,6 @@ then the effect is the same, but the dashes are shorter.
 If true, the creature token should be displayed in a semi-transparent
 form whenever it has this condition
 (added in protocol 404).
-'\" <</New>>
 .TP
 .B Description
 A description of the effects on the character of having that condition
@@ -2054,12 +2093,10 @@ server configuration), it is an indicator that the server's main event loop is d
 .BI ServerTime " (RFC 3339-formatted datetime string)"
 The current wall-clock time on the server. This provides an accurate point of reference
 to determine how long ago the other server time values occurred.
-'\" <<New>>
 .TP
 .B ServerVersion
 The server's version number.
 (Added in protocol 405.)
-'\" <</New>>
 '\" <<ital-is-var>>
 '\" <</>>
 .RE
@@ -2184,12 +2221,10 @@ is 10, then hit points are displayed only in 10% increments.
 '\" <</>>
 .RE
 .TP
-'\" <<New>>
 '\" <</ital-is-var>>
 .BI Hidden " (bool)"
 If true, this creature token is hidden from player view, although the GM can still see it.
 Added in protocol 404.
-'\" <</New>>
 .TP
 .BI Gx " (float)"
 The grid 
@@ -2231,7 +2266,6 @@ A note to attach to the creature token to indicate special conditions or status.
 .BI Size
 The tactical size category of the creature.
 '\" <<ital-is-var>>
-'\" <<New>>
 This has the general form
 .RS
 .RS
@@ -2261,7 +2295,6 @@ to the given size category and should be displayed as such.
 The value is otherwise identical to
 .BR Size .
 (Added in 406.)
-'\" <</New>>
 .TP
 '\" <</ital-is-var>>
 .BI StatusList " (list of strings)"
@@ -2327,7 +2360,6 @@ should be de-emphasized compared to the one with initiative.
 The specific type of creature. This may be 0 if the type is unknown, 1 for
 monsters, or 2 for players. Clients MUST NOT set this field to a value other
 than 1 or 2.
-'\" <<New>>
 .TP
 '\" <</ital-is-var>>
 .BI CustomReach " (object)"
@@ -2352,7 +2384,6 @@ but indicates the distance for reach weapons.
 .RE
 .LP
 (Added in protocol 406.)
-'\" <</New>>
 '\" <</>>
 .RE
 .TP
@@ -2659,7 +2690,11 @@ John Mechalas (elevation and movement modes).
 .SH HISTORY
 .LP
 '\" <<New>>
-This document defines map protocol version 406,
+This document defines map protocol version 407,
+which added the image animation features.
+'\" <</New>>
+.LP
+This document also defines map protocol version 406,
 which dropped the
 .B Area
 attribute from creatures and added the
@@ -2669,7 +2704,6 @@ attribute and the expanded syntax for the
 attribute, as well as the new
 .B DispSize
 attribute.
-'\" <</New>>
 .LP
 Protocol version 405
 introduced the

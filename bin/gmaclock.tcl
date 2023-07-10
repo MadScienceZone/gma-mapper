@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___        __    ______       __           #
-# (  ____ \(       )(  ___  ) Game         /   )      /  \  / ___  \     /  \          #
-# | (    \/| () () || (   ) | Master's    / /) |      \/) ) \/   \  \    \/) )         #
-# | |      | || || || (___) | Assistant  / (_) (_       | |    ___) /      | |         #
-# | | ____ | |(_)| ||  ___  |           (____   _)      | |   (___ (       | |         #
-# | | \_  )| |   | || (   ) |                ) (        | |       ) \      | |         #
-# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_/\___/  / _  __) (_        #
-# (_______)|/     \||/     \| Client         (_)  (_) \____/\______/ (_) \____/        #
+#  _______  _______  _______                ___        __       ___                    #
+# (  ____ \(       )(  ___  ) Game         /   )      /  \     /   )                   #
+# | (    \/| () () || (   ) | Master's    / /) |      \/) )   / /) |                   #
+# | |      | || || || (___) | Assistant  / (_) (_       | |  / (_) (_                  #
+# | | ____ | |(_)| ||  ___  |           (____   _)      | | (____   _)                 #
+# | | \_  )| |   | || (   ) |                ) (        | |      ) (                   #
+# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_     | |                   #
+# (_______)|/     \||/     \| Client         (_)  (_) \____/     (_)                   #
 #                                                                                      #
 ########################################################################################
 #
@@ -778,7 +778,7 @@ proc update_initiative_slots {w {limit {}} args} {
 							-highlightbackground [dict get $::_preferences styles clocks negative_hp [::gmaprofile::dlkeypref $::_preferences]] \
 							-highlightcolor [dict get $::_preferences styles clocks negative_hp [::gmaprofile::dlkeypref $::_preferences]] \
 							-highlightthickness 4 \
-							-background [dict get $::_preferences styles clocks slot_bg [::gmaprofile::dlkeypref $::_preferences]] \
+							-background [dict get $::_preferences styles clocks slot_bg [::gmaprofile::dlkeypref $::_preferences]]
 						$w.slot$i.icon configure -image $icon_dieing \
 							-background [dict get $::_preferences styles clocks slot_bg [::gmaprofile::dlkeypref $::_preferences]] \
 							-foreground [dict get $::_preferences styles clocks slot_fg [::gmaprofile::dlkeypref $::_preferences]]
@@ -1046,7 +1046,7 @@ proc exists {w} {
 
 }
 #
-# @[00]@| GMA-Mapper 4.13.1
+# @[00]@| GMA-Mapper 4.14
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
