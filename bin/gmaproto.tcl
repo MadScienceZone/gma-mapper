@@ -68,6 +68,7 @@ namespace eval ::gmaproto {
 	variable sock {}
 	variable send_buffer {}
 	variable recv_buffer {}
+	variable read_buffer {}
 	variable poll_buffer {}
 	variable proxy {}
 	variable proxy_user {}
@@ -280,7 +281,8 @@ proc ::gmaproto::redial {} {
 		set ::gmaproto::sock [socket $::gmaproto::host $::gmaproto::port]
 	}
 	fconfigure $::gmaproto::sock -blocking 0
-	fileevent $::gmaproto::sock readable "::gmaproto::_receive $::gmaproto::sock"
+#	fileevent $::gmaproto::sock readable "::gmaproto::_receive $::gmaproto::sock"
+	after 10 ::gmaproto::_receive $::gmaproto::sock
 
 	if [catch {::gmaproto::_login} err] {
 		say "Attempt to sign on to server failed: $err"
@@ -288,8 +290,9 @@ proc ::gmaproto::redial {} {
 }
 
 proc ::gmaproto::_receive {s} {
-	if {[gets $s event] == -1} {
-		if [eof $s] {
+	while true {
+		append ::gmaproto::read_buffer [read $s 1024]
+		if {[eof $s]} {
 			::DEBUG 0 "Lost connection to map server"
 			close $s
 			set ::gmaproto::sock {}
@@ -297,10 +300,18 @@ proc ::gmaproto::_receive {s} {
 			::gmaproto::background_redial 1
 			return
 		}
-		return
+		if {$::gmaproto::read_buffer eq {}} {
+			# nothing read; back off a little
+			after 100 ::gmaproto::_receive $s
+			return
+		}
+		if {[set e [string first "\n" $::gmaproto::read_buffer]] >= 0} {
+			lappend ::gmaproto::recv_buffer [set event [string range $::gmaproto::read_buffer 0 $e-1]]
+			set ::gmaproto::read_buffer [string range $::gmaproto::read_buffer $e+1 end]
+			break
+		}
 	}
 
-	lappend ::gmaproto::recv_buffer $event
 	set queue_depth [llength $::gmaproto::recv_buffer]
 	::gmaproto::DEBUG "($queue_depth) <- $event"
 	if {!$::gmaproto::pending_login && $queue_depth == 1} {
@@ -310,6 +321,7 @@ proc ::gmaproto::_receive {s} {
 			::DEBUG 0 $err
 		}
 	}
+	after 10 ::gmaproto::_receive $s
 }
 
 proc ::gmaproto::_dispatch {} {
