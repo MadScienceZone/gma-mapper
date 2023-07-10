@@ -302,7 +302,7 @@ proc ::gmaproto::_receive {s} {
 		}
 		if {$::gmaproto::read_buffer eq {}} {
 			# nothing read; back off a little
-			after 100 ::gmaproto::_receive $s
+			after 50 ::gmaproto::_receive $s
 			return
 		}
 		if {[set e [string first "\n" $::gmaproto::read_buffer]] >= 0} {
@@ -321,7 +321,7 @@ proc ::gmaproto::_receive {s} {
 			::DEBUG 0 $err
 		}
 	}
-	after 10 ::gmaproto::_receive $s
+	after 5 ::gmaproto::_receive $s
 }
 
 proc ::gmaproto::_dispatch {} {
