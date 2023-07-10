@@ -778,7 +778,7 @@ proc update_initiative_slots {w {limit {}} args} {
 							-highlightbackground [dict get $::_preferences styles clocks negative_hp [::gmaprofile::dlkeypref $::_preferences]] \
 							-highlightcolor [dict get $::_preferences styles clocks negative_hp [::gmaprofile::dlkeypref $::_preferences]] \
 							-highlightthickness 4 \
-							-background [dict get $::_preferences styles clocks slot_bg [::gmaprofile::dlkeypref $::_preferences]] \
+							-background [dict get $::_preferences styles clocks slot_bg [::gmaprofile::dlkeypref $::_preferences]]
 						$w.slot$i.icon configure -image $icon_dieing \
 							-background [dict get $::_preferences styles clocks slot_bg [::gmaprofile::dlkeypref $::_preferences]] \
 							-foreground [dict get $::_preferences styles clocks slot_fg [::gmaprofile::dlkeypref $::_preferences]]
