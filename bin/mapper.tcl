@@ -8304,9 +8304,13 @@ proc fetch_map_file {id} {
 	if {[catch {
 		if {$CURLproxy ne {}} {
 			DEBUG 3 "Running $CURLpath $CreateOpt --output [file nativename $cache_filename] --proxy $CURLproxy -f -z [clock format $cache_newer_than] $url"
+			puts "Running $CURLpath $CreateOpt --output [file nativename $cache_filename] --proxy $CURLproxy -f -z [clock format $cache_newer_than] $url"
+			flush stdout
 			exec $CURLpath $CreateOpt --output [file nativename $cache_filename] --proxy $CURLproxy -f -z [clock format $cache_newer_than] $url >&@$my_stdout
 		} else {
 			DEBUG 3 "Running $CURLpath $CreateOpt --output [file nativename $cache_filename] -f -z [clock format $cache_newer_than] $url"
+			puts "Running $CURLpath $CreateOpt --output [file nativename $cache_filename] -f -z [clock format $cache_newer_than] $url"
+			flush stdout
 			exec $CURLpath $CreateOpt --output [file nativename $cache_filename] -f -z [clock format $cache_newer_than] $url >&@$my_stdout
 		}
 		DEBUG 3 "Updating cache file time"
