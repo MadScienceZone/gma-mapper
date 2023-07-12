@@ -75,7 +75,10 @@ MAY
 be implemented to wait synchronously for a server
 response during the authentication negotiation stage.
 .LP
-This describes protocol version 407. These notes are intended to be 
+'\" <</bold-is-fixed>>
+.B "This describes protocol version 407."
+'\" <<bold-is-fixed>>
+These notes are intended to be 
 detailed enough to implement a client from and should be considered
 the definitive standard reference to the protocol.
 .LP
@@ -326,8 +329,9 @@ usage of the server.
 .RE
 .TP
 .BI "PROTOCOL " v
-This command, which, if used at all, MUST be the first command sent by the server
-to the client, gives an up-front indication to the client as to what protocol
+This command (which\(emif used at all\(emMUST be the first command sent by 
+the server to the client) 
+gives an up-front indication to the client as to what protocol
 version is expected by the server. Older versions of the server waited until
 the
 .B OK
@@ -355,7 +359,7 @@ SHOULD send it.
 Add a character to the pop-up menu for map clients. This makes it easy to place important character tokens
 on the map and ensures that such tokens are given consistent
 .I id
-values rather than generating a random one.
+values rather than generating random ones.
 Clients MUST NOT send this command to each other; it is intended for the server to send to the clients.
 The payload includes the same fields as the
 .B PS
@@ -412,7 +416,7 @@ a variety of formats, and SHOULD provide single-frame files in all
 formats in which they provide static images. 
 .RS
 .LP
-Individual frame files are available by prefixing the base filename
+Individual frame files are named by prefixing the base filename
 with 
 .RB \*(lq :\fIn\fP: \*(rq
 where
@@ -1213,6 +1217,9 @@ for that creature's
 .B StatusList
 attribute.
 The mapper comes with the following conditions pre-defined:
+'\" <<New>>
+.BR "ability damage" ,
+'\" <</New>>
 .BR "ability drained" ,
 .BR bleed ,
 .BR blinded ,
@@ -1220,6 +1227,9 @@ The mapper comes with the following conditions pre-defined:
 .BR cowering ,
 .BR dazed ,
 .BR dazzled ,
+'\" <<New>>
+.BR dead ,
+'\" <</New>>
 .BR deafened ,
 .BR disabled ,
 .BR dying ,
@@ -1867,6 +1877,9 @@ The name of the font family as recognized by Tk.
 .TP
 .BI Size " (float)"
 The font size as recognized by Tk.
+'\" <<New>>
+The client MAY truncate this to an integer if it can't handle fractional point sizes.
+'\" <</New>>
 .TP
 .BI Weight " (int)"
 The type wight to use. This may be 0 for normal or 1 for boldface.
@@ -2694,8 +2707,7 @@ This document defines map protocol version 407,
 which added the image animation features.
 '\" <</New>>
 .LP
-This document also defines map protocol version 406,
-which dropped the
+Protocol version 406 dropped the
 .B Area
 attribute from creatures and added the
 .B CustomReach
