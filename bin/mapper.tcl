@@ -5414,8 +5414,8 @@ proc RenderSomeone {w id {norecurse false}} {
 	foreach mob_id [array names MOBdata] {
 		DEBUG 1 "Looking for location of $mob_id"
 		if {![dict get $MOBdata($mob_id) Killed] && ![dict get $MOBdata($mob_id) Hidden]} {
-			set xx [dict get $MOBdata($mob_id) Gx]
-			set yy [dict get $MOBdata($mob_id) Gy]
+			set xx [expr int([dict get $MOBdata($mob_id) Gx])]
+			set yy [expr int([dict get $MOBdata($mob_id) Gy])]
 			set sz [MonsterSizeValue [CreatureDisplayedSize $mob_id]]
 			DEBUG 1 "- Found at ($xx,$yy), size=$sz:"
 			for {set xi 0} {$xi < $sz} {incr xi} {
@@ -5513,7 +5513,7 @@ proc RenderSomeone {w id {norecurse false}} {
 			}
 		} else {
 			set Xstart [expr ($x-$mob_reach)]
-			set yy [expr ($y-$mob_reach)]
+			set yy [expr int($y-$mob_reach)]
 			switch [dict get $MOBdata($id) Reach] {
 				1 {
 					# reach weapons
@@ -5530,7 +5530,7 @@ proc RenderSomeone {w id {norecurse false}} {
 			}
 			set color [dict get $MOBdata($id) Color]
 			foreach row $mob_matrix {
-				set xx $Xstart
+				set xx [expr int($Xstart)]
 				foreach col $row {
 					if {$col & $hashbit} {
 						foreach {xa ya xb yb} {
@@ -6001,7 +6001,7 @@ proc RenderSomeone {w id {norecurse false}} {
 #			set sz [MonsterSizeValue [CreatureDisplayedSize $threatening_mob_id]]
 			DEBUG 1 "-- area $ar reach $re ($xc,$yc) r=$rc"
 			set Xstart [expr ([dict get $MOBdata($threatening_mob_id) Gx] - $re)]
-			set yy [expr ([dict get $MOBdata($threatening_mob_id) Gy] - $re)]
+			set yy [expr int([dict get $MOBdata($threatening_mob_id) Gy] - $re)]
 			array unset target
 			if {[dict get $MOBdata($threatening_mob_id) Reach] > 0} {
 				set matbit 1
@@ -6009,7 +6009,7 @@ proc RenderSomeone {w id {norecurse false}} {
 				set matbit 2
 			}
 			foreach row $mat {
-				set xx $Xstart
+				set xx [expr int($Xstart)]
 				foreach col $row {
 					DEBUG 1 "--- @($xx,$yy) m=$col"
 					if {$col & $matbit} {
