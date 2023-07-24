@@ -3,11 +3,11 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.14          <!-- @@##@@ -->
- * Effective Date: 10-Jul-2023               <!-- @@##@@ -->
+ * This Package Version: 4.14.1          <!-- @@##@@ -->
+ * Effective Date: 24-Jul-2023               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.4-alpha <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.5 <!-- @@##@@ -->
  * GMA Mapper File Format: 22	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 407        <!-- @@##@@ -->
 
@@ -15,6 +15,10 @@
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.14.1
+## Fixes
+ * Corrects an issue where combat threat zone drawing fails if a creature's coordinates were sent as a float value (e.g., 123.0) instead of an integer (e.g., 123).
 
 # 4.14
 ## Adds
