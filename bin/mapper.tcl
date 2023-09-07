@@ -190,9 +190,35 @@ proc ScrollToCenterScreenXY {x y} {
 	lassign $region x1 y1 x2 y2
 	lassign [$canvas xview] vx1 vx2
 	lassign [$canvas yview] vy1 vy2
-	$canvas xview moveto [expr min(1.0,max(0.0,(double($x)-(($vx2*$x2-$vx1*$x2)/2.0))/$x2))]
-	$canvas yview moveto [expr min(1.0,max(0.0,(double($y)-(($vy2*$y2-$vy1*$y2)/2.0))/$y2))]
+	SmoothScroll 10 100 \
+		$vx1 [expr min(1.0,max(0.0,(double($x)-(($vx2*$x2-$vx1*$x2)/2.0))/$x2))] \
+	        $vy1 [expr min(1.0,max(0.0,(double($y)-(($vy2*$y2-$vy1*$y2)/2.0))/$y2))]
 }
+
+set smooth_scroll_bg_id {}
+proc SmoothScroll {steps delay x0 x1 y0 y1} {
+	global smooth_scroll_bg_id
+	if {$smooth_scroll_bg_id ne {}} {
+		after cancel $smooth_scroll_bg_id
+	}
+	set smooth_scroll_bg_id [after $delay "do_smooth_scroll_update $steps $delay 1 $x0 $x1 $y0 $y1"]
+}
+
+proc do_smooth_scroll_update {steps delay step x0 x1 y0 y1} {
+	global smooth_scroll_bg_id
+	global canvas
+
+	if {$step >= $steps} {
+		$canvas xview moveto $x1
+		$canvas yview moveto $y1
+		set smooth_scroll_bg_id {}
+	} else {
+		$canvas xview moveto [expr (($x1-$x0)*(double($step)/$steps))+$x0]
+		$canvas yview moveto [expr (($y1-$y0)*(double($step)/$steps))+$y0]
+		set smooth_scroll_bg_id [after $delay "do_smooth_scroll_update $steps $delay [expr $step+1] $x0 $x1 $y0 $y1"]
+	}
+}
+	
 
 # determine if the (x,y) coordinates are within the visible scroll region.
 proc IsScreenXYVisible {x y {ltmargin 0} {rbmargin 0}} {
@@ -9207,7 +9233,6 @@ proc DoCommandI {d} {
 
 			if {$mob_id ne {} && [info exists MOBdata($mob_id)] && ![dict get $MOBdata($mob_id) Killed]} {
 				lappend ITlist $mob_id
-				DEBUG 0 "select $mob_id $CombatantScrollEnabled $MOBdata($mob_id)"
 				if {$CombatantScrollEnabled} {
 					ScrollToCenterScreenXY [GridToCanvas [dict get $MOBdata($mob_id) Gx]] \
 							       [GridToCanvas [dict get $MOBdata($mob_id) Gy]]
