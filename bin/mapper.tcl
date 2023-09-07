@@ -15,7 +15,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.14.1}     ;# @@##@@
+set GMAMapperVersion {4.15-alpha.0}     ;# @@##@@
 set GMAMapperFileFormat {22}        ;# @@##@@
 set GMAMapperProtocol {407}         ;# @@##@@
 set CoreVersionNumber {6.5}            ;# @@##@@
@@ -173,6 +173,45 @@ proc ScrollToGridXY {gx gy} {
 	$canvas xview moveto [expr double($x)/$x2]
 	$canvas yview moveto [expr double($y)/$y2]
 }
+
+# scroll to ensure (x,y) are centered on the screen unless they're 
+# already visible within a margin of a couple of grids from the edges.
+proc ScrollToCenterScreenXY {x y} {
+	global canvas
+
+	if {[IsScreenXYVisible $x $y 100 150]} {
+		return
+	}
+
+	set region [$canvas cget -scrollregion]
+	if {[llength $region] == 0} {
+		error "no -scrollregion set on canvas"
+	}
+	lassign $region x1 y1 x2 y2
+	lassign [$canvas xview] vx1 vx2
+	lassign [$canvas yview] vy1 vy2
+	$canvas xview moveto [expr min(1.0,max(0.0,(double($x)-(($vx2*$x2-$vx1*$x2)/2.0))/$x2))]
+	$canvas yview moveto [expr min(1.0,max(0.0,(double($y)-(($vy2*$y2-$vy1*$y2)/2.0))/$y2))]
+}
+
+# determine if the (x,y) coordinates are within the visible scroll region.
+proc IsScreenXYVisible {x y {ltmargin 0} {rbmargin 0}} {
+	global canvas
+
+	set region [$canvas cget -scrollregion]
+	if {[llength $region] == 0} {
+		error "no -scrollregion set on canvas"
+	}
+	lassign $region x1 y1 x2 y2
+	lassign [$canvas xview] vx1 vx2
+	lassign [$canvas yview] vy1 vy2
+
+	if {($x - $ltmargin) < ($vx1*$x2) || ($x + $rbmargin) > ($vx2*$x2) || ($y - $ltmargin) < ($vy1*$y2) || ($y + $rbmargin) > ($vy2*$y2)} {
+		return false
+	}
+	return true
+}
+
 
 
 proc GoToGridCoords {} {
@@ -864,13 +903,20 @@ set GuideLines 0
 set MajorGuideLines 0
 set GuideLineOffset {0 0}
 set MajorGuideLineOffset {0 0}
+set CombatantScrollEnabled false
+set check_menu_color     [::gmaprofile::preferred_color $_preferences check_menu   $colortheme]
 #set iscale 100
 #set rscale 100.0
 
 frame .toolbar2
 set MAIN_MENU {}
+proc update_main_menu {} {
+	global check_menu_color MAIN_MENU
+	$MAIN_MENU.view entryconfigure "*Follow Combatants*" -selectcolor $check_menu_color
+}
+
 proc create_main_menu {use_button} {
-	global MAIN_MENU connmenuidx
+	global MAIN_MENU connmenuidx CombatantScrollEnabled check_menu_color
 	if {$MAIN_MENU ne {}} {
 		return
 	}
@@ -938,6 +984,7 @@ proc create_main_menu {use_button} {
 	$mm.view add separator
 	$mm.view add command -command {FindNearby} -label "Scroll to Visible Objects"
 	$mm.view add command -command {SyncView} -label "Scroll Others' Views to Match Mine"
+	$mm.view add checkbutton -onvalue true -offvalue false -selectcolor $check_menu_color -variable CombatantScrollEnabled -label "Scroll to Follow Combatants"
 	$mm.view add command -command {GoToGridCoords} -label "Go to Map Location..."
 	$mm.view add separator
 	$mm.view add command -command {refreshScreen} -label "Refresh Display"
@@ -9130,6 +9177,7 @@ proc DoCommandDSM {d} {
 proc DoCommandI {d} {
 	# update initiative clock
 	global MOB_COMBATMODE canvas MOB_BLINK NextMOBID MOBdata MOBid
+	global CombatantScrollEnabled
 	set ITlist {}
 
 	if {$MOB_COMBATMODE} {
@@ -9157,8 +9205,13 @@ proc DoCommandI {d} {
 				set mob_id {};			# non-existent actor ID
 			}
 
-			if {$mob_id ne {} && ![dict get $MOBdata($mob_id) Killed]} {
+			if {$mob_id ne {} && [info exists MOBdata($mob_id)] && ![dict get $MOBdata($mob_id) Killed]} {
 				lappend ITlist $mob_id
+				DEBUG 0 "select $mob_id $CombatantScrollEnabled $MOBdata($mob_id)"
+				if {$CombatantScrollEnabled} {
+					ScrollToCenterScreenXY [GridToCanvas [dict get $MOBdata($mob_id) Gx]] \
+							       [GridToCanvas [dict get $MOBdata($mob_id) Gy]]
+				}
 			}
 		}
 	}
@@ -12540,6 +12593,7 @@ if {![::gmaproto::is_ready] && $IThost ne {}} {
     report_progress "Mapper Client Ready"
     after 5000 {report_progress {}}
 }
+update_main_menu
 
 proc ConnectToServerByIdx {idx} {
 	global PreferencesData
