@@ -16,6 +16,10 @@ The support for old server protocols (<400) and map file formats (<20) will be d
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
+# 4.15.0 (unreleased development branch)
+## Adds
+ * View -> Scroll to Follow Combatants menu option. When this is checked during combat, the map will automatically scroll as needed when each combatant's turn starts so that creature is visible on the map.
+
 # 4.14.1
 ## Fixes
  * Corrects an issue where combat threat zone drawing fails if a creature's coordinates were sent as a float value (e.g., 123.0) instead of an integer (e.g., 123).
