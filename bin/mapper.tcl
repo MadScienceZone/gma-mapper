@@ -190,7 +190,7 @@ proc ScrollToCenterScreenXY {x y} {
 	lassign $region x1 y1 x2 y2
 	lassign [$canvas xview] vx1 vx2
 	lassign [$canvas yview] vy1 vy2
-	SmoothScroll 10 100 \
+	SmoothScroll 20 50 \
 		$vx1 [expr min(1.0,max(0.0,(double($x)-(($vx2*$x2-$vx1*$x2)/2.0))/$x2))] \
 	        $vy1 [expr min(1.0,max(0.0,(double($y)-(($vy2*$y2-$vy1*$y2)/2.0))/$y2))]
 }
@@ -9203,7 +9203,7 @@ proc DoCommandDSM {d} {
 proc DoCommandI {d} {
 	# update initiative clock
 	global MOB_COMBATMODE canvas MOB_BLINK NextMOBID MOBdata MOBid
-	global CombatantScrollEnabled
+	global CombatantScrollEnabled is_GM
 	set ITlist {}
 
 	if {$MOB_COMBATMODE} {
@@ -9233,7 +9233,7 @@ proc DoCommandI {d} {
 
 			if {$mob_id ne {} && [info exists MOBdata($mob_id)] && ![dict get $MOBdata($mob_id) Killed]} {
 				lappend ITlist $mob_id
-				if {$CombatantScrollEnabled} {
+				if {$CombatantScrollEnabled && (![dict get $MOBdata($mob_id) Hidden] || $is_GM)} {
 					ScrollToCenterScreenXY [GridToCanvas [dict get $MOBdata($mob_id) Gx]] \
 							       [GridToCanvas [dict get $MOBdata($mob_id) Gy]]
 				}
