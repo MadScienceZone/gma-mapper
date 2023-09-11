@@ -1,24 +1,24 @@
 #!/usr/bin/env wish
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
 ########################################################################################
-#  _______  _______  _______                ___        __       ___        __          #
-# (  ____ \(       )(  ___  ) Game         /   )      /  \     /   )      /  \         #
-# | (    \/| () () || (   ) | Master's    / /) |      \/) )   / /) |      \/) )        #
-# | |      | || || || (___) | Assistant  / (_) (_       | |  / (_) (_       | |        #
-# | | ____ | |(_)| ||  ___  |           (____   _)      | | (____   _)      | |        #
-# | | \_  )| |   | || (   ) |                ) (        | |      ) (        | |        #
-# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_     | |   _  __) (_       #
-# (_______)|/     \||/     \| Client         (_)  (_) \____/     (_)  (_) \____/       #
+#  _______  _______  _______                ___        __    _______                   #
+# (  ____ \(       )(  ___  ) Game         /   )      /  \  (  ____ \                  #
+# | (    \/| () () || (   ) | Master's    / /) |      \/) ) | (    \/                  #
+# | |      | || || || (___) | Assistant  / (_) (_       | | | (____                    #
+# | | ____ | |(_)| ||  ___  |           (____   _)      | | (_____ \                   #
+# | | \_  )| |   | || (   ) |                ) (        | |       ) )                  #
+# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_/\____) )                  #
+# (_______)|/     \||/     \| Client         (_)  (_) \____/\______/                   #
 #                                                                                      #
 ########################################################################################
 #
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.14.1}     ;# @@##@@
+set GMAMapperVersion {4.15}     ;# @@##@@
 set GMAMapperFileFormat {22}        ;# @@##@@
 set GMAMapperProtocol {407}         ;# @@##@@
-set CoreVersionNumber {6.5}            ;# @@##@@
+set CoreVersionNumber {6.6}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -173,6 +173,71 @@ proc ScrollToGridXY {gx gy} {
 	$canvas xview moveto [expr double($x)/$x2]
 	$canvas yview moveto [expr double($y)/$y2]
 }
+
+# scroll to ensure (x,y) are centered on the screen unless they're 
+# already visible within a margin of a couple of grids from the edges.
+proc ScrollToCenterScreenXY {x y} {
+	global canvas
+
+	if {[IsScreenXYVisible $x $y 100 150]} {
+		return
+	}
+
+	set region [$canvas cget -scrollregion]
+	if {[llength $region] == 0} {
+		error "no -scrollregion set on canvas"
+	}
+	lassign $region x1 y1 x2 y2
+	lassign [$canvas xview] vx1 vx2
+	lassign [$canvas yview] vy1 vy2
+	SmoothScroll 20 50 \
+		$vx1 [expr min(1.0,max(0.0,(double($x)-(($vx2*$x2-$vx1*$x2)/2.0))/$x2))] \
+	        $vy1 [expr min(1.0,max(0.0,(double($y)-(($vy2*$y2-$vy1*$y2)/2.0))/$y2))]
+}
+
+set smooth_scroll_bg_id {}
+proc SmoothScroll {steps delay x0 x1 y0 y1} {
+	global smooth_scroll_bg_id
+	if {$smooth_scroll_bg_id ne {}} {
+		after cancel $smooth_scroll_bg_id
+	}
+	set smooth_scroll_bg_id [after $delay "do_smooth_scroll_update $steps $delay 1 $x0 $x1 $y0 $y1"]
+}
+
+proc do_smooth_scroll_update {steps delay step x0 x1 y0 y1} {
+	global smooth_scroll_bg_id
+	global canvas
+
+	if {$step >= $steps} {
+		$canvas xview moveto $x1
+		$canvas yview moveto $y1
+		set smooth_scroll_bg_id {}
+	} else {
+		$canvas xview moveto [expr (($x1-$x0)*(double($step)/$steps))+$x0]
+		$canvas yview moveto [expr (($y1-$y0)*(double($step)/$steps))+$y0]
+		set smooth_scroll_bg_id [after $delay "do_smooth_scroll_update $steps $delay [expr $step+1] $x0 $x1 $y0 $y1"]
+	}
+}
+	
+
+# determine if the (x,y) coordinates are within the visible scroll region.
+proc IsScreenXYVisible {x y {ltmargin 0} {rbmargin 0}} {
+	global canvas
+
+	set region [$canvas cget -scrollregion]
+	if {[llength $region] == 0} {
+		error "no -scrollregion set on canvas"
+	}
+	lassign $region x1 y1 x2 y2
+	lassign [$canvas xview] vx1 vx2
+	lassign [$canvas yview] vy1 vy2
+
+	if {($x - $ltmargin) < ($vx1*$x2) || ($x + $rbmargin) > ($vx2*$x2) || ($y - $ltmargin) < ($vy1*$y2) || ($y + $rbmargin) > ($vy2*$y2)} {
+		return false
+	}
+	return true
+}
+
 
 
 proc GoToGridCoords {} {
@@ -864,13 +929,23 @@ set GuideLines 0
 set MajorGuideLines 0
 set GuideLineOffset {0 0}
 set MajorGuideLineOffset {0 0}
+set CombatantScrollEnabled false
+set ForceElementsToTop true
+set check_menu_color     [::gmaprofile::preferred_color $_preferences check_menu   $colortheme]
 #set iscale 100
 #set rscale 100.0
 
 frame .toolbar2
 set MAIN_MENU {}
+proc update_main_menu {} {
+	global check_menu_color MAIN_MENU
+	$MAIN_MENU.view entryconfigure "*Follow Combatants*" -selectcolor $check_menu_color
+	$MAIN_MENU.edit entryconfigure "*Force Drawn Elements*" -selectcolor $check_menu_color
+}
+
 proc create_main_menu {use_button} {
-	global MAIN_MENU connmenuidx
+	global MAIN_MENU connmenuidx CombatantScrollEnabled check_menu_color
+	global ForceElementsToTop
 	if {$MAIN_MENU ne {}} {
 		return
 	}
@@ -917,6 +992,8 @@ proc create_main_menu {use_button} {
 	$mm.edit add command -command movetool -label "Move Objects"
 	$mm.edit add command -command stamptool -label "Stamp Objects"
 	$mm.edit add separator
+	$mm.edit add checkbutton -onvalue true -offvalue false -selectcolor $check_menu_color -variable ForceElementsToTop -label "Force Drawn Elements to Top"
+	$mm.edit add separator
 	$mm.edit add command -command toggleNoFill -label "Toggle Fill/No-Fill"
 	$mm.edit add command -command {colorpick fill} -label "Choose Fill Color..."
 	$mm.edit add command -command {colorpick line} -label "Choose Outline Color..."
@@ -938,6 +1015,7 @@ proc create_main_menu {use_button} {
 	$mm.view add separator
 	$mm.view add command -command {FindNearby} -label "Scroll to Visible Objects"
 	$mm.view add command -command {SyncView} -label "Scroll Others' Views to Match Mine"
+	$mm.view add checkbutton -onvalue true -offvalue false -selectcolor $check_menu_color -variable CombatantScrollEnabled -label "Scroll to Follow Combatants"
 	$mm.view add command -command {GoToGridCoords} -label "Go to Map Location..."
 	$mm.view add separator
 	$mm.view add command -command {refreshScreen} -label "Refresh Display"
@@ -3807,6 +3885,7 @@ proc StartObj {w x y} {
 	global BUTTON_MIDDLE BUTTON_RIGHT
 	global OBJ_NEXT_Z zoom
 	global animatePlacement
+	global ForceElementsToTop
 
 	modifiedflag - 1
 	#
@@ -3836,6 +3915,9 @@ proc StartObj {w x y} {
 	set x [$canvas canvasx $x]
 	set y [$canvas canvasy $y]
 	set z [incr OBJ_NEXT_Z]
+	if {$ForceElementsToTop} {
+		incr z 999999999
+	}
 
 	switch $OBJ_MODE {
 		nil - kill - move { 
@@ -7320,9 +7402,9 @@ proc CreateReachSubMenu {args} {
 		$mid.$submenu add command -command [list $cmd $mob_list -incr$submenu -1] -label "-5 ft"
 		$mid.$submenu add command -command [list $cmd $mob_list -incr$submenu -2] -label "-10 ft"
 	}
-	global SCRR SCRN
-	$mid add checkbutton -onvalue 1 -offvalue 0 -variable SCRR($mob_id) -command [list $cmd $mob_list -toggle reach] -label "Extended Reach"
-	$mid add checkbutton -onvalue 1 -offvalue 0 -variable SCRN($mob_id) -command [list $cmd $mob_list -toggle all] -label "Include Natural Distance"
+	global SCRR SCRN check_menu_color
+	$mid add checkbutton -onvalue 1 -offvalue 0 -variable SCRR($mob_id) -command [list $cmd $mob_list -toggle reach] -label "Extended Reach" -selectcolor $check_menu_color
+	$mid add checkbutton -onvalue 1 -offvalue 0 -variable SCRN($mob_id) -command [list $cmd $mob_list -toggle all] -label "Include Natural Distance" -selectcolor $check_menu_color
 
 	if {$mob_id eq {__mass__}} {
 		set SCRR(__mass__) 2
@@ -9130,6 +9212,7 @@ proc DoCommandDSM {d} {
 proc DoCommandI {d} {
 	# update initiative clock
 	global MOB_COMBATMODE canvas MOB_BLINK NextMOBID MOBdata MOBid
+	global CombatantScrollEnabled is_GM
 	set ITlist {}
 
 	if {$MOB_COMBATMODE} {
@@ -9157,8 +9240,12 @@ proc DoCommandI {d} {
 				set mob_id {};			# non-existent actor ID
 			}
 
-			if {$mob_id ne {} && ![dict get $MOBdata($mob_id) Killed]} {
+			if {$mob_id ne {} && [info exists MOBdata($mob_id)] && ![dict get $MOBdata($mob_id) Killed]} {
 				lappend ITlist $mob_id
+				if {$CombatantScrollEnabled && (![dict get $MOBdata($mob_id) Hidden] || $is_GM)} {
+					ScrollToCenterScreenXY [GridToCanvas [dict get $MOBdata($mob_id) Gx]] \
+							       [GridToCanvas [dict get $MOBdata($mob_id) Gy]]
+				}
 			}
 		}
 	}
@@ -11702,12 +11789,12 @@ proc aboutMapper {} {
 	if {[::gmaproto::is_enabled]} {
 		if {[::gmaproto::is_connected]} {
 			if {[::gmaproto::is_ready]} {
-				set connection_info "Connected to $::gmaproto::host as $::gmaproto::username. The server is version $::gmaproto::server_version and speaks protocol $::gmaproto::protocol."
+				set connection_info "Connected to ${::gmaproto::host}:${::gmaproto::port} as $::gmaproto::username. The server is version $::gmaproto::server_version and speaks protocol $::gmaproto::protocol."
 			} else {
 				set connection_info "This mapper is negotiating its connection to $::gmaproto::host."
 			}
 		} else {
-			set connection_info "This mapper wants to connect to $::gmaproto::host, but it has not yet connected."
+			set connection_info "This mapper wants to connect to ${::gmaproto::host}:${::gmaproto::port}, but it has not yet connected."
 		}
 	} else {
 		set connection_info "This mapper is running offline."
@@ -12540,6 +12627,7 @@ if {![::gmaproto::is_ready] && $IThost ne {}} {
     report_progress "Mapper Client Ready"
     after 5000 {report_progress {}}
 }
+update_main_menu
 
 proc ConnectToServerByIdx {idx} {
 	global PreferencesData
@@ -12654,7 +12742,7 @@ proc ConnectToServerByIdx {idx} {
 #   .../<name>@<zoom>/:<frame>:<name>@<zoom>.<ext>
 #   .../<name>.map
 
-# @[00]@| GMA-Mapper 4.14.1
+# @[00]@| GMA-Mapper 4.15
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

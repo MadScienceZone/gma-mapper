@@ -3,11 +3,11 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.14.1          <!-- @@##@@ -->
- * Effective Date: 24-Jul-2023               <!-- @@##@@ -->
+ * This Package Version: 4.15          <!-- @@##@@ -->
+ * Effective Date: 10-Sep-2023               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.5 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.6 <!-- @@##@@ -->
  * GMA Mapper File Format: 22	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 407        <!-- @@##@@ -->
 
@@ -15,6 +15,15 @@
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.15
+## Adds
+ * View -> Scroll to Follow Combatants menu option. When this is checked during combat, the map will automatically scroll as needed when each combatant's turn starts so that creature is visible on the map.
+ * Adds option to force hand-drawn objects to the top of the display stacking order.
+ * About dialog now displays the server's port number.
+
+## Fixes
+ * Corrects color of menu checkbox items.
 
 # 4.14.1
 ## Fixes
