@@ -15,7 +15,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.15-beta.0}     ;# @@##@@
+set GMAMapperVersion {4.15-beta.1}     ;# @@##@@
 set GMAMapperFileFormat {22}        ;# @@##@@
 set GMAMapperProtocol {407}         ;# @@##@@
 set CoreVersionNumber {6.5}            ;# @@##@@
@@ -930,6 +930,7 @@ set MajorGuideLines 0
 set GuideLineOffset {0 0}
 set MajorGuideLineOffset {0 0}
 set CombatantScrollEnabled false
+set ForceElementsToTop true
 set check_menu_color     [::gmaprofile::preferred_color $_preferences check_menu   $colortheme]
 #set iscale 100
 #set rscale 100.0
@@ -939,10 +940,12 @@ set MAIN_MENU {}
 proc update_main_menu {} {
 	global check_menu_color MAIN_MENU
 	$MAIN_MENU.view entryconfigure "*Follow Combatants*" -selectcolor $check_menu_color
+	$MAIN_MENU.edit entryconfigure "*Force Drawn Elements*" -selectcolor $check_menu_color
 }
 
 proc create_main_menu {use_button} {
 	global MAIN_MENU connmenuidx CombatantScrollEnabled check_menu_color
+	global ForceElementsToTop
 	if {$MAIN_MENU ne {}} {
 		return
 	}
@@ -988,6 +991,8 @@ proc create_main_menu {use_button} {
 	$mm.edit add command -command killtool -label "Remove Objects"
 	$mm.edit add command -command movetool -label "Move Objects"
 	$mm.edit add command -command stamptool -label "Stamp Objects"
+	$mm.edit add separator
+	$mm.edit add checkbutton -onvalue true -offvalue false -selectcolor $check_menu_color -variable ForceElementsToTop -label "Force Drawn Elements to Top"
 	$mm.edit add separator
 	$mm.edit add command -command toggleNoFill -label "Toggle Fill/No-Fill"
 	$mm.edit add command -command {colorpick fill} -label "Choose Fill Color..."
@@ -3880,6 +3885,7 @@ proc StartObj {w x y} {
 	global BUTTON_MIDDLE BUTTON_RIGHT
 	global OBJ_NEXT_Z zoom
 	global animatePlacement
+	global ForceElementsToTop
 
 	modifiedflag - 1
 	#
@@ -3909,6 +3915,9 @@ proc StartObj {w x y} {
 	set x [$canvas canvasx $x]
 	set y [$canvas canvasy $y]
 	set z [incr OBJ_NEXT_Z]
+	if {$ForceElementsToTop} {
+		incr z 999999999
+	}
 
 	switch $OBJ_MODE {
 		nil - kill - move { 
@@ -7393,9 +7402,9 @@ proc CreateReachSubMenu {args} {
 		$mid.$submenu add command -command [list $cmd $mob_list -incr$submenu -1] -label "-5 ft"
 		$mid.$submenu add command -command [list $cmd $mob_list -incr$submenu -2] -label "-10 ft"
 	}
-	global SCRR SCRN
-	$mid add checkbutton -onvalue 1 -offvalue 0 -variable SCRR($mob_id) -command [list $cmd $mob_list -toggle reach] -label "Extended Reach"
-	$mid add checkbutton -onvalue 1 -offvalue 0 -variable SCRN($mob_id) -command [list $cmd $mob_list -toggle all] -label "Include Natural Distance"
+	global SCRR SCRN check_menu_color
+	$mid add checkbutton -onvalue 1 -offvalue 0 -variable SCRR($mob_id) -command [list $cmd $mob_list -toggle reach] -label "Extended Reach" -selectcolor $check_menu_color
+	$mid add checkbutton -onvalue 1 -offvalue 0 -variable SCRN($mob_id) -command [list $cmd $mob_list -toggle all] -label "Include Natural Distance" -selectcolor $check_menu_color
 
 	if {$mob_id eq {__mass__}} {
 		set SCRR(__mass__) 2
@@ -11780,12 +11789,12 @@ proc aboutMapper {} {
 	if {[::gmaproto::is_enabled]} {
 		if {[::gmaproto::is_connected]} {
 			if {[::gmaproto::is_ready]} {
-				set connection_info "Connected to $::gmaproto::host as $::gmaproto::username. The server is version $::gmaproto::server_version and speaks protocol $::gmaproto::protocol."
+				set connection_info "Connected to ${::gmaproto::host}:${::gmaproto::port} as $::gmaproto::username. The server is version $::gmaproto::server_version and speaks protocol $::gmaproto::protocol."
 			} else {
 				set connection_info "This mapper is negotiating its connection to $::gmaproto::host."
 			}
 		} else {
-			set connection_info "This mapper wants to connect to $::gmaproto::host, but it has not yet connected."
+			set connection_info "This mapper wants to connect to ${::gmaproto::host}:${::gmaproto::port}, but it has not yet connected."
 		}
 	} else {
 		set connection_info "This mapper is running offline."
