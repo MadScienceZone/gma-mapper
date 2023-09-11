@@ -19,6 +19,11 @@ versions.
 # 4.15.0 (unreleased development branch)
 ## Adds
  * View -> Scroll to Follow Combatants menu option. When this is checked during combat, the map will automatically scroll as needed when each combatant's turn starts so that creature is visible on the map.
+ * Adds option to force hand-drawn objects to the top of the display stacking order.
+ * About dialog now displays the server's port number.
+
+## Fixes
+ * Corrects color of menu checkbox items.
 
 # 4.14.1
 ## Fixes
