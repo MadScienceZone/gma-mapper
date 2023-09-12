@@ -5762,7 +5762,8 @@ proc RenderSomeone {w id {norecurse false}} {
 
 		set nametag_w "$w.nt_$id"
 		if {[winfo exists $nametag_w]} {
-			$nametag_w configure -font [FontBySize [CreatureDisplayedSize $id]] -text $mob_name
+			$nametag_w configure -font [FontBySize [CreatureDisplayedSize $id]] -text $mob_name \
+				-background [::tk::Darken [dict get $MOBdata($id) Color] 40]
 		} else {
 			label $nametag_w -background [::tk::Darken [dict get $MOBdata($id) Color] 40] \
 				-foreground white -font [FontBySize [CreatureDisplayedSize $id]] -text $mob_name 
