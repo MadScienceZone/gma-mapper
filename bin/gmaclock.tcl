@@ -683,7 +683,7 @@ proc update_initiative_slots {w {limit {}} args} {
 				pack [label $w.slot$i.icon -background $flist_bg -image $icon_blank] -side left
 				pack [label $w.slot$i.name -background $flist_bg -foreground $flist_fg \
 					-font [::gmaprofile::lookup_font $::_preferences [dict get $::_preferences styles clocks default_font]] \
-					-text [dict get $_window_state($w) ilist $i name] -anchor center -relief solid -bd 0] \
+					-text [string map {_ {}} [dict get $_window_state($w) ilist $i name]] -anchor center -relief solid -bd 0] \
 						-side top -fill x
 				pack $w.slot$i -side top -padx 2 -pady 1 -expand 0 -fill x -ipadx 0 -ipady 0
 				if {$i == $slot} {
@@ -739,7 +739,7 @@ proc update_initiative_slots {w {limit {}} args} {
 						pack [label $w.slot$slot.icon -background $flist_bg -image $icon_blank] -side left
 						pack [label $w.slot$slot.name -background $flist_bg -foreground $flist_fg\
 							-font [::gmaprofile::lookup_font $::_preferences [dict get $::_preferences styles clocks default_font]] \
-							-text [dict get $_window_state($w) ilist $slot name] \
+							-text [string map {_ {}} [dict get $_window_state($w) ilist $slot name]] \
 							-anchor center -relief solid -bd 0] \
 								-side top -fill x
 						pack $w.slot$slot -side top -padx 2 -pady 1 -expand 0 -fill x -ipadx 0 -ipady 0
