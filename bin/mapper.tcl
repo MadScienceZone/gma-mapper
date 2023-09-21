@@ -1,21 +1,21 @@
 #!/usr/bin/env wish
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
 ########################################################################################
-#  _______  _______  _______                ___        __    _______      __           #
-# (  ____ \(       )(  ___  ) Game         /   )      /  \  (  ____ \    /  \          #
-# | (    \/| () () || (   ) | Master's    / /) |      \/) ) | (    \/    \/) )         #
-# | |      | || || || (___) | Assistant  / (_) (_       | | | (____        | |         #
-# | | ____ | |(_)| ||  ___  |           (____   _)      | | (_____ \       | |         #
-# | | \_  )| |   | || (   ) |                ) (        | |       ) )      | |         #
-# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_/\____) ) _  __) (_        #
-# (_______)|/     \||/     \| Client         (_)  (_) \____/\______/ (_) \____/        #
+#  _______  _______  _______                ___        __    _______     _______       #
+# (  ____ \(       )(  ___  ) Game         /   )      /  \  (  ____ \   / ___   )      #
+# | (    \/| () () || (   ) | Master's    / /) |      \/) ) | (    \/   \/   )  |      #
+# | |      | || || || (___) | Assistant  / (_) (_       | | | (____         /   )      #
+# | | ____ | |(_)| ||  ___  |           (____   _)      | | (_____ \      _/   /       #
+# | | \_  )| |   | || (   ) |                ) (        | |       ) )    /   _/        #
+# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_/\____) ) _ (   (__/\      #
+# (_______)|/     \||/     \| Client         (_)  (_) \____/\______/ (_)\_______/      #
 #                                                                                      #
 ########################################################################################
 #
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.15.1}     ;# @@##@@
+set GMAMapperVersion {4.15.2}     ;# @@##@@
 set GMAMapperFileFormat {22}        ;# @@##@@
 set GMAMapperProtocol {407}         ;# @@##@@
 set CoreVersionNumber {6.7}            ;# @@##@@
@@ -2644,7 +2644,7 @@ proc loadfile {file args} {
 										      {Animation FrameSpeed} aspeed \
 										      {Animation Loops} aloops
 								fetch_animated_image $image_id $image_zoom $image_filename $aframes $aspeed $aloops
-								animation_init [tile_id $image_id $image_zoom] $aframes $aspeed $aloops
+								#animation_init [tile_id $image_id $image_zoom] $aframes $aspeed $aloops
 							} else {
 								fetch_image $image_id $image_zoom $image_filename
 								set TILE_ID([tile_id $image_id $image_zoom]) $image_filename
@@ -12743,7 +12743,7 @@ proc ConnectToServerByIdx {idx} {
 #   .../<name>@<zoom>/:<frame>:<name>@<zoom>.<ext>
 #   .../<name>.map
 
-# @[00]@| GMA-Mapper 4.15.1
+# @[00]@| GMA-Mapper 4.15.2
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
