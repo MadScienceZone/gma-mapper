@@ -2644,7 +2644,7 @@ proc loadfile {file args} {
 										      {Animation FrameSpeed} aspeed \
 										      {Animation Loops} aloops
 								fetch_animated_image $image_id $image_zoom $image_filename $aframes $aspeed $aloops
-								animation_init [tile_id $image_id $image_zoom] $aframes $aspeed $aloops
+								#animation_init [tile_id $image_id $image_zoom] $aframes $aspeed $aloops
 							} else {
 								fetch_image $image_id $image_zoom $image_filename
 								set TILE_ID([tile_id $image_id $image_zoom]) $image_filename
