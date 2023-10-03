@@ -3,8 +3,8 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.15.1          <!-- @@##@@ -->
- * Effective Date: 11-Sep-2023               <!-- @@##@@ -->
+ * This Package Version: 4.15.2          <!-- @@##@@ -->
+ * Effective Date: 21-Sep-2023               <!-- @@##@@ -->
 
 ## Compatibility
  * GMA Core API Library Version: 6.7 <!-- @@##@@ -->
@@ -15,6 +15,10 @@
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.15.2
+## Fixes
+ * Corrects a bug where loading an animated image via loading a `.map` file (as opposed to an *ad-hoc* load by placing a token or being commanded to place the token by the server) caused the frame list to be reset to null.
 
 # 4.15.1
 ## Fixes
