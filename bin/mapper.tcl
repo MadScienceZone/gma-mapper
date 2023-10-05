@@ -2269,7 +2269,7 @@ proc CreateHealthStatsToolTip {mob_id {extra_condition {}}} {
 	if {$has_health_info} {
 		if {$flatp && [lsearch -exact $conditions flat-footed] < 0} {lappend conditions flat-footed}
 		if {$stablep && [lsearch -exact $conditions stable] < 0} {lappend conditions stable}
-		set tiptext "[dict get $MOBdata($mob_id) Name]:"
+		set tiptext "[::gmaclock::nameplate_text [dict get $MOBdata($mob_id) Name]]:"
 
 		global blur_all blur_pct
 		set client_blur {}
@@ -2329,7 +2329,7 @@ proc CreateHealthStatsToolTip {mob_id {extra_condition {}}} {
 			append tiptext " dead."
 		}
 	} else {
-		set tiptext "[dict get $MOBdata($mob_id) Name]: \[no health info\]"
+		set tiptext "[::gmaclock::nameplate_text [dict get $MOBdata($mob_id) Name]]: \[no health info\]"
 	}
 
 	if {[set elevation [dict get $MOBdata($mob_id) Elev]] != 0} {
@@ -4830,18 +4830,18 @@ proc PlaceSomeone {w d} {
 	set n [dict get $d Name]
 	set id [dict get $d ID]
 	if {[info exists MOBid($n)] && $id ne $MOBid($n)} {
-		DEBUG 1 "Placing $n (ID $id) but already have one with ID $MOBid($n)"
+		DEBUG 1 "Placing [::gmaclock::nameplate_text $n] (ID $id) but already have one with ID $MOBid($n)"
 		DEBUG 1 "--Removing old one"
 		::gmaproto::clear $MOBid($n)	;# TODO ???
 		RemovePerson $MOBid($n)
 	}
 
 	if {![info exists MOBdata($id)]} {
-		DEBUG 1 "--Adding new person $n with ID $id"
+		DEBUG 1 "--Adding new person [::gmaclock::nameplate_text $n] with ID $id"
 		set MOBid($n) $id
 		set MOBdata($id) $d
 	} else {
-		DEBUG 1 "--PlaceSomeone $n using existing id $id (updating in-place)"
+		DEBUG 1 "--PlaceSomeone [::gmaclock::nameplate_text $n] using existing id $id (updating in-place)"
 		set MOBdata($id) [dict merge $MOBdata($id) $d]
 	}
 
@@ -5760,9 +5760,8 @@ proc RenderSomeone {w id {norecurse false}} {
 			animation_create $w [expr $x*$iscale] [expr $y*$iscale] $mob_token_tile_id $id -start
 		}
 
-		# remove underscores from display name so we can have two names that are 
-		# different internally but display the same on-screen.
-		set mob_name [string map {_ {}} $mob_name]
+		# set mob_name to just what the players should see, not the full name known to the system.
+		set mob_name [::gmaclock::nameplate_text $mob_name]
 		set nametag_w "$w.nt_$id"
 		if {[winfo exists $nametag_w]} {
 			$nametag_w configure -font [FontBySize [CreatureDisplayedSize $id]] -text $mob_name \
@@ -6418,7 +6417,7 @@ proc MOB_StartDrag {w x y} {
 		} else {
 			.movemobmenu delete 0 end
 			foreach mob_id $MOB_MOVING {
-				.movemobmenu add command -command "set MOB_DISAMBIG $mob_id" -label "Move [dict get $MOBdata($mob_id) Name]"
+				.movemobmenu add command -command "set MOB_DISAMBIG $mob_id" -label "Move [::gmaclock::nameplate_text [dict get $MOBdata($mob_id) Name]]"
 			}
 			set MOB_MOVING {}
 			set MOB_DISAMBIG {}
@@ -6460,9 +6459,9 @@ proc MOB_SelectEvent {w x y} {
 		.movemobmenu delete 0 end
 		foreach mob_id $target_MOB {
 			if {[info exists MOB_SELECTED($mob_id)] && $MOB_SELECTED($mob_id)} {
-				set label "Deselect [dict get $MOBdata($mob_id) Name]"
+				set label "Deselect [::gmaclock::nameplate_text [dict get $MOBdata($mob_id) Name]]"
 			} else {
-				set label "Select [dict get $MOBdata($mob_id) Name]"
+				set label "Select [::gmaclock::nameplate_text [dict get $MOBdata($mob_id) Name]]"
 			}
 			.movemobmenu add command -command "ToggleSelection $mob_id" -label $label
 		}
@@ -6643,7 +6642,7 @@ proc DistanceFromGrid {x y z_ft} {
 	foreach target [array names MOBdata] {
 		set centerdist($target) [DistanceToTarget3D $Gx $Gy $z_ft $target]
 		set dimension($target) [expr [dict get $MOBdata($target) Elev] == $z_ft ? {{2D}} : {{3D}}]
-		set name($target) [dict get $MOBdata($target) Name]
+		set name($target) [::gmaclock::nameplate_text [dict get $MOBdata($target) Name]]
 		lassign [set nearest($target) [NearestCreatureGridToPoint $Gx $Gy $z_ft $target]] neardist nearX nearY nearLbl
 		$canvas create line {*}[GridXYToCenterPoint $Gx $Gy] {*}[lrange [MOBCenterPoint $target] 0 1] \
 			-fill yellow -width 5 -tags distanceTracer -arrow last -arrowshape [list 15 18 8]
@@ -7464,9 +7463,9 @@ proc DoContext {x y} {
 	} elseif {[llength $mob_list] == 1} {
 		set mob_id [lindex $mob_list 0]
 		set mob_name [dict get $MOBdata($mob_id) Name]
-		set mob_disp_name [string map {_ {}} $mob_name]
+		set mob_disp_name [::gmaclock::nameplate_text $mob_name]
 		.contextMenu delete 0
-		.contextMenu insert 0 command -command "RemovePerson $mob_id; ::gmaproto::clear $mob_id" -label "Remove [dict get $MOBdata($mob_id) Name]"
+		.contextMenu insert 0 command -command "RemovePerson $mob_id; ::gmaproto::clear $mob_id" -label "Remove [::gmaclock::nameplate_text [dict get $MOBdata($mob_id) Name]]"
 		.contextMenu delete 3
 		.contextMenu insert 3 command -command "KillPerson $mob_id" -label "Toggle Death for $mob_disp_name"
 		.contextMenu delete 4
@@ -7505,7 +7504,7 @@ proc DoContext {x y} {
 		.contextMenu.tsel delete 0 end
 		foreach mob_id $mob_list {
 			set mob_name [dict get $MOBdata($mob_id) Name]
-			set mob_disp_name [string map {_ {}} $mob_name]
+			set mob_disp_name [::gmaclock::nameplate_text $mob_name]
 			.contextMenu.del add command -command "RemovePerson $mob_id; ::gmaproto::clear $mob_id" -label $mob_disp_name
 			.contextMenu.kill add command -command "KillPerson $mob_id" -label $mob_disp_name
 #			.contextMenu.reach add command -command "ToggleReach $mob_id" -label $mob_name
