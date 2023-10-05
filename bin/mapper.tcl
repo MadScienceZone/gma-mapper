@@ -15,7 +15,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.15.2}     ;# @@##@@
+set GMAMapperVersion {4.16-alpha}     ;# @@##@@
 set GMAMapperFileFormat {22}        ;# @@##@@
 set GMAMapperProtocol {407}         ;# @@##@@
 set CoreVersionNumber {6.7}            ;# @@##@@
@@ -2269,7 +2269,7 @@ proc CreateHealthStatsToolTip {mob_id {extra_condition {}}} {
 	if {$has_health_info} {
 		if {$flatp && [lsearch -exact $conditions flat-footed] < 0} {lappend conditions flat-footed}
 		if {$stablep && [lsearch -exact $conditions stable] < 0} {lappend conditions stable}
-		set tiptext "[dict get $MOBdata($mob_id) Name]:"
+		set tiptext "[::gmaclock::nameplate_text [dict get $MOBdata($mob_id) Name]]:"
 
 		global blur_all blur_pct
 		set client_blur {}
@@ -2329,7 +2329,7 @@ proc CreateHealthStatsToolTip {mob_id {extra_condition {}}} {
 			append tiptext " dead."
 		}
 	} else {
-		set tiptext "[dict get $MOBdata($mob_id) Name]: \[no health info\]"
+		set tiptext "[::gmaclock::nameplate_text [dict get $MOBdata($mob_id) Name]]: \[no health info\]"
 	}
 
 	if {[set elevation [dict get $MOBdata($mob_id) Elev]] != 0} {
@@ -4830,18 +4830,18 @@ proc PlaceSomeone {w d} {
 	set n [dict get $d Name]
 	set id [dict get $d ID]
 	if {[info exists MOBid($n)] && $id ne $MOBid($n)} {
-		DEBUG 1 "Placing $n (ID $id) but already have one with ID $MOBid($n)"
+		DEBUG 1 "Placing [::gmaclock::nameplate_text $n] (ID $id) but already have one with ID $MOBid($n)"
 		DEBUG 1 "--Removing old one"
 		::gmaproto::clear $MOBid($n)	;# TODO ???
 		RemovePerson $MOBid($n)
 	}
 
 	if {![info exists MOBdata($id)]} {
-		DEBUG 1 "--Adding new person $n with ID $id"
+		DEBUG 1 "--Adding new person [::gmaclock::nameplate_text $n] with ID $id"
 		set MOBid($n) $id
 		set MOBdata($id) $d
 	} else {
-		DEBUG 1 "--PlaceSomeone $n using existing id $id (updating in-place)"
+		DEBUG 1 "--PlaceSomeone [::gmaclock::nameplate_text $n] using existing id $id (updating in-place)"
 		set MOBdata($id) [dict merge $MOBdata($id) $d]
 	}
 
@@ -5760,6 +5760,8 @@ proc RenderSomeone {w id {norecurse false}} {
 			animation_create $w [expr $x*$iscale] [expr $y*$iscale] $mob_token_tile_id $id -start
 		}
 
+		# set mob_name to just what the players should see, not the full name known to the system.
+		set mob_name [::gmaclock::nameplate_text $mob_name]
 		set nametag_w "$w.nt_$id"
 		if {[winfo exists $nametag_w]} {
 			$nametag_w configure -font [FontBySize [CreatureDisplayedSize $id]] -text $mob_name \
@@ -6415,7 +6417,7 @@ proc MOB_StartDrag {w x y} {
 		} else {
 			.movemobmenu delete 0 end
 			foreach mob_id $MOB_MOVING {
-				.movemobmenu add command -command "set MOB_DISAMBIG $mob_id" -label "Move [dict get $MOBdata($mob_id) Name]"
+				.movemobmenu add command -command "set MOB_DISAMBIG $mob_id" -label "Move [::gmaclock::nameplate_text [dict get $MOBdata($mob_id) Name]]"
 			}
 			set MOB_MOVING {}
 			set MOB_DISAMBIG {}
@@ -6457,9 +6459,9 @@ proc MOB_SelectEvent {w x y} {
 		.movemobmenu delete 0 end
 		foreach mob_id $target_MOB {
 			if {[info exists MOB_SELECTED($mob_id)] && $MOB_SELECTED($mob_id)} {
-				set label "Deselect [dict get $MOBdata($mob_id) Name]"
+				set label "Deselect [::gmaclock::nameplate_text [dict get $MOBdata($mob_id) Name]]"
 			} else {
-				set label "Select [dict get $MOBdata($mob_id) Name]"
+				set label "Select [::gmaclock::nameplate_text [dict get $MOBdata($mob_id) Name]]"
 			}
 			.movemobmenu add command -command "ToggleSelection $mob_id" -label $label
 		}
@@ -6640,7 +6642,7 @@ proc DistanceFromGrid {x y z_ft} {
 	foreach target [array names MOBdata] {
 		set centerdist($target) [DistanceToTarget3D $Gx $Gy $z_ft $target]
 		set dimension($target) [expr [dict get $MOBdata($target) Elev] == $z_ft ? {{2D}} : {{3D}}]
-		set name($target) [dict get $MOBdata($target) Name]
+		set name($target) [::gmaclock::nameplate_text [dict get $MOBdata($target) Name]]
 		lassign [set nearest($target) [NearestCreatureGridToPoint $Gx $Gy $z_ft $target]] neardist nearX nearY nearLbl
 		$canvas create line {*}[GridXYToCenterPoint $Gx $Gy] {*}[lrange [MOBCenterPoint $target] 0 1] \
 			-fill yellow -width 5 -tags distanceTracer -arrow last -arrowshape [list 15 18 8]
@@ -7461,31 +7463,32 @@ proc DoContext {x y} {
 	} elseif {[llength $mob_list] == 1} {
 		set mob_id [lindex $mob_list 0]
 		set mob_name [dict get $MOBdata($mob_id) Name]
+		set mob_disp_name [::gmaclock::nameplate_text $mob_name]
 		.contextMenu delete 0
-		.contextMenu insert 0 command -command "RemovePerson $mob_id; ::gmaproto::clear $mob_id" -label "Remove [dict get $MOBdata($mob_id) Name]"
+		.contextMenu insert 0 command -command "RemovePerson $mob_id; ::gmaproto::clear $mob_id" -label "Remove [::gmaclock::nameplate_text [dict get $MOBdata($mob_id) Name]]"
 		.contextMenu delete 3
-		.contextMenu insert 3 command -command "KillPerson $mob_id" -label "Toggle Death for $mob_name"
+		.contextMenu insert 3 command -command "KillPerson $mob_id" -label "Toggle Death for $mob_disp_name"
 		.contextMenu delete 4
 #		.contextMenu insert 4 command -command "ToggleReach $mob_id" -label "Cycle Reach for $mob_name"
-		.contextMenu insert 4 cascade -menu [CreateReachSubMenu -shallow $mob_id] -label "Set Reach for $mob_name"
+		.contextMenu insert 4 cascade -menu [CreateReachSubMenu -shallow $mob_id] -label "Set Reach for $mob_disp_name"
 		.contextMenu delete 5
-		.contextMenu insert 5 command -command "ToggleSpellArea $mob_id" -label "Toggle Spell Area for $mob_name"
+		.contextMenu insert 5 command -command "ToggleSpellArea $mob_id" -label "Toggle Spell Area for $mob_disp_name"
 		.contextMenu delete 6
-		.contextMenu insert 6 cascade -menu [CreatePolySubMenu -shallow $mob_id] -label "Polymorph $mob_name"
+		.contextMenu insert 6 cascade -menu [CreatePolySubMenu -shallow $mob_id] -label "Polymorph $mob_disp_name"
 		.contextMenu delete 7
-		.contextMenu insert 7 cascade -menu [CreateSizeSubMenu -shallow $mob_id] -label "Change Size of $mob_name"
+		.contextMenu insert 7 cascade -menu [CreateSizeSubMenu -shallow $mob_id] -label "Change Size of $mob_disp_name"
 		.contextMenu delete 8
-		.contextMenu insert 8 cascade -menu [CreateConditionSubMenu -shallow $mob_id] -label "Toggle Condition for $mob_name"
+		.contextMenu insert 8 cascade -menu [CreateConditionSubMenu -shallow $mob_id] -label "Toggle Condition for $mob_disp_name"
 		.contextMenu delete 9
-		.contextMenu insert 9 cascade -menu [CreateTagSubMenu -shallow $mob_id] -label "Tag $mob_name"
+		.contextMenu insert 9 cascade -menu [CreateTagSubMenu -shallow $mob_id] -label "Tag $mob_disp_name"
 		.contextMenu delete 10
-		.contextMenu insert 10 cascade -menu [CreateElevationSubMenu -shallow $mob_id] -label "Set Elevation for $mob_name"
+		.contextMenu insert 10 cascade -menu [CreateElevationSubMenu -shallow $mob_id] -label "Set Elevation for $mob_disp_name"
 		.contextMenu delete 11
-		.contextMenu insert 11 cascade -menu [CreateMovementModeSubMenu -shallow $mob_id] -label "Set Movement Mode for $mob_name"
+		.contextMenu insert 11 cascade -menu [CreateMovementModeSubMenu -shallow $mob_id] -label "Set Movement Mode for $mob_disp_name"
 		.contextMenu delete 14
-		.contextMenu insert 14 command -command "DistanceFromMob $mob_id" -label "Distance from $mob_name..."
+		.contextMenu insert 14 command -command "DistanceFromMob $mob_id" -label "Distance from $mob_disp_name..."
 		.contextMenu delete 16
-		.contextMenu insert 16 command -command "ToggleSelection $mob_id" -label "Toggle Selection for $mob_name"
+		.contextMenu insert 16 command -command "ToggleSelection $mob_id" -label "Toggle Selection for $mob_disp_name"
 	} else {
 		.contextMenu.del delete 0 end
 		.contextMenu.kill delete 0 end
@@ -7501,19 +7504,20 @@ proc DoContext {x y} {
 		.contextMenu.tsel delete 0 end
 		foreach mob_id $mob_list {
 			set mob_name [dict get $MOBdata($mob_id) Name]
-			.contextMenu.del add command -command "RemovePerson $mob_id; ::gmaproto::clear $mob_id" -label $mob_name
-			.contextMenu.kill add command -command "KillPerson $mob_id" -label $mob_name
+			set mob_disp_name [::gmaclock::nameplate_text $mob_name]
+			.contextMenu.del add command -command "RemovePerson $mob_id; ::gmaproto::clear $mob_id" -label $mob_disp_name
+			.contextMenu.kill add command -command "KillPerson $mob_id" -label $mob_disp_name
 #			.contextMenu.reach add command -command "ToggleReach $mob_id" -label $mob_name
-			.contextMenu.reach add cascade -menu [CreateReachSubMenu -deep $mob_id] -label $mob_name
-			.contextMenu.aoe add command -command "ToggleSpellArea $mob_id" -label $mob_name
-			.contextMenu.poly add cascade -menu [CreatePolySubMenu -deep $mob_id] -label $mob_name
-			.contextMenu.size add cascade -menu [CreateSizeSubMenu -deep $mob_id] -label $mob_name
-			.contextMenu.cond add cascade -menu [CreateConditionSubMenu -deep $mob_id] -label $mob_name
-			.contextMenu.tag add cascade -menu [CreateTagSubMenu -deep $mob_id] -label $mob_name
-			.contextMenu.elev add cascade -menu [CreateElevationSubMenu -deep $mob_id] -label $mob_name
-			.contextMenu.mmode add cascade -menu [CreateMovementModeSubMenu -deep $mob_id] -label $mob_name
-			.contextMenu.dist add command -command "DistanceFromMob $mob_id" -label $mob_name
-			.contextMenu.tsel add command -command "ToggleSelection $mob_id" -label $mob_name
+			.contextMenu.reach add cascade -menu [CreateReachSubMenu -deep $mob_id] -label $mob_disp_name
+			.contextMenu.aoe add command -command "ToggleSpellArea $mob_id" -label $mob_disp_name
+			.contextMenu.poly add cascade -menu [CreatePolySubMenu -deep $mob_id] -label $mob_disp_name
+			.contextMenu.size add cascade -menu [CreateSizeSubMenu -deep $mob_id] -label $mob_disp_name
+			.contextMenu.cond add cascade -menu [CreateConditionSubMenu -deep $mob_id] -label $mob_disp_name
+			.contextMenu.tag add cascade -menu [CreateTagSubMenu -deep $mob_id] -label $mob_disp_name
+			.contextMenu.elev add cascade -menu [CreateElevationSubMenu -deep $mob_id] -label $mob_disp_name
+			.contextMenu.mmode add cascade -menu [CreateMovementModeSubMenu -deep $mob_id] -label $mob_disp_name
+			.contextMenu.dist add command -command "DistanceFromMob $mob_id" -label $mob_disp_name
+			.contextMenu.tsel add command -command "ToggleSelection $mob_id" -label $mob_disp_name
 		}
 		.contextMenu.del add command -command "RemoveAll $mob_list" -label "(all of the above)"
 		.contextMenu.kill add command -command "KillAll $mob_list" -label "(all of the above)"
