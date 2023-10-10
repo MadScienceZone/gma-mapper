@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___        __    _______     _______       #
-# (  ____ \(       )(  ___  ) Game         /   )      /  \  (  ____ \   / ___   )      #
-# | (    \/| () () || (   ) | Master's    / /) |      \/) ) | (    \/   \/   )  |      #
-# | |      | || || || (___) | Assistant  / (_) (_       | | | (____         /   )      #
-# | | ____ | |(_)| ||  ___  |           (____   _)      | | (_____ \      _/   /       #
-# | | \_  )| |   | || (   ) |                ) (        | |       ) )    /   _/        #
-# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_/\____) ) _ (   (__/\      #
-# (_______)|/     \||/     \| Client         (_)  (_) \____/\______/ (_)\_______/      #
+#  _______  _______  _______                ___        __     ______                   #
+# (  ____ \(       )(  ___  ) Game         /   )      /  \   / ____ \                  #
+# | (    \/| () () || (   ) | Master's    / /) |      \/) ) ( (    \/                  #
+# | |      | || || || (___) | Assistant  / (_) (_       | | | (____                    #
+# | | ____ | |(_)| ||  ___  |           (____   _)      | | |  ___ \                   #
+# | | \_  )| |   | || (   ) |                ) (        | | | (   ) )                  #
+# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_( (___) )                  #
+# (_______)|/     \||/     \| Client         (_)  (_) \____/ \_____/                   #
 #                                                                                      #
 ########################################################################################
 #
@@ -29,6 +29,16 @@ if {[info exists _clock_state($w)]} {
 		catch { $w destroy }
 		array unset _clock_state $w
 	}
+}
+
+# nameplate_text full_name -> visible_name
+#   Remove any leading "<tag>_" label from the creature name. This provides
+#   a player-visible name for display purposes ONLY which may differ from the
+#   full name as tracked internally by programs, so that the full name can remain
+#   unique without requiring on-screen nameplates or even initiative lists to be
+#   necessarily unique.
+proc nameplate_text {full_name} {
+	return [regsub {^\w*_} $full_name {}]
 }
 
 # widget w ?-24hr? ?-dark? ?-handscale x? ?-calendar name? ?-- canvasopts ...? -> id
@@ -683,7 +693,7 @@ proc update_initiative_slots {w {limit {}} args} {
 				pack [label $w.slot$i.icon -background $flist_bg -image $icon_blank] -side left
 				pack [label $w.slot$i.name -background $flist_bg -foreground $flist_fg \
 					-font [::gmaprofile::lookup_font $::_preferences [dict get $::_preferences styles clocks default_font]] \
-					-text [dict get $_window_state($w) ilist $i name] -anchor center -relief solid -bd 0] \
+					-text [nameplate_text [dict get $_window_state($w) ilist $i name]] -anchor center -relief solid -bd 0] \
 						-side top -fill x
 				pack $w.slot$i -side top -padx 2 -pady 1 -expand 0 -fill x -ipadx 0 -ipady 0
 				if {$i == $slot} {
@@ -739,7 +749,7 @@ proc update_initiative_slots {w {limit {}} args} {
 						pack [label $w.slot$slot.icon -background $flist_bg -image $icon_blank] -side left
 						pack [label $w.slot$slot.name -background $flist_bg -foreground $flist_fg\
 							-font [::gmaprofile::lookup_font $::_preferences [dict get $::_preferences styles clocks default_font]] \
-							-text [dict get $_window_state($w) ilist $slot name] \
+							-text [nameplate_text [dict get $_window_state($w) ilist $slot name]] \
 							-anchor center -relief solid -bd 0] \
 								-side top -fill x
 						pack $w.slot$slot -side top -padx 2 -pady 1 -expand 0 -fill x -ipadx 0 -ipady 0
@@ -1046,7 +1056,7 @@ proc exists {w} {
 
 }
 #
-# @[00]@| GMA-Mapper 4.15.2
+# @[00]@| GMA-Mapper 4.16
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
