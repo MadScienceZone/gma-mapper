@@ -7838,7 +7838,7 @@ proc ChangeDispSize {id code} {
 proc ChangeRealSize {id code} {
 	global MOBdata
 	dict set MOBdata($id) Size $code
-	ChangeDisplaySize $id $code
+	ChangeDispSize $id $code
 }
 
 proc ChangeDispSizeAll {mob_list code} {
