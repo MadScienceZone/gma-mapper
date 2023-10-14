@@ -3,11 +3,11 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.16          <!-- @@##@@ -->
- * Effective Date: 10-Oct-2023               <!-- @@##@@ -->
+ * This Package Version: 4.16.1          <!-- @@##@@ -->
+ * Effective Date: 13-Oct-2023               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.7 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.9-alpha.0 <!-- @@##@@ -->
  * GMA Mapper File Format: 22	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 407        <!-- @@##@@ -->
 
@@ -15,6 +15,10 @@
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.16.1
+## Fixes
+ * Corrects bug in the `ChangeRealSize` procedure.
 
 # 4.16
 ## Adds
