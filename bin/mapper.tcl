@@ -11711,10 +11711,12 @@ proc _do_roll {roll_string extra w} {
 	if {[catch {
 		set rollspec [_apply_die_roll_mods $roll_string $extra { ad hoc}]
 		DEBUG 1 " after ad hoc: $rollspec"
-		foreach id $DieRollPresetState(apply_order) {
-			if {$DieRollPresetState(on,$id)} {
-				set rollspec [_apply_die_roll_mods $rollspec $DieRollPresetState(global,$id) {} $DieRollPresetState(g,$id)]
-				DEBUG 1 " after $DieRollPresetState(global,$id): $rollspec"
+		if {[info exists DieRollPresetState(apply_order)]} {
+			foreach id $DieRollPresetState(apply_order) {
+				if {$DieRollPresetState(on,$id)} {
+					set rollspec [_apply_die_roll_mods $rollspec $DieRollPresetState(global,$id) {} $DieRollPresetState(g,$id)]
+					DEBUG 1 " after $DieRollPresetState(global,$id): $rollspec"
+				}
 			}
 		}
 		set rollspec [_apply_die_roll_variables $rollspec]
