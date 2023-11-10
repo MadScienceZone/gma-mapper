@@ -16,6 +16,17 @@ The support for old server protocols (<400) and map file formats (<20) will be d
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
+# 4.16.4
+## Fixes
+ * Cleaned up the way conditions are automatically calculated based on lethal and nonlethal damage.
+
+# 4.16.3
+## Fixes
+ * Corrects software logic bug.
+
+# 4.16.2
+* Does not exist (error in release process)
+
 # 4.16.1
 ## Fixes
  * Corrects bug in the `ChangeRealSize` procedure.
