@@ -5894,7 +5894,7 @@ proc RenderSomeone {w id {norecurse false}} {
 				return
 			} elseif {$true_hp_remaining < 0} {
 				set condition dying
-			} elseif {$nonlethal > $true_hp_remaining}
+			} elseif {$nonlethal > $true_hp_remaining} {
 				set condition unconscious
 			} elseif {$true_hp_remaining == 0} {
 				set condition disabled
