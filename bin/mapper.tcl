@@ -2256,6 +2256,11 @@ proc CreateHealthStatsToolTip {mob_id {extra_condition {}}} {
 				default { lappend conditions $condition }
 			}
 		}
+		if {$nonlethal > $maxhp} {
+			set lethal [expr $lethal + ($nonlethal - $maxhp)]
+			set nonlethal $maxhp
+		}
+		set true_hp_remaining [expr $maxhp - $lethal]
 	}
 
 	if {[llength [set statuslist [dict get $MOBdata($mob_id) StatusList]]] > 0} {
@@ -2292,6 +2297,7 @@ proc CreateHealthStatsToolTip {mob_id {extra_condition {}}} {
 			if {[dict get $MOBdata($mob_id) CreatureType] == 2} {
 				# player
 				if {$maxhp == 0} {
+					# we don't know the total hp (yet?) so just say how much damage they have
 					if {$lethal == 0} {
 						append tiptext " no lethal wounds"
 					} else {
@@ -2318,6 +2324,7 @@ proc CreateHealthStatsToolTip {mob_id {extra_condition {}}} {
 							lappend conditions dying
 						} 
 					} else {
+						# n%+x+x
 						append tiptext [format " %d%%%s%s HP" [expr (100 * $hp_remaining)/$maxhp] $client_blur $server_blur]
 						if {$nonlethal != 0 && $maxhp != $lethal} {
 							append tiptext [format " (%d%% of remaining hp non-lethal)" [expr (100*$nonlethal)/$hp_remaining]]
@@ -5856,17 +5863,25 @@ proc RenderSomeone {w id {norecurse false}} {
 			HPBlur server_blur_hp
 		set show_healthbar true
 		global blur_all blur_pct
+
+		if {$nonlethal > $maxhp} {
+			set lethal [expr $lethal + ($nonlethal - $maxhp)]
+			set nonlethal $maxhp
+		}
+		set true_hp_remaining [expr $maxhp - $lethal]
+
 		if {($blur_all || [dict get $MOBdata($id) CreatureType] != 2) && $server_blur_hp == 0} {
 			set hp_remaining [blur_hp $maxhp $lethal]
 		} else {
 			set hp_remaining [expr $maxhp - $lethal]
 		}
 
+
 		if {$its_dead_jim} {
 			set condition {}
 		} elseif {$condition eq {}} {
 			# calculate condition automatically, otherwise it's forced
-			if {$maxhp <= 0 || ($maxhp-$lethal <= -$grace)} { 
+			if {$maxhp <= 0 || ($true_hp_remaining <= -$grace)} { 
 				set condition dead 
 				# We're making the change locally here instead of broadcasting it out
 				# because all the other map clients will be acting on the same logic
@@ -5877,13 +5892,13 @@ proc RenderSomeone {w id {norecurse false}} {
 				# useful to know. Start over and re-render them as a corpse this time.
 				RenderSomeone $w $id
 				return
-			} elseif {$lethal > $maxhp && -$grace < $maxhp-$lethal} {
+			} elseif {$true_hp_remaining < 0} {
 				set condition dying
-			} elseif {$lethal == $maxhp} {
-				set condition disabled
-			} elseif {$nonlethal > 0 && $lethal+$nonlethal > $maxhp} {
+			} elseif {$nonlethal > $true_hp_remaining}
 				set condition unconscious
-			} elseif {$nonlethal > 0 && $lethal+$nonlethal == $maxhp} {
+			} elseif {$true_hp_remaining == 0} {
+				set condition disabled
+			} elseif {$nonlethal == $true_hp_remaining} {
 				set condition staggered
 			} elseif {$flatp} {
 				set condition flat-footed
