@@ -15,9 +15,9 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.16.4}     ;# @@##@@
+set GMAMapperVersion {4.17.0-alpha.0}     ;# @@##@@
 set GMAMapperFileFormat {22}        ;# @@##@@
-set GMAMapperProtocol {407}         ;# @@##@@
+set GMAMapperProtocol {408}         ;# @@##@@
 set CoreVersionNumber {6.9-alpha.0}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
@@ -1269,7 +1269,7 @@ proc usage {} {
 
 	puts $stderr "This is mapper, version $GMAMapperVersion"
 	puts $stderr "Usage: $argv0 \[-display name\] \[-geometry value\] \[other wish options...\] -- \[--help]"
-	puts $stderr {        [-A] [-a] [-B] [-b pct] [-C file] [-c name[:color]] [-D] [-d] [-f fmt]}
+	puts $stderr {        [-A] [-a] [-B] [-b pct] [-C file] [-D] [-d] [-f fmt]}
 	puts $stderr {        [-G n[+x[:y]]] [-g n[+x[:y]]] [-h hostname] [-k] [-l] [-M moduleID]}
 	puts $stderr {        [-n] [-P pass] [-p port] [-S profile] [-t transcriptfile] [-u name]}
 	puts $stderr {        [-x proxyurl] [-X proxyhost] [--button-size size] [--chat-history n]}
@@ -1286,7 +1286,6 @@ proc usage {} {
 	puts $stderr {   -b, --blur-hp:     Change imprecision factor for health bar displays (0 for full precision) [0]}
 	puts $stderr {       --button-size: Set button size to "small" (default), "medium", or "large"}
 	puts $stderr {   -C, --config:      Read options from specified file (subsequent options further modify)}
-	puts $stderr {   -c, --character:   Add another character name for menu}
 	puts $stderr {   -d, --dark:        Adjust colors for dark mode}
 	puts $stderr {   -D, --debug:       Increase debug output level}
 	puts $stderr {       --debug-protocol: Show a transcript of network I/O data in debug window}
@@ -1382,14 +1381,15 @@ for {set argi 0} {$argi < $optc} {incr argi} {
 			close $config_file
 		}
 		-c - --character { 
-				set charToAdd [split [getarg -c] :]
-				if {[llength $charToAdd] == 1} {
-					lappend charToAdd blue
-				} elseif {[llength $charToAdd] > 2} {
-					puts $stderr "Option -c syntax error: should be '-c name\[:color\]'"
-					usage
-				}
-                lappend OptAddCharacters $charToAdd
+#				set charToAdd [split [getarg -c] :]
+#				if {[llength $charToAdd] == 1} {
+#					lappend charToAdd blue
+#				} elseif {[llength $charToAdd] > 2} {
+#					puts $stderr "Option -c syntax error: should be '-c name\[:color\]'"
+#					usage
+#				}
+#                lappend OptAddCharacters $charToAdd
+			DEBUG 0 "-c / --character command-line option is DEPRECATED and no longer supported."
 			}
 		-D - --debug  { incr DEBUG_level }
 		--debug-protocol { ApplyDebugProtocol true }
@@ -7620,17 +7620,31 @@ menu .contextMenu.tsel -tearoff 0
 .contextMenu add separator										;# 18; was 22
 
 # AddPlayer name color ?area? ?size? ?id?  defaults to 1x1, generated ID
-proc AddPlayer {name color args} {
+#
+# DEPRECATED
+#proc AddPlayer {name color args} {
+#	global MOB_X MOB_Y canvas
+#
+#	set g [ScreenXYToGridXY $MOB_X $MOB_Y]
+#	# deprecated # if {[llength $args] > 0} { set area [lindex $args 0] } else { set area 1 }
+#	if {[llength $args] > 1} { set size [lindex $args 1] } else { set size 1 }
+#	if {[llength $args] > 2} { set id   [lindex $args 2] } else { set id [new_id] }
+#	# XXX check for existing player
+#	set d [::gmaproto::new_dict PS Gx [lindex $g 0] Gy [lindex $g 1] Color $color Name [AcceptCreatureImageName $name] Size $size CreatureType 2 ID $id]
+#	DEBUG 3 "PlaceSomeone $canvas $d"
+#	PlaceSomeone $canvas $d
+#	::gmaproto::place_someone_d [InsertCreatureImageName $d]
+#}
+
+proc AddPlayerD {d} {
 	global MOB_X MOB_Y canvas
 
 	set g [ScreenXYToGridXY $MOB_X $MOB_Y]
-	# deprecated # if {[llength $args] > 0} { set area [lindex $args 0] } else { set area 1 }
-	if {[llength $args] > 1} { set size [lindex $args 1] } else { set size 1 }
-	if {[llength $args] > 2} { set id   [lindex $args 2] } else { set id [new_id] }
-	# XXX check for existing player
-	set d [::gmaproto::new_dict PS Gx [lindex $g 0] Gy [lindex $g 1] Color $color Name [AcceptCreatureImageName $name] Size $size CreatureType 2 ID $id]
-	DEBUG 3 "PlaceSomeone $canvas $d"
+	dict set d Name [AcceptCreatureImageName [dict get $d Name]]
+	dict set d Gx [lindex $g 0]
+	dict set d Gy [lindex $g 1]
 	PlaceSomeone $canvas $d
+	DEBUG 0 "AddPlayerD $d"
 	::gmaproto::place_someone_d [InsertCreatureImageName $d]
 }
 
@@ -8801,11 +8815,33 @@ proc DoCommandIL {d} {
 	}
 }
 
+# given a creature dict, enforce the new protocol specs in a backward-compatible way
+# so that the Size field contains the value from SkinSize indexed by Skin if those
+# are set.
+# If SkinSize is empty, set it with the Size field.
+# The updated dictionary value is returned.
+proc _adjust_creature_sizes {d} {
+	set idx [dict get $d Skin]
+	if {[llength [set sizes [dict get $d SkinSize]]] > 0} {
+		if {$idx < 0 || $idx >= [llength $sizes]} {
+			set idx 0
+		}
+		dict set d Size [lindex $sizes $idx]
+		dict set d Skin $idx
+	} else {
+		dict set d Skin 0
+		dict set d SkinSize [list [dict get $d Size]]
+	}
+	return $d
+}
+
 proc DoCommandAC {d} {
 	# Add character to the menu
 	global PC_IDs
-	::gmautil::dassign $d Name name ID id Color color Size size
-	set creature_name [AcceptCreatureImageName $name]
+	set d [_adjust_creature_sizes $d]
+	set creature_name [AcceptCreatureImageName [dict get $d Name]]
+	set id [dict get $d ID]
+
 	if {[info exists PC_IDs($creature_name)]} {
 		if {$PC_IDs($creature_name) ne $id} {
 			DEBUG 0 "Attempting to add player '$creature_name' with ID $id to menu but ID $PC_IDs($creature_name) is already known for it! Ignoring new request."
@@ -8814,7 +8850,7 @@ proc DoCommandAC {d} {
 		}
 	} else {
 		set PC_IDs($creature_name) $id
-		.contextMenu add command -command "AddPlayer $creature_name $color 0 $size $id" -label $creature_name 
+		.contextMenu add command -command "AddPlayerD [list $d]" -label $creature_name 
 	}
 }
 
@@ -12626,8 +12662,7 @@ proc display_initiative_clock {} {
 #
 report_progress "Adding party members"
 foreach charToAdd $OptAddCharacters {
-    set c_name [AcceptCreatureImageName [lindex $charToAdd 0]]
-    .contextMenu add command -command "AddPlayer $c_name [lindex $charToAdd 1]" -label $c_name
+    DEBUG 0 "Adding party members via command-line option is no longer supported."
 }
 if {$OptPreload} {
     report_progress "Preloading image data..."
