@@ -11,7 +11,7 @@
 ########################################################################################
 
 proc CreatureSizeParams {size_code} {
-	if {[regexp {^\s*([FDTSMLHGCfdtsmlhgc])(\d+)?(?:->(\d+))?(?:=(\d+))?\s*$} $size_code _ category nat ext sz]} {
+	if {[regexp {^\s*([FDTSMLHGCfdtsmlhgc])(\d+)?(?:->(\d+))?(?:=(\d+))?(?::.*)?\s*$} $size_code _ category nat ext sz]} {
 		if {$nat ne {}} {set nat [expr int($nat/5)]}
 		if {$ext ne {}} {set ext [expr int($ext/5)]}
 		if {$sz  ne {}} {set sz  [expr int($sz/5)]}
