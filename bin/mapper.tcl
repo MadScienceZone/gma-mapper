@@ -1,5 +1,9 @@
 #!/usr/bin/env wish
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
+# TODO note that in server INIT file, Skin= must be set; the mapper does not use the * field in monsters,
+#      it just does as instructed based on Skin index
+# TODO polymorph menu shoud be disabled if only one skin
+# TODO polymorph menu should use comments if provided instead of #1 #2 etc
 ########################################################################################
 #  _______  _______  _______                ___        __     ______        ___        #
 # (  ____ \(       )(  ___  ) Game         /   )      /  \   / ____ \      /   )       #
@@ -972,6 +976,7 @@ proc create_main_menu {use_button} {
 	$mm.file add command -command {loadfile {} -merge} -label "Merge Map File..."
 	$mm.file add command -command savefile -label "Save Map File..."
 	$mm.file add separator
+	$mm.file add command -command restartMapper -label "Restart Mapper"
 	$mm.file add command -command exitchk -label Exit
 	menu $mm.edit
 	$mm.edit add command -command playtool -label "Normal Play Mode"
@@ -1187,39 +1192,44 @@ proc editPreferences {} {
 	if {[tk_messageBox -type yesno -default no -icon warning -title "Restart Mapper?"\
 		-message "Some preferences will only take effect when the mapper is restarted. Do you wish to go ahead and restart the mapper now? (If you do, it will be started with the same command-line arguments as were used to start this instance.)"\
 	]} {
-		global argv0
-		global argv
-		global env
-		set searchlist {}
-		if {[info exists env(GMA_WISH)]} {
-			lappend searchlist $env(GMA_WISH)
-		}
-		lappend searchlist wish8.7 wish8.6 wish -
-
-		foreach i $searchlist {
-			if {$i eq {-}} {
-				DEBUG 1 "Trying to run $argv0 $argv"
-				puts "Trying to run $argv0 $argv"
-				if {![catch {exec $argv0 {*}$argv &} err]} {
-					exit 0
-				}
-			} else {
-				if {[set cmd [::gmautil::searchInPath $i]] eq {}} {
-					DEBUG 1 "Skipping $i; not found in \$PATH"
-					puts "Skipping $i; not found in \$PATH"
-					continue
-				}
-				DEBUG 1 "Trying to run $cmd $argv0 $argv"
-				puts "Trying to run $cmd $argv0 $argv"
-				if {![catch {exec $cmd $argv0 {*}$argv &} err]} {
-					exit 0
-				}
-			}
-		}
-		tk_messageBox -type ok -icon error -title "Unable to restart" -message "Sorry, we were unable to relaunch the mapper. If you want to restart it, you need to manually exit and restart the mapper." -detail $err
-		return
+		restartMapper
 	}
 }
+
+proc restartMapper {} {
+	global argv0
+	global argv
+	global env
+	set searchlist {}
+	if {[info exists env(GMA_WISH)]} {
+		lappend searchlist $env(GMA_WISH)
+	}
+	lappend searchlist wish8.7 wish8.6 wish -
+
+	foreach i $searchlist {
+		if {$i eq {-}} {
+			DEBUG 1 "Trying to run $argv0 $argv"
+			puts "Trying to run $argv0 $argv"
+			if {![catch {exec $argv0 {*}$argv &} err]} {
+				exit 0
+			}
+		} else {
+			if {[set cmd [::gmautil::searchInPath $i]] eq {}} {
+				DEBUG 1 "Skipping $i; not found in \$PATH"
+				puts "Skipping $i; not found in \$PATH"
+				continue
+			}
+			DEBUG 1 "Trying to run $cmd $argv0 $argv"
+			puts "Trying to run $cmd $argv0 $argv"
+			if {![catch {exec $cmd $argv0 {*}$argv &} err]} {
+				exit 0
+			}
+		}
+	}
+	tk_messageBox -type ok -icon error -title "Unable to restart" -message "Sorry, we were unable to relaunch the mapper. If you want to restart it, you need to manually exit and restart the mapper." -detail $err
+	return
+}
+
 
 #
 # Load preferences from disk if possible
@@ -4962,12 +4972,43 @@ proc creature_display_zoom {size dispsize zoom} {
 	return 0
 }
 
+# ParseSizeCode sizecode -> category reach extended tokensize default? comment OR throws error
+proc ParseSizeCode {sizecode} {
+	if {[regexp -nocase {^\s*([fdtsmlhgc])(\d+)?(?:->(\d+))?(?:=(\d+))?(?::(\*)?(.*))?\s*$} $sizecode _ category reach extended token def comment]} {
+		return [list $category $reach $extended $token [expr "{$def} eq {*}"] $comment]
+	}
+	error "invalid size code \"$sizecode\""
+}
+
+proc SkinComment {sizecode} {
+	if {[catch {
+		set comment [lindex [ParseSizeCode $sizecode] 5]
+	} err]} {
+		DEBUG 0 "ERROR in SkinComment: $err; sizecode=$sizecode"
+		return ""
+	}
+	return $comment
+}
+
+proc SkinIsDefault {sizecode} {
+	if {[catch {
+		set def [lindex [ParseSizeCode $sizecode] 4]
+	}]} {
+		return false
+	}
+	return $def
+}
+
+proc SkinSizeOnly {sizecode} {
+	return [regsub {:.*$} $sizecode {}]
+}
+
 proc CreatureDisplayedSize {id} {
 	global MOBdata
 	if {[dict exists $MOBdata($id) DispSize] && [set dsize [dict get $MOBdata($id) DispSize]] ne {}} {
-		return $dsize
+		return [SkinSizeOnly $dsize]
 	}
-	return [dict get $MOBdata($id) Size]
+	return [SkinSizeOnly [dict get $MOBdata($id) Size]]
 }
 
 #
@@ -5713,7 +5754,7 @@ proc RenderSomeone {w id {norecurse false}} {
     #
     set found_image false
     if {[dict exists $MOBdata($id) DispSize] \
-     && [set disp_size [dict get $MOBdata($id) DispSize]] ne {} \
+     && [set disp_size [SkinSizeOnly [dict get $MOBdata($id) DispSize]]] ne {} \
      && [set real_size [dict get $MOBdata($id) Size]] ne $disp_size} {
 	    set disp_zoom [creature_display_zoom $real_size $disp_size $zoom]
     } else {
@@ -5800,6 +5841,7 @@ proc RenderSomeone {w id {norecurse false}} {
 			$w create window [expr $x*$iscale] [expr $y*$iscale] -anchor $nametag_anchor -window $nametag_w -tags "M#$id MF#$id MT#$id allMOB"
 		}
 	} else {
+		set mob_name [::gmaclock::nameplate_text $mob_name]
 		DEBUG 3 "No $image_pfx:$disp_zoom found in TILE_SET"
 		$w create oval [expr $x*$iscale] [expr $y*$iscale] [expr ($x+$mob_size)*$iscale] [expr ($y+$mob_size)*$iscale] -fill $fillcolor -tags "mob MF#$id M#$id MN#$id MB#id allMOB"
 		$w create text [expr ($x+(.5*$mob_size))*$iscale] [expr ($y+(.5*$mob_size))*$iscale] -fill $textcolor \
@@ -7188,6 +7230,37 @@ proc TagAll {mob_list tag} {
 	}
 }
 
+proc AllowedToPolymorph {mobID} {
+	global MOBdata
+	global is_GM
+
+	if {![info exists MOBdata($mobID)]} {
+		return false
+	}
+
+	if {[dict exists $MOBdata($mobID) PolyGM] && [dict get $MOBdata($mobID) PolyGM] && !$is_GM} {
+		return false
+	}
+	
+	if {[dict exists $MOBdata($mobID) SkinSize] && [llength [dict get $MOBdata($mobID) SkinSize]] > 1} {
+		return true
+	}
+
+	return false
+}
+
+# CreatePolySubMenu ?-deep <mobID>? ?-shallow <mobID>? ?-mass <mobIDlist>?
+#   adds a new set of menu items for each skin available to a monster
+#   -mass (used for "all of the above" selection)
+#   	.contextMenu.poly.m___mass__		-> PolymorphMass <mobIDlist> <skin#>
+#   -deep (used when adding a sub-menu for each of a set of mobs)
+#   	.contextMenu.poly.m_<mobID>		-> PolymorphPerson <mobID> <skin#>
+#   default (used for a single creature)
+#   	.contextMenu.poly_m_<mobID>		-> PolymorphPerson <mobID> <skin#>
+#
+#   all targets which can't polymorph (or the player can't polymorph) are removed
+#   from the list for -mass; otherwise it's the caller's responsibility to decide
+#   not to call CreatePolySubMenu if a creature can't be polymorphed
 proc CreatePolySubMenu {args} {
 	global MOBdata
 	if {[lindex $args 0] == {-mass}} {
@@ -7203,24 +7276,48 @@ proc CreatePolySubMenu {args} {
 	set mid .contextMenu.$sub$mob_id
 	catch {$mid delete 0 end; destroy $mid}
 	menu $mid
+	set mob_list [lmap mi $mob_list {
+		if {![AllowedToPolymorph $mi]} {
+			continue
+		}
+		list $mi
+	}]
+	if {[llength $mob_list] == 0} {
+		return $mid
+	}
+
+	if {[llength $mob_list] == 1} {
+		set mob_id [lindex $mob_list 0]
+		set i 0
+		foreach sz [dict get $MOBdata($mob_id) SkinSize] {
+			if {[set name [SkinComment $sz]] eq {}} {
+				set name [format "Skin #%d" $i]
+			}
+			if {[SkinIsDefault $sz]} {
+				set name "\[$name\]"
+			}
+			if {[MobState $mob_list Skin $i]} {
+				$mid add command -command [list $cmd $mob_list $i] -label $name -foreground #ff0000
+			} else {
+				$mid add command -command [list $cmd $mob_list $i] -label $name
+			}
+			incr i
+		}
+		return $mid
+	}
+
 	#
 	# Find the maximum number of skins for the monster(s) we're dealing with here
 	#
 	set max_skin 0
 	foreach mi $mob_list {
-		if {[info exists MOBdata($mi)]} {
+		if {[info exists MOBdata($mi)] && [dict exists $MOBdata($mi) SkinSize]} {
 			set max_skin [expr max($max_skin, [llength [dict get $MOBdata($mi) SkinSize]])]
-		} else {
-			set max_skin [expr max($max_skin, 4)]
-		}
+		} 
 	}
 
 	for {set i 0} {$i < $max_skin} {incr i} {
-		if {[MobState $mob_list Skin $i]} {
-			$mid add command -command [list $cmd $mob_list $i] -label [expr $i==0 ? {{Base}} : "{# $i}"] -foreground #ff0000
-		} else {
-			$mid add command -command [list $cmd $mob_list $i] -label [expr $i==0 ? {{Base}} : "{# $i}"]
-		}
+		$mid add command -command [list $cmd $mob_list $i] -label [format "Skin #%d" $i]
 	}
 	return $mid
 }
@@ -7257,7 +7354,7 @@ proc CreateSizeSubMenu {args} {
 		C {Colossal (tall)}
 	} {
 		if {$mob_id ne {__mass__}} {
-			set real_size [dict get $MOBdata($mob_id) Size]
+			set real_size [SkinSizeOnly [dict get $MOBdata($mob_id) Size]]
 			set disp_size [CreatureDisplayedSize $mob_id]
 
 			if {[lsearch -exact $size_code $disp_size] >= 0} {
@@ -7489,7 +7586,11 @@ proc DoContext {x y} {
 		.contextMenu delete 5
 		.contextMenu insert 5 command -command "ToggleSpellArea $mob_id" -label "Toggle Spell Area for $mob_disp_name"
 		.contextMenu delete 6
-		.contextMenu insert 6 cascade -menu [CreatePolySubMenu -shallow $mob_id] -label "Polymorph $mob_disp_name"
+		if {[AllowedToPolymorph $mob_id]} {
+			.contextMenu insert 6 cascade -menu [CreatePolySubMenu -shallow $mob_id] -label "Polymorph $mob_disp_name"
+		} else {
+			.contextMenu insert 6 command -state disabled -label "Polymorph $mob_disp_name"
+		}
 		.contextMenu delete 7
 		.contextMenu insert 7 cascade -menu [CreateSizeSubMenu -shallow $mob_id] -label "Change Size of $mob_disp_name"
 		.contextMenu delete 8
@@ -7517,6 +7618,7 @@ proc DoContext {x y} {
 		.contextMenu.mmode delete 0 end
 		.contextMenu.dist delete 0 end
 		.contextMenu.tsel delete 0 end
+		set polymorph_qty 0
 		foreach mob_id $mob_list {
 			set mob_name [dict get $MOBdata($mob_id) Name]
 			set mob_disp_name [::gmaclock::nameplate_text $mob_name]
@@ -7525,7 +7627,13 @@ proc DoContext {x y} {
 #			.contextMenu.reach add command -command "ToggleReach $mob_id" -label $mob_name
 			.contextMenu.reach add cascade -menu [CreateReachSubMenu -deep $mob_id] -label $mob_disp_name
 			.contextMenu.aoe add command -command "ToggleSpellArea $mob_id" -label $mob_disp_name
-			.contextMenu.poly add cascade -menu [CreatePolySubMenu -deep $mob_id] -label $mob_disp_name
+			if {[AllowedToPolymorph $mob_id]} {
+				.contextMenu.poly add cascade -menu [CreatePolySubMenu -deep $mob_id] -label $mob_disp_name
+				incr polymorph_qty
+			} else {
+				.contextMenu.poly add command -state disabled -label $mob_disp_name
+			}
+
 			.contextMenu.size add cascade -menu [CreateSizeSubMenu -deep $mob_id] -label $mob_disp_name
 			.contextMenu.cond add cascade -menu [CreateConditionSubMenu -deep $mob_id] -label $mob_disp_name
 			.contextMenu.tag add cascade -menu [CreateTagSubMenu -deep $mob_id] -label $mob_disp_name
@@ -7537,7 +7645,11 @@ proc DoContext {x y} {
 		.contextMenu.del add command -command "RemoveAll $mob_list" -label "(all of the above)"
 		.contextMenu.kill add command -command "KillAll $mob_list" -label "(all of the above)"
 		.contextMenu.reach add cascade -menu [CreateReachSubMenu -mass $mob_list] -label "(all of the above)"
-		.contextMenu.poly add cascade -menu [CreatePolySubMenu -mass $mob_list] -label "(all of the above)"
+		if {$polymorph_qty > 1} {
+			.contextMenu.poly add cascade -menu [CreatePolySubMenu -mass $mob_list] -label "(all of the above)"
+		} else {
+			.contextMenu.poly add command -state disabled -label "(all of the above)"
+		}
 		.contextMenu.size add cascade -menu [CreateSizeSubMenu -mass $mob_list] -label "(all of the above)"
 		.contextMenu.tag add cascade -menu [CreateTagSubMenu -mass $mob_list] -label "(all of the above)"
 		.contextMenu.cond add cascade -menu [CreateConditionSubMenu -mass $mob_list] -label "(all of the above)"
@@ -7772,7 +7884,7 @@ proc AddMobFromMenu {baseX baseY color name _ size type reach} {
 			}
 			set apm_id [new_id]
 			DEBUG 3 "Multi-add $i of $multistart-$multiend: ${basename}#$i"
-			set d [::gmaproto::new_dict PS Gx [expr $baseX+$XX] Gy $baseY Color $color Name [AcceptCreatureImageName "${basename}#$i"] Size $size CreatureType [::gmaproto::to_enum CreatureType $type] ID $apm_id Reach $reach]
+			set d [::gmaproto::new_dict PS Gx [expr $baseX+$XX] Gy $baseY Color $color Name [AcceptCreatureImageName "${basename}#$i"] SkinSize [list $size] Skin 0 PolyGM false Size $size CreatureType [::gmaproto::to_enum CreatureType $type] ID $apm_id Reach $reach]
 			PlaceSomeone $canvas $d
 			::gmaproto::place_someone_d [InsertCreatureImageName $d]
 		}
@@ -7788,7 +7900,7 @@ proc AddMobFromMenu {baseX baseY color name _ size type reach} {
 		} else {
 			set apm_id [new_id]
 		}
-		set d [::gmaproto::new_dict PS Gx $baseX Gy $baseY Color $color Name $basename Size $size CreatureType [::gmaproto::to_enum CreatureType $type] ID $apm_id Reach $reach]
+		set d [::gmaproto::new_dict PS Gx $baseX Gy $baseY Color $color Name $basename Size $size SkinSize [list $size] Skin 0 PolyGM false CreatureType [::gmaproto::to_enum CreatureType $type] ID $apm_id Reach $reach]
 		PlaceSomeone $canvas $d
 		::gmaproto::place_someone_d [InsertCreatureImageName $d]
 	}
