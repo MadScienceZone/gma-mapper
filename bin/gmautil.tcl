@@ -388,7 +388,7 @@ proc ::gmautil::upgrade {destination_dir_list tmp_path source_base_url source_ba
 				tk_messageBox -type ok -icon error -title "File not unpacked" \
 					-message "We did not successfully unpack $path." \
 					-detail "Since we were not able to confirm that this file was unpacked from the download, we can't proceed with the installation."
-				$msg_callback "$msg_pfs upgrade failed" -done -display
+				$msg_callback "$msg_pfx upgrade failed" -done -display
 				return
 			}
 			if {![info exists checklist(:hash:$path)]} {
@@ -396,7 +396,7 @@ proc ::gmautil::upgrade {destination_dir_list tmp_path source_base_url source_ba
 				tk_messageBox -type ok -icon error -title "File not in manifest" \
 					-message "We did not find $path in the manifest list." \
 					-detail "This file was unpacked from the server download but does not appear in the manifest list of files that are supposed to be there. Since we were not able to confirm that this file was unpacked correctly from the download, we can't proceed with the installation."
-				$msg_callback "$msg_pfs upgrade failed" -done -display
+				$msg_callback "$msg_pfx upgrade failed" -done -display
 				return
 			}
 			set actual_digest [::sha2::sha256 -hex -file $checklist(:path:$path)]
@@ -405,7 +405,7 @@ proc ::gmautil::upgrade {destination_dir_list tmp_path source_base_url source_ba
 				tk_messageBox -type ok -icon error -title "Corrupt file" \
 					-message "The installed file $checklist(:path:$path) failed its integrity check."\
 					-detail "This file was unpacked but the data did not match what was expected. We cannot proceed with installation. (Expected checksum $checklist(:hash:$path); actual checksum $actual_digest.)"
-				$msg_callback "$msg_pfs upgrade failed" -done -display
+				$msg_callback "$msg_pfx upgrade failed" -done -display
 				return
 			}
 		}
@@ -417,7 +417,7 @@ proc ::gmautil::upgrade {destination_dir_list tmp_path source_base_url source_ba
 		tk_messageBox -type ok -icon error -title "Installation error" \
 			-message "An error was encountered while trying to perform the upgrade."\
 			-detail $err
-		$msg_callback "$msg_pfs upgrade failed" -done -display
+		$msg_callback "$msg_pfx upgrade failed" -done -display
 		return
 	}
 
@@ -437,7 +437,7 @@ proc ::gmautil::upgrade {destination_dir_list tmp_path source_base_url source_ba
 				tk_messageBox -type ok -icon error -title "Unable to Launch Automatically" \
 					-message "We were unable to start the new mapper. Please exit this one and run $exec_path to use the new version."\
 					-detail "We tried to start the new mapper twice. The first time we encountered the error $err1; the second time the result was $err2."
-				$msg_callback "$msg_pfs upgrade failed" -display
+				$msg_callback "$msg_pfx upgrade failed" -display
 				return
 			}
 		}
