@@ -1,7 +1,7 @@
 '\" t
 '\" <<ital-is-var>>
 '\" <<bold-is-fixed>>
-.TH MAPPER 6 "GMA-Mapper 4.16.4" 10-Nov-2023 "Games" \" @@mp@@
+.TH MAPPER 6 "GMA-Mapper 4.17" 24-Nov-2023 "Games" \" @@mp@@
 .SH NAME
 mapper \- GMA battle grid map
 .SH SYNOPSIS
@@ -28,8 +28,8 @@ mapper \- GMA battle grid map
 .IR pct ]
 .RB [ \-C
 .IR file ]
-.RB [ \-c
-.RI [ image\fB=\fP ] name [\fB:\fP color ]]
+'\".RB [ \-c
+'\".RI [ image\fB=\fP ] name [\fB:\fP color ]]
 .RB [ \-D ]
 .RB [ \-d ]
 .RB [ \-f
@@ -104,8 +104,8 @@ mapper \- GMA battle grid map
 .BR small | medium | large ]
 .RB [ \-\-config
 .IR file ]
-.RB [ \-\-character
-.RI [ image\fB=\fP ] name [\fB:\fP color ]]
+'\".RB [ \-\-character
+.R'\"I [ image\fB=\fP ] name [\fB:\fP color ]]
 .RB [ \-\-chat\-history
 .IR n ]
 .RB [ \-\-curl\-path
@@ -459,38 +459,38 @@ option may be given, in which case the files are read in the order they appear i
 command line. This may be used to split up options into different files, such as general
 settings common to all sessions, and specific settings based on networks or different games.
 .RE
-.TP
-.BI "\-c\fR, \fP\-\-character \fR[\fP" image =\fR]\fP name \fR[\fP: color \fR]\fP
-Add player
-.I name
-to the list of standard players tracked by the mapper.
-This is the list that appears in the pop-up menu for placing
-people onto the map.  If 
-.I color
-is also specified, that color is used for the threat zone
-highlighting.  This may be a standard X11 color name, or
-an RGB value in the form 
-.BI # rgb,
-.BI # rrggbb,
-or
-.BI # rrrgggbbb.
-The default is \*(lqblue\*(rq.
-.RS
-.LP
-If an image file will be used with the character that's not the same
-name as the character, specify it as
-.IB image = name
-in this option.
-.LP
-Multiple
-.B \-c
-options may be given.  Each adds another name to the list.
-.LP
-Note that when the mapper is networked, the
-default list of names actually comes from the server, so it
-should not be necessary to specify these names to the client from
-the command line or configuration file.
-.RE
+'\".TP
+'\".BI "\-c\fR, \fP\-\-character \fR[\fP" image =\fR]\fP name \fR[\fP: color \fR]\fP
+'\"Add player
+'\".I name
+'\"to the list of standard players tracked by the mapper.
+'\"This is the list that appears in the pop-up menu for placing
+'\"people onto the map.  If 
+'\".I color
+'\"is also specified, that color is used for the threat zone
+'\"highlighting.  This may be a standard X11 color name, or
+'\"an RGB value in the form 
+'\".BI # rgb,
+'\".BI # rrggbb,
+'\"or
+'\".BI # rrrgggbbb.
+'\"The default is \*(lqblue\*(rq.
+'\".RS
+'\".LP
+'\"If an image file will be used with the character that's not the same
+'\"name as the character, specify it as
+'\".IB image = name
+'\"in this option.
+'\".LP
+'\"Multiple
+'\".B \-c
+'\"options may be given.  Each adds another name to the list.
+'\".LP
+'\"Note that when the mapper is networked, the
+'\"default list of names actually comes from the server, so it
+'\"should not be necessary to specify these names to the client from
+'\"the command line or configuration file.
+'\".RE
 .TP
 .BI "\-\-chat\-history " n
 Limits the retained chat history to 
@@ -1676,7 +1676,7 @@ Preferences data storage file, normally edited via the in-application
 preferences editor window.
 .TP
 .B ~/.gma/mapper/mapper.conf
-Default configuration file read if no explicit
+(DEPRECATED) Default configuration file read if no explicit
 .B \-C
 or
 .B \-\-config
@@ -1753,5 +1753,10 @@ obsolete and they no longer perform any function:
 .BR \-s ,
 and
 .BR \-\-style .
+.LP
+The
+.B \-c
+.RB ( \-\-character )
+option is no longer supported.
 .SH COPYRIGHT
 Part of the GMA software suite, copyright \(co 1992\-2023 by Steven L. Willoughby, Aloha, Oregon, USA. All Rights Reserved. Distributed under BSD-3-Clause License. \"@m(c)@

@@ -1,5 +1,5 @@
 '\" t
-'\" *** 407 ***
+'\" *** 408 ***
 '\" <<ital-is-var>>
 '\" <<bold-is-fixed>>
 .TH MAPPER-PROTOCOL 7 "GMA-Mapper 4.3.4" 16-Mar-2023 "Games" \" @@mp@@
@@ -76,7 +76,7 @@ be implemented to wait synchronously for a server
 response during the authentication negotiation stage.
 .LP
 '\" <</bold-is-fixed>>
-.B "This describes protocol version 407."
+.B "This describes protocol version 408."
 '\" <<bold-is-fixed>>
 These notes are intended to be 
 detailed enough to implement a client from and should be considered
@@ -1414,7 +1414,7 @@ got to this request amongst the others it received. The following
 fields may be populated:
 .RS
 '\" <<list>>
-.TP 10
+.TP 12
 .B s
 An arbitrary string value.
 .TP
@@ -1426,9 +1426,22 @@ An arbitrary integer value.
 An arbitrary boolean value.
 .TP
 .BI "o " (object)
-'\" <<ital-is-var>>
 An arbitrary set of key/value pairs, with each value having any type.
+.LP
+'\" <<New>>
+The server will also populate the following additional fields in its reply, which
+a client can use to calculate the round-trip time for the request and identify
+how much of that was internal to the server and how much was network latency.
+.TP
+.BI "ReceivedTime " "(RFC 3339-formatted datetime string)"
+The time when the server received the packet from the client.
+.TP
+.BI "SentTime " "(RFC 3339-formatted datetime string)"
+The time when the server sent the response packet to the client.
+'\" <<ital-is-var>>
+'\" <</New>>
 .RE
+
 '\" <</>>
 .TP
 .B GRANTED
@@ -2250,6 +2263,13 @@ The grid
 .I y
 coordinate for the creature's reference point. Note that this is in
 grids, not pixel units.
+'\" <<New>>
+.TP
+.BI PolyGM " (bool)"
+If true, only the GM may access the polymorph capabilities of this creature.
+Map clients not logged in as GM MUST not display any information indicating
+that there are different skins available, nor allow the user to select among them.
+'\" <</New>>
 .TP
 .BI Skin " (int)"
 If 0, show the default appearance on the creature's token. Otherwise, show
@@ -2264,8 +2284,8 @@ number. For example, if there are 3 skins defined for a
 shape-changing creature, and the first two are medium-size
 but the third is large, then 
 .B SkinSize
-would have the value
-.BR [\[dq]M\[dq],\[dq]M\[dq],\[dq]L\[dq]] .
+would have a value like
+.BR [\[dq]M:base\[dq],\[dq]M:disguise\[dq],\[dq]L:giant\[dq]] .
 .TP
 .BI Elev " (int)"
 The creature's elevation in feet relative to the \*(lqfloor\*(rq level.
@@ -2283,7 +2303,7 @@ This has the general form
 .RS
 .RS
 .LP
-.IR category [ natural ][\fB->\fP extended ][\fB=\fP space ]
+.IR category [ natural ][\fB->\fP extended ][\fB=\fP space ][\fB:\fP[\fB*\fP] comment]
 .RE
 .LP
 where
@@ -2297,6 +2317,20 @@ and
 .I space
 is a custom creature space diameter in feet (if different than the standard for that size category).
 (Changed in protocol 406.)
+'\" <<New>>
+.LP
+This is now DEPRECATED. If present and the
+.B SkinSize
+field is also present, then the value of
+.B Size
+MUST equal the value of the first element of
+.BR SkinSize .
+The preferred usage going forward is to not set the
+.B Size
+field at all, and just use
+.B SkinSize
+alone. If there is only one skin for the creature, this value will have only a single value.
+'\" <</New>>
 .RE
 '\".TP
 '\".BI Area
@@ -2703,9 +2737,14 @@ John Mechalas (elevation and movement modes).
 .SH HISTORY
 .LP
 '\" <<New>>
-This document defines map protocol version 407,
-which added the image animation features.
+This document defines map protocol version 408,
+which added the
+.B PolyGM
+creature attribute.
 '\" <</New>>
+.LP
+Protocol version 407
+added the image animation features.
 .LP
 Protocol version 406 dropped the
 .B Area
