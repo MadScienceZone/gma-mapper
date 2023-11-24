@@ -3,7 +3,7 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.17          <!-- @@##@@ -->
+ * This Package Version: 4.17.1          <!-- @@##@@ -->
  * Effective Date: 24-Nov-2023               <!-- @@##@@ -->
 
 ## Compatibility
@@ -15,6 +15,11 @@
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.17.1
+## Fixes
+ * Removed debugging statement
+ * Fixed bug in auto-update code (failed to correctly print error messages if update failed)
 
 # 4.17
 ## Enhancements
