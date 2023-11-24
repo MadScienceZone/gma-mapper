@@ -2,8 +2,6 @@
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
 # TODO note that in server INIT file, Skin= must be set; the mapper does not use the * field in monsters,
 #      it just does as instructed based on Skin index
-# TODO polymorph menu shoud be disabled if only one skin
-# TODO polymorph menu should use comments if provided instead of #1 #2 etc
 ########################################################################################
 #  _______  _______  _______                ___        __     ______        ___        #
 # (  ____ \(       )(  ___  ) Game         /   )      /  \   / ____ \      /   )       #
