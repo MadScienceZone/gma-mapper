@@ -16,6 +16,16 @@ The support for old server protocols (<400) and map file formats (<20) will be d
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
+# 4.17
+## Enhancements
+ * Supports server protocol version 408.
+ * Now supports enhanced size codes for creatures (including skin comment tags).
+ * Adds `File`->`Restart Mapper` menu option to restart the mapper client.
+ * More intelligently handles creation of polymorph context menu (only enables when a creature can actually polymorph, uses better descriptions instead of numbers)
+
+## Deprecations
+ * Removed old `-c` / `--character` command-line option.
+
 # 4.16.4
 ## Fixes
  * Cleaned up the way conditions are automatically calculated based on lethal and nonlethal damage.
