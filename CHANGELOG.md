@@ -19,6 +19,8 @@ versions.
 # Unreleased 4.17.3
 ## Fixes
  * Adds warning message to the `Play` -> `Connect to ...` menu which advises users that this method of switching servers is not guaranteed to work correctly, and suggests methods which are reliable.
+## Enhancements
+ * Adds server notice alert boxes.
 
 # 4.17.2
 ## Fixes
