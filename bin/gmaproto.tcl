@@ -1889,7 +1889,12 @@ proc ::gmaproto::_login {} {
 		# Negotiate interaction with server up to successful login.
 		#
 		switch -exact -- $cmd {
-			//	{ ::DEBUG 1 "server: $params" }
+			//	{ ::DEBUG 1 "server: $params" 
+				set msg [string trim [string range $params 2 end]]
+				if {[string compare -nocase -length 7 $msg notice:] == 0} {
+					tk_messageBox -type ok -icon info -message [string range $msg 7 end] -title "Server Notice" -parent .
+				}
+			}
 			AC	{ ::gmaproto::_dispatch_to_app AC $params }
 			DSM	{ ::gmaproto::_dispatch_to_app DSM $params }
 			MARCO	{ ::gmaproto::DEBUG "Ignored MARCO during login" }
