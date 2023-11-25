@@ -16,6 +16,10 @@ The support for old server protocols (<400) and map file formats (<20) will be d
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
+# Unreleased 4.17.3
+## Fixes
+ * Adds warning message to the `Play` -> `Connect to ...` menu which advises users that this method of switching servers is not guaranteed to work correctly, and suggests methods which are reliable.
+
 # 4.17.2
 ## Fixes
  * Corrects bug in error message reporting for duplicate AC commands from server.
