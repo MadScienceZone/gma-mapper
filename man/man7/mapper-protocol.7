@@ -312,10 +312,21 @@ command string sent or received.
 '\" <<list>>
 .TP 12
 .B //
-This is a server comment.  The entire command should be ignored by all clients. This is used
+This is a server comment.  The entire command SHOULD be ignored by all clients. This is used
 to inject informative context and messages into the client/server conversation which may be
 of interest for debugging or interactive use.
 .RS
+'\" <<New>>
+.LP
+The mapper client will interpret a server comment beginning with the text
+.RB \*(lq notice: \*(rq
+which is received during the initial connection negotiation (i.e., before the
+.B READY
+message is given by the server) as a notice that the end user should see.
+The text following the word
+.RB \*(lq notice: \*(rq
+is posted in an alert box.
+'\" <</New>>
 .LP
 '\" <</ital-is-var>>
 .I "This is one of two exceptions to the rule that a command contains a JSON parameter"
