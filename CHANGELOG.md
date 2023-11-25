@@ -16,6 +16,14 @@ The support for old server protocols (<400) and map file formats (<20) will be d
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
+# Unreleased 4.17.2
+## Fixes
+ * Corrects bug in error message reporting for duplicate AC commands from server.
+ * Mitigates bug with die-roll modifiers getting turned on; now there is no setting for "on by default" in the stored presets; presets will turn off any time the presets are reloaded from the server.
+ * Fixed error with die-roll preset grouping option that incorrectly put the parens around the title string as well as the die roll expression.
+## Enhancements
+ * Changes die-roll color button icons.
+
 # 4.17.1
 ## Fixes
  * Removed debugging statement
