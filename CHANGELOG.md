@@ -3,7 +3,7 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.17.1          <!-- @@##@@ -->
+ * This Package Version: 4.17.2          <!-- @@##@@ -->
  * Effective Date: 24-Nov-2023               <!-- @@##@@ -->
 
 ## Compatibility
@@ -16,7 +16,7 @@ The support for old server protocols (<400) and map file formats (<20) will be d
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
-# Unreleased 4.17.2
+# 4.17.2
 ## Fixes
  * Corrects bug in error message reporting for duplicate AC commands from server.
  * Mitigates bug with die-roll modifiers getting turned on; now there is no setting for "on by default" in the stored presets; presets will turn off any time the presets are reloaded from the server.
