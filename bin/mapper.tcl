@@ -8548,8 +8548,7 @@ proc fetch_map_file {id} {
 
 
 	if {[catch {
-		DEBUG 3 "Running $CURLpath $CreateOpt $opts --output [file nativename $cache_filename] -f -z [clock format $cache_newer_than] $url"
-		puts "Running $CURLpath $CreateOpt $opts --output [file nativename $cache_filename] -f -z [clock format $cache_newer_than] $url"
+		DEBUG 1 "Running $CURLpath $CreateOpt $opts --output [file nativename $cache_filename] -f -z [clock format $cache_newer_than] $url"
 		flush stdout
 		exec $CURLpath $CreateOpt {*}$opts --output [file nativename $cache_filename] -f -z [clock format $cache_newer_than] $url >&@$my_stdout
 		DEBUG 3 "Updating cache file time"
@@ -8572,8 +8571,10 @@ proc fetch_map_file {id} {
 }
 
 proc fetch_url {localdir local url} {
-	global CURLproxy CURLpath CURLserver
+	global CURLproxy CURLpath CURLserver CURLinsecure
 	global my_stdout
+
+	set opts {}
 
 	if {![file isdirectory $localdir]} {
 		if {[file exists $localdir]} {
@@ -8594,14 +8595,15 @@ proc fetch_url {localdir local url} {
 	}
 
 	set dest [file join $localdir $local]
+	if {$CURLproxy ne {}} {
+		lappend opts --proxy $CURLproxy
+	}
+	if {$CURLinsecure} {
+		lappend opts -k
+	}
 	if {[catch {
-		if {$CURLproxy ne {}} {
-			DEBUG 3 "Running $CURLpath --output [file nativename $dest] --proxy $CURLproxy -f $url"
-			exec $CURLpath --output [file nativename $dest] --proxy $CURLproxy -f $url >&@$my_stdout
-		} else {
-			DEBUG 3 "Running $CURLpath --output [file nativename $dest] -f $url"
-			exec $CURLpath --output [file nativename $dest] -f $url >&@$my_stdout
-		}
+		DEBUG 1 "Running $CURLpath $opts --output [file nativename $dest] -f $url"
+		exec $CURLpath {*}$opts --output [file nativename $dest] -f $url >&@$my_stdout
 	} err options]} {
 		set i [dict get $options -errorcode]
 		if {[llength $i] >= 3 && [lindex $i 0] eq {CHILDSTATUS} && [lindex $i 2] == 22} {
@@ -8678,7 +8680,7 @@ proc send_file_to_server {id local_file} {
 proc fetch_image {name zoom id} {
 	global ClockDisplay
 	global ImageFormat
-	global CURLproxy CURLpath CURLserver
+	global CURLproxy CURLpath CURLserver CURLinsecure
 	global cache_too_old_days
 	global my_stdout
 
@@ -8718,16 +8720,18 @@ proc fetch_image {name zoom id} {
 		set CreateOpt --create-dirs
 	}
 	set url "$CURLserver/[string range $id 0 0]/[string range $id 0 1]/$id.$ImageFormat"
+	set opts {}
+	if {$CURLproxy ne {}} {
+		lappend opts --proxy $CURLproxy
+	}
+	if {$CURLinsecure} {
+		lappend opts -k
+	}
 	if {[catch {
-		if {$CURLproxy ne {}} {
-			DEBUG 3 "Running $CURLpath $CreateOpt --output [file nativename $cache_filename] --proxy $CURLproxy -f -z [clock format $cache_newer_than] $url"
-			exec $CURLpath $CreateOpt --output [file nativename $cache_filename] --proxy $CURLproxy -f -z [clock format $cache_newer_than] $url >&@$my_stdout
-		} else {
-			DEBUG 3 "Running $CURLpath $CreateOpt --output [file nativename $cache_filename] -f -z [clock format $cache_newer_than] $url"
-			exec $CURLpath $CreateOpt --output [file nativename $cache_filename] -f -z [clock format $cache_newer_than] $url >&@$my_stdout
-		}
+		DEBUG 1 "Running $CURLpath $CreateOpt $opts --output [file nativename $cache_filename] -f -z [clock format $cache_newer_than] $url"
+		exec $CURLpath $CreateOpt {*}$opts --output [file nativename $cache_filename] -f -z [clock format $cache_newer_than] $url >&@$my_stdout
 		DEBUG 3 "Updating cache file time"
-        file mtime [file nativename $cache_filename] [clock seconds]
+		file mtime [file nativename $cache_filename] [clock seconds]
 	} err options]} {
 		set i [dict get $options -errorcode]
 		if {[llength $i] >= 3 && [lindex $i 0] eq {CHILDSTATUS} && [lindex $i 2] == 22} {
@@ -8747,7 +8751,7 @@ proc fetch_image {name zoom id} {
 proc fetch_animated_image {name zoom id frames speed loops} {
 	global ClockDisplay
 	global ImageFormat
-	global CURLproxy CURLpath CURLserver
+	global CURLproxy CURLpath CURLserver CURLinsecure
 	global cache_too_old_days
 	global my_stdout
 
@@ -8795,14 +8799,16 @@ proc fetch_animated_image {name zoom id frames speed loops} {
 			set CreateOpt --create-dirs
 		}
 		set url "$CURLserver/[string range $id 0 0]/[string range $id 0 1]/:$n:$id.$ImageFormat"
+		set opts {}
+		if {$CURLproxy ne {}} {
+			lappend opts --proxy $CURLproxy
+		}
+		if {$CURLinsecure} {
+			lappend opts -k
+		}
 		if {[catch {
-			if {$CURLproxy ne {}} {
-				DEBUG 3 "Running $CURLpath $CreateOpt --output [file nativename $cache_filename] --proxy $CURLproxy -f -z [clock format $cache_newer_than] $url"
-				exec $CURLpath $CreateOpt --output [file nativename $cache_filename] --proxy $CURLproxy -f -z [clock format $cache_newer_than] $url >&@$my_stdout
-			} else {
-				DEBUG 3 "Running $CURLpath $CreateOpt --output [file nativename $cache_filename] -f -z [clock format $cache_newer_than] $url"
-				exec $CURLpath $CreateOpt --output [file nativename $cache_filename] -f -z [clock format $cache_newer_than] $url >&@$my_stdout
-			}
+			DEBUG 3 "Running $CURLpath $CreateOpt $opts --output [file nativename $cache_filename] -f -z [clock format $cache_newer_than] $url"
+			exec $CURLpath $CreateOpt {*}$opts --output [file nativename $cache_filename] -f -z [clock format $cache_newer_than] $url >&@$my_stdout
 			DEBUG 3 "Updating cache file time"
 			file mtime [file nativename $cache_filename] [clock seconds]
 		} err options]} {
@@ -9619,7 +9625,7 @@ proc checkForUpdates {} {
 # UpgradeAvailable upgrade_dict
 proc UpgradeAvailable {args} {
 	global GMAMapperVersion BIN_DIR path_install_base
-	global UpdateURL path_tmp CURLproxy CURLpath
+	global UpdateURL path_tmp CURLproxy CURLpath CURLinsecure
 	global ServerAvailableVersion
 
 	if {[llength $args] == 2 && [lindex $args 0] eq {-github}} {
@@ -9704,7 +9710,7 @@ proc UpgradeAvailable {args} {
 						-detail "If you click YES, the new client will be installed in the recommended location to make it easier to maintain all the versions of the mapper you have on your system.\nIf you click NO, you will be prompted to choose the installation directory of your choice.\nIt you click CANCEL, we won't install the new version at this time at all."]
 					if {$answer eq {yes}} {
 						INFO "Initiating upgrade from $GMAMapperVersion to $new_version from $_UpdateURL"
-						::gmautil::upgrade $target_dirs $path_tmp $_UpdateURL $upgrade_file $GMAMapperVersion $new_version mapper bin/mapper.tcl ::INFO $CURLproxy $CURLpath
+						::gmautil::upgrade $target_dirs $path_tmp $_UpdateURL $upgrade_file $GMAMapperVersion $new_version mapper bin/mapper.tcl ::INFO $CURLproxy $CURLpath $CURLinsecure
 					} elseif {$answer eq {no}} {
 						set chosen_dir [tk_chooseDirectory -initialdir [file join {*}$target_dirs] \
 							-mustexist true \
@@ -9716,7 +9722,7 @@ proc UpgradeAvailable {args} {
 								-title "Confirm Installation Directory" \
 								-message "Are you sure you wish to install into $chosen_dir?"\
 								-detail "If you click YES, we will install the new mapper client into $chosen_dir."] eq {yes}} {
-								::gmautil::upgrade [file split $chosen_dir] $path_tmp $_UpdateURL $upgrade_file $GMAMapperVersion $new_version mapper bin/mapper.tcl ::INFO $CURLproxy $CURLpath
+								::gmautil::upgrade [file split $chosen_dir] $path_tmp $_UpdateURL $upgrade_file $GMAMapperVersion $new_version mapper bin/mapper.tcl ::INFO $CURLproxy $CURLpath $CURLinsecure
 							} else {
 								say "Installation of version $new_version cancelled."
 							}
