@@ -267,7 +267,7 @@ if {[::gmautil::version_compare $::tcl_version 8.7] >= 0} {
 # __checksums__ file at the root of the tar file is read to
 # verify the integrity of files after extraction
 #
-proc ::gmautil::upgrade {destination_dir_list tmp_path source_base_url source_base_file old_version new_version strip_prefix launch msg_callback curl_proxy curl_path} {
+proc ::gmautil::upgrade {destination_dir_list tmp_path source_base_url source_base_file old_version new_version strip_prefix launch msg_callback curl_proxy curl_path {curl_insecure false}} {
 	variable checklist
 	set pi 0
 
@@ -325,13 +325,16 @@ proc ::gmautil::upgrade {destination_dir_list tmp_path source_base_url source_ba
 
 		$msg_callback "$msg_pfx downloading..." -progress [incr pi] -display
 		$msg_callback "$msg_pfx downloading $new_version from $source_base_url..." 
+		set opts {}
+		if {$curl_proxy ne {}} {
+			lappend opts --proxy $curl_proxy
+		}
+		if {$curl_insecure} {
+			lappend opts -k
+		}
 		foreach suffix {tar.gz tar.gz.sig} {
 			if [catch {
-				if {$curl_proxy ne {}} {
-					exec -ignorestderr $curl_path --output [file nativename [file join $tmp_path "${source_base_file}.${suffix}"]] --proxy $curl_proxy -f "${source_base_url}/${source_base_file}.${suffix}"
-				} else {
-					exec -ignorestderr $curl_path --output [file nativename [file join $tmp_path "${source_base_file}.${suffix}"]] -f "${source_base_url}/${source_base_file}.${suffix}"
-				}
+				exec -ignorestderr $curl_path {*}$opts --output [file nativename [file join $tmp_path "${source_base_file}.${suffix}"]] -f "${source_base_url}/${source_base_file}.${suffix}"
 			} err options] {
 				set i [dict get $options -errorcode]
 				if {[llength $i] >= 3 && [lindex $i 0] eq {CHILDSTATUS} && [lindex $i 2] == 22} {
