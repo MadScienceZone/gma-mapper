@@ -11,7 +11,7 @@
 ########################################################################################
 # Profile editor
 
-package provide gmaprofile 1.1
+package provide gmaprofile 1.2
 package require gmacolors
 package require json 1.3.3
 package require json::write 1.0.3
@@ -28,7 +28,7 @@ namespace eval ::gmaprofile {
 	variable font_repository
 	variable _default_color_table
 	variable minimum_file_version 1
-	variable maximum_file_version 3
+	variable maximum_file_version 4
 	array set _default_color_table {
 		fg,light           #000000
 		normal_fg,light    #000000
@@ -87,6 +87,7 @@ namespace eval ::gmaprofile {
 		button_size s
 		colorize_die_rolls ?
 		curl_path s
+		curl_insecure ?
 		current_profile s
 		dark ?
 		debug_level i
@@ -277,6 +278,7 @@ namespace eval ::gmaprofile {
 			button_size     small\
 			colorize_die_rolls true\
 			curl_path       [::gmautil::searchInPath curl]\
+			curl_insecure   false\
 			current_profile offline\
 			dark            false\
 			debug_level     0\
@@ -500,7 +502,7 @@ namespace eval ::gmaprofile {
 
 		json::write indented true
 		json::write aligned true
-		dict set data GMA_Mapper_preferences_version 3
+		dict set data GMA_Mapper_preferences_version 4
 		set f [open $filename w]
 		puts $f [::gmaproto::_encode_payload $data $_file_format]
 		close $f
@@ -554,7 +556,7 @@ namespace eval ::gmaprofile {
 	}
 	proc _save {} {
 		global animate colorize_die_rolls button_size bsizetext dark image_format keep_tools preload
-		global imgtext debug_level debug_proto curl_path profiles menu_button never_animate
+		global imgtext debug_level debug_proto curl_path curl_insecure profiles menu_button never_animate
 		global major_interval major_offset_x major_offset_y
 		global minor_interval minor_offset_x minor_offset_y
 		variable _profile
@@ -564,6 +566,7 @@ namespace eval ::gmaprofile {
 			button_size $button_size \
 			colorize_die_rolls $colorize_die_rolls \
 			curl_path $curl_path \
+			curl_insecure $curl_insecure \
 			dark $dark \
 			debug_level $debug_level \
 			debug_proto $debug_proto \
@@ -734,7 +737,7 @@ namespace eval ::gmaprofile {
 
 	proc editor {w d} {
 		global animate button_size bsizetext colorize_die_rolls dark image_format keep_tools preload
-		global imgtext debug_proto debug_level curl_path profiles menu_button never_animate
+		global imgtext debug_proto debug_level curl_path curl_insecure profiles menu_button never_animate
 		global major_interval major_offset_x major_offset_y
 		global minor_interval minor_offset_x minor_offset_y
 		global s_hostname s_port s_user s_pass s_blur_hp
@@ -751,6 +754,7 @@ namespace eval ::gmaprofile {
 			button_size button_size \
 			colorize_die_rolls colorize_die_rolls \
 			curl_path curl_path \
+			curl_insecure curl_insecure \
 			dark dark \
 			debug_level debug_level \
 			debug_proto debug_proto \
@@ -1073,6 +1077,7 @@ namespace eval ::gmaprofile {
 		grid [ttk::label $w.n.t.title -text "PATHS TO SUPPORT PROGRAMS" -anchor center -foreground $sep_fg -background $sep_bg] - -sticky we -pady 5
 		grid [ttk::label $w.n.t.curl_label -text "Curl program path:"] \
 		     [ttk::entry $w.n.t.curl -textvariable curl_path] -sticky w
+	     	grid [ttk::checkbutton $w.n.t.curl_k -text "Run Curl in insecure mode" -variable curl_insecure] - -sticky w
 
 		grid [ttk::label $w.n.d.title -text "DIAGNOSTIC/DEBUGGING OPTIONS" -anchor center -foreground $sep_fg -background $sep_bg] - -sticky we -pady 5
 		grid [ttk::label $w.n.d.level_label -text "Debugging level:"] \
