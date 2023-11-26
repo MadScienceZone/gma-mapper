@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___        __    ______      _______       #
-# (  ____ \(       )(  ___  ) Game         /   )      /  \  / ___  \    / ___   )      #
-# | (    \/| () () || (   ) | Master's    / /) |      \/) ) \/   )  )   \/   )  |      #
-# | |      | || || || (___) | Assistant  / (_) (_       | |     /  /        /   )      #
-# | | ____ | |(_)| ||  ___  |           (____   _)      | |    /  /       _/   /       #
-# | | \_  )| |   | || (   ) |                ) (        | |   /  /       /   _/        #
-# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_ /  /     _ (   (__/\      #
-# (_______)|/     \||/     \| Client         (_)  (_) \____/ \_/     (_)\_______/      #
+#  _______  _______  _______                ___        __    ______      ______        #
+# (  ____ \(       )(  ___  ) Game         /   )      /  \  / ___  \    / ___  \       #
+# | (    \/| () () || (   ) | Master's    / /) |      \/) ) \/   )  )   \/   \  \      #
+# | |      | || || || (___) | Assistant  / (_) (_       | |     /  /       ___) /      #
+# | | ____ | |(_)| ||  ___  |           (____   _)      | |    /  /       (___ (       #
+# | | \_  )| |   | || (   ) |                ) (        | |   /  /            ) \      #
+# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_ /  /     _ /\___/  /      #
+# (_______)|/     \||/     \| Client         (_)  (_) \____/ \_/     (_)\______/       #
 #                                                                                      #
 ########################################################################################
 #
@@ -1889,7 +1889,12 @@ proc ::gmaproto::_login {} {
 		# Negotiate interaction with server up to successful login.
 		#
 		switch -exact -- $cmd {
-			//	{ ::DEBUG 1 "server: $params" }
+			//	{ ::DEBUG 1 "server: $params" 
+				set msg [string trim [string range $params 2 end]]
+				if {[string compare -nocase -length 7 $msg notice:] == 0} {
+					tk_messageBox -type ok -icon info -message [string range $msg 7 end] -title "Server Notice" -parent .
+				}
+			}
 			AC	{ ::gmaproto::_dispatch_to_app AC $params }
 			DSM	{ ::gmaproto::_dispatch_to_app DSM $params }
 			MARCO	{ ::gmaproto::DEBUG "Ignored MARCO during login" }
@@ -2188,7 +2193,7 @@ proc ::gmaproto::GMATypeToProtocolCommand {gt} {
 	return $gt
 }
 
-# @[00]@| GMA-Mapper 4.17.2
+# @[00]@| GMA-Mapper 4.17.3
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

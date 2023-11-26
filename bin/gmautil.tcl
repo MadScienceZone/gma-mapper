@@ -1,18 +1,18 @@
 ########################################################################################
-#  _______  _______  _______                ___        __    ______      _______       #
-# (  ____ \(       )(  ___  ) Game         /   )      /  \  / ___  \    / ___   )      #
-# | (    \/| () () || (   ) | Master's    / /) |      \/) ) \/   )  )   \/   )  |      #
-# | |      | || || || (___) | Assistant  / (_) (_       | |     /  /        /   )      #
-# | | ____ | |(_)| ||  ___  |           (____   _)      | |    /  /       _/   /       #
-# | | \_  )| |   | || (   ) |                ) (        | |   /  /       /   _/        #
-# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_ /  /     _ (   (__/\      #
-# (_______)|/     \||/     \| Client         (_)  (_) \____/ \_/     (_)\_______/      #
+#  _______  _______  _______                ___        __    ______      ______        #
+# (  ____ \(       )(  ___  ) Game         /   )      /  \  / ___  \    / ___  \       #
+# | (    \/| () () || (   ) | Master's    / /) |      \/) ) \/   )  )   \/   \  \      #
+# | |      | || || || (___) | Assistant  / (_) (_       | |     /  /       ___) /      #
+# | | ____ | |(_)| ||  ___  |           (____   _)      | |    /  /       (___ (       #
+# | | \_  )| |   | || (   ) |                ) (        | |   /  /            ) \      #
+# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_ /  /     _ /\___/  /      #
+# (_______)|/     \||/     \| Client         (_)  (_) \____/ \_/     (_)\______/       #
 #                                                                                      #
 ########################################################################################
 # version 1.0, 17 July 2020.
 # Steve Willoughby <steve@madscience.zone>
 #
-# @[00]@| GMA-Mapper 4.17.2
+# @[00]@| GMA-Mapper 4.17.3
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
@@ -267,7 +267,7 @@ if {[::gmautil::version_compare $::tcl_version 8.7] >= 0} {
 # __checksums__ file at the root of the tar file is read to
 # verify the integrity of files after extraction
 #
-proc ::gmautil::upgrade {destination_dir_list tmp_path source_base_url source_base_file old_version new_version strip_prefix launch msg_callback curl_proxy curl_path} {
+proc ::gmautil::upgrade {destination_dir_list tmp_path source_base_url source_base_file old_version new_version strip_prefix launch msg_callback curl_proxy curl_path {curl_insecure false}} {
 	variable checklist
 	set pi 0
 
@@ -325,13 +325,16 @@ proc ::gmautil::upgrade {destination_dir_list tmp_path source_base_url source_ba
 
 		$msg_callback "$msg_pfx downloading..." -progress [incr pi] -display
 		$msg_callback "$msg_pfx downloading $new_version from $source_base_url..." 
+		set opts {}
+		if {$curl_proxy ne {}} {
+			lappend opts --proxy $curl_proxy
+		}
+		if {$curl_insecure} {
+			lappend opts -k
+		}
 		foreach suffix {tar.gz tar.gz.sig} {
 			if [catch {
-				if {$curl_proxy ne {}} {
-					exec -ignorestderr $curl_path --output [file nativename [file join $tmp_path "${source_base_file}.${suffix}"]] --proxy $curl_proxy -f "${source_base_url}/${source_base_file}.${suffix}"
-				} else {
-					exec -ignorestderr $curl_path --output [file nativename [file join $tmp_path "${source_base_file}.${suffix}"]] -f "${source_base_url}/${source_base_file}.${suffix}"
-				}
+				exec -ignorestderr $curl_path {*}$opts --output [file nativename [file join $tmp_path "${source_base_file}.${suffix}"]] -f "${source_base_url}/${source_base_file}.${suffix}"
 			} err options] {
 				set i [dict get $options -errorcode]
 				if {[llength $i] >= 3 && [lindex $i 0] eq {CHILDSTATUS} && [lindex $i 2] == 22} {
