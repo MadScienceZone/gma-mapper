@@ -17,10 +17,10 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.17.3}     ;# @@##@@
+set GMAMapperVersion {4.18}     ;# @@##@@
 set GMAMapperFileFormat {22}        ;# @@##@@
 set GMAMapperProtocol {408}         ;# @@##@@
-set CoreVersionNumber {6.9-beta.1}            ;# @@##@@
+set CoreVersionNumber {6.9}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -748,6 +748,7 @@ proc InitializeChatHistory {} {
 			DEBUG 0 "Refusing to load the chat history from cache because someone beat me to the file! (mode $ChatHistoryFileDirection) This shouldn't happen."
 			return
 		}
+		set prog_id [begin_progress * "Loading cached chat messages" *]
 		set ChatHistoryFile [file join $path_cache "${IThost}-${ITport}-${local_user}-chat.history"]
 		DEBUG 1 "Loading chat history from $ChatHistoryFile"
 		if {! [file exists $ChatHistoryFile]} {
@@ -762,6 +763,7 @@ proc InitializeChatHistory {} {
 				if {[catch {
 					while {[gets $ChatHistoryFileHandle msg] >= 0} {
 						DEBUG 2 "read $msg from cache"
+						update 
 						if {[lindex $msg 0] eq {CHAT}} {
 							# new-style entry:	{CHAT ROLL|TO|CC|-system json-dict}
 							DEBUG 3 "parsing new style message"
@@ -808,6 +810,7 @@ proc InitializeChatHistory {} {
 						set ChatHistoryFileDirection w
 						set ChatHistory [lrange $ChatHistory end-$ChatHistoryLimit end]
 						foreach msg $ChatHistory {
+							update
 							puts $ChatHistoryFileHandle [MarshalChatHistoryEntry $msg]
 						}
 						flush $ChatHistoryFileHandle
@@ -815,6 +818,7 @@ proc InitializeChatHistory {} {
 				}
 			}
 		}
+		end_progress $prog_id
 
 		set ChatHistoryFileDirection a
 		if {$ChatHistoryFileHandle eq {}} {
@@ -829,13 +833,16 @@ proc InitializeChatHistory {} {
 			if {$ChatHistoryLimit > 0} {
 				DEBUG 1 "We don't have any loaded history; asking server for up to $ChatHistoryLimit messages."
 				::gmaproto::sync_chat -$ChatHistoryLimit
+				::gmaproto::watch_operation "Loading up to $ChatHistoryLimit chat messages"
 			} elseif {$ChatHistoryLimit == 0} {
 				DEBUG 1 "We don't have any loaded history; asking server all messages."
 				::gmaproto::sync_chat 0
+				::gmaproto::watch_operation "Loading full chat message history"
 			}
 		} else {
 			DEBUG 1 "Asking server for any new messages since $ChatHistoryLastMessageID."
 			::gmaproto::sync_chat $ChatHistoryLastMessageID
+			::gmaproto::watch_operation "Loading new chat messages"
 		}
 	}
 }
@@ -1050,6 +1057,8 @@ proc create_main_menu {use_button} {
 	$mm.tools add command -command {CleanupImageCache 0} -label "Clear Image Cache"
 	$mm.tools add command -command {CleanupImageCache 60} -label "Clear Image Cache (over 60 days)"
 	$mm.tools add command -command {CleanupImageCache -update} -label "Update Cached Images from Server..."
+	$mm.tools add separator
+	$mm.tools add command -command ServerPingTest -label "Test server response time..."
 
 	menu $mm.tools.rch
 	$mm.tools.rch add command -command {ResetChatHistory 50} -label "...and load 50 messages"
@@ -2212,6 +2221,7 @@ proc SyncFromServer {} {
 	cleargrid
 	clearplayers *
 	::gmaproto::sync
+	::gmaproto::watch_operation "Syncing game state"
 }
 
 proc ReconnectToServer {} {
@@ -6617,6 +6627,7 @@ proc DistanceToTarget3D {Gx Gy Gz_ft MobID} {
 	return [GridDistance $Cx $Cy $MGx $MGy]
 }
 
+
 proc DebugMarker {title cmd dcmd} {
 	create_dialog .dm
 	wm title .dm $title
@@ -6676,6 +6687,89 @@ proc PixelsToFeet {px} {
 proc FeetToPixels {ft} {
 	global iscale
 	return [expr $ft * ($iscale / 5.0)]
+}
+
+#
+# time ->server @server ->client round-trip
+# 0
+# 1
+# 2
+# 3
+# 4
+# 5
+# [Dismiss]
+#
+proc ServerPingTest {} {
+	global _preferences colortheme SPTidx
+
+	create_dialog .spt
+	set SPTidx 5
+	wm title .spt "Server Ping Test"
+	grid [label .spt.h0 -text "Time"      -foreground [dict get $_preferences styles dialogs heading_fg $colortheme]] \
+	     [label .spt.h1 -text "In Transit" -foreground [dict get $_preferences styles dialogs heading_fg $colortheme]] \
+	     [label .spt.h2 -text "In Server" -foreground [dict get $_preferences styles dialogs heading_fg $colortheme]] \
+	     [label .spt.h3 -text "Round-Trip" -foreground [dict get $_preferences styles dialogs heading_fg $colortheme]]
+     	grid [label .spt.t0 -text "--:--:--"]
+     	grid [label .spt.t1 -text "--:--:--"]
+     	grid [label .spt.t2 -text "--:--:--"]
+     	grid [label .spt.t3 -text "--:--:--"]
+     	grid [label .spt.t4 -text "--:--:--"]
+     	grid [label .spt.t5 -text "--:--:--"]
+     	grid [button .spt.dismiss -text Dismiss -command "destroy .spt"] - - -
+	after 0 _ping_server
+}
+
+proc _ping_server {} {
+	global SPTidx _preferences colortheme
+	if {[winfo exists .spt]} {
+		set SPTidx [expr ($SPTidx + 1) % 6]
+		foreach w {s i r} {
+			if {[winfo exists .spt.$w$SPTidx]} {
+				grid forget .spt.$w$SPTidx
+				destroy .spt.$w$SPTidx
+			}
+		}
+		.spt.t$SPTidx configure -text [clock format [clock seconds] -format %H:%M:%S]
+		grid [label .spt.s$SPTidx -text "pending..."] - - -row [expr $SPTidx + 1] -column 1
+		.spt.t$SPTidx configure -foreground [dict get $_preferences styles dialogs highlight_fg $colortheme]
+		.spt.s$SPTidx configure -foreground [dict get $_preferences styles dialogs highlight_fg $colortheme]
+		::gmaproto::_protocol_send ECHO s __spt__ i $SPTidx o [dict create origin [clock microseconds]]
+		after 10000 _ping_server
+	}
+}
+
+proc scan_fractional_seconds {t} {
+	if {[regexp {^(.*T\d+:\d+:\d+)\.(\d+)([+-].*)$} $t _ pre frac post]} {
+		if {[set intsec [clock scan "$pre$post" -format "%Y-%m-%dT%H:%M:%S%z"]]} {
+			return "$intsec.$frac"
+		}
+	}
+	DEBUG 0 "Unable to parse date string \"$t\""
+	return 0
+}
+
+proc _server_ping_reply {d} {
+	global _preferences colortheme
+
+	if {[winfo exists .spt]} {
+		set recd_f [expr [clock microseconds] / 1000000.0]
+		set sent_f [expr [dict get $d o origin] / 1000000.0]
+		set idx [dict get $d i]
+		set server_recd [scan_fractional_seconds [dict get $d ReceivedTime]]
+		set server_sent [scan_fractional_seconds [dict get $d SentTime]]
+		set round_trip [expr $recd_f - $sent_f]
+		set in_server [expr $server_sent - $server_recd]
+		set in_transit [expr $round_trip - $in_server]
+
+		.spt.t$idx configure -foreground [dict get $_preferences styles dialogs normal_fg $colortheme]
+		grid forget .spt.s$idx
+		.spt.s$idx configure -foreground [dict get $_preferences styles dialogs normal_fg $colortheme]\
+			-text [format "%.3fms" [expr $in_transit * 1000.0]]
+		grid configure x .spt.s$idx \
+			[label .spt.i$idx -foreground [dict get $_preferences styles dialogs normal_fg $colortheme] -text [format "%.3fms" [expr $in_server * 1000.0]]] \
+			[label .spt.r$idx -foreground [dict get $_preferences styles dialogs normal_fg $colortheme] -text [format "%.3fms" [expr $round_trip * 1000.0]]] \
+		-row [expr $idx+1] -sticky e
+	}
 }
 
 proc DistanceFromGrid {x y z_ft} {
@@ -8892,6 +8986,11 @@ proc DoCommandCLR   {d} { ClearObjectById [dict get $d ObjID] }
 proc DoCommandCO    {d} { setCombatMode [dict get $d Enabled] }
 proc DoCommandMARCO {d} { ::gmaproto::polo }
 proc DoCommandMARK  {d} { global canvas; start_ping_marker $canvas [dict get $d X] [dict get $d Y] 0 }
+proc DoCommandECHO  {d} {
+	if {[dict get $d s] eq "__spt__"} {
+		_server_ping_reply $d
+	}
+}
 proc DoCommandOA    {d} { 
 	SetObjectAttribute [dict get $d ObjID] [dict get $d NewAttrs] 
 	if {[::gmaclock::exists .initiative.clock]} {
@@ -11436,7 +11535,10 @@ proc LoadChatHistory {} {
 	global ChatHistory
 	set w .chatwindow.p.chat.1.text
 
+	set prog_id [begin_progress * "Loading chat messages" [set prog_max [llength $ChatHistory]]]
+	set prog_i 0
 	foreach msg $ChatHistory {
+		update_progress $prog_id [incr prog_i] $prog_max
 	if {[set m [ValidateChatHistoryEntry $msg]] ne {}} {
 	    lassign $m msg_type d msg_id
 
@@ -11466,6 +11568,7 @@ proc LoadChatHistory {} {
             DEBUG 1 "LoadChatHistory: Invalid message $msg"
         }
 	}
+	end_progress $prog_id
 }
 
 
@@ -12808,11 +12911,19 @@ if {$UpgradeNotice} {
 }
 report_progress "Configuring SaF"
 configureSafCapability
+proc clear_report_progress {} {
+	global progress_stack
+	if {[llength $progress_stack] > 0} {
+		after 5000 clear_report_progress
+	} else {
+		report_progress {}
+	}
+}
 if {![::gmaproto::is_ready] && $IThost ne {}} {
     report_progress "Mapper Client Ready (awaiting server login to complete)"
 } else {
     report_progress "Mapper Client Ready"
-    after 5000 {report_progress {}}
+    after 5000 clear_report_progress
 }
 update_main_menu
 
@@ -12930,7 +13041,7 @@ proc ConnectToServerByIdx {idx} {
 #   .../<name>@<zoom>/:<frame>:<name>@<zoom>.<ext>
 #   .../<name>.map
 
-# @[00]@| GMA-Mapper 4.17.3
+# @[00]@| GMA-Mapper 4.18
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
