@@ -748,6 +748,7 @@ proc InitializeChatHistory {} {
 			DEBUG 0 "Refusing to load the chat history from cache because someone beat me to the file! (mode $ChatHistoryFileDirection) This shouldn't happen."
 			return
 		}
+		set prog_id [begin_progress * "Loading cached chat messages" *]
 		set ChatHistoryFile [file join $path_cache "${IThost}-${ITport}-${local_user}-chat.history"]
 		DEBUG 1 "Loading chat history from $ChatHistoryFile"
 		if {! [file exists $ChatHistoryFile]} {
@@ -762,6 +763,7 @@ proc InitializeChatHistory {} {
 				if {[catch {
 					while {[gets $ChatHistoryFileHandle msg] >= 0} {
 						DEBUG 2 "read $msg from cache"
+						update 
 						if {[lindex $msg 0] eq {CHAT}} {
 							# new-style entry:	{CHAT ROLL|TO|CC|-system json-dict}
 							DEBUG 3 "parsing new style message"
@@ -808,6 +810,7 @@ proc InitializeChatHistory {} {
 						set ChatHistoryFileDirection w
 						set ChatHistory [lrange $ChatHistory end-$ChatHistoryLimit end]
 						foreach msg $ChatHistory {
+							update
 							puts $ChatHistoryFileHandle [MarshalChatHistoryEntry $msg]
 						}
 						flush $ChatHistoryFileHandle
@@ -815,6 +818,7 @@ proc InitializeChatHistory {} {
 				}
 			}
 		}
+		end_progress $prog_id
 
 		set ChatHistoryFileDirection a
 		if {$ChatHistoryFileHandle eq {}} {
@@ -829,13 +833,16 @@ proc InitializeChatHistory {} {
 			if {$ChatHistoryLimit > 0} {
 				DEBUG 1 "We don't have any loaded history; asking server for up to $ChatHistoryLimit messages."
 				::gmaproto::sync_chat -$ChatHistoryLimit
+				::gmaproto::watch_operation "Loading up to $ChatHistoryLimit chat messages"
 			} elseif {$ChatHistoryLimit == 0} {
 				DEBUG 1 "We don't have any loaded history; asking server all messages."
 				::gmaproto::sync_chat 0
+				::gmaproto::watch_operation "Loading full chat message history"
 			}
 		} else {
 			DEBUG 1 "Asking server for any new messages since $ChatHistoryLastMessageID."
 			::gmaproto::sync_chat $ChatHistoryLastMessageID
+			::gmaproto::watch_operation "Loading new chat messages"
 		}
 	}
 }
@@ -2212,6 +2219,7 @@ proc SyncFromServer {} {
 	cleargrid
 	clearplayers *
 	::gmaproto::sync
+	::gmaproto::watch_operation "Syncing game state"
 }
 
 proc ReconnectToServer {} {
@@ -8888,6 +8896,7 @@ proc BackgroundConnectToServer {tries} {
 #
 
 # simple commands
+proc DoCommandECHO  {d} {}
 proc DoCommandCLR   {d} { ClearObjectById [dict get $d ObjID] }
 proc DoCommandCO    {d} { setCombatMode [dict get $d Enabled] }
 proc DoCommandMARCO {d} { ::gmaproto::polo }
@@ -11436,7 +11445,10 @@ proc LoadChatHistory {} {
 	global ChatHistory
 	set w .chatwindow.p.chat.1.text
 
+	set prog_id [begin_progress * "Loading chat messages" [set prog_max [llength $ChatHistory]]]
+	set prog_i 0
 	foreach msg $ChatHistory {
+		update_progress $prog_id [incr prog_i] $prog_max
 	if {[set m [ValidateChatHistoryEntry $msg]] ne {}} {
 	    lassign $m msg_type d msg_id
 
@@ -11466,6 +11478,7 @@ proc LoadChatHistory {} {
             DEBUG 1 "LoadChatHistory: Invalid message $msg"
         }
 	}
+	end_progress $prog_id
 }
 
 
@@ -12808,11 +12821,19 @@ if {$UpgradeNotice} {
 }
 report_progress "Configuring SaF"
 configureSafCapability
+proc clear_report_progress {} {
+	global progress_stack
+	if {[llength $progress_stack] > 0} {
+		after 5000 clear_report_progress
+	} else {
+		report_progress {}
+	}
+}
 if {![::gmaproto::is_ready] && $IThost ne {}} {
     report_progress "Mapper Client Ready (awaiting server login to complete)"
 } else {
     report_progress "Mapper Client Ready"
-    after 5000 {report_progress {}}
+    after 5000 clear_report_progress
 }
 update_main_menu
 
