@@ -81,6 +81,7 @@ namespace eval ::gmaproto {
 	variable client
 	variable current_stream {}
 	variable stream_dict {}
+	variable progress_stack {}
 
 	variable _message_map
 	array set _message_map {
@@ -193,6 +194,21 @@ namespace eval ::gmaproto {
 		MoveMode {land burrow climb fly swim} \
 	    CreatureType {unknown monster player} \
 	]
+}
+
+# let the user know we're in the middle of some operation which will involve
+# a number of server messages, until we receive a note from the server that
+# they are done. Call this just after making the request to the server.
+# uses:
+#	::begin_progress id|* title max|0|* ?-send?
+#	::update_progress id value newmax|* ?-send?
+#	::end_progress id ?-send?
+#
+proc ::gmaproto::watch_operation {description} {
+	set this_operation_id [::gmaproto::new_id]
+	lappend ::gmaproto::progress_stack $this_operation_id
+	::gmaproto::_protocol_send ECHO s $this_operation_id
+	::begin_progress $this_operation_id $description *
 }
 
 proc ::gmaproto::is_enabled {} {
@@ -346,6 +362,13 @@ proc ::gmaproto::_dispatch {} {
 		} else {
 			if {$::gmaproto::debug_f ne {}} {
 				$::gmaproto::debug_f "dispatching $cmd to app: $params"
+			}
+			if {$cmd eq "ECHO" && [llength $::gmaproto::progress_stack] > 0} {
+				if {[set watched_idx [lsearch -exact $::gmaproto::progress_stack [dict get $params s]]] >= 0} {
+					set watched_id [lindex $::gmaproto::progress_stack $watched_idx]
+					::end_progress $watched_id
+					set ::gmaproto::progress_stack [lreplace $::gmaproto::progress_stack $watched_idx $watched_idx]
+				}
 			}
 			::gmaproto::_dispatch_to_app $cmd $params
 		}
@@ -1964,6 +1987,7 @@ proc ::gmaproto::_login {} {
 			READY { 
 				::gmaproto::DEBUG "Server sign-on completed." 
 				set sync_done true
+				::gmaproto::watch_operation "Syncing game state"
 			}
 			UPDATES {
 				foreach p [dict get $params Packages] {
