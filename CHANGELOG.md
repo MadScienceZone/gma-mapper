@@ -3,11 +3,11 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.17.3          <!-- @@##@@ -->
- * Effective Date: 25-Nov-2023               <!-- @@##@@ -->
+ * This Package Version: 4.18          <!-- @@##@@ -->
+ * Effective Date: 28-Nov-2023               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.9-beta.1 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.9 <!-- @@##@@ -->
  * GMA Mapper File Format: 22	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 408        <!-- @@##@@ -->
 
@@ -15,6 +15,11 @@
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.18
+## Enhancements
+ * Adds progress bars for long-running operations, especially those done at start-up, so you know when the mapper is ready to use.
+ * Adds a server response time testing tool.
 
 # 4.17.3
 ## Fixes
