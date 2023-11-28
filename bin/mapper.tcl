@@ -1057,6 +1057,8 @@ proc create_main_menu {use_button} {
 	$mm.tools add command -command {CleanupImageCache 0} -label "Clear Image Cache"
 	$mm.tools add command -command {CleanupImageCache 60} -label "Clear Image Cache (over 60 days)"
 	$mm.tools add command -command {CleanupImageCache -update} -label "Update Cached Images from Server..."
+	$mm.tools add separator
+	$mm.tools add command -command ServerPingTest -label "Test server response time..."
 
 	menu $mm.tools.rch
 	$mm.tools.rch add command -command {ResetChatHistory 50} -label "...and load 50 messages"
@@ -6625,6 +6627,7 @@ proc DistanceToTarget3D {Gx Gy Gz_ft MobID} {
 	return [GridDistance $Cx $Cy $MGx $MGy]
 }
 
+
 proc DebugMarker {title cmd dcmd} {
 	create_dialog .dm
 	wm title .dm $title
@@ -6684,6 +6687,68 @@ proc PixelsToFeet {px} {
 proc FeetToPixels {ft} {
 	global iscale
 	return [expr $ft * ($iscale / 5.0)]
+}
+
+#
+# time ->server @server ->client round-trip
+# 0
+# 1
+# 2
+# 3
+# 4
+# 5
+# [Dismiss]
+#
+proc ServerPingTest {} {
+	global _preferences colortheme SPTidx
+
+	create_dialog .spt
+	set SPTidx 5
+	wm title .spt "Server Ping Test"
+	grid [label .spt.h0 -text "Time"      -foreground [dict get $_preferences styles dialogs heading_fg $colortheme]] \
+	     [label .spt.h1 -text "To Server" -foreground [dict get $_preferences styles dialogs heading_fg $colortheme]] \
+	     [label .spt.h2 -text "In Server" -foreground [dict get $_preferences styles dialogs heading_fg $colortheme]] \
+	     [label .spt.h3 -text "To Client" -foreground [dict get $_preferences styles dialogs heading_fg $colortheme]] \
+	     [label .spt.h4 -text "Round-Trip" -foreground [dict get $_preferences styles dialogs heading_fg $colortheme]]
+     	grid [label .spt.t0 -text "--:--:--"]
+     	grid [label .spt.t1 -text "--:--:--"]
+     	grid [label .spt.t2 -text "--:--:--"]
+     	grid [label .spt.t3 -text "--:--:--"]
+     	grid [label .spt.t4 -text "--:--:--"]
+     	grid [label .spt.t5 -text "--:--:--"]
+     	grid [button .spt.dismiss -text Dismiss -command "destroy .spt"] - - - - 
+	after 0 _ping_server
+}
+
+proc _ping_server {} {
+	global SPTidx _preferences colortheme
+	if {[winfo exists .spt]} {
+		set SPTidx [expr ($SPTidx + 1) % 6]
+		foreach w {s i c r} {
+			if {[winfo exists .spt.$w$SPTidx]} {
+				grid forget .spt.$w$SPTidx
+				destroy .spt.$w$SPTidx
+			}
+		}
+		.spt.t$SPTidx configure -text [clock format [clock seconds] -format %H:%M:%S]
+		grid [label .spt.s$SPTidx -text "pending..."] - - - -row [expr $SPTidx + 1] -column 1
+		.spt.t configure -foreground [dict get $_preferences styles dialogs highlight_fg $colortheme]
+		.spt.s configure -foreground [dict get $_preferences styles dialogs highlight_fg $colortheme]
+		::gmaproto::_protocol_send ECHO s __spt__ i $SPTidx o [dict create origin [clock microseconds]]
+		after 10000 _ping_server
+	}
+}
+
+
+proc _server_ping_reply {d} {
+	if {[winfo exists .spt]} {
+		sent_us [dict get $d o origin]
+		server_rec [clock scan [dict get $d ReceivedTime 
+		.spt.t configure -foreground [dict get $_preferences styles dialogs normal_fg $colortheme]
+		grid forget .spt.s
+		.spt.s configure -foreground [dict get $_preferences styles dialogs normal_fg $colortheme]\
+			-text [
+	}
 }
 
 proc DistanceFromGrid {x y z_ft} {
@@ -8896,11 +8961,15 @@ proc BackgroundConnectToServer {tries} {
 #
 
 # simple commands
-proc DoCommandECHO  {d} {}
 proc DoCommandCLR   {d} { ClearObjectById [dict get $d ObjID] }
 proc DoCommandCO    {d} { setCombatMode [dict get $d Enabled] }
 proc DoCommandMARCO {d} { ::gmaproto::polo }
 proc DoCommandMARK  {d} { global canvas; start_ping_marker $canvas [dict get $d X] [dict get $d Y] 0 }
+proc DoCommandECHO  {d} {
+	if {[dict get $d s] eq "__spt__"} {
+		_server_ping_reply $d
+	}
+}
 proc DoCommandOA    {d} { 
 	SetObjectAttribute [dict get $d ObjID] [dict get $d NewAttrs] 
 	if {[::gmaclock::exists .initiative.clock]} {
