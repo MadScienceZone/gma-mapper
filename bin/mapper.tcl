@@ -6706,17 +6706,16 @@ proc ServerPingTest {} {
 	set SPTidx 5
 	wm title .spt "Server Ping Test"
 	grid [label .spt.h0 -text "Time"      -foreground [dict get $_preferences styles dialogs heading_fg $colortheme]] \
-	     [label .spt.h1 -text "To Server" -foreground [dict get $_preferences styles dialogs heading_fg $colortheme]] \
+	     [label .spt.h1 -text "In Transit" -foreground [dict get $_preferences styles dialogs heading_fg $colortheme]] \
 	     [label .spt.h2 -text "In Server" -foreground [dict get $_preferences styles dialogs heading_fg $colortheme]] \
-	     [label .spt.h3 -text "To Client" -foreground [dict get $_preferences styles dialogs heading_fg $colortheme]] \
-	     [label .spt.h4 -text "Round-Trip" -foreground [dict get $_preferences styles dialogs heading_fg $colortheme]]
+	     [label .spt.h3 -text "Round-Trip" -foreground [dict get $_preferences styles dialogs heading_fg $colortheme]]
      	grid [label .spt.t0 -text "--:--:--"]
      	grid [label .spt.t1 -text "--:--:--"]
      	grid [label .spt.t2 -text "--:--:--"]
      	grid [label .spt.t3 -text "--:--:--"]
      	grid [label .spt.t4 -text "--:--:--"]
      	grid [label .spt.t5 -text "--:--:--"]
-     	grid [button .spt.dismiss -text Dismiss -command "destroy .spt"] - - - - 
+     	grid [button .spt.dismiss -text Dismiss -command "destroy .spt"] - - -
 	after 0 _ping_server
 }
 
@@ -6724,30 +6723,52 @@ proc _ping_server {} {
 	global SPTidx _preferences colortheme
 	if {[winfo exists .spt]} {
 		set SPTidx [expr ($SPTidx + 1) % 6]
-		foreach w {s i c r} {
+		foreach w {s i r} {
 			if {[winfo exists .spt.$w$SPTidx]} {
 				grid forget .spt.$w$SPTidx
 				destroy .spt.$w$SPTidx
 			}
 		}
 		.spt.t$SPTidx configure -text [clock format [clock seconds] -format %H:%M:%S]
-		grid [label .spt.s$SPTidx -text "pending..."] - - - -row [expr $SPTidx + 1] -column 1
-		.spt.t configure -foreground [dict get $_preferences styles dialogs highlight_fg $colortheme]
-		.spt.s configure -foreground [dict get $_preferences styles dialogs highlight_fg $colortheme]
+		grid [label .spt.s$SPTidx -text "pending..."] - - -row [expr $SPTidx + 1] -column 1
+		.spt.t$SPTidx configure -foreground [dict get $_preferences styles dialogs highlight_fg $colortheme]
+		.spt.s$SPTidx configure -foreground [dict get $_preferences styles dialogs highlight_fg $colortheme]
 		::gmaproto::_protocol_send ECHO s __spt__ i $SPTidx o [dict create origin [clock microseconds]]
 		after 10000 _ping_server
 	}
 }
 
+proc scan_fractional_seconds {t} {
+	if {[regexp {^(.*T\d+:\d+:\d+)\.(\d+)([+-].*)$} $t _ pre frac post]} {
+		if {[set intsec [clock scan "$pre$post" -format "%Y-%m-%dT%H:%M:%S%z"]]} {
+			return "$intsec.$frac"
+		}
+	}
+	DEBUG 0 "Unable to parse date string \"$t\""
+	return 0
+}
 
 proc _server_ping_reply {d} {
+	global _preferences colortheme
+
 	if {[winfo exists .spt]} {
-		sent_us [dict get $d o origin]
-		server_rec [clock scan [dict get $d ReceivedTime 
-		.spt.t configure -foreground [dict get $_preferences styles dialogs normal_fg $colortheme]
-		grid forget .spt.s
-		.spt.s configure -foreground [dict get $_preferences styles dialogs normal_fg $colortheme]\
-			-text [
+		set recd_f [expr [clock microseconds] / 1000000.0]
+		set sent_f [expr [dict get $d o origin] / 1000000.0]
+		set idx [dict get $d i]
+		set server_recd [scan_fractional_seconds [dict get $d ReceivedTime]]
+		set server_sent [scan_fractional_seconds [dict get $d SentTime]]
+		set round_trip [expr $recd_f - $sent_f]
+		set in_server [expr $server_sent - $server_recd]
+		set in_transit [expr $round_trip - $in_server]
+
+		.spt.t$idx configure -foreground [dict get $_preferences styles dialogs normal_fg $colortheme]
+		grid forget .spt.s$idx
+		.spt.s$idx configure -foreground [dict get $_preferences styles dialogs normal_fg $colortheme]\
+			-text [format "%.3fms" [expr $in_transit * 1000.0]]
+		grid configure x .spt.s$idx \
+			[label .spt.i$idx -foreground [dict get $_preferences styles dialogs normal_fg $colortheme] -text [format "%.3fms" [expr $in_server * 1000.0]]] \
+			[label .spt.r$idx -foreground [dict get $_preferences styles dialogs normal_fg $colortheme] -text [format "%.3fms" [expr $round_trip * 1000.0]]] \
+		-row [expr $idx+1] -sticky e
 	}
 }
 
