@@ -2671,6 +2671,44 @@ Each element in this list is a JSON object with the following fields:
 .TP
 .B Name
 The name of the software package, such as \*(lqmapper\*(rq, \*(lqgo-gma\*(rq, or \*(lqcore\*(rq.
+'\" <<New>>
+.TP
+.B MinimumVersion
+If a server wishes to limit clients from this package to only those with a minimum version number
+(as self-reported by the client in its
+.B AUTH
+message), then a
+.B MinimumVersion
+and
+.B VersionPattern
+field MUST be added to that package's information here. The
+.B MinimumVersion
+field is a string with the minimum client version allowed to be used, as a semantic version
+string such as
+.RB \*(lq 1.2 \*(rq,
+.RB \*(lq 1.7.3 \*(rq,
+.RB \*(lq 1.6-alpha.1 \*(rq,
+etc. This will be matched against the value captured from the client's version number
+via the
+.B VersionPattern
+field.
+'\" <</ital-is-var>>
+.I "This field should be used only in server init files. Clients SHOULD NOT use this field, nor expect it to be sent by the server."
+'\" <<ital-is-var>>
+.TP
+.B VersionPattern
+This gives a regular expression which is matched against the
+.B Client
+field sent by the client as part of its
+.B AUTH
+message when signing on to the server. This expression MUST contain a single capturing group
+which yields the client's version number to be compared against the
+.B MinimumVersion
+field described above.
+'\" <</ital-is-var>>
+.I "This field should be used only in server init files. Clients SHOULD NOT use this field, nor expect it to be sent by the server."
+'\" <<ital-is-var>>
+'\" <</New>>
 .TP
 .BI Instances " (list of objects)"
 A list of all available instances of the named package. Each is a JSON object
