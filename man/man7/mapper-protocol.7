@@ -636,7 +636,10 @@ Every time an
 .B ALLOW
 command is given, it resets the entire set of features, rather than 
 adding to them.
-Currently, only one feature is recognized:
+Currently,
+'\" <<New>>
+the following features are recognized.
+'\" <</New>>
 .RS
 '\" <<list>>
 .TP
@@ -659,6 +662,18 @@ color code, indicating the foreground color for that part of the title. A second
 such suffix may be added to indicate the background color. If this feature is
 not enabled, these formatting codes are stripped out by the server before sending
 die roll results to a client which isn't prepared to interpret them.
+'\" <<New>>
+.TP
+.B HIDDEN-DUPLICATE-NAMES
+The client supports the notion that creature names (which must be unique amongst
+the other creature names) may appear identical to the user. It will do this by
+hiding the initial portion of each creature name up to and including the last underscore
+character) from the user while retaining the full, unique name for its internal use.
+The hidden leading characters in the name must consist only of alphanumeric characters
+and underscores. The underscore between that and the player-visible name is required.
+If a client does not support this feature, the server SHOULD remove the hidden portion
+of creature names server-side so the client never sees them.
+'\" <</New>>
 '\" <</>>
 '\" <</>>
 .RE
