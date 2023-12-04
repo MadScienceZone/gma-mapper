@@ -9643,7 +9643,7 @@ proc DoCommandLoginSuccessful {} {
 	}
 	refresh_title
 	if {[dict get $_preferences colorize_die_rolls]} {
-		::gmaproto::allow DICE-COLOR-BOXES
+		::gmaproto::allow [list DICE-COLOR-BOXES HIDDEN-DUPLICATE-NAMES]
 	}
 }
 
