@@ -325,7 +325,9 @@ which is received during the initial connection negotiation (i.e., before the
 message is given by the server) as a notice that the end user should see.
 The text following the word
 .RB \*(lq notice: \*(rq
-is posted in an alert box.
+is posted in an alert box. Clients MUST recognize the string in all lower-case
+if they choose to implement this feature; they MAY also recognize it regardless
+of case.
 '\" <</New>>
 .LP
 '\" <</ital-is-var>>
