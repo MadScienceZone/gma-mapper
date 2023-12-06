@@ -17,10 +17,10 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.18}     ;# @@##@@
+set GMAMapperVersion {4.18.1}     ;# @@##@@
 set GMAMapperFileFormat {22}        ;# @@##@@
 set GMAMapperProtocol {408}         ;# @@##@@
-set CoreVersionNumber {6.9}            ;# @@##@@
+set CoreVersionNumber {6.9.1}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -12936,7 +12936,8 @@ proc ConnectToServerByIdx {idx} {
 		tk_messageBox -type ok -icon error -title "Unable to Connect" -message "Unable to find the requested server profile."
 		return
 	}
-	tk_messageBox -type ok -icon warning -title "Not the recommended way to switch servers" -message "We will attempt to reconnect you now to your requested server profile; however, this is not guaranteed to work 100% due to some known issues with the implementation of this feature.\n\nInstead, we recommend either of these methods which will work perfectly:\n(1) On the command line, add a \"--select PROFILENAME\" switch to the mapper command;\n(2) Select Edit -> Preferences from the menu, click the Servers tab, click on the server you want to connect to, save, and click Yes to have the mapper restart with those settings."
+	set profilename [dict get $newdata current_profile]
+	tk_messageBox -type ok -icon warning -title "Not Recommended" -message "We will attempt to reconnect you now to your \"$profilename\" server profile; however, this is not guaranteed to work 100% due to some known issues with the implementation of this feature.\n\nInstead, we recommend either of these methods which will work perfectly:\n(1) On the command line, add a --select '$profilename' switch to the mapper command;\n(2) Select Edit -> Preferences from the menu, click the Servers tab, click on $profilename, save, and click Yes to have the mapper restart with those settings."
 	set PreferencesData $newdata
 	#::gmaprofile::save $preferences_path $newdata
 	ApplyPreferences $newdata
@@ -13041,7 +13042,7 @@ proc ConnectToServerByIdx {idx} {
 #   .../<name>@<zoom>/:<frame>:<name>@<zoom>.<ext>
 #   .../<name>.map
 
-# @[00]@| GMA-Mapper 4.18
+# @[00]@| GMA-Mapper 4.18.1
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
