@@ -16,6 +16,12 @@ The support for old server protocols (<400) and map file formats (<20) will be d
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
+# 4.18.1
+## Fixes
+ * Improves language in `Play -> Connect to...` menu.
+ * Documents `// notice:` in protocol spec.
+ * Fixes typos in manpages.
+
 # 4.18
 ## Enhancements
  * Adds progress bars for long-running operations, especially those done at start-up, so you know when the mapper is ready to use.
