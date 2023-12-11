@@ -17,7 +17,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.18.1}     ;# @@##@@
+set GMAMapperVersion {4.18.2}     ;# @@##@@
 set GMAMapperFileFormat {22}        ;# @@##@@
 set GMAMapperProtocol {408}         ;# @@##@@
 set CoreVersionNumber {6.9.1}            ;# @@##@@
@@ -5358,13 +5358,21 @@ proc CreatureStatusMarker {w id x y s calc_condition} {
 			} else {
 				set dashpattern {}
 			}
+			
+			# calculate border color
+			lassign [winfo rgb . $color] fillR fillG fillB
+			if {$fillR * 0.299 + $fillG * 0.587 + $fillB * 0.114 > 32767} {
+				set outlineColor black
+			} else {
+				set outlineColor white
+			}
 			switch -exact $MarkerShape($condition) {
 				|v		{
 							$w create polygon [expr $x+$vlo] [expr $y+($s*.5)] \
 									  [expr $x+$vlo+10] [expr $y+($s*.5)] \
 									  [expr $x+$vlo+5] [expr $y+($s*.5)+15] \
 									  [expr $x+$vlo] [expr $y+($s*.5)] \
-								-fill $color -width 1 -outline white -tags $tags -dash $dashpattern
+								-fill $color -width 1 -outline $outlineColor -tags $tags -dash $dashpattern
 							incr vlo 10
 						}
 				v|		{
@@ -5372,19 +5380,19 @@ proc CreatureStatusMarker {w id x y s calc_condition} {
 											  [expr $x1-$vro-10] [expr $y+($s*.5)] \
 											  [expr $x1-$vro-5] [expr $y+($s*.5)+15] \
 											  [expr $x1-$vro] [expr $y+($s*.5)] \
-								-fill $color -width 1 -outline white -tags $tags -dash $dashpattern
+								-fill $color -width 1 -outline $outlineColor -tags $tags -dash $dashpattern
 							incr vro 10
 						}
 				|o		{
 							$w create oval [expr $x+$vlo] [expr $y+($s*.5)] \
 									  	   [expr $x+$vlo+15] [expr $y+($s*.5)+15] \
-								-fill $color -width 1 -outline white -tags $tags -dash $dashpattern
+								-fill $color -width 1 -outline $outlineColor -tags $tags -dash $dashpattern
 							incr vlo 15
 						}
 				o|		{
 							$w create oval [expr $x1-$vro] [expr $y+($s*.5)] \
 									  	   [expr $x1-$vro-15] [expr $y+($s*.5)+15] \
-								-fill $color -width 1 -outline white -tags $tags -dash $dashpattern
+								-fill $color -width 1 -outline $outlineColor -tags $tags -dash $dashpattern
 							incr vro 15
 						}
 				|<>		{
@@ -5393,7 +5401,7 @@ proc CreatureStatusMarker {w id x y s calc_condition} {
 									  	      [expr $x+$vlo+5] [expr $y+($s*.5)+15] \
 									  	      [expr $x+$vlo] [expr $y+($s*.5)+7] \
 									  	      [expr $x+$vlo+5] [expr $y+($s*.5)] \
-								-fill $color -width 1 -outline white -tags $tags -dash $dashpattern
+								-fill $color -width 1 -outline $outlineColor -tags $tags -dash $dashpattern
 							incr vlo 10
 						}
 				<>|		{
@@ -5402,7 +5410,7 @@ proc CreatureStatusMarker {w id x y s calc_condition} {
 									  	      [expr $x1-$vro-5] [expr $y+($s*.5)+15] \
 									  	      [expr $x1-$vro] [expr $y+($s*.5)+7] \
 									  	      [expr $x1-$vro-5] [expr $y+($s*.5)] \
-								-fill $color -width 1 -outline white -tags $tags -dash $dashpattern
+								-fill $color -width 1 -outline $outlineColor -tags $tags -dash $dashpattern
 							incr vro 10
 						}
 				{\\\\}	{
@@ -13042,7 +13050,7 @@ proc ConnectToServerByIdx {idx} {
 #   .../<name>@<zoom>/:<frame>:<name>@<zoom>.<ext>
 #   .../<name>.map
 
-# @[00]@| GMA-Mapper 4.18.1
+# @[00]@| GMA-Mapper 4.18.2
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
