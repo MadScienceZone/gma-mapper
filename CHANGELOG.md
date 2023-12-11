@@ -3,8 +3,8 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.18.1          <!-- @@##@@ -->
- * Effective Date: 05-Dec-2023               <!-- @@##@@ -->
+ * This Package Version: 4.18.2          <!-- @@##@@ -->
+ * Effective Date: 11-Dec-2023               <!-- @@##@@ -->
 
 ## Compatibility
  * GMA Core API Library Version: 6.9.1 <!-- @@##@@ -->
@@ -15,6 +15,10 @@
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.18.2
+## Fixes
+ * The condition markers weren't always easy to see against the creature token background. Added contrasting white or black border around the markers to resolve this.
 
 # 4.18.1
 ## Fixes
