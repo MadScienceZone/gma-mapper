@@ -3,18 +3,24 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.18.2          <!-- @@##@@ -->
- * Effective Date: 11-Dec-2023               <!-- @@##@@ -->
+ * This Package Version: 4.19          <!-- @@##@@ -->
+ * Effective Date: 13-Dec-2023               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.9.1 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.10 <!-- @@##@@ -->
  * GMA Mapper File Format: 22	     <!-- @@##@@ -->
- * GMA Mapper Protocol: 408        <!-- @@##@@ -->
+ * GMA Mapper Protocol: 409        <!-- @@##@@ -->
 
 ## DEPRECATION NOTICE
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.19
+## Enhancements
+ * Adds fill patterns for drawn objects. Stipple patterns are included for 12%, 25%, 50%, and 75% area shading, and this set can be added to later.
+ * Now supports protocol 409.
+ * Menus are more dynamic now, indicating more clearly what the current state of the mapper controls are.
 
 # 4.18.2
 ## Fixes
