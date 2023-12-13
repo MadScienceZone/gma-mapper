@@ -1,0 +1,233 @@
+'\" t
+'\" <<bold-is-fixed>>
+'\" <<ital-is-var>>
+.TH MAPPER 3 "GMA-Mapper 4.18.2" 11-Dec-2023 "API Functions" \" @@mp@@
+.SH NAME
+mapper \- Various functions of interest
+.SH SYNOPSIS
+'\" <<usage>>
+.na
+.B source
+.B gmazones.tcl
+.LP
+.B ComputedReachMatrix
+.I size_code
+.I natural
+.I extended
+\[->]
+.I template
+.br
+.B CreatureDisplayedSize
+.I id
+\[->]
+.I size_code
+.br
+.B creature_display_zoom
+.I size_code
+.I dispsize
+.I zoom
+\[->]
+.I effective_zoom
+.br
+.B CreatureSizeParams
+.I size_code
+\[->]
+.BI { category
+.I natural
+.I extended
+.IB space }
+.br
+.B FullCreatureAreaInfo
+.I id
+\[->]
+.BI { space
+.I natural
+.I extended
+.I matrix
+.IB custom }
+.br
+.B MatchesStandardTemplate
+.I size_code
+.I natural
+.I extended
+\[->]
+.I template
+.br
+.B MonsterSizeValue
+.I size_code
+\[->]
+.I grids
+.br
+.B ReachMatrix
+.I size_code
+\[->]
+.I template
+.ad
+'\" <</usage>>
+.SH DESCRIPTION
+.LP
+This document describes the usage of a number of functions internal to the mapper client,
+either in the
+.B mapper.tcl
+or
+.B gmazones.tcl
+source file, but are not in their own package.
+.LP
+Over time, more functions may be added here as it seems useful to have them documented
+for reference.
+'\" <<list>>
+.TP 10
+.BI "ComputedReachMatrix " size_code " " natural " " extended
+If the specified values match an existing template, that is returned without going to any more trouble.
+Otherwise, a template is calculated and returned based on the requested values.
+The
+.I natural
+and 
+.I extended
+values are in grid square units.
+.TP
+.BI "CreatureDisplayedSize " id
+Given a creature's
+.I id
+number, this returns the
+.I size_code
+that should be used for displaying it. This is based on the creature's
+.B Size
+and
+.B DispSize
+attributes.
+.TP
+.BI "creature_display_zoom " size_code " " dispsize " " zoom
+Given a creature's
+.IR size_code ,
+the size code
+.I dispsize
+that you want to display them as (temporarily), and the map's
+current
+.I zoom
+factor, this returns the zoom factor for the creature token image
+to use to accomplish this, assuming that creature images are available
+at zoom factors 0.25, 0.5, 1, 2, 3, 4, 6, 8, 12, 16, and 32.
+It will choose the image zoom factor from that list that is not larger
+than the creature's token size. This means a smaller image may be
+used.
+.TP
+.BI "CreatureSizeParams " size_code
+Given a creature size code in the form
+.IR category [ nat ][\fB->\fP ext ][\fB=\fP space ], 
+this function parses out the various parameters that may appear in that code.
+Note that the values for
+.IR nat ,
+.IR ext ,
+and 
+.I space
+are in units of feet.
+If the
+.I size_code
+is invalid, the empty string will be returned.
+Otherwise the return value is a four-element list consisting of the following elements.
+Any which were not specified in the
+.I size_code
+are empty strings in the returned list.
+.RS
+'\"<<desc>>
+.TP 10
+.I category
+The size category as a single letter.
+.TP
+.I nat
+The natural reach diameter in grid squares.
+.TP
+.I ext
+The extended reach diameter in grid squares.
+.TP
+.I space
+The creature's occupied space diameter in grid squares.
+.RE
+'\" <</>>
+.TP 
+.BI "FullCreatureAreaInfo " id
+This is the main function that will usually be called when managing on-screen creatures.
+It accepts a creature
+.I id
+which is used to look up the creature's
+.BR CustomReach ,
+.BR DispSize ,
+and
+.RB Size .
+It then returns the creature's actual distance values as a list with the following elements, or it returns
+the empty string if it was unable to understand the creature's size.
+.RS
+'\" <<desc>>
+.TP 10
+.I space
+The creature's occupied space in grid-square units.
+.TP
+.I natural
+The creature's natural reach distance in grid-square units.
+.TP
+.I extended
+The creature's extended reach distance in grid-square units.
+.TP
+.I matrix
+The creature's threat zone matrix as described for
+.BR ReachMatrix .
+.TP
+.I custom
+A dictionary containing the creature's
+.B CustomReach
+attribute if there is one; otherwise it is the empty string.
+.RE
+'\" <</>>
+.TP
+.BI "MatchesStandardTemplate " size_code " " natural " " extended
+Given a
+.I size_code
+as described above, and the desired
+.I natural
+and 
+.I reach
+distances in grid squares, this function returns a
+.I template
+list, as defined in the description of the
+.B ReachMatrix
+function, if the values 
+happen to exactly match one of the standard creature space and reach templates.
+Otherwise, it returns the empty string.
+.TP
+.BI "MonsterSizeValue " size_code
+Returns the space occupied by the creature in units of grid squares, which may be a real number.
+If the
+.I size_code
+cannot be understood, 0 is returned.
+.TP
+.BI "ReachMatrix " size_code
+Given a
+.IR size_code ,
+this returns a creature area template based on the first character of
+.IR size_code .
+If that character does not correspond to a standard size category, the empty string
+is returned. Otherwise, the template is a 3-element list with the following values:
+.RS
+'\" <<desc>>
+.TP 10
+.I natural
+The distance in grid squares of the creature's natural reach zone.
+.TP
+.I extended
+The distance in grid squares of the creature's extended reach zone.
+.TP
+.I matrix
+a 2D list in row-major order. Each element describes a grid square on the map,
+with the creature in the center of that matrix. If an element has the value 0,
+that square is not part of the creature's threat zones. If it is 1, then it is
+part of the extended area; if 2, it is part of the natural area; if 3, it is
+part of both.
+.RE
+'\" <</>>
+'\" <</>>
+.SH AUTHOR
+.LP
+Steve Willoughby / steve@madscience.zone.
+.SH COPYRGHT
+Part of the GMA software suite, copyright \(co 1992\-2023 by Steven L. Willoughby, Aloha, Oregon, USA. All Rights Reserved. Distributed under BSD-3-Clause License. \"@m(c)@
