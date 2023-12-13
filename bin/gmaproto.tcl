@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___        __     _____      _______       #
-# (  ____ \(       )(  ___  ) Game         /   )      /  \   / ___ \    / ___   )      #
-# | (    \/| () () || (   ) | Master's    / /) |      \/) ) ( (___) )   \/   )  |      #
-# | |      | || || || (___) | Assistant  / (_) (_       | |  \     /        /   )      #
-# | | ____ | |(_)| ||  ___  |           (____   _)      | |  / ___ \      _/   /       #
-# | | \_  )| |   | || (   ) |                ) (        | | ( (   ) )    /   _/        #
-# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_( (___) ) _ (   (__/\      #
-# (_______)|/     \||/     \| Client         (_)  (_) \____/ \_____/ (_)\_______/      #
+#  _______  _______  _______                ___        __     _____                    #
+# (  ____ \(       )(  ___  ) Game         /   )      /  \   / ___ \                   #
+# | (    \/| () () || (   ) | Master's    / /) |      \/) ) ( (   ) )                  #
+# | |      | || || || (___) | Assistant  / (_) (_       | | ( (___) |                  #
+# | | ____ | |(_)| ||  ___  |           (____   _)      | |  \____  |                  #
+# | | \_  )| |   | || (   ) |                ) (        | |       ) |                  #
+# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_/\____) )                  #
+# (_______)|/     \||/     \| Client         (_)  (_) \____/\______/                   #
 #                                                                                      #
 ########################################################################################
 #
@@ -57,9 +57,9 @@ package require base64 2.4.2
 package require uuid 1.0.1
 
 namespace eval ::gmaproto {
-	variable protocol 408
+	variable protocol 409
 	variable min_protocol 333
-	variable max_protocol 408
+	variable max_protocol 409
 	variable max_max_protocol 499
 	variable debug_f {}
 	variable legacy false
@@ -2217,7 +2217,7 @@ proc ::gmaproto::GMATypeToProtocolCommand {gt} {
 	return $gt
 }
 
-# @[00]@| GMA-Mapper 4.18.2
+# @[00]@| GMA-Mapper 4.19
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
