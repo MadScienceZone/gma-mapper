@@ -1903,6 +1903,7 @@ foreach icon_name {
 	arrow_both arrow_first arrow_none arrow_last arrow_refresh heart
 	saf saf_open saf_merge saf_unload saf_group_go die16 die16c information info20 die20 die20c
 	delete add clock dieb16 -- *hourglass *hourglass_go *arrow_right *cross *bullet_go menu
+	stipple_100 stipple_75 stipple_50 stipple_25 stipple_12 stipple_88
 } {
 	if {$icon_name eq {--}} {
 		if {$ImageFormat eq {png}} {
@@ -1934,15 +1935,6 @@ foreach icon_name {
 			}
 			set icon_${icon_name}_$sz [image create photo -format $_icon_format -file $icon_filename]
 		}
-	}
-}
-
-foreach gray {12 25 50 75} {
-	if {[catch {
-		set icon_gray$gray [image create bitmap gray$gray]
-	} err]} {
-		DEBUG 0 "Your Tcl/Tk does not appear to support the fill pattern \"gray$gray\"."
-		set icon_gray$gray $icon_blank
 	}
 }
 
@@ -2048,7 +2040,7 @@ grid \
 	 [button .toolbar.nfill -image $icon_no_fill -command toggleNoFill]\
 	 [button .toolbar.cfill -image $icon_fill_color -bg $initialColor -command {colorpick fill}] \
 	 [button .toolbar.cline -image $icon_outline_color -bg $initialColor -command {colorpick line}] \
-	 [button .toolbar.cstip -image $icon_blank -command {cycleStipple}] \
+	 [button .toolbar.cstip -image $icon_stipple_100 -command {cycleStipple}] \
 	 [button .toolbar.snap -image $icon_snap_0 -command gridsnap] \
 	 [button .toolbar.width -image [set icon_width_$initialwidth] -command setwidth] \
 	 [label  .toolbar.sp2  -text "   "] \
@@ -2218,24 +2210,27 @@ proc toggleNoFill {} {
 set StipplePattern {}
 proc cycleStipple {} {
 	global StipplePattern
-	global icon_blank icon_gray12 icon_gray25 icon_gray50 icon_gray75 
+	global icon_stipple_100 icon_stipple_75 icon_stipple_50 icon_stipple_25 icon_stipple_12 icon_stipple_88
 
 	switch -exact -- $StipplePattern {
-		""		{ set StipplePattern "gray12" }
-		"gray12"	{ set StipplePattern "gray25" }
-		"gray25"	{ set StipplePattern "gray50" }
-		"gray50"	{ set StipplePattern "gray75" }
-		"gray75"	{ set StipplePattern "" }
-		default		{ set StipplePattern "" }
+		""		{ set n 12; set i 88 }
+		"gray12"	{ set n 25; set i 75 }
+		"gray25"	{ set n 50; set i 50 }
+		"gray50"	{ set n 75; set i 25 }
+		"gray75"	{ set n 100; set i 100 }
+		default		{ set n 100; set i 100 }
 	}
-	if {$StipplePattern eq {}} {
-		.toolbar.cstip configure -image $icon_blank
+	if {$n == 100} {
+		.toolbar.cstip configure -image $icon_stipple_100
+		set StipplePattern {}
 	} else {
 		if {[catch {
-			.toolbar.cstip configure -image $StipplePattern
+			.toolbar.cstip configure -image [set icon_stipple_$i]
+			set StipplePattern "gray$n"
 		} err]} {
 			DEBUG 1 "Unable to set stipple pattern $StipplePattern on toolbar button: $err"
-			.toolbar.cstip configure -image $icon_blank
+			.toolbar.cstip configure -image $icon_stipple_100
+			set StipplePattern {}
 		}
 	}
 }
@@ -3603,7 +3598,7 @@ proc RefreshGrid {show} {
 			#
 			# Get universal element attributes
 			#
-			::gmautil::dassign $OBJdata($id) X X Y Y Z Z Points _Points Line Line Fill Fill Width Width Layer Layer Level Level Group Group Dash _Dash Hidden Hidden Locked Locked
+			::gmautil::dassign $OBJdata($id) X X Y Y Z Z Points _Points Line Line Fill Fill Stipple Stipple Width Width Layer Layer Level Level Group Group Dash _Dash Hidden Hidden Locked Locked
 			set Dash [::gmaproto::from_enum Dash ${_Dash}]
 			
 			#
@@ -3627,31 +3622,31 @@ proc RefreshGrid {show} {
 			switch $OBJtype($id) {
 				arc {
 					$canvas create arc "$X $Y $Points"\
-						-fill $Fill -outline $Line \
+						-fill $Fill -outline $Line -stipple $Stipple \
 						-style [::gmaproto::from_enum ArcMode [dict get $OBJdata($id) ArcMode]] \
 						-start [dict get $OBJdata($id) Start] -extent [dict get $OBJdata($id) Extent] \
 						-dash $Dash -width $Width -tags [list obj$id allOBJ]
 				}
 				circ {
 					$canvas create oval "$X $Y $Points"\
-						-fill $Fill -outline $Line -width $Width -dash $Dash -tags [list obj$id allOBJ]
+						-fill $Fill -outline $Line -stipple $Stipple -width $Width -dash $Dash -tags [list obj$id allOBJ]
 				}
 				line {
 					$canvas create line "$X $Y $Points"\
-						-fill $Fill -width $Width -tags [list obj$id allOBJ] \
+						-fill $Fill -width $Width -stipple $Stipple -tags [list obj$id allOBJ] \
 						-dash $Dash -arrow [::gmaproto::from_enum Arrow [dict get $OBJdata($id) Arrow]] \
 						-arrowshape [list 15 18  8]
 				}
 				poly {
 					set Spline [dict get $OBJdata($id) Spline]
 					$canvas create polygon "$X $Y $Points"\
-						-fill $Fill -outline $Line -width $Width -tags [list obj$id allOBJ]\
+						-fill $Fill -outline $Line -stipple $Stipple -width $Width -tags [list obj$id allOBJ]\
 						-joinstyle [::gmaproto::from_enum Join [dict get $OBJdata($id) Join]] \
 						-smooth [expr $Spline != 0] -splinesteps $Spline -dash $Dash
 				}
 				rect {
 					$canvas create rectangle "$X $Y $Points"\
-						-fill $Fill -outline $Line -width $Width -dash $Dash -tags [list obj$id allOBJ]
+						-fill $Fill -outline $Line -stipple $Stipple -width $Width -dash $Dash -tags [list obj$id allOBJ]
 				}
 				aoe - saoe {
 					$canvas create line [expr $X-10] $Y [expr $X+10] $Y $X $Y $X [expr $Y-10] $X [expr $Y+10]\
@@ -3667,7 +3662,7 @@ proc RefreshGrid {show} {
 					#::gmautil::dassign $Font Family FontFamily Size FontSize WeightFontWei
 					set Anchor [::gmaproto::from_enum Anchor ${_Anchor}]
 
-					$canvas create text $X $Y -fill $Fill -anchor $Anchor -font [ScaleFont [GMAFontToTkFont $Font] $zoom] \
+					$canvas create text $X $Y -fill $Fill -stipple $Stipple -anchor $Anchor -font [ScaleFont [GMAFontToTkFont $Font] $zoom] \
 						-justify left -text $Text -tags [list obj$id allOBJ]
 				}
 				tile {
@@ -3946,7 +3941,7 @@ proc ShowDiceSyntax {} {
 # OBJ_MODE will be nil, line, rect, poly, circ, arc, kill, aoe, move, text, tile, aoebound, ruler
 proc StartObj {w x y} {
 	global OBJtype OBJdata OBJ_CURRENT canvas OBJ_SNAP OBJ_MODE OBJ_COLOR OBJ_WIDTH OBJ_MODIFIED ARCMODE
-	global NoFill JOINSTYLE SPLINE DASHSTYLE ARROWSTYLE
+	global NoFill StipplePattern JOINSTYLE SPLINE DASHSTYLE ARROWSTYLE
 	global BUTTON_MIDDLE BUTTON_RIGHT
 	global OBJ_NEXT_Z zoom
 	global animatePlacement
@@ -4031,9 +4026,9 @@ proc StartObj {w x y} {
 			set OBJtype($OBJ_CURRENT) arc
 			set OBJdata($OBJ_CURRENT) [::gmaproto::new_dict LS-ARC ID $OBJ_CURRENT \
 				X [expr [SnapCoord $x] / $zoom] Y [expr [SnapCoord $y] / $zoom] Z $z \
-				Fill $fill_color Line $OBJ_COLOR(line) Width $OBJ_WIDTH \
+				Stipple $StipplePattern Fill $fill_color Line $OBJ_COLOR(line) Width $OBJ_WIDTH \
 				Dash $dash Layer $layer]
-			$canvas create arc  [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] -fill [dict get $OBJdata($OBJ_CURRENT) Fill] -outline $OBJ_COLOR(line) -width $OBJ_WIDTH -tags [list obj$OBJ_CURRENT allOBJ] -style $ARCMODE -start 0 -extent 359 -dash $DASHSTYLE
+			$canvas create arc  [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] -fill [dict get $OBJdata($OBJ_CURRENT) Fill] -stipple $StipplePattern -outline $OBJ_COLOR(line) -width $OBJ_WIDTH -tags [list obj$OBJ_CURRENT allOBJ] -style $ARCMODE -start 0 -extent 359 -dash $DASHSTYLE
 			bind $canvas <1> "LastArcPoint $canvas %x %y"
 			dict set OBJdata($OBJ_CURRENT) ArcMode [::gmaproto::to_enum ArcMode $ARCMODE]
 		}
@@ -4041,9 +4036,9 @@ proc StartObj {w x y} {
 			set OBJtype($OBJ_CURRENT) circ
 			set OBJdata($OBJ_CURRENT) [::gmaproto::new_dict LS-CIRC ID $OBJ_CURRENT \
 				X [expr [SnapCoord $x] / $zoom] Y [expr [SnapCoord $y] / $zoom] Z $z \
-				Fill $fill_color Line $OBJ_COLOR(line) \
+				Fill $fill_color Stipple $StipplePattern Line $OBJ_COLOR(line) \
 				Width $OBJ_WIDTH Dash $dash Layer $layer]
-			$canvas create oval [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] -fill $fill_color -outline $OBJ_COLOR(line) -width $OBJ_WIDTH -tags [list obj$OBJ_CURRENT allOBJ] -dash $DASHSTYLE
+			$canvas create oval [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] -fill $fill_color -stipple $StipplePattern -outline $OBJ_COLOR(line) -width $OBJ_WIDTH -tags [list obj$OBJ_CURRENT allOBJ] -dash $DASHSTYLE
 			bind $canvas <1> "LastPoint $canvas %x %y"
 		}
 		line { 
@@ -4060,20 +4055,20 @@ proc StartObj {w x y} {
 			set OBJtype($OBJ_CURRENT) poly
 			set OBJdata($OBJ_CURRENT) [::gmaproto::new_dict LS-POLY ID $OBJ_CURRENT \
 				X [expr [SnapCoord $x] / $zoom] Y [expr [SnapCoord $y] / $zoom] Z $z \
-				Fill $fill_color Line $OBJ_COLOR(line) Width $OBJ_WIDTH Dash $dash Layer $layer\
+				Stipple $StipplePattern Fill $fill_color Line $OBJ_COLOR(line) Width $OBJ_WIDTH Dash $dash Layer $layer\
 				Join [::gmaproto::to_enum Join $JOINSTYLE] \
 				Spline $SPLINE \
 			]
-			$canvas create polygon [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] -fill $fill_color -width $OBJ_WIDTH -outline $OBJ_COLOR(line) -tags [list obj$OBJ_CURRENT allOBJ] -joinstyle $JOINSTYLE -smooth [expr $SPLINE != 0] -splinesteps $SPLINE -dash $DASHSTYLE
+			$canvas create polygon [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] -stipple $StipplePattern -fill $fill_color -width $OBJ_WIDTH -outline $OBJ_COLOR(line) -tags [list obj$OBJ_CURRENT allOBJ] -joinstyle $JOINSTYLE -smooth [expr $SPLINE != 0] -splinesteps $SPLINE -dash $DASHSTYLE
 			bind $canvas <1> "NextPoint $canvas %x %y"
 		}
 		rect {
 			set OBJtype($OBJ_CURRENT) rect
 			set OBJdata($OBJ_CURRENT) [::gmaproto::new_dict LS-RECT ID $OBJ_CURRENT \
 				X [expr [SnapCoord $x] / $zoom] Y [expr [SnapCoord $y] / $zoom] Z $z \
-				Fill $fill_color Line $OBJ_COLOR(line) Width $OBJ_WIDTH \
+				Stipple $StipplePattern Fill $fill_color Line $OBJ_COLOR(line) Width $OBJ_WIDTH \
 				Dash $dash Layer $layer]
-			$canvas create rectangle [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] -fill $fill_color -outline $OBJ_COLOR(line) -width $OBJ_WIDTH -tags [list obj$OBJ_CURRENT allOBJ] -dash $DASHSTYLE
+			$canvas create rectangle [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] -stipple $StipplePattern -fill $fill_color -outline $OBJ_COLOR(line) -width $OBJ_WIDTH -tags [list obj$OBJ_CURRENT allOBJ] -dash $DASHSTYLE
 			bind $canvas <1> "LastPoint $canvas %x %y"
 		}
 		ruler {
@@ -4099,12 +4094,14 @@ proc StartObj {w x y} {
 					-justify left \
 					-text $CurrentTextString \
 					-fill $fill_color \
+					-stipple $StipplePattern \
 					-tags "tiles obj$OBJ_CURRENT"
 
 				set OBJtype($OBJ_CURRENT) text
 				set OBJdata($OBJ_CURRENT) [::gmaproto::new_dict LS-TEXT ID $OBJ_CURRENT \
 					X [expr [SnapCoord $x] / $zoom] Y [expr [SnapCoord $y] / $zoom] Z $z \
 					Fill $fill_color Layer $layer Text $CurrentTextString \
+					Stipple $StipplePattern \
 					Font [TkFontToGMAFont $CURRENT_FONT] \
 					Anchor [::gmaproto::to_enum Anchor $CurrentAnchor]\
 				]
