@@ -951,6 +951,18 @@ proc update_main_menu {} {
 	global check_menu_color MAIN_MENU
 	$MAIN_MENU.view entryconfigure "*Follow Combatants*" -selectcolor $check_menu_color
 	$MAIN_MENU.edit entryconfigure "*Force Drawn Elements*" -selectcolor $check_menu_color
+	$MAIN_MENU.edit entryconfigure "*Normal Play Mode*" -selectcolor $check_menu_color
+	$MAIN_MENU.edit entryconfigure "*Draw*" -selectcolor $check_menu_color
+	$MAIN_MENU.edit entryconfigure "*Add Text*" -selectcolor $check_menu_color
+	$MAIN_MENU.edit entryconfigure "*Remove Objects*" -selectcolor $check_menu_color
+	$MAIN_MENU.edit entryconfigure "*Move Objects*" -selectcolor $check_menu_color
+	$MAIN_MENU.edit entryconfigure "*Stamp Objects*" -selectcolor $check_menu_color
+	$MAIN_MENU.edit entryconfigure "*Fill Shapes*" -selectcolor $check_menu_color
+	$MAIN_MENU.view entryconfigure "*Show Toolbar*" -selectcolor $check_menu_color
+	$MAIN_MENU.view entryconfigure "*Show Map Grid*" -selectcolor $check_menu_color
+	$MAIN_MENU.view entryconfigure "*Show Health Stats*" -selectcolor $check_menu_color
+	$MAIN_MENU.play entryconfigure "*Combat Mode*" -selectcolor $check_menu_color
+
 }
 
 proc create_main_menu {use_button} {
