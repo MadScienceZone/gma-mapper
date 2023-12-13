@@ -1008,6 +1008,7 @@ proc create_main_menu {use_button} {
 	$mm.edit add command -command toggleNoFill -label "Toggle Fill/No-Fill"
 	$mm.edit add command -command {colorpick fill} -label "Choose Fill Color..."
 	$mm.edit add command -command {colorpick line} -label "Choose Outline Color..."
+	$mm.edit add command -command {cycleStipple} -label "Cycle Fill Pattern"
 	$mm.edit add separator
 	$mm.edit add command -command gridsnap -label "Cycle Grid Snap"
 	$mm.edit add command -command setwidth -label "Cycle Line Thickness"
@@ -1936,6 +1937,15 @@ foreach icon_name {
 	}
 }
 
+foreach gray {12 25 50 75} {
+	if {[catch {
+		set icon_gray$gray [image create bitmap gray$gray]
+	} err]} {
+		DEBUG 0 "Your Tcl/Tk does not appear to support the fill pattern \"gray$gray\"."
+		set icon_gray$gray $icon_blank
+	}
+}
+
 catch {
 	.toolbar2.menu configure -image $icon_menu
 }
@@ -2038,6 +2048,7 @@ grid \
 	 [button .toolbar.nfill -image $icon_no_fill -command toggleNoFill]\
 	 [button .toolbar.cfill -image $icon_fill_color -bg $initialColor -command {colorpick fill}] \
 	 [button .toolbar.cline -image $icon_outline_color -bg $initialColor -command {colorpick line}] \
+	 [button .toolbar.cstip -image $icon_blank -command {cycleStipple}] \
 	 [button .toolbar.snap -image $icon_snap_0 -command gridsnap] \
 	 [button .toolbar.width -image [set icon_width_$initialwidth] -command setwidth] \
 	 [label  .toolbar.sp2  -text "   "] \
@@ -2144,6 +2155,7 @@ foreach {btn tip} {
 	move	{Mode Select: Move Objects}
 	stamp	{Mode Select: Stamp Images/Textures}
 	nfill	{Toggle Fill/No-Fill Mode}
+	cstip	{Cycle Fill Pattern}
 	cfill	{Select Fill Color}
 	cline	{Select Outline Color}
 	snap	{Cycle Grid Snap (none/full/half/third/quarter)}
@@ -2202,6 +2214,32 @@ proc toggleNoFill {} {
 		set NoFill 1
 	}
 }
+
+set StipplePattern {}
+proc cycleStipple {} {
+	global StipplePattern
+	global icon_blank icon_gray12 icon_gray25 icon_gray50 icon_gray75 
+
+	switch -exact -- $StipplePattern {
+		""		{ set StipplePattern "gray12" }
+		"gray12"	{ set StipplePattern "gray25" }
+		"gray25"	{ set StipplePattern "gray50" }
+		"gray50"	{ set StipplePattern "gray75" }
+		"gray75"	{ set StipplePattern "" }
+		default		{ set StipplePattern "" }
+	}
+	if {$StipplePattern eq {}} {
+		.toolbar.cstip configure -image $icon_blank
+	} else {
+		if {[catch {
+			.toolbar.cstip configure -image $StipplePattern
+		} err]} {
+			DEBUG 1 "Unable to set stipple pattern $StipplePattern on toolbar button: $err"
+			.toolbar.cstip configure -image $icon_blank
+		}
+	}
+}
+
 
 set ShowHealthStats 0
 proc toggleShowHealthStats {} {

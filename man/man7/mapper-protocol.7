@@ -1,5 +1,5 @@
 '\" t
-'\" *** 408 ***
+'\" *** 409 ***
 '\" <<ital-is-var>>
 '\" <<bold-is-fixed>>
 .TH MAPPER-PROTOCOL 7 "GMA-Mapper 4.3.4" 16-Mar-2023 "Games" \" @@mp@@
@@ -76,7 +76,7 @@ be implemented to wait synchronously for a server
 response during the authentication negotiation stage.
 .LP
 '\" <</bold-is-fixed>>
-.B "This describes protocol version 408."
+.B "This describes protocol version 409."
 '\" <<bold-is-fixed>>
 These notes are intended to be 
 detailed enough to implement a client from and should be considered
@@ -1672,6 +1672,24 @@ color. They don't have an outline so don't use the
 .B Line
 value.
 .TP
+.B Stipple
+If nonempty, the value is the name of a bitmap image which is assumed to be known
+to the client. The shape will be filled in with the
+.B Fill
+color using this bitmap to form a stipple pattern in that color. If the
+.B Stipple
+bitmap is empty or unknown to the client, a solid color fill is used instead. If
+the
+.B Fill
+field is empty, then
+.B Stipple
+is ignored. Clients SHOULD by default understand stipple bitmap names
+.RB \*(lq gray12 \*(rq,
+.RB \*(lq gray25 \*(rq,
+.RB \*(lq gray50 \*(rq,
+and
+.RB \*(lq gray75 \*(rq.
+.TP
 .BI Width " (int)"
 The width in pixel units of the element's outline.
 .TP
@@ -2788,8 +2806,12 @@ John Mechalas (elevation and movement modes).
 .SH HISTORY
 .LP
 '\" <<New>>
-This document defines map protocol version 408,
+This document defines map protocol version 409,
 which added the
+.B Stipple
+pattern fill attribute.
+.LP
+Protocol version 408 introduced the
 .B PolyGM
 creature attribute.
 '\" <</New>>
