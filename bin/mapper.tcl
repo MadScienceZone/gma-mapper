@@ -17,8 +17,8 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.19.1}     ;# @@##@@
-set GMAMapperFileFormat {22}        ;# @@##@@
+set GMAMapperVersion {4.19.2}     ;# @@##@@
+set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {409}         ;# @@##@@
 set CoreVersionNumber {6.10}            ;# @@##@@
 encoding system utf-8
@@ -3664,7 +3664,12 @@ proc RefreshGrid {show} {
 			#
 			# Get universal element attributes
 			#
-			::gmautil::dassign $OBJdata($id) X X Y Y Z Z Points _Points Line Line Fill Fill Stipple Stipple Width Width Layer Layer Level Level Group Group Dash _Dash Hidden Hidden Locked Locked
+			::gmautil::dassign $OBJdata($id) X X Y Y Z Z Points _Points Line Line Fill Fill Width Width Layer Layer Level Level Group Group Dash _Dash Hidden Hidden Locked Locked
+			if {[dict exists $OBJdata($id) Stipple]} {
+				set Stipple [dict get $OBJdata($id) Stipple]
+			} else {
+				set Stipple {}
+			}
 			set Dash [::gmaproto::from_enum Dash ${_Dash}]
 			
 			#
@@ -4114,7 +4119,7 @@ proc StartObj {w x y} {
 				X [expr [SnapCoord $x] / $zoom] Y [expr [SnapCoord $y] / $zoom] Z $z \
 				Fill $fill_color Line $OBJ_COLOR(line) Width $OBJ_WIDTH \
 				Dash $dash Layer $layer Arrow $arrow]
-			$canvas create line [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] -fill $fill_color -width $OBJ_WIDTH -tags [list obj$OBJ_CURRENT allOBJ] -dash $DASHSTYLE -arrow $ARROWSTYLE -arrowshape [list 15 18 8]
+			$canvas create line [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] -stipple $StipplePattern -fill $fill_color -width $OBJ_WIDTH -tags [list obj$OBJ_CURRENT allOBJ] -dash $DASHSTYLE -arrow $ARROWSTYLE -arrowshape [list 15 18 8]
 			bind $canvas <1> "NextPoint $canvas %x %y"
 		}
 		poly {
@@ -13151,7 +13156,7 @@ proc ConnectToServerByIdx {idx} {
 #   .../<name>@<zoom>/:<frame>:<name>@<zoom>.<ext>
 #   .../<name>.map
 
-# @[00]@| GMA-Mapper 4.19.1
+# @[00]@| GMA-Mapper 4.19.2
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

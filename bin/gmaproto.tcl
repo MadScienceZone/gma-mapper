@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___        __     _____       __           #
-# (  ____ \(       )(  ___  ) Game         /   )      /  \   / ___ \     /  \          #
-# | (    \/| () () || (   ) | Master's    / /) |      \/) ) ( (   ) )    \/) )         #
-# | |      | || || || (___) | Assistant  / (_) (_       | | ( (___) |      | |         #
-# | | ____ | |(_)| ||  ___  |           (____   _)      | |  \____  |      | |         #
-# | | \_  )| |   | || (   ) |                ) (        | |       ) |      | |         #
-# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_/\____) ) _  __) (_        #
-# (_______)|/     \||/     \| Client         (_)  (_) \____/\______/ (_) \____/        #
+#  _______  _______  _______                ___        __     _____      _______       #
+# (  ____ \(       )(  ___  ) Game         /   )      /  \   / ___ \    / ___   )      #
+# | (    \/| () () || (   ) | Master's    / /) |      \/) ) ( (   ) )   \/   )  |      #
+# | |      | || || || (___) | Assistant  / (_) (_       | | ( (___) |       /   )      #
+# | | ____ | |(_)| ||  ___  |           (____   _)      | |  \____  |     _/   /       #
+# | | \_  )| |   | || (   ) |                ) (        | |       ) |    /   _/        #
+# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_/\____) ) _ (   (__/\      #
+# (_______)|/     \||/     \| Client         (_)  (_) \____/\______/ (_)\_______/      #
 #                                                                                      #
 ########################################################################################
 #
@@ -152,9 +152,9 @@ namespace eval ::gmaproto {
 		LS-LINE {Arrow i ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Stipple s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		LS-POLY {Spline i Join i ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Stipple s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		LS-RECT {ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Stipple s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
-		LS-SAOE {AoEShape i ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Stipple s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
+		LS-SAOE {AoEShape i ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		LS-TEXT {Text s Font {o {Family s Size f Weight i Slant i}} Anchor i ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Stipple s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
-		LS-TILE {Image s BBHeight f BBWidth f ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Stipple s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
+		LS-TILE {Image s BBHeight f BBWidth f ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		MARCO   {}
 		MARK    {X f Y f}
 		OA      {ObjID s NewAttrs d}
@@ -2232,7 +2232,7 @@ proc ::gmaproto::normalize_dict {cmd d} {
 	return [::gmaproto::new_dict_from_json $cmd [::gmaproto::json_from_dict $cmd $d]]
 }
 
-# @[00]@| GMA-Mapper 4.19.1
+# @[00]@| GMA-Mapper 4.19.2
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

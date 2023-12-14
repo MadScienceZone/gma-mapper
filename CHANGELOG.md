@@ -3,18 +3,22 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.19.1          <!-- @@##@@ -->
+ * This Package Version: 4.19.2          <!-- @@##@@ -->
  * Effective Date: 13-Dec-2023               <!-- @@##@@ -->
 
 ## Compatibility
  * GMA Core API Library Version: 6.10 <!-- @@##@@ -->
- * GMA Mapper File Format: 22	     <!-- @@##@@ -->
+ * GMA Mapper File Format: 23	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 409        <!-- @@##@@ -->
 
 ## DEPRECATION NOTICE
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.19.2
+## Fixes
+ * File I/O module was missing increment to file format version and support for `Stipple` and `PolyGM` attributes.
 
 # 4.19.1
 ## Fixes
