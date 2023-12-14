@@ -17,8 +17,8 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.19.1}     ;# @@##@@
-set GMAMapperFileFormat {22}        ;# @@##@@
+set GMAMapperVersion {4.19.2}     ;# @@##@@
+set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {409}         ;# @@##@@
 set CoreVersionNumber {6.10}            ;# @@##@@
 encoding system utf-8
@@ -13156,7 +13156,7 @@ proc ConnectToServerByIdx {idx} {
 #   .../<name>@<zoom>/:<frame>:<name>@<zoom>.<ext>
 #   .../<name>.map
 
-# @[00]@| GMA-Mapper 4.19.1
+# @[00]@| GMA-Mapper 4.19.2
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
