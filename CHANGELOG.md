@@ -3,7 +3,7 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.19          <!-- @@##@@ -->
+ * This Package Version: 4.19.1          <!-- @@##@@ -->
  * Effective Date: 13-Dec-2023               <!-- @@##@@ -->
 
 ## Compatibility
@@ -15,6 +15,11 @@
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.19.1
+## Fixes
+ * Bug that prevented loading map files which don't have expected fields (i.e., if the old file was created before a protocol change).
+ * Fixes color of menu checkmarks in dark mode.
 
 # 4.19
 ## Enhancements
