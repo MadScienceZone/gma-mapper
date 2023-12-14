@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___        __     _____                    #
-# (  ____ \(       )(  ___  ) Game         /   )      /  \   / ___ \                   #
-# | (    \/| () () || (   ) | Master's    / /) |      \/) ) ( (   ) )                  #
-# | |      | || || || (___) | Assistant  / (_) (_       | | ( (___) |                  #
-# | | ____ | |(_)| ||  ___  |           (____   _)      | |  \____  |                  #
-# | | \_  )| |   | || (   ) |                ) (        | |       ) |                  #
-# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_/\____) )                  #
-# (_______)|/     \||/     \| Client         (_)  (_) \____/\______/                   #
+#  _______  _______  _______                ___        __     _____       __           #
+# (  ____ \(       )(  ___  ) Game         /   )      /  \   / ___ \     /  \          #
+# | (    \/| () () || (   ) | Master's    / /) |      \/) ) ( (   ) )    \/) )         #
+# | |      | || || || (___) | Assistant  / (_) (_       | | ( (___) |      | |         #
+# | | ____ | |(_)| ||  ___  |           (____   _)      | |  \____  |      | |         #
+# | | \_  )| |   | || (   ) |                ) (        | |       ) |      | |         #
+# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_/\____) ) _  __) (_        #
+# (_______)|/     \||/     \| Client         (_)  (_) \____/\______/ (_) \____/        #
 #                                                                                      #
 ########################################################################################
 #
@@ -2217,7 +2217,22 @@ proc ::gmaproto::GMATypeToProtocolCommand {gt} {
 	return $gt
 }
 
-# @[00]@| GMA-Mapper 4.19
+#
+# Take an object dict and reset it with the current set of fields
+# 	normalize_dict cmd d => d
+# 	or error
+#
+proc ::gmaproto::normalize_dict {cmd d} {
+	if {! [info exists ::gmaproto::_message_payload($cmd)]} {
+		set cmd [::gmaproto::GMATypeToProtocolCommand $cmd]
+		if {! [info exists ::gmaproto::_message_payload($cmd)]} {
+			error "can't normalize type $cmd dictionary $d"
+		}
+	}
+	return [::gmaproto::new_dict_from_json $cmd [::gmaproto::json_from_dict $cmd $d]]
+}
+
+# @[00]@| GMA-Mapper 4.19.1
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

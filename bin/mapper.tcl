@@ -17,7 +17,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.19}     ;# @@##@@
+set GMAMapperVersion {4.19.1}     ;# @@##@@
 set GMAMapperFileFormat {22}        ;# @@##@@
 set GMAMapperProtocol {409}         ;# @@##@@
 set CoreVersionNumber {6.10}            ;# @@##@@
@@ -240,8 +240,6 @@ proc IsScreenXYVisible {x y {ltmargin 0} {rbmargin 0}} {
 	}
 	return true
 }
-
-
 
 proc GoToGridCoords {} {
 	global GoToGrid__label
@@ -951,6 +949,18 @@ proc update_main_menu {} {
 	global check_menu_color MAIN_MENU
 	$MAIN_MENU.view entryconfigure "*Follow Combatants*" -selectcolor $check_menu_color
 	$MAIN_MENU.edit entryconfigure "*Force Drawn Elements*" -selectcolor $check_menu_color
+	$MAIN_MENU.edit entryconfigure "*Normal Play Mode*" -selectcolor $check_menu_color
+	$MAIN_MENU.edit entryconfigure "*Draw*" -selectcolor $check_menu_color
+	$MAIN_MENU.edit entryconfigure "*Add Text*" -selectcolor $check_menu_color
+	$MAIN_MENU.edit entryconfigure "*Remove Objects*" -selectcolor $check_menu_color
+	$MAIN_MENU.edit entryconfigure "*Move Objects*" -selectcolor $check_menu_color
+	$MAIN_MENU.edit entryconfigure "*Stamp Objects*" -selectcolor $check_menu_color
+	$MAIN_MENU.edit entryconfigure "*Fill Shapes*" -selectcolor $check_menu_color
+	$MAIN_MENU.view entryconfigure "*Show Toolbar*" -selectcolor $check_menu_color
+	$MAIN_MENU.view entryconfigure "*Show Map Grid*" -selectcolor $check_menu_color
+	$MAIN_MENU.view entryconfigure "*Show Health Stats*" -selectcolor $check_menu_color
+	$MAIN_MENU.play entryconfigure "*Combat Mode*" -selectcolor $check_menu_color
+
 }
 
 proc create_main_menu {use_button} {
@@ -2814,7 +2824,13 @@ proc loadfile {file args} {
 						DEBUG 0 "Can't load element of unknown type $element_type ($err)."
 						continue
 					}
-					set OBJdata([dict get $d ID]) $d
+					if {[catch {
+						set OBJdata([dict get $d ID]) [::gmaproto::normalize_dict $element_type $d]
+					} err]} {
+						DEBUG 0 "input type $element_type: $err"
+						set OBJdata([dict get $d ID]) $d
+					}
+
 					set OBJtype([dict get $d ID]) $etype
 					if {$sendp} {
 						::gmaproto::ls $element_type $d
@@ -13135,7 +13151,7 @@ proc ConnectToServerByIdx {idx} {
 #   .../<name>@<zoom>/:<frame>:<name>@<zoom>.<ext>
 #   .../<name>.map
 
-# @[00]@| GMA-Mapper 4.19
+# @[00]@| GMA-Mapper 4.19.1
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
