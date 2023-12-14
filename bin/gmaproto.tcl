@@ -152,9 +152,9 @@ namespace eval ::gmaproto {
 		LS-LINE {Arrow i ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Stipple s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		LS-POLY {Spline i Join i ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Stipple s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		LS-RECT {ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Stipple s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
-		LS-SAOE {AoEShape i ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Stipple s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
+		LS-SAOE {AoEShape i ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		LS-TEXT {Text s Font {o {Family s Size f Weight i Slant i}} Anchor i ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Stipple s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
-		LS-TILE {Image s BBHeight f BBWidth f ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Stipple s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
+		LS-TILE {Image s BBHeight f BBWidth f ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		MARCO   {}
 		MARK    {X f Y f}
 		OA      {ObjID s NewAttrs d}

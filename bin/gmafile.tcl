@@ -62,26 +62,26 @@ package require gmaproto 1.0
 package require Tcl 8.5
 
 namespace eval ::gmafile {
-	variable version 22
+	variable version 23
 	variable dice_version 2
 	variable min_dice_version 1
 	variable max_dice_version 2
 	variable min_version 16
-	variable max_version 22
+	variable max_version 23
 
 	array set _data_payload {
 		__META__ {Timestamp i DateTime s Comment s Location s}
 		__DMETA__ {Timestamp i DateTime s Comment s}
-		ARC      {ArcMode i Start f Extent f ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
-		CIRC     {ArcMode i Start f Extent f ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
+		ARC      {ArcMode i Start f Extent f ID s X f Y f Points {a {X f Y f}} Z i Line s Stipple s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
+		CIRC     {ArcMode i Start f Extent f ID s X f Y f Points {a {X f Y f}} Z i Line s Stipple s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		CREATURE {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}}}
 		IMG      {Name s Sizes {a {File s ImageData b IsLocalFile ? Zoom f}} Animation {o {Frames i FrameSpeed i Loops i}}}
-		LINE     {Arrow i ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
+		LINE     {Arrow i ID s X f Y f Points {a {X f Y f}} Z i Line s Stipple s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		MAP      {File s IsLocalFile ? CacheOnly ? Merge ?}
-		POLY     {Spline i Join i ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
-		RECT     {ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
+		POLY     {Spline i Join i ID s X f Y f Points {a {X f Y f}} Z i Line s Stipple s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
+		RECT     {ID s X f Y f Points {a {X f Y f}} Z i Line s Stipple s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		SAOE     {AoEShape i ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
-		TEXT     {Text s Font {o {Family s Size f Weight i Slant i}} Anchor i ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
+		TEXT     {Text s Font {o {Family s Size f Weight i Slant i}} Anchor i ID s X f Y f Points {a {X f Y f}} Z i Line s Stipple s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		TILE     {Image s BBHeight f BBWidth f ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		PRESET   {Name s Description s DieRollSpec s}
 	}
