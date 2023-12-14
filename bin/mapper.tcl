@@ -3664,7 +3664,12 @@ proc RefreshGrid {show} {
 			#
 			# Get universal element attributes
 			#
-			::gmautil::dassign $OBJdata($id) X X Y Y Z Z Points _Points Line Line Fill Fill Stipple Stipple Width Width Layer Layer Level Level Group Group Dash _Dash Hidden Hidden Locked Locked
+			::gmautil::dassign $OBJdata($id) X X Y Y Z Z Points _Points Line Line Fill Fill Width Width Layer Layer Level Level Group Group Dash _Dash Hidden Hidden Locked Locked
+			if {[dict exists $OBJdata($id) Stipple]} {
+				set Stipple [dict get $OBJdata($id) Stipple]
+			} else {
+				set Stipple {}
+			}
 			set Dash [::gmaproto::from_enum Dash ${_Dash}]
 			
 			#
@@ -4114,7 +4119,7 @@ proc StartObj {w x y} {
 				X [expr [SnapCoord $x] / $zoom] Y [expr [SnapCoord $y] / $zoom] Z $z \
 				Fill $fill_color Line $OBJ_COLOR(line) Width $OBJ_WIDTH \
 				Dash $dash Layer $layer Arrow $arrow]
-			$canvas create line [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] -fill $fill_color -width $OBJ_WIDTH -tags [list obj$OBJ_CURRENT allOBJ] -dash $DASHSTYLE -arrow $ARROWSTYLE -arrowshape [list 15 18 8]
+			$canvas create line [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] -stipple $StipplePattern -fill $fill_color -width $OBJ_WIDTH -tags [list obj$OBJ_CURRENT allOBJ] -dash $DASHSTYLE -arrow $ARROWSTYLE -arrowshape [list 15 18 8]
 			bind $canvas <1> "NextPoint $canvas %x %y"
 		}
 		poly {
