@@ -1,5 +1,4 @@
-'\" t
-'\" *** 409 ***
+'\" *** 410 ***
 '\" <<ital-is-var>>
 '\" <<bold-is-fixed>>
 .TH MAPPER-PROTOCOL 7 "GMA-Mapper 4.3.4" 16-Mar-2023 "Games" \" @@mp@@
@@ -76,7 +75,7 @@ be implemented to wait synchronously for a server
 response during the authentication negotiation stage.
 .LP
 '\" <</bold-is-fixed>>
-.B "This describes protocol version 409."
+.B "This describes protocol version 410."
 '\" <<bold-is-fixed>>
 These notes are intended to be 
 detailed enough to implement a client from and should be considered
@@ -182,7 +181,7 @@ since all communications are asynchronous.
 '\"  \z{AV}     &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Scroll clients' views\\
 '\"  \z{AI}     &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Add image to client's known set\\
 '\"  \z{AI?}    &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Ask for definition of image\\
-'\"   \z{AI/}    &C$\rightarrow$S    &---        &yes&\acronym{JSON}&Filter saved image definitions\\
+'\"  \z{AI/}    &C$\rightarrow$S    &---        &yes&\acronym{JSON}&Filter saved image definitions\\
 '\"  \z{CC}     &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Clear the chat history\\
 '\"  \z{CLR}    &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Remove objects from client\\
 '\"  \z{CLR@}   &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Remove elements from a map file\\
@@ -224,6 +223,7 @@ since all communications are asynchronous.
 '\"  \z{PROTOCOL}&C$\leftarrow$S    &---        &N/A&int           &Signal protocol version in use\\
 '\"  \z{PS}     &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Place a creature token\\
 '\"  \z{READY}  &C$\leftarrow$S     &---        &N/A&none          &Server sign-on complete\\
+'\"  \z{REDIRECT}&C$\leftarrow$S    &---        &N/A&\acronym{JSON}&Instruct client to use a different server\\
 '\"  \z{ROLL}   &C$\leftarrow$S     &---        &N/A&\acronym{JSON}&Result of a die roll\\
 '\"  \z{OA}     &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Update object attributes\\
 '\"  \z{OA+}    &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Add values to an attribute\\
@@ -285,6 +285,7 @@ QueryDicePresets	DR	C\[->]S	DD=	no	none	Request user's presets
 QueryImage	AI?	C\[<>]S	AI	no	JSON	Ask for definition of image
 QueryPeers	/CONN	C\[->]S	CONN	no	none	Request list of peer clients
 Ready	READY	C\[<-]S	\fR\(em\fP	N/A	none	Server sign-on complete
+Redirect	REDIRECT	C\[<-]S	\fR\(em\fP	N/A	JSON	Instruct client to use a different server
 RemoveObjAttributes	OA-	C\[<>]S	\fR\(em\fP	no	JSON	Remove values from an attribute
 RollDice	D	C\[->]S	ROLL	no	JSON	Initiate a die roll
 RollResult	ROLL	C\[<-]S	\fR\(em\fP	N/A	JSON	Result of a die roll
@@ -2469,6 +2470,30 @@ but indicates the distance for reach weapons.
 The server sends this to the client to indicate that all preliminary
 data has been sent, authentication (if applicable) has been successful,
 and the client may proceed to carry out normal operations now.
+'\" <<New>>
+.TP
+.B REDIRECT
+Instructs the client to use a different server for this session. This is used when
+the GM wants to use an alternate server temporarily without requiring the players to
+reconfigure all their clients.
+The server SHOULD send this during the initial stage of client interaction to avoid
+authenticating to a server you won't be using and then authenticating to the other one,
+but MAY be sent at any point. The client SHOULD disconnect immediately upon receiving
+this command, so the rest of the server negotiation may not even happen at all.
+The JSON payload includes the following values:
+'\" <<list>>
+.RS
+.TP
+.B Host
+The host name or IP address of the server to connect to for this session.
+.TP
+'\" <</ital-is-var>>
+.BI "Port " (int)
+'\" <<ital-is-var>>
+The TCP port number on which to connect to the server.
+.RE
+'\" <</>>
+'\" <</New>>
 .TP
 .B ROLL
 Reports the results of a die roll initiated by the
@@ -2784,6 +2809,38 @@ The name of the calendar system in play, as known to the GMA game clock.
 prior to protocol version 400.)
 
 Declares which calendaring system the various dates and times are based upon.
+'\" <<New>>
+'\" <</ital-is-var>>
+.TP
+.BI "ClientSettings " (object)
+Any of the following settings will override the client's own settings. Clients SHOULD
+notify users that this has happened. This allows the GM to make global changes to things
+like where images are stored without requiring players to adjust all their settings.
+'\" <<list>>
+.RS
+.TP
+.B MkdirPath
+The path to the
+.B mkdir
+program on the server (used for GM uploads of mapper content to the server).
+.TP
+.B ImageBaseURL
+The base URL from which the client will retrieve map and image files.
+.TP
+.B ModuleCode
+The current module's ID code.
+.TP
+.B SCPDestination
+The directory where GM uploads of mapper content should be sent to.
+.TP
+.B ServerHostname
+The hostname (and optionally username in the form
+.IB name @ host\fR)\fP
+for the GM to upload mapper content to the server.
+.RE
+'\" <</>>
+'\" <<ital-is-var>>
+'\" <</New>>
 '\" <</>>
 .LP
 Example:
@@ -2806,8 +2863,17 @@ John Mechalas (elevation and movement modes).
 .SH HISTORY
 .LP
 '\" <<New>>
-This document defines map protocol version 409,
+This document defines map protocol version 410,
 which added the
+.B REDIRECT
+command and the
+.B ClientSettings
+field of the
+.B WORLD
+command.
+.LP
+Protocol version 409
+added the
 .B Stipple
 pattern fill attribute.
 .LP
