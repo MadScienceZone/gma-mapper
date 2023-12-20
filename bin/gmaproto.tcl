@@ -1201,6 +1201,12 @@ proc ::gmaproto::int_bool {b} {
 		return 0
 	}
 }
+
+# unfortunately, the tcllib JSON interpreter is broken and cannot distinguish
+# between a JSON null value and a string "null". So we are forced to treat a
+# null value (including a string "null") as a null. So you can't have any string
+# with the value of "null". 
+# Sorry.
 proc ::gmaproto::_construct {input types} {
 	foreach {field t} $types {
 		switch -exact -- [lindex $t 0] {
@@ -1314,10 +1320,8 @@ proc ::gmaproto::_construct {input types} {
 				}
 			}
 			d {
-				if {[dict exists $input $field]} {
-					if {[dict get $input $field] eq "null"} {
-						dict set input $field {}
-					}
+				if {[dict exists $input $field] && [dict get $input $field] ne "null"} {
+					dict set input $field [dict map {k v} [dict get $input $field] {if {$v eq "null"} {set v {}}}]
 				} else {
 					dict set input $field {}
 				}
