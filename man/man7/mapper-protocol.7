@@ -2491,8 +2491,22 @@ The host name or IP address of the server to connect to for this session.
 .BI "Port " (int)
 '\" <<ital-is-var>>
 The TCP port number on which to connect to the server.
-.RE
+.TP
+.BI Reason
+The reason for the redirection to a new server.
 '\" <</>>
+.LP
+This command SHOULD appear before any commands which would alter the client's internal state
+such as
+.B DSM
+or
+.BR AC ,
+because we cannot guarantee that the client will undo those settings before connecting to the
+new server which will send its own set of those commands.  Ideally, when redirecting clients to
+a different server,
+.B REDIRECT
+should be the first item in the server's init file.
+.RE
 '\" <</New>>
 .TP
 .B ROLL
