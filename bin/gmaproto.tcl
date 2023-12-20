@@ -1321,7 +1321,12 @@ proc ::gmaproto::_construct {input types} {
 			}
 			d {
 				if {[dict exists $input $field] && [dict get $input $field] ne "null"} {
-					dict set input $field [dict map {k v} [dict get $input $field] {if {$v eq "null"} {set v {}}}]
+					dict set input $field [dict map {k v} [dict get $input $field] {
+						if {$v eq "null"} {
+							set v {}
+						}
+						set v
+					}]
 				} else {
 					dict set input $field {}
 				}
