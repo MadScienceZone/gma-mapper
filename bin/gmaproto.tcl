@@ -57,9 +57,9 @@ package require base64 2.4.2
 package require uuid 1.0.1
 
 namespace eval ::gmaproto {
-	variable protocol 409
+	variable protocol 410
 	variable min_protocol 333
-	variable max_protocol 409
+	variable max_protocol 410
 	variable max_max_protocol 499
 	variable debug_f {}
 	variable legacy false
@@ -82,6 +82,7 @@ namespace eval ::gmaproto {
 	variable current_stream {}
 	variable stream_dict {}
 	variable progress_stack {}
+	variable ClientSettings {}
 
 	variable _message_map
 	array set _message_map {
@@ -166,13 +167,14 @@ namespace eval ::gmaproto {
 		PROGRESS {OperationID s Title s Value i MaxValue i IsDone ?}
 		PS      {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l PolyGM ? Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}}}
 		READY   {}
+		REDIRECT {Host s Port i Reason s}
 		ROLL    {Sender s Recipients l MessageID i ToAll ? ToGM ? Title s Result {o {InvalidRequest ? ResultSuppressed ? Result i Details {a {Type s Value s}}}} RequestID s MoreResults ?}
 		SYNC    {}
 		SYNC-CHAT {Target i}
 		TB      {Enabled ?}
 		TO      {Sender s Recipients l MessageID i ToAll ? ToGM ? Text s}
 		UPDATES {Packages {a {Name s Instances {a {OS s Arch s Version s Token s}}}}}
-		WORLD   {Calendar s}
+		WORLD   {Calendar s ClientSettings {o {MkdirPath s ImageBaseURL s ModuleCode s SCPDestination s ServerHostname s}}}
 		/CONN   {}
 		Animation {Frames i FrameSpeed i Loops i}
 		Health  {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}
@@ -301,7 +303,7 @@ proc ::gmaproto::redial {} {
 	after 10 ::gmaproto::_receive $::gmaproto::sock
 
 	if [catch {::gmaproto::_login} err] {
-		say "Attempt to sign on to server failed: $err"
+		::say "Attempt to sign on to server failed: $err"
 	}
 }
 
@@ -1920,8 +1922,29 @@ proc ::gmaproto::_login {} {
 			}
 			AC	{ ::gmaproto::_dispatch_to_app AC $params }
 			DSM	{ ::gmaproto::_dispatch_to_app DSM $params }
+			REDIRECT {
+				::gmautil::dassign $params Host newhost Port newport Reason reason
+				::INFO "Server ${::gmaproto::host}:${::gmaproto::port} asked us to connect instead to the server at ${newhost}:${newport}"
+				if {$reason ne {}} {
+					::INFO "Redirecting because $reason"
+				}
+				set ::gmaproto::sock {}
+				set ::gmaproto::pending_login true
+				set ::gmaproto::host $newhost
+				set ::gmaproto::port $newport
+				catch {close $::gmaproto::sock}
+				set ::gmaproto::send_buffer {}
+				set ::gmaproto::recv_buffer {}
+				set ::gmaproto::read_buffer {}
+				set ::gmaproto::poll_buffer {}
+				::gmaproto::redial
+				return
+			}
 			MARCO	{ ::gmaproto::DEBUG "Ignored MARCO during login" }
-			WORLD	{ set calendar [dict get $params Calendar] }
+			WORLD	{ 
+				set calendar [dict get $params Calendar] ;# TODO currently not used; the mapper only recognizes the Golarion calendar
+				::gmaproto::_dispatch_to_app WORLD $params
+			}
 			DENIED {
 				::report_progress "Server denied access"
 				::say "Server DENIED access: [dict get $params Reason]"
