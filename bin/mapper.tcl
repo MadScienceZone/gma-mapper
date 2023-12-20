@@ -41,6 +41,7 @@ set CURLpath /usr/bin/curl
 set CURLinsecure false
 set CURLserver https://www.rag.com/gma/map
 set ImageFormat png
+set ServerSideConfiguration {}
 #
 # SCP/SSH:
 #  The mapper runs SSH and SCP to send files TO the web server for authorized
@@ -1096,6 +1097,43 @@ proc ApplyDebugProtocol {enabled} {
 		::gmaproto::set_debug {}
 	}
 }
+proc applyServerSideConfiguration {} {
+	global ServerSideConfiguration
+	global SERVER_MKDIRpath SCPserver SCPdest ModuleID CURLserver
+
+	if {$ServerSideConfiguration ne {}} {
+		if {[dict exists $ServerSideConfiguration MkdirPath] && [set v [dict get $ServerSideConfiguration MkdirPath]] ne {}} {
+			if {$v ne $SERVER_MKDIRpath} {
+				INFO "Server requests server-side mkdir path changes from \"$SERVER_MKDIRpath\" to \"$v\""
+				set SERVER_MKDIRpath $v
+			}
+		}
+		if {[dict exists $ServerSideConfiguration ImageBaseURL] && [set v [dict get $ServerSideConfiguration ImageBaseURL]] ne {}} {
+			if {$v ne $CURLserver} {
+				INFO "Server requests server-side image base URL changes from \"$CURLserver\" to \"$v\""
+				set CURLserver $v
+			}
+		}
+		if {[dict exists $ServerSideConfiguration ModuleCode] && [set v [dict get $ServerSideConfiguration ModuleCode]] ne {}} {
+			if {$v ne $ModuleID} {
+				INFO "Server requests module ID changes from \"$ModuleID\" to \"$v\""
+				set ModuleID $v
+			}
+		}
+		if {[dict exists $ServerSideConfiguration SCPDestination] && [set v [dict get $ServerSideConfiguration SCPDestination]] ne {}} {
+			if {$v ne $SCPdest} {
+				INFO "Server requests server-side image destination path changes from \"$SCPdest\" to \"$v\""
+				set SCPdest $v
+			}
+		}
+		if {[dict exists $ServerSideConfiguration ServerHostname] && [set v [dict get $ServerSideConfiguration ServerHostname]] ne {}} {
+			if {$v ne $SCPserver} {
+				INFO "Server requests content server host changes from \"$SCPserver\" to \"$v\""
+				set SCPserver $v
+			}
+		}
+	}
+}
 proc ApplyPreferences {data args} {
 	global colortheme
 	global animatePlacement blur_all blur_pct DEBUG_level debug_protocol
@@ -1179,6 +1217,7 @@ proc ApplyPreferences {data args} {
 	if {$username ne {}} {
 		set local_user $username
 	}
+	applyServerSideConfiguration
 	create_main_menu [dict get $data menu_button]
 	UpdateConnectionMenu [::gmaprofile::list_server_names $data]
 }
@@ -9100,6 +9139,18 @@ proc DoCommandCLR   {d} { ClearObjectById [dict get $d ObjID] }
 proc DoCommandCO    {d} { setCombatMode [dict get $d Enabled] }
 proc DoCommandMARCO {d} { ::gmaproto::polo }
 proc DoCommandMARK  {d} { global canvas; start_ping_marker $canvas [dict get $d X] [dict get $d Y] 0 }
+
+proc DoCommandWORLD {d} {
+	global ServerSideConfiguration
+	if {[dict exists $d ClientSettings]} {
+		set ServerSideConfiguration [dict get $d ClientSettings]
+	} else {
+		set ServerSideConfiguration {}
+	}
+	applyServerSideConfiguration
+}
+
+
 proc DoCommandECHO  {d} {
 	if {[dict get $d s] eq "__spt__"} {
 		_server_ping_reply $d
