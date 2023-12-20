@@ -6,7 +6,7 @@
 mapper \- battle grid save file format
 .SH DESCRIPTION
 .LP
-The version 22 file format for the
+The version 23 file format for the
 .BR mapper (6)
 battle grid program is described in this document.
 .LP
@@ -133,7 +133,7 @@ these assumptions.
 .SH EXAMPLE
 '\" <<TeX>>
 '\" \begin{Coding}
-'\" |__MAPPER__:22|\\
+'\" |__MAPPER__:23|\\
 '\" \guillemotleft|__META__|\guillemotright{}| {|\\
 '\" |  "Timestamp": 1650611775,|\\
 '\" |  "DateTime": "Fri Apr 22 00:16:15 PDT 2022",|\\
@@ -178,7 +178,7 @@ these assumptions.
 .nf
 .na
 \fB
-__MAPPER__:22
+__MAPPER__:23
 \[Fo]__META__\[Fc] {
   "Timestamp": 1650611775,
   "DateTime": "Fri Apr 22 00:16:15 PDT 2022",
@@ -471,5 +471,10 @@ permissively than this spec requires, strictly speaking (e.g., an otherwise vali
 object where the final brace is not by itself on a line), but this behavior should not
 be construed as a requirement for other code. File readers and writers should follow 
 this specification as the authoritative standard.
+.SS "Changes as of File Format 23"
+.LP
+Map elements may now have a
+.B Stipple
+attribute.
 .SH COPYRIGHT
 Part of the GMA software suite, copyright \(co 1992\-2023 by Steven L. Willoughby, Aloha, Oregon, USA. All Rights Reserved. Distributed under BSD-3-Clause License. \"@m(c)@
