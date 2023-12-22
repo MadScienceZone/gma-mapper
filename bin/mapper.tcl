@@ -17,7 +17,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.20-alpha.1}     ;# @@##@@
+set GMAMapperVersion {4.20-alpha.2}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {410}         ;# @@##@@
 set CoreVersionNumber {6.11-alpha}            ;# @@##@@
@@ -1104,31 +1104,31 @@ proc applyServerSideConfiguration {} {
 	if {$ServerSideConfiguration ne {}} {
 		if {[dict exists $ServerSideConfiguration MkdirPath] && [set v [dict get $ServerSideConfiguration MkdirPath]] ne {}} {
 			if {$v ne $SERVER_MKDIRpath} {
-				INFO "Server requests server-side mkdir path changes from \"$SERVER_MKDIRpath\" to \"$v\""
+				INFO "Server requests server-side mkdir path to be changed from \"$SERVER_MKDIRpath\" to \"$v\""
 				set SERVER_MKDIRpath $v
 			}
 		}
 		if {[dict exists $ServerSideConfiguration ImageBaseURL] && [set v [dict get $ServerSideConfiguration ImageBaseURL]] ne {}} {
 			if {$v ne $CURLserver} {
-				INFO "Server requests server-side image base URL changes from \"$CURLserver\" to \"$v\""
+				INFO "Server requests server-side image base URL to be changed from \"$CURLserver\" to \"$v\""
 				set CURLserver $v
 			}
 		}
 		if {[dict exists $ServerSideConfiguration ModuleCode] && [set v [dict get $ServerSideConfiguration ModuleCode]] ne {}} {
 			if {$v ne $ModuleID} {
-				INFO "Server requests module ID changes from \"$ModuleID\" to \"$v\""
+				INFO "Server requests module ID to be changed from \"$ModuleID\" to \"$v\""
 				set ModuleID $v
 			}
 		}
 		if {[dict exists $ServerSideConfiguration SCPDestination] && [set v [dict get $ServerSideConfiguration SCPDestination]] ne {}} {
 			if {$v ne $SCPdest} {
-				INFO "Server requests server-side image destination path changes from \"$SCPdest\" to \"$v\""
+				INFO "Server requests server-side image destination path to be changed from \"$SCPdest\" to \"$v\""
 				set SCPdest $v
 			}
 		}
 		if {[dict exists $ServerSideConfiguration ServerHostname] && [set v [dict get $ServerSideConfiguration ServerHostname]] ne {}} {
 			if {$v ne $SCPserver} {
-				INFO "Server requests content server host changes from \"$SCPserver\" to \"$v\""
+				INFO "Server requests content server host to be changed from \"$SCPserver\" to \"$v\""
 				set SCPserver $v
 			}
 		}
