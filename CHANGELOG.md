@@ -3,11 +3,11 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.20-alpha          <!-- @@##@@ -->
- * Effective Date: 20-Dec-2023               <!-- @@##@@ -->
+ * This Package Version: 4.20          <!-- @@##@@ -->
+ * Effective Date: 21-Dec-2023               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.11-alpha <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.11 <!-- @@##@@ -->
  * GMA Mapper File Format: 23	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 410        <!-- @@##@@ -->
 
@@ -16,7 +16,7 @@ The support for old server protocols (<400) and map file formats (<20) will be d
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
-# 4.20-alpha
+# 4.20
 ## Fixes
  * Bug that misinterpreted `null` in dict-value JSON payloads (e.g., `OA` commands).
 ## Enhancements
