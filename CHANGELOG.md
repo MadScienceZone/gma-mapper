@@ -3,18 +3,29 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.19.2          <!-- @@##@@ -->
- * Effective Date: 13-Dec-2023               <!-- @@##@@ -->
+ * This Package Version: 4.20          <!-- @@##@@ -->
+ * Effective Date: 21-Dec-2023               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.10 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.11 <!-- @@##@@ -->
  * GMA Mapper File Format: 23	     <!-- @@##@@ -->
- * GMA Mapper Protocol: 409        <!-- @@##@@ -->
+ * GMA Mapper Protocol: 410        <!-- @@##@@ -->
 
 ## DEPRECATION NOTICE
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.20
+## Fixes
+ * Bug that misinterpreted `null` in dict-value JSON payloads (e.g., `OA` commands).
+## Enhancements
+ * Protocol 410
+   * Adds `REDIRECT` command to protocol, allowing the server administrator to temporarily direct clients to an alternate server.
+   * Adds server-side configuration extension to `WORLD` command to allow server admin/GM to set a limited number of client preferences, overriding local user preferences.
+      * `MkdirPath`, `SCPDestination`, `ServerHostname` GM settings for uploading content to the server.
+      * `ImageBaseURL` setting which tells clients where to find images and maps on the server.
+      * `ModuleCode` setting which specifies the adventure module in play.
 
 # 4.19.2
 ## Fixes
