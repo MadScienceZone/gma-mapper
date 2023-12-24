@@ -737,16 +737,24 @@ proc ResetChatHistory {loadqty} {
 # if we do, we can look at our in-memory history for that instead of taking time to update
 # this for every message).
 
+set ICH_tries 10
 proc InitializeChatHistory {} {
 	global ChatHistoryFile ChatHistory ChatHistoryFileHandle ChatHistoryLastMessageID
 	global path_cache IThost ITport ChatHistoryLimit local_user
-	global ChatHistoryFileDirection
+	global ChatHistoryFileDirection ICH_tries
 
 	if {$IThost ne {}} {
 		if {$ChatHistoryFileDirection ne {}} {
-			DEBUG 0 "Refusing to load the chat history from cache because someone beat me to the file! (mode $ChatHistoryFileDirection) This shouldn't happen."
+			if {$ICH_tries <= 0} {
+				DEBUG 0 "Refusing to load the chat history from cache because someone beat me to the file! (mode $ChatHistoryFileDirection) This shouldn't happen."
+				return
+			}
+			DEBUG 0 "Can't load the chat history because it's currently busy (mode $ChatHistoryFileDirection). Waiting... $ICH_tries more attempts"
+			incr ICH_tries -1
+			after 1000 InitializeChatHistory
 			return
 		}
+		set ICH_tries 10
 		set prog_id [begin_progress * "Loading cached chat messages" *]
 		set ChatHistoryFile [file join $path_cache "${IThost}-${ITport}-${local_user}-chat.history"]
 		DEBUG 1 "Loading chat history from $ChatHistoryFile"
