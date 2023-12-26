@@ -1,7 +1,4 @@
 #!/usr/bin/env wish
-# TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
-# TODO note that in server INIT file, Skin= must be set; the mapper does not use the * field in monsters,
-#      it just does as instructed based on Skin index
 ########################################################################################
 #  _______  _______  _______                ___        __     ______        ___        #
 # (  ____ \(       )(  ___  ) Game         /   )      /  \   / ____ \      /   )       #
@@ -13,11 +10,14 @@
 # (_______)|/     \||/     \| Client         (_)  (_) \____/ \_____/ (_)     (_)       #
 #                                                                                      #
 ########################################################################################
+# TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
+# TODO note that in server INIT file, Skin= must be set; the mapper does not use the * field in monsters,
+#      it just does as instructed based on Skin index
 #
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.20}     ;# @@##@@
+set GMAMapperVersion {4.20.1-alpha}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {410}         ;# @@##@@
 set CoreVersionNumber {6.11}            ;# @@##@@
