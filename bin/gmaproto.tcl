@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___       _______  _______                 #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___   )(  __   )                #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  || (  )  |                #
-# | |      | || || || (___) | Assistant  / (_) (_        /   )| | /   |                #
-# | | ____ | |(_)| ||  ___  |           (____   _)     _/   / | (/ /) |                #
-# | | \_  )| |   | || (   ) |                ) (      /   _/  |   / | |                #
-# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\|  (__) |                #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/(_______)                #
+#  _______  _______  _______                ___       _______  _______      __         #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___   )(  __   )    /  \        #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  || (  )  |    \/) )       #
+# | |      | || || || (___) | Assistant  / (_) (_        /   )| | /   |      | |       #
+# | | ____ | |(_)| ||  ___  |           (____   _)     _/   / | (/ /) |      | |       #
+# | | \_  )| |   | || (   ) |                ) (      /   _/  |   / | |      | |       #
+# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\|  (__) | _  __) (_      #
+# (_______)|/     \||/     \| Client         (_)  (_)\_______/(_______)(_) \____/      #
 #                                                                                      #
 ########################################################################################
 #
@@ -66,6 +66,7 @@ namespace eval ::gmaproto {
 	variable host {}
 	variable port {}
 	variable sock {}
+	variable recv_daemon {}
 	variable send_buffer {}
 	variable recv_buffer {}
 	variable read_buffer {}
@@ -206,6 +207,13 @@ namespace eval ::gmaproto {
 #	::update_progress id value newmax|* ?-send?
 #	::end_progress id ?-send?
 #
+proc ::gmaproto::stop_all_progress_meters {} {
+	foreach id $::gmaproto::progress_stack {
+		::end_progress $id
+	}
+	set ::gmaproto::progress_stack {}
+}
+
 proc ::gmaproto::watch_operation {description} {
 	set this_operation_id [::gmaproto::new_id]
 	lappend ::gmaproto::progress_stack $this_operation_id
@@ -300,7 +308,11 @@ proc ::gmaproto::redial {} {
 	}
 	fconfigure $::gmaproto::sock -blocking 0
 #	fileevent $::gmaproto::sock readable "::gmaproto::_receive $::gmaproto::sock"
-	after 10 ::gmaproto::_receive $::gmaproto::sock
+	if {![catch {set existing_daemon [after info $::gmaproto::recv_daemon]}]} {
+		::gmaproto::DEBUG "Stopping existing receiver daemon $existing_daemon"
+		after cancel [lindex $existing_daemon 0]
+	}
+	set ::gmaproto::recv_daemon [after 10 ::gmaproto::_receive $::gmaproto::sock]
 
 	if [catch {::gmaproto::_login} err] {
 		::say "Attempt to sign on to server failed: $err"
@@ -309,9 +321,19 @@ proc ::gmaproto::redial {} {
 
 proc ::gmaproto::_receive {s} {
 	while true {
-		append ::gmaproto::read_buffer [read $s 1024]
+		if {$s eq {}} {
+			::gmaproto::DEBUG "_receive exits (socket seems to have disappeared)"
+			return
+		}
+		if {[catch {
+			append ::gmaproto::read_buffer [read $s 1024]
+		} err]} {
+			::gmaproto::DEBUG "Error reading from map server: $err; stopping _receive daemon"
+			return
+		}
+
 		if {[eof $s]} {
-			::DEBUG 0 "Lost connection to map server"
+			::gmaproto::DEBUG 0 "Lost connection to map server"
 			close $s
 			set ::gmaproto::sock {}
 			set ::gmaproto::pending_login true
@@ -320,7 +342,7 @@ proc ::gmaproto::_receive {s} {
 		}
 		if {$::gmaproto::read_buffer eq {}} {
 			# nothing read; back off a little
-			after 50 ::gmaproto::_receive $s
+			set ::gmaproto::recv_daemon [after 50 ::gmaproto::_receive $s]
 			return
 		}
 		if {[set e [string first "\n" $::gmaproto::read_buffer]] >= 0} {
@@ -339,7 +361,7 @@ proc ::gmaproto::_receive {s} {
 			::DEBUG 0 $err
 		}
 	}
-	after 5 ::gmaproto::_receive $s
+	set ::gmaproto::recv_daemon [after 5 ::gmaproto::_receive $s]
 }
 
 proc ::gmaproto::_dispatch {} {
@@ -1935,19 +1957,22 @@ proc ::gmaproto::_login {} {
 				::gmautil::dassign $params Host newhost Port newport Reason reason
 				::INFO "Server ${::gmaproto::host}:${::gmaproto::port} asked us to connect instead to the server at ${newhost}:${newport}"
 				if {$reason ne {}} {
-					::INFO "Redirecting because $reason"
+					::INFO "Reason for redirect is $reason"
 				}
-				set ::gmaproto::sock {}
 				set ::gmaproto::pending_login true
 				set ::gmaproto::host $newhost
 				set ::gmaproto::port $newport
-				catch {close $::gmaproto::sock}
+				if {[catch {close $::gmaproto::sock} err]} {
+					::gmaproto::DEBUG "Error closing socket: $err"
+				}
+				set ::gmaproto::sock {}
 				set ::gmaproto::send_buffer {}
 				set ::gmaproto::recv_buffer {}
 				set ::gmaproto::read_buffer {}
 				set ::gmaproto::poll_buffer {}
+				stop_all_progress_meters
 				::gmaproto::redial
-				return
+				error REDIRECT
 			}
 			MARCO	{ ::gmaproto::DEBUG "Ignored MARCO during login" }
 			WORLD	{ 
@@ -2050,6 +2075,10 @@ proc ::gmaproto::_login {} {
 			}
 		}
 		} err] {
+			if {$err eq "REDIRECT"} {
+				::gmaproto::DEBUG "cancelling login due to redirect"
+				return
+			}
 			::say "Error processing login negotiation step: $err"
 		}
 	}
@@ -2264,7 +2293,7 @@ proc ::gmaproto::normalize_dict {cmd d} {
 	return [::gmaproto::new_dict_from_json $cmd [::gmaproto::json_from_dict $cmd $d]]
 }
 
-# @[00]@| GMA-Mapper 4.20
+# @[00]@| GMA-Mapper 4.20.1
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
