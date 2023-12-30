@@ -1947,7 +1947,7 @@ proc ::gmaproto::_login {} {
 				set ::gmaproto::read_buffer {}
 				set ::gmaproto::poll_buffer {}
 				::gmaproto::redial
-				return
+				error REDIRECT
 			}
 			MARCO	{ ::gmaproto::DEBUG "Ignored MARCO during login" }
 			WORLD	{ 
@@ -2050,6 +2050,10 @@ proc ::gmaproto::_login {} {
 			}
 		}
 		} err] {
+			if {$err eq "REDIRECT"} {
+				::say "cancelling login due to redirect"
+				return
+			}
 			::say "Error processing login negotiation step: $err"
 		}
 	}
