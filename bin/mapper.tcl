@@ -1,23 +1,23 @@
 #!/usr/bin/env wish
+########################################################################################
+#  _______  _______  _______                ___       _______  _______      __         #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___   )(  __   )    /  \        #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  || (  )  |    \/) )       #
+# | |      | || || || (___) | Assistant  / (_) (_        /   )| | /   |      | |       #
+# | | ____ | |(_)| ||  ___  |           (____   _)     _/   / | (/ /) |      | |       #
+# | | \_  )| |   | || (   ) |                ) (      /   _/  |   / | |      | |       #
+# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\|  (__) | _  __) (_      #
+# (_______)|/     \||/     \| Client         (_)  (_)\_______/(_______)(_) \____/      #
+#                                                                                      #
+########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
 # TODO note that in server INIT file, Skin= must be set; the mapper does not use the * field in monsters,
 #      it just does as instructed based on Skin index
-########################################################################################
-#  _______  _______  _______                ___        __     ______        ___        #
-# (  ____ \(       )(  ___  ) Game         /   )      /  \   / ____ \      /   )       #
-# | (    \/| () () || (   ) | Master's    / /) |      \/) ) ( (    \/     / /) |       #
-# | |      | || || || (___) | Assistant  / (_) (_       | | | (____      / (_) (_      #
-# | | ____ | |(_)| ||  ___  |           (____   _)      | | |  ___ \    (____   _)     #
-# | | \_  )| |   | || (   ) |                ) (        | | | (   ) )        ) (       #
-# | (___) || )   ( || )   ( | Mapper         | |   _  __) (_( (___) ) _      | |       #
-# (_______)|/     \||/     \| Client         (_)  (_) \____/ \_____/ (_)     (_)       #
-#                                                                                      #
-########################################################################################
 #
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.20}     ;# @@##@@
+set GMAMapperVersion {4.20.1}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {410}         ;# @@##@@
 set CoreVersionNumber {6.11}            ;# @@##@@
@@ -737,16 +737,24 @@ proc ResetChatHistory {loadqty} {
 # if we do, we can look at our in-memory history for that instead of taking time to update
 # this for every message).
 
+set ICH_tries 10
 proc InitializeChatHistory {} {
 	global ChatHistoryFile ChatHistory ChatHistoryFileHandle ChatHistoryLastMessageID
 	global path_cache IThost ITport ChatHistoryLimit local_user
-	global ChatHistoryFileDirection
+	global ChatHistoryFileDirection ICH_tries
 
 	if {$IThost ne {}} {
 		if {$ChatHistoryFileDirection ne {}} {
-			DEBUG 0 "Refusing to load the chat history from cache because someone beat me to the file! (mode $ChatHistoryFileDirection) This shouldn't happen."
+			if {$ICH_tries <= 0} {
+				DEBUG 0 "Refusing to load the chat history from cache because someone beat me to the file! (mode $ChatHistoryFileDirection) This shouldn't happen."
+				return
+			}
+			DEBUG 0 "Can't load the chat history because it's currently busy (mode $ChatHistoryFileDirection). Waiting... $ICH_tries more attempts"
+			incr ICH_tries -1
+			after 1000 InitializeChatHistory
 			return
 		}
+		set ICH_tries 10
 		set prog_id [begin_progress * "Loading cached chat messages" *]
 		set ChatHistoryFile [file join $path_cache "${IThost}-${ITport}-${local_user}-chat.history"]
 		DEBUG 1 "Loading chat history from $ChatHistoryFile"
@@ -13207,7 +13215,7 @@ proc ConnectToServerByIdx {idx} {
 #   .../<name>@<zoom>/:<frame>:<name>@<zoom>.<ext>
 #   .../<name>.map
 
-# @[00]@| GMA-Mapper 4.20
+# @[00]@| GMA-Mapper 4.20.1
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
