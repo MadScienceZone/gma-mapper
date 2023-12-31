@@ -49,7 +49,7 @@
 # 	::report_progress message
 # 	::say message
 
-package provide gmaproto 1.2
+package provide gmaproto 1.3
 package require Tcl 8.5
 package require json 1.3.3
 package require json::write 1.0.3
@@ -57,9 +57,9 @@ package require base64 2.4.2
 package require uuid 1.0.1
 
 namespace eval ::gmaproto {
-	variable protocol 410
+	variable protocol 411
 	variable min_protocol 333
-	variable max_protocol 410
+	variable max_protocol 411
 	variable max_max_protocol 499
 	variable debug_f {}
 	variable legacy false
@@ -169,11 +169,11 @@ namespace eval ::gmaproto {
 		PS      {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l PolyGM ? Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}}}
 		READY   {}
 		REDIRECT {Host s Port i Reason s}
-		ROLL    {Sender s Recipients l MessageID i ToAll ? ToGM ? Title s Result {o {InvalidRequest ? ResultSuppressed ? Result i Details {a {Type s Value s}}}} RequestID s MoreResults ?}
+		ROLL    {Sender s Recipients l MessageID i ToAll ? ToGM ? Title s Result {o {InvalidRequest ? ResultSuppressed ? Result i Details {a {Type s Value s}}}} RequestID s MoreResults ? Sent s}
 		SYNC    {}
 		SYNC-CHAT {Target i}
 		TB      {Enabled ?}
-		TO      {Sender s Recipients l MessageID i ToAll ? ToGM ? Text s}
+		TO      {Sender s Recipients l MessageID i ToAll ? ToGM ? Text s Sent s}
 		UPDATES {Packages {a {Name s Instances {a {OS s Arch s Version s Token s}}}}}
 		WORLD   {Calendar s ClientSettings {o {MkdirPath s ImageBaseURL s ModuleCode s SCPDestination s ServerHostname s}}}
 		/CONN   {}
@@ -333,7 +333,7 @@ proc ::gmaproto::_receive {s} {
 		}
 
 		if {[eof $s]} {
-			::gmaproto::DEBUG 0 "Lost connection to map server"
+			::DEBUG 0 "Lost connection to map server"
 			close $s
 			set ::gmaproto::sock {}
 			set ::gmaproto::pending_login true
