@@ -1,4 +1,5 @@
-'\" *** 410 ***
+'\" t
+'\" *** 411 ***
 '\" <<ital-is-var>>
 '\" <<bold-is-fixed>>
 .TH MAPPER-PROTOCOL 7 "GMA-Mapper 4.3.4" 16-Mar-2023 "Games" \" @@mp@@
@@ -75,7 +76,7 @@ be implemented to wait synchronously for a server
 response during the authentication negotiation stage.
 .LP
 '\" <</bold-is-fixed>>
-.B "This describes protocol version 410."
+.B "This describes protocol version 411."
 '\" <<bold-is-fixed>>
 These notes are intended to be 
 detailed enough to implement a client from and should be considered
@@ -2540,6 +2541,14 @@ The
 .B RequestID
 string passed by the client when requesting this die roll, or the empty string
 if they didn't.
+'\" <<New>>
+.TP
+.BI Sent " (RFC 3339-formatted datetime string)"
+The date and time the message was sent.
+Clients SHOULD NOT set a nonempty value for this field. It will be filled in by the server when sending
+messages to clients. If this field is missing or empty when received from the server,
+it means the date was not available to report for that message.
+'\" <</New>>
 .TP
 .BI ToAll " (bool)"
 If true, this is a global message sent to all clients.
@@ -2684,6 +2693,14 @@ global messages, this should be
 .BI MessageID " (int)"
 The unique number assigned by the server for this chat message. Clients SHOULD NOT
 set this field.
+'\" <<New>>
+.TP
+.BI Sent " (RFC 3339-formatted datetime string)"
+The date and time the message was sent.
+Clients SHOULD NOT set a nonempty value for this field. It will be filled in by the server when sending
+messages to clients. If this field is missing or empty when received from the server,
+it means the date was not available to report for that message.
+'\" <</New>>
 .TP
 .BI ToAll " (bool)"
 If true, this is a global message sent to all clients.
@@ -2877,8 +2894,11 @@ John Mechalas (elevation and movement modes).
 .SH HISTORY
 .LP
 '\" <<New>>
-This document defines map protocol version 410,
-which added the
+This document defines map protocol version 411,
+which added timestamps to chat messages and die-roll results.
+.LP
+Protocol 410
+added the
 .B REDIRECT
 command and the
 .B ClientSettings
