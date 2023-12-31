@@ -1067,9 +1067,9 @@ proc create_main_menu {use_button} {
 	$mm.play add command -command {ClearSelection} -label "Deselect All"
 	$mm.play add separator
 	if {[::gmautil::version_compare [info patchlevel] 8.7] >= 0} {
-		$mm.play add cascade -menu $mm.play.servers -state disabled -label "Connect to"
+		$mm.play add cascade -menu $mm.play.servers -state disabled -label "\[DEPRECATED\] Connect to"
 	} else {
-		$mm.play add cascade -menu $mm.play.servers -label "Connect to"
+		$mm.play add cascade -menu $mm.play.servers -label "\[DEPRECATED\] Connect to"
 	}
 	set connmenuidx 8
 	menu $mm.tools
