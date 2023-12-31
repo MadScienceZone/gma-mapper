@@ -309,10 +309,11 @@ proc ::gmaproto::redial {} {
 	fconfigure $::gmaproto::sock -blocking 0
 #	fileevent $::gmaproto::sock readable "::gmaproto::_receive $::gmaproto::sock"
 	if {![catch {set existing_daemon [after info $::gmaproto::recv_daemon]}]} {
-		::gmaproto::DEBUG "Stopping existing receiver daemon $existing_daemon"
-		after cancel [lindex $existing_daemon 0]
+		::gmaproto::DEBUG "Stopping existing receiver daemon $::gmaproto::recv_daemon ($existing_daemon)"
+		after cancel $::gmaproto::recv_daemon
 	}
 	set ::gmaproto::recv_daemon [after 10 ::gmaproto::_receive $::gmaproto::sock]
+	::gmaproto::DEBUG "Started new receiver daemon $::gmaproto::recv_daemon"
 
 	if [catch {::gmaproto::_login} err] {
 		::say "Attempt to sign on to server failed: $err"
