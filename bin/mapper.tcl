@@ -17,9 +17,9 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.20.1}     ;# @@##@@
+set GMAMapperVersion {4.21-alpha.0}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
-set GMAMapperProtocol {410}         ;# @@##@@
+set GMAMapperProtocol {411}         ;# @@##@@
 set CoreVersionNumber {6.11}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
@@ -112,6 +112,7 @@ set time_rel 0
 set ClockProgress 0
 set progress_stack {}
 set is_GM false
+set LastDisplayedChatDate {}
 proc begin_progress { id title max args } {
     if {[catch {
         DEBUG 1 "begin_progress [list $id $title $max $args]"
@@ -713,7 +714,7 @@ set ChatHistoryLastMessageID 0
 
 proc ResetChatHistory {loadqty} {
 	global ChatHistoryFile ChatHistoryFileHandle ChatHistoryLastMessageID ChatHistoryLimit ChatHistoryFileDirection
-	global ChatHistory
+	global ChatHistory LastDisplayedChatDate
 
 	catch {
 		close $ChatHistoryFileHandle
@@ -727,6 +728,7 @@ proc ResetChatHistory {loadqty} {
 	set ch $ChatHistoryLimit
 	set ChatHistoryLimit $loadqty
 	set ChatHistory {}
+	set LastDisplayedChatDate {}
 	BlankChatHistoryDisplay
 	InitializeChatHistory
 	set ChatHistoryLimit $ch
@@ -742,6 +744,8 @@ proc InitializeChatHistory {} {
 	global ChatHistoryFile ChatHistory ChatHistoryFileHandle ChatHistoryLastMessageID
 	global path_cache IThost ITport ChatHistoryLimit local_user
 	global ChatHistoryFileDirection ICH_tries
+	global LastDisplayedChatDate
+	set LastDisplayedChatDate {}
 
 	if {$IThost ne {}} {
 		if {$ChatHistoryFileDirection ne {}} {
@@ -6900,6 +6904,10 @@ proc _ping_server {} {
 }
 
 proc scan_fractional_seconds {t} {
+	if {$t eq {0001-01-01T00:00:00Z}} {
+		# This is the zero value for times
+		return 0
+	}
 	if {[regexp {^(.*T\d+:\d+:\d+)\.(\d+)([+-].*)$} $t _ pre frac post]} {
 		if {[set intsec [clock scan "$pre$post" -format "%Y-%m-%dT%H:%M:%S%z"]]} {
 			return "$intsec.$frac"
@@ -10061,7 +10069,7 @@ proc format_with_style {value format} {
 
 set drd_id 0
 proc DisplayDieRoll {d} {
-	global icon_dieb16 icon_die16 icon_die16c SuppressChat drd_id
+	global icon_dieb16 icon_die16 icon_die16c SuppressChat drd_id LastDisplayedChatDate
 
 	if {$SuppressChat} {
 		return
@@ -10074,7 +10082,8 @@ proc DisplayDieRoll {d} {
 		{Result Result}  result \
 		{Result Details} details \
 		{Result InvalidRequest} is_invalid \
-		{Result ResultSuppressed} is_blind
+		{Result ResultSuppressed} is_blind \
+		Sent             date_sent
 
 	set w .chatwindow.p.chat
 
@@ -10092,8 +10101,25 @@ proc DisplayDieRoll {d} {
 		set icon $icon_dieb16
 	}
 
-	TranscribeDieRoll $from $recipientlist $title $result $details [dict get $d ToAll] [dict get $d ToGM] $is_blind $is_invalid
+	TranscribeDieRoll $from $recipientlist $title $result $details [dict get $d ToAll] [dict get $d ToGM] $is_blind $is_invalid $date_sent
 	$w.1.text configure -state normal
+	global _preferences LastDisplayedChatDate
+	if {[dict exists $_preferences chat_timestamp] && [dict get $_preferences chat_timestamp]} {
+		if {$date_sent ne {}} {
+			if {[set date_sent_sec [scan_fractional_seconds $date_sent]] != 0} {
+				set date_sent_date [clock format [expr int($date_sent_sec)] -format "%A, %B %d, %Y"]
+				if {$LastDisplayedChatDate ne $date_sent_date} {
+					set LastDisplayedChatDate $date_sent_date
+					$w.1.text insert end "\n--$date_sent_date--\n" timestamp
+				}
+				$w.1.text insert end [clock format [expr int($date_sent_sec)] -format "%H:%M "] timestamp
+			} else {
+				$w.1.text insert end "??:?? " timestamp
+			}
+		} else {
+			$w.1.text insert end "--:-- " timestamp
+		}
+	}
 	$w.1.text image create end -align baseline -image $icon -padx 2
 	if {!$is_blind && !$is_invalid} {
 		$w.1.text insert end [format_with_style $result fullresult] fullresult
@@ -11303,9 +11329,9 @@ proc DisplayChatMessage {d args} {
 	global _preferences colortheme
 
 	if {$d ne {}} {
-		::gmautil::dassign $d Sender from Recipients recipientlist Text message
+		::gmautil::dassign $d Sender from Recipients recipientlist Text message Sent date_sent
 	} else {
-		lassign {} from recipientlist message
+		lassign {} from recipientlist message date_sent
 	}
 
 	if {$SuppressChat} return
@@ -11454,7 +11480,7 @@ proc DisplayChatMessage {d args} {
 			begingroup best bonus constant critlabel critspec dc diebonus diespec discarded
 			endgroup exceeded fail from fullmax fullresult iteration label max maximized maxroll 
 			met min moddelim normal operator repeat result roll separator short sf success 
-			title to until worst system subtotal error notice
+			title to until worst system subtotal error notice timestamp
 		} {
 			if {![dict exists $_preferences styles dierolls components $tag]} {
 				DEBUG 0 "Preferences profile is missing a definition for $tag; using default"
@@ -11500,22 +11526,38 @@ proc DisplayChatMessage {d args} {
 	}
 
 	set system [expr [lsearch -exact $args "-system"] >= 0] 
-	_render_chat_message $wc.1.text $system $message $recipientlist $from [dict get $d ToAll] [dict get $d ToGM]
+	_render_chat_message $wc.1.text $system $message $recipientlist $from [dict get $d ToAll] [dict get $d ToGM] $date_sent
 	if {$system} {
-		TranscribeChat (system) $recipientlist $message [dict get $d ToAll] [dict get $d ToGM]
+		TranscribeChat (system) $recipientlist $message [dict get $d ToAll] [dict get $d ToGM] $date_sent
 	} else {
-		TranscribeChat $from $recipientlist $message [dict get $d ToAll] [dict get $d ToGM]
+		TranscribeChat $from $recipientlist $message [dict get $d ToAll] [dict get $d ToGM] $date_sent
 	}
 }
 
-proc _render_chat_message {w system message recipientlist from toall togm} {
-	global SuppressChat
+proc _render_chat_message {w system message recipientlist from toall togm {date_sent {}}} {
+	global SuppressChat _preferences LastDisplayedChatDate
 
 	if {!$SuppressChat && [winfo exists $w]} {
 		$w configure -state normal
 		if {$system} {
 			$w insert end "$message\n" system
 		} else {
+			if {[dict exists $_preferences chat_timestamp] && [dict get $_preferences chat_timestamp]} {
+				if {$date_sent ne {}} {
+					if {[set date_sent_sec [scan_fractional_seconds $date_sent]] != 0} {
+						set date_sent_date [clock format [expr int($date_sent_sec)] -format "%A, %B %d, %Y"]
+						if {$LastDisplayedChatDate ne $date_sent_date} {
+							set LastDisplayedChatDate $date_sent_date
+							$w insert end "\n--$date_sent_date--\n" timestamp
+						}
+						$w insert end [clock format [expr int($date_sent_sec)] -format "%H:%M "] timestamp
+					} else {
+						$w insert end "??:?? " timestamp
+					}
+				} else {
+					$w insert end "--:-- " timestamp
+				}
+			}
 			ChatAttribution $w $from $recipientlist $toall $togm
 			$w insert end "$message\n" normal
 		}
@@ -11720,10 +11762,15 @@ proc LoadChatHistory {} {
                 ROLL { DisplayDieRoll $d }
                 TO   { 
 			set d [lindex $m 1]
-			if {[dict get $d Sender] eq {-system}} {
-				_render_chat_message $w 1 [dict get $d Text] {} {} false false
+			if {[dict exists $d Sent]} {
+				set date_sent [dict get $d Sent]
 			} else {
-				_render_chat_message $w 0 [dict get $d Text] [dict get $d Recipients] [dict get $d Sender] [dict get $d ToAll] [dict get $d ToGM]
+				set date_sent {}
+			}
+			if {[dict get $d Sender] eq {-system}} {
+				_render_chat_message $w 1 [dict get $d Text] {} {} false false $date_sent
+			} else {
+				_render_chat_message $w 0 [dict get $d Text] [dict get $d Recipients] [dict get $d Sender] [dict get $d ToAll] [dict get $d ToGM] $date_sent
 			}
 		}
                 CC	 {
@@ -11746,13 +11793,13 @@ proc LoadChatHistory {} {
 
 
 set chat_transcript_file {}
-proc TranscribeChat {from recipientlist message toall togm} {
+proc TranscribeChat {from recipientlist message toall togm {date_sent {}}} {
 	global ChatTranscript
 	if {$ChatTranscript ne {}} {
 		if {[set private [Chat_text_attribution $from $recipientlist $toall $togm]] eq {}} {
-			_log_transcription "$from: $message"
+			_log_transcription "<$date_sent> $from: $message"
 		} else {
-			_log_transcription "$from ($private): $message"
+			_log_transcription "<$date_sent> $from ($private): $message"
 		}
 	}
 }
@@ -11773,14 +11820,19 @@ proc _log_transcription {message} {
 	}
 }
 
-proc TranscribeDieRoll {from recipientlist title result details toall togm {is_blind false} {is_invalid false}} {
+proc TranscribeDieRoll {from recipientlist title result details toall togm {is_blind false} {is_invalid false} {date_sent {}}} {
 	global ChatTranscript
 
 	if {$ChatTranscript ne {}} {
-		if {[set private [Chat_text_attribution $from $recipientlist $toall $togm]] eq {}} {
-			set message "\[ROLL $result\] $from: "
+		if {$date_sent eq {}} {
+			set message *
 		} else {
-			set message "\[ROLL $result\] $from ($private): "
+			set message [list $date_sent]
+		}
+		if {[set private [Chat_text_attribution $from $recipientlist $toall $togm]] eq {}} {
+			append message "\[ROLL $result\] $from: "
+		} else {
+			append message "\[ROLL $result\] $from ($private): "
 		}
 		if {$is_invalid} {
 			append message "ERROR "

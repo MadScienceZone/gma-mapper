@@ -11,7 +11,7 @@
 ########################################################################################
 # Profile editor
 
-package provide gmaprofile 1.2
+package provide gmaprofile 1.3
 package require gmacolors
 package require json 1.3.3
 package require json::write 1.0.3
@@ -28,7 +28,7 @@ namespace eval ::gmaprofile {
 	variable font_repository
 	variable _default_color_table
 	variable minimum_file_version 1
-	variable maximum_file_version 4
+	variable maximum_file_version 5
 	array set _default_color_table {
 		fg,light           #000000
 		normal_fg,light    #000000
@@ -85,6 +85,7 @@ namespace eval ::gmaprofile {
 		GMA_Mapper_preferences_version i
 		animate ?
 		button_size s
+		chat_timestamp ?
 		colorize_die_rolls ?
 		curl_path s
 		curl_insecure ?
@@ -226,6 +227,7 @@ namespace eval ::gmaprofile {
 		subtotal   {This shows a subtotal at various places in a complex, multi-dice roll expression.}
 		success    {If the roll includes clear success/fail criteria, this indicates why the roll succeeded.}
 		system     {This gives the style to display system messages in the chat window.}
+		timestamp  {This gives the style to display timestamps on messages in the chat window.}
 		title      {A user-supplied title applied to the die-roll expression.}
 		to         {If the die-roll expression or chat message was addressed to specific people, this displays the list of recipients.}
 		until      {An indicator that you want to repeat the roll until a specified target value is reached.}
@@ -276,6 +278,7 @@ namespace eval ::gmaprofile {
 		return [dict create \
 			animate         false\
 			button_size     small\
+			chat_timestamp  false\
 			colorize_die_rolls true\
 			curl_path       [::gmautil::searchInPath curl]\
 			curl_insecure   false\
@@ -502,7 +505,7 @@ namespace eval ::gmaprofile {
 
 		json::write indented true
 		json::write aligned true
-		dict set data GMA_Mapper_preferences_version 4
+		dict set data GMA_Mapper_preferences_version 5
 		set f [open $filename w]
 		puts $f [::gmaproto::_encode_payload $data $_file_format]
 		close $f
@@ -529,6 +532,12 @@ namespace eval ::gmaprofile {
 		if {![dict exists $data fonts] || [dict size [dict get $data fonts]] == 0} {
 			puts "** Preferences data is missing font list; setting to default **"
 			dict set data fonts [default_fonts]
+		}
+		dict for {font_name font_dict} [default_fonts] {
+			if {![dict exists $data fonts $font_name]} {
+				puts "** Preferences data is missing font $font_name; setting to default $font_dict **"
+				dict set data fonts $font_name $font_dict
+			}
 		}
 		return $data
 	}
@@ -559,11 +568,13 @@ namespace eval ::gmaprofile {
 		global imgtext debug_level debug_proto curl_path curl_insecure profiles menu_button never_animate
 		global major_interval major_offset_x major_offset_y
 		global minor_interval minor_offset_x minor_offset_y
+		global chat_timestamp
 		variable _profile
 
 		set _profile [dict replace $_profile \
 			animate $animate \
 			button_size $button_size \
+			chat_timestamp $chat_timestamp \
 			colorize_die_rolls $colorize_die_rolls \
 			curl_path $curl_path \
 			curl_insecure $curl_insecure \
@@ -736,7 +747,7 @@ namespace eval ::gmaprofile {
 	}
 
 	proc editor {w d} {
-		global animate button_size bsizetext colorize_die_rolls dark image_format keep_tools preload
+		global animate button_size bsizetext colorize_die_rolls dark image_format keep_tools preload chat_timestamp
 		global imgtext debug_proto debug_level curl_path curl_insecure profiles menu_button never_animate
 		global major_interval major_offset_x major_offset_y
 		global minor_interval minor_offset_x minor_offset_y
@@ -752,6 +763,7 @@ namespace eval ::gmaprofile {
 		::gmautil::dassign $::gmaprofile::_profile \
 			animate animate \
 			button_size button_size \
+			chat_timestamp chat_timestamp \
 			colorize_die_rolls colorize_die_rolls \
 			curl_path curl_path \
 			curl_insecure curl_insecure \
@@ -769,6 +781,7 @@ namespace eval ::gmaprofile {
 
 		set animate [::gmaproto::int_bool $animate]
 		set colorize_die_rolls [::gmaproto::int_bool $colorize_die_rolls]
+		set chat_timestamp [::gmaproto::int_bool $chat_timestamp]
 		set dark [::gmaproto::int_bool $dark]
 		set menu_button [::gmaproto::int_bool $menu_button]
 		set never_animate [::gmaproto::int_bool $never_animate]
@@ -1048,6 +1061,7 @@ namespace eval ::gmaprofile {
 
 		grid [ttk::label $w.n.a.title -text "MAPPER APPEARANCE SETTINGS" -anchor center -foreground $sep_fg -background $sep_bg] - - - - - - -sticky we -pady 5
 		grid [ttk::checkbutton $w.n.a.animate -text "Animate updates" -variable animate] - - - - - - -sticky w
+		grid [ttk::checkbutton $w.n.a.chat_timestamp -text "Show timestamp in chat messages" -variable chat_timestamp] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.cdr -text "Enable colors in die-roll titles" -variable colorize_die_rolls] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.dark -text "Dark theme" -variable dark] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.menu_button -text "Use menu button instead of menu bar" -variable menu_button] - - - - - - -sticky w
@@ -1291,6 +1305,7 @@ namespace eval ::gmaprofile {
 			Important [dict create family Helvetica size 12 weight 1 slant 0 overstrike false underline false] \
 			Special [dict create family Times     size 12 weight 0 slant 1 overstrike false underline false] \
 			System [dict create family Times     size 10 weight 0 slant 1 overstrike false underline false] \
+			Tiny [dict create family Helvetica     size 8 weight 0 slant 0 overstrike false underline false] \
 			FullResult [dict create family Helvetica size 16 weight 1 slant 0 overstrike false underline false] \
 			Result [dict create family Helvetica size 14 weight 0 slant 0 overstrike false underline false] \
 			ClockTime [dict create family Helvetica size 16 weight 0 slant 0 overstrike false underline false] \
@@ -1456,6 +1471,7 @@ namespace eval ::gmaprofile {
 					subtotal  [dict create fg [dict create dark #00fa92 light green] bg [dict create dark {} light {}] font Normal format {(%s)} overstrike false underline false offset 0]\
 					success   [dict create fg [dict create dark #00fa92 light green] bg [dict create dark {} light {}] font Important format {(%s) } overstrike false underline false offset 0]\
 					system    [dict create fg [dict create dark cyan light blue] bg [dict create dark {} light {}] font System format {} overstrike false underline false offset 0]\
+					timestamp [dict create fg [dict create dark #888888 light #888888] bg [dict create dark {} light {}] font Tiny format {} overstrike false underline false offset 0]\
 					title     [dict create fg [dict create dark #aaaaaa light #ffffff] bg [dict create dark #000044 light #c7c0ae] font Normal format {} overstrike false underline false offset 0]\
 					to        [dict create fg [dict create dark red light red] bg [dict create dark {} light {}] font Special format {} overstrike false underline false offset 0]\
 					until     [dict create fg [dict create dark #aaaaaa light #888888] bg [dict create dark {} light {}] font Special format {until %s} overstrike false underline false offset 0]\
@@ -1760,16 +1776,20 @@ namespace eval ::gmaprofile {
 			$st.r.ex$ww configure -state normal
 			$st.r.ex$ww delete 1.0 end
 			foreach {tag text} {
+				timestamp {12:34 }
 				system {System message}
 				- -
+				timestamp {12:34 }
 				from   {Steve: }
 				normal {Hello, this is a chat message.}
 				- -
+				timestamp {12:34 }
 				from   Steve
 				to     { (to Alice, Bob)}
 				from   {: }
 				normal {This is a private chat message.}
 				- -
+				timestamp {12:34 }
 				fullresult 23
 				{}         { }
 				from       {Bob: }
@@ -1793,6 +1813,7 @@ namespace eval ::gmaprofile {
 				moddelim    |
 				critspec    c
 				- -
+				timestamp {12:34 }
 				fullresult 27
 				{}         { }
 				from       {Bob: }
@@ -1809,6 +1830,7 @@ namespace eval ::gmaprofile {
 				roll        3,3,5
 				discarded   1,5,3
 				- -
+				timestamp {12:34 }
 				fullresult  0
 				{}          { }
 				from   {Alice: }
@@ -1819,6 +1841,7 @@ namespace eval ::gmaprofile {
 				moddelim    |
 				fullmax     maximized
 				- -
+				timestamp {12:34 }
 				fullresult  1 {} { }
 				from   {Alice: }
 				success     miss
@@ -1827,6 +1850,7 @@ namespace eval ::gmaprofile {
 				label       miss
 				roll        37
 				- -
+				timestamp {12:34 }
 				fullresult 14 {} { }
 				from   {Alice: }
 				result     14
@@ -1839,6 +1863,7 @@ namespace eval ::gmaprofile {
 				iteration  1
 				short      4
 				- -
+				timestamp {12:34 }
 				fullresult 7 {} { }
 				from   {Alice: }
 				result     7
@@ -1856,6 +1881,7 @@ namespace eval ::gmaprofile {
 				dc         5
 				exceeded   2
 				- -
+				timestamp {12:34 }
 				fullresult 21 {} { }
 				from   {Alice: }
 				result     21
@@ -1869,10 +1895,12 @@ namespace eval ::gmaprofile {
 				dc         21
 				met        successful
 				- -
+				timestamp {12:34 }
 				from   {Alice: }
 				notice     {roll to GM}
 				diespec    6d6
 				- -
+				timestamp {12:34 }
 				fullresult 4 {} { }
 				from   {Alice: }
 				result     4
@@ -1883,6 +1911,7 @@ namespace eval ::gmaprofile {
 				moddelim   |
 				sf         {sf defeat/triumph}
 				- -
+				timestamp {12:34 }
 				error      {Error message from server!}
 			} {
 				if {$tag eq {-}} {
