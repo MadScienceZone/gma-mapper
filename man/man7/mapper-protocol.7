@@ -2548,6 +2548,10 @@ The date and time the message was sent.
 Clients SHOULD NOT set a nonempty value for this field. It will be filled in by the server when sending
 messages to clients. If this field is missing or empty when received from the server,
 it means the date was not available to report for that message.
+Note that the special value
+.RB \*(lq "0001-01-01T00:00:00Z" \*(rq
+is the \*(lqzero\*(rq value for dates and indicates that the date is not known (as is the case if this
+field is omitted entirely or is the empty string).
 '\" <</New>>
 .TP
 .BI ToAll " (bool)"
@@ -2700,6 +2704,10 @@ The date and time the message was sent.
 Clients SHOULD NOT set a nonempty value for this field. It will be filled in by the server when sending
 messages to clients. If this field is missing or empty when received from the server,
 it means the date was not available to report for that message.
+Note that the special value
+.RB \*(lq "0001-01-01T00:00:00Z" \*(rq
+is the \*(lqzero\*(rq value for dates and indicates that the date is not known (as is the case if this
+field is omitted entirely or is the empty string).
 '\" <</New>>
 .TP
 .BI ToAll " (bool)"
