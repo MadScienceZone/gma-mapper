@@ -3,18 +3,23 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.20.1          <!-- @@##@@ -->
- * Effective Date: 30-Dec-2023               <!-- @@##@@ -->
+ * This Package Version: 4.21-alpha.0          <!-- @@##@@ -->
+ * Effective Date: 31-Dec-2023               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.11 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.12 <!-- @@##@@ -->
  * GMA Mapper File Format: 23	     <!-- @@##@@ -->
- * GMA Mapper Protocol: 410        <!-- @@##@@ -->
+ * GMA Mapper Protocol: 411        <!-- @@##@@ -->
 
 ## DEPRECATION NOTICE
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.21 (alpha)
+## Enancements
+ * Protocol 411
+   * Adds timestamps to chat messages and die-roll results, along with preferences settings to allow users to choose whether, and how, to display them.
 
 # 4.20.1
 ## Fixes
