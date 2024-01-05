@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       _______  _______      __         #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___   )(  __   )    /  \        #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  || (  )  |    \/) )       #
-# | |      | || || || (___) | Assistant  / (_) (_        /   )| | /   |      | |       #
-# | | ____ | |(_)| ||  ___  |           (____   _)     _/   / | (/ /) |      | |       #
-# | | \_  )| |   | || (   ) |                ) (      /   _/  |   / | |      | |       #
-# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\|  (__) | _  __) (_      #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/(_______)(_) \____/      #
+#  _______  _______  _______                ___       _______   __                     #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___   ) /  \                    #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  | \/) )                   #
+# | |      | || || || (___) | Assistant  / (_) (_        /   )   | |                   #
+# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /    | |                   #
+# | | \_  )| |   | || (   ) |                ) (      /   _/     | |                   #
+# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\ __) (_                  #
+# (_______)|/     \||/     \| Client         (_)  (_)\_______/ \____/                  #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -17,10 +17,10 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.20.1}     ;# @@##@@
+set GMAMapperVersion {4.21}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
-set GMAMapperProtocol {410}         ;# @@##@@
-set CoreVersionNumber {6.11}            ;# @@##@@
+set GMAMapperProtocol {411}         ;# @@##@@
+set CoreVersionNumber {6.12}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -112,6 +112,8 @@ set time_rel 0
 set ClockProgress 0
 set progress_stack {}
 set is_GM false
+set LastDisplayedChatDate {}
+set CombatantSelected {}
 proc begin_progress { id title max args } {
     if {[catch {
         DEBUG 1 "begin_progress [list $id $title $max $args]"
@@ -713,7 +715,7 @@ set ChatHistoryLastMessageID 0
 
 proc ResetChatHistory {loadqty} {
 	global ChatHistoryFile ChatHistoryFileHandle ChatHistoryLastMessageID ChatHistoryLimit ChatHistoryFileDirection
-	global ChatHistory
+	global ChatHistory LastDisplayedChatDate
 
 	catch {
 		close $ChatHistoryFileHandle
@@ -727,6 +729,7 @@ proc ResetChatHistory {loadqty} {
 	set ch $ChatHistoryLimit
 	set ChatHistoryLimit $loadqty
 	set ChatHistory {}
+	set LastDisplayedChatDate {}
 	BlankChatHistoryDisplay
 	InitializeChatHistory
 	set ChatHistoryLimit $ch
@@ -742,6 +745,8 @@ proc InitializeChatHistory {} {
 	global ChatHistoryFile ChatHistory ChatHistoryFileHandle ChatHistoryLastMessageID
 	global path_cache IThost ITport ChatHistoryLimit local_user
 	global ChatHistoryFileDirection ICH_tries
+	global LastDisplayedChatDate
+	set LastDisplayedChatDate {}
 
 	if {$IThost ne {}} {
 		if {$ChatHistoryFileDirection ne {}} {
@@ -1063,9 +1068,9 @@ proc create_main_menu {use_button} {
 	$mm.play add command -command {ClearSelection} -label "Deselect All"
 	$mm.play add separator
 	if {[::gmautil::version_compare [info patchlevel] 8.7] >= 0} {
-		$mm.play add cascade -menu $mm.play.servers -state disabled -label "Connect to"
+		$mm.play add cascade -menu $mm.play.servers -state disabled -label "\[DEPRECATED\] Connect to"
 	} else {
-		$mm.play add cascade -menu $mm.play.servers -label "Connect to"
+		$mm.play add cascade -menu $mm.play.servers -label "\[DEPRECATED\] Connect to"
 	}
 	set connmenuidx 8
 	menu $mm.tools
@@ -5039,10 +5044,22 @@ proc PlaceSomeone {w d} {
 
 proc MoveSomeone {w id x y} {
 	global MOBdata
+	global CombatantScrollEnabled
+	global CombatantSelected
+	global is_GM
+	global MOB_COMBATMODE
 
 	if {[info exists MOBdata($id)]} {
 		dict set MOBdata($id) Gx $x
 		dict set MOBdata($id) Gy $y
+		if {$CombatantScrollEnabled && $CombatantSelected eq $id && [info exists MOBdata($CombatantSelected)] && (![dict get $MOBdata($CombatantSelected) Hidden] || $is_GM)} {
+			if {!$MOB_COMBATMODE} {
+				set CombatantSelected {}
+			} else {
+				ScrollToCenterScreenXY [GridToCanvas [dict get $MOBdata($CombatantSelected) Gx]] \
+						       [GridToCanvas [dict get $MOBdata($CombatantSelected) Gy]]
+			}
+		}
 		RenderSomeone $w $id
 	}
 }
@@ -6900,6 +6917,10 @@ proc _ping_server {} {
 }
 
 proc scan_fractional_seconds {t} {
+	if {$t eq {0001-01-01T00:00:00Z}} {
+		# This is the zero value for times
+		return 0
+	}
 	if {[regexp {^(.*T\d+:\d+:\d+)\.(\d+)([+-].*)$} $t _ pre frac post]} {
 		if {[set intsec [clock scan "$pre$post" -format "%Y-%m-%dT%H:%M:%S%z"]]} {
 			return "$intsec.$frac"
@@ -6935,7 +6956,7 @@ proc _server_ping_reply {d} {
 
 proc DistanceFromGrid {x y z_ft} {
 	global MOBdata canvas
-	global iscale
+	global iscale is_GM
 	global _preferences colortheme
 	lassign [ScreenXYToGridXY $x $y -exact] Gx Gy
 
@@ -6953,9 +6974,19 @@ proc DistanceFromGrid {x y z_ft} {
 	set namelen [string length "TARGET"]
 
 	foreach target [array names MOBdata] {
+		# exclude hidden MOBs
+		if {[dict get $MOBdata($target) Hidden]} {
+			if {$is_GM} {
+				set name($target) [format "(%s)" [::gmaclock::nameplate_text [dict get $MOBdata($target) Name]]]
+			} else {
+				continue
+			}
+		} else {
+			set name($target) [::gmaclock::nameplate_text [dict get $MOBdata($target) Name]]
+		}
+
 		set centerdist($target) [DistanceToTarget3D $Gx $Gy $z_ft $target]
 		set dimension($target) [expr [dict get $MOBdata($target) Elev] == $z_ft ? {{2D}} : {{3D}}]
-		set name($target) [::gmaclock::nameplate_text [dict get $MOBdata($target) Name]]
 		lassign [set nearest($target) [NearestCreatureGridToPoint $Gx $Gy $z_ft $target]] neardist nearX nearY nearLbl
 		$canvas create line {*}[GridXYToCenterPoint $Gx $Gy] {*}[lrange [MOBCenterPoint $target] 0 1] \
 			-fill yellow -width 5 -tags distanceTracer -arrow last -arrowshape [list 15 18 8]
@@ -6983,7 +7014,7 @@ proc SortByValue {arrname i j} {
 
 proc DistanceFromMob {MobID} {
 	global MOBdata canvas
-	global iscale
+	global iscale is_GM
 	global _preferences colortheme
 	lassign [MOBCenterPoint $MobID] MobX MobY MobR
 	set Cx [expr int($MobX/$iscale)]
@@ -6993,6 +7024,10 @@ proc DistanceFromMob {MobID} {
 	set MGx1 [expr ($MobX+$MobR)/$iscale]
 	set MGy0 [expr ($MobY-$MobR)/$iscale]
 	set MGy1 [expr ($MobY+$MobR)/$iscale]
+
+	if {[dict get $MOBdata($MobID) Hidden] && !$is_GM} {
+		return
+	}
 
 	create_dialog .dfg
 	wm title .dfg "Distance from [dict get $MOBdata($MobID) Name]"
@@ -7009,11 +7044,19 @@ proc DistanceFromMob {MobID} {
 
 	foreach target [array names MOBdata] {
 		if {$target eq $MobID} continue
+		if {[dict get $MOBdata($target) Hidden]} {
+			if {$is_GM} {
+				set name($target) [format "(%s)" [::gmaclock::nameplate_text [dict get $MOBdata($target) Name]]]
+			} else {
+				continue
+			}
+		} else {
+			set name($target) [::gmaclock::nameplate_text [dict get $MOBdata($target) Name]]
+		}
 		
 		# get center-to-center distance
 		set centerdist($target) [DistanceToTarget3D $Cx $Cy $z_ft $target]
 		set dimension($target) [expr [dict get $MOBdata($target) Elev] == $z_ft ? {{2D}} : {{3D}}]
-		set name($target) [dict get $MOBdata($target) Name]
 		set namelen [expr max($namelen, [string length $name($target)])]
 		$canvas create line $MobX $MobY {*}[lrange [MOBCenterPoint $target] 0 1] \
 			-fill yellow -width 5 -tags distanceTracer -arrow last -arrowshape [list 15 18 8]
@@ -9690,12 +9733,16 @@ proc DoCommandI {d} {
 				set mob_id {};			# non-existent actor ID
 			}
 
+			global CombatantSelected
 			if {$mob_id ne {} && [info exists MOBdata($mob_id)] && ![dict get $MOBdata($mob_id) Killed]} {
+				set CombatantSelected $mob_id
 				lappend ITlist $mob_id
 				if {$CombatantScrollEnabled && (![dict get $MOBdata($mob_id) Hidden] || $is_GM)} {
 					ScrollToCenterScreenXY [GridToCanvas [dict get $MOBdata($mob_id) Gx]] \
 							       [GridToCanvas [dict get $MOBdata($mob_id) Gy]]
 				}
+			} else {
+				set CombatantSelected {}
 			}
 		}
 	}
@@ -10061,7 +10108,7 @@ proc format_with_style {value format} {
 
 set drd_id 0
 proc DisplayDieRoll {d} {
-	global icon_dieb16 icon_die16 icon_die16c SuppressChat drd_id
+	global icon_dieb16 icon_die16 icon_die16c SuppressChat drd_id LastDisplayedChatDate
 
 	if {$SuppressChat} {
 		return
@@ -10074,7 +10121,8 @@ proc DisplayDieRoll {d} {
 		{Result Result}  result \
 		{Result Details} details \
 		{Result InvalidRequest} is_invalid \
-		{Result ResultSuppressed} is_blind
+		{Result ResultSuppressed} is_blind \
+		Sent             date_sent
 
 	set w .chatwindow.p.chat
 
@@ -10092,8 +10140,25 @@ proc DisplayDieRoll {d} {
 		set icon $icon_dieb16
 	}
 
-	TranscribeDieRoll $from $recipientlist $title $result $details [dict get $d ToAll] [dict get $d ToGM] $is_blind $is_invalid
+	TranscribeDieRoll $from $recipientlist $title $result $details [dict get $d ToAll] [dict get $d ToGM] $is_blind $is_invalid $date_sent
 	$w.1.text configure -state normal
+	global _preferences LastDisplayedChatDate
+	if {[dict exists $_preferences chat_timestamp] && [dict get $_preferences chat_timestamp]} {
+		if {$date_sent ne {}} {
+			if {[set date_sent_sec [scan_fractional_seconds $date_sent]] != 0} {
+				set date_sent_date [clock format [expr int($date_sent_sec)] -format "%A, %B %d, %Y"]
+				if {$LastDisplayedChatDate ne $date_sent_date} {
+					set LastDisplayedChatDate $date_sent_date
+					$w.1.text insert end "\n--$date_sent_date--\n" timestamp
+				}
+				$w.1.text insert end [clock format [expr int($date_sent_sec)] -format "%H:%M "] timestamp
+			} else {
+				$w.1.text insert end "??:?? " timestamp
+			}
+		} else {
+			$w.1.text insert end "--:-- " timestamp
+		}
+	}
 	$w.1.text image create end -align baseline -image $icon -padx 2
 	if {!$is_blind && !$is_invalid} {
 		$w.1.text insert end [format_with_style $result fullresult] fullresult
@@ -11303,9 +11368,9 @@ proc DisplayChatMessage {d args} {
 	global _preferences colortheme
 
 	if {$d ne {}} {
-		::gmautil::dassign $d Sender from Recipients recipientlist Text message
+		::gmautil::dassign $d Sender from Recipients recipientlist Text message Sent date_sent
 	} else {
-		lassign {} from recipientlist message
+		lassign {} from recipientlist message date_sent
 	}
 
 	if {$SuppressChat} return
@@ -11454,7 +11519,7 @@ proc DisplayChatMessage {d args} {
 			begingroup best bonus constant critlabel critspec dc diebonus diespec discarded
 			endgroup exceeded fail from fullmax fullresult iteration label max maximized maxroll 
 			met min moddelim normal operator repeat result roll separator short sf success 
-			title to until worst system subtotal error notice
+			title to until worst system subtotal error notice timestamp
 		} {
 			if {![dict exists $_preferences styles dierolls components $tag]} {
 				DEBUG 0 "Preferences profile is missing a definition for $tag; using default"
@@ -11500,22 +11565,38 @@ proc DisplayChatMessage {d args} {
 	}
 
 	set system [expr [lsearch -exact $args "-system"] >= 0] 
-	_render_chat_message $wc.1.text $system $message $recipientlist $from [dict get $d ToAll] [dict get $d ToGM]
+	_render_chat_message $wc.1.text $system $message $recipientlist $from [dict get $d ToAll] [dict get $d ToGM] $date_sent
 	if {$system} {
-		TranscribeChat (system) $recipientlist $message [dict get $d ToAll] [dict get $d ToGM]
+		TranscribeChat (system) $recipientlist $message [dict get $d ToAll] [dict get $d ToGM] $date_sent
 	} else {
-		TranscribeChat $from $recipientlist $message [dict get $d ToAll] [dict get $d ToGM]
+		TranscribeChat $from $recipientlist $message [dict get $d ToAll] [dict get $d ToGM] $date_sent
 	}
 }
 
-proc _render_chat_message {w system message recipientlist from toall togm} {
-	global SuppressChat
+proc _render_chat_message {w system message recipientlist from toall togm {date_sent {}}} {
+	global SuppressChat _preferences LastDisplayedChatDate
 
 	if {!$SuppressChat && [winfo exists $w]} {
 		$w configure -state normal
 		if {$system} {
 			$w insert end "$message\n" system
 		} else {
+			if {[dict exists $_preferences chat_timestamp] && [dict get $_preferences chat_timestamp]} {
+				if {$date_sent ne {}} {
+					if {[set date_sent_sec [scan_fractional_seconds $date_sent]] != 0} {
+						set date_sent_date [clock format [expr int($date_sent_sec)] -format "%A, %B %d, %Y"]
+						if {$LastDisplayedChatDate ne $date_sent_date} {
+							set LastDisplayedChatDate $date_sent_date
+							$w insert end "\n--$date_sent_date--\n" timestamp
+						}
+						$w insert end [clock format [expr int($date_sent_sec)] -format "%H:%M "] timestamp
+					} else {
+						$w insert end "??:?? " timestamp
+					}
+				} else {
+					$w insert end "--:-- " timestamp
+				}
+			}
 			ChatAttribution $w $from $recipientlist $toall $togm
 			$w insert end "$message\n" normal
 		}
@@ -11720,10 +11801,15 @@ proc LoadChatHistory {} {
                 ROLL { DisplayDieRoll $d }
                 TO   { 
 			set d [lindex $m 1]
-			if {[dict get $d Sender] eq {-system}} {
-				_render_chat_message $w 1 [dict get $d Text] {} {} false false
+			if {[dict exists $d Sent]} {
+				set date_sent [dict get $d Sent]
 			} else {
-				_render_chat_message $w 0 [dict get $d Text] [dict get $d Recipients] [dict get $d Sender] [dict get $d ToAll] [dict get $d ToGM]
+				set date_sent {}
+			}
+			if {[dict get $d Sender] eq {-system}} {
+				_render_chat_message $w 1 [dict get $d Text] {} {} false false $date_sent
+			} else {
+				_render_chat_message $w 0 [dict get $d Text] [dict get $d Recipients] [dict get $d Sender] [dict get $d ToAll] [dict get $d ToGM] $date_sent
 			}
 		}
                 CC	 {
@@ -11746,13 +11832,13 @@ proc LoadChatHistory {} {
 
 
 set chat_transcript_file {}
-proc TranscribeChat {from recipientlist message toall togm} {
+proc TranscribeChat {from recipientlist message toall togm {date_sent {}}} {
 	global ChatTranscript
 	if {$ChatTranscript ne {}} {
 		if {[set private [Chat_text_attribution $from $recipientlist $toall $togm]] eq {}} {
-			_log_transcription "$from: $message"
+			_log_transcription "<$date_sent> $from: $message"
 		} else {
-			_log_transcription "$from ($private): $message"
+			_log_transcription "<$date_sent> $from ($private): $message"
 		}
 	}
 }
@@ -11773,14 +11859,19 @@ proc _log_transcription {message} {
 	}
 }
 
-proc TranscribeDieRoll {from recipientlist title result details toall togm {is_blind false} {is_invalid false}} {
+proc TranscribeDieRoll {from recipientlist title result details toall togm {is_blind false} {is_invalid false} {date_sent {}}} {
 	global ChatTranscript
 
 	if {$ChatTranscript ne {}} {
-		if {[set private [Chat_text_attribution $from $recipientlist $toall $togm]] eq {}} {
-			set message "\[ROLL $result\] $from: "
+		if {$date_sent eq {}} {
+			set message *
 		} else {
-			set message "\[ROLL $result\] $from ($private): "
+			set message [list $date_sent]
+		}
+		if {[set private [Chat_text_attribution $from $recipientlist $toall $togm]] eq {}} {
+			append message "\[ROLL $result\] $from: "
+		} else {
+			append message "\[ROLL $result\] $from ($private): "
 		}
 		if {$is_invalid} {
 			append message "ERROR "
@@ -12419,12 +12510,21 @@ proc SetObjectAttribute {id kvlist} {
 	}
 	
 	lassign $idlist a id datatype
+	set move_to_Gx {}
+	set move_to_Gy {}
 	global $a
 
 	DEBUG 4 "Changing attributes of object $id from $kvlist"
 	foreach {k v} $kvlist {
 		if {$datatype eq "PS" && $k eq "CustomReach"} {
 			set v [::gmaproto::new_dict CustomReach {*}$v]
+		}
+
+		if {$datatype eq "PS" && $k eq "Gx"} {
+			set move_to_Gx $v
+		}
+		if {$datatype eq "PS" && $k eq "Gy"} {
+			set move_to_Gy $v
 		}
 
 		if {$datatype eq "PS" && $k eq "Name"} {
@@ -12460,6 +12560,9 @@ proc SetObjectAttribute {id kvlist} {
 		}
 	}
 	if {$datatype eq "PS"} {
+		if {$move_to_Gx ne {} && $move_to_Gy ne {}} {
+			MoveSomeone $canvas $id $move_to_Gx $move_to_Gy
+		}
 		RefreshMOBs
 		FlashMob $canvas $id 3
 	} else {
@@ -13215,7 +13318,7 @@ proc ConnectToServerByIdx {idx} {
 #   .../<name>@<zoom>/:<frame>:<name>@<zoom>.<ext>
 #   .../<name>.map
 
-# @[00]@| GMA-Mapper 4.20.1
+# @[00]@| GMA-Mapper 4.21
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
