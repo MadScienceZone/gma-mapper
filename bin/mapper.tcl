@@ -5043,10 +5043,17 @@ proc PlaceSomeone {w d} {
 
 proc MoveSomeone {w id x y} {
 	global MOBdata
+	global CombatantScrollEnabled
+	global CombatantSelected
+	global is_GM
 
 	if {[info exists MOBdata($id)]} {
 		dict set MOBdata($id) Gx $x
 		dict set MOBdata($id) Gy $y
+		if {$CombatantScrollEnabled && $CombatantSelected eq $id && [info exists MOBdata($CombatantSelected)] && (![dict get $MOBdata($CombatantSelected) Hidden] || $is_GM)} {
+			ScrollToCenterScreenXY [GridToCanvas [dict get $MOBdata($CombatantSelected) Gx]] \
+			                       [GridToCanvas [dict get $MOBdata($CombatantSelected) Gy]]
+		}
 		RenderSomeone $w $id
 	}
 }
@@ -9720,12 +9727,16 @@ proc DoCommandI {d} {
 				set mob_id {};			# non-existent actor ID
 			}
 
+			global CombatantSelected
 			if {$mob_id ne {} && [info exists MOBdata($mob_id)] && ![dict get $MOBdata($mob_id) Killed]} {
+				set CombatantSelected $mob_id
 				lappend ITlist $mob_id
 				if {$CombatantScrollEnabled && (![dict get $MOBdata($mob_id) Hidden] || $is_GM)} {
 					ScrollToCenterScreenXY [GridToCanvas [dict get $MOBdata($mob_id) Gx]] \
 							       [GridToCanvas [dict get $MOBdata($mob_id) Gy]]
 				}
+			} else {
+				set CombatantSelected {}
 			}
 		}
 	}
@@ -12493,12 +12504,21 @@ proc SetObjectAttribute {id kvlist} {
 	}
 	
 	lassign $idlist a id datatype
+	set move_to_Gx {}
+	set move_to_Gy {}
 	global $a
 
 	DEBUG 4 "Changing attributes of object $id from $kvlist"
 	foreach {k v} $kvlist {
 		if {$datatype eq "PS" && $k eq "CustomReach"} {
 			set v [::gmaproto::new_dict CustomReach {*}$v]
+		}
+
+		if {$datatype eq "PS" && $k eq "Gx"} {
+			set move_to_Gx $v
+		}
+		if {$datatype eq "PS" && $k eq "Gy"} {
+			set move_to_Gy $v
 		}
 
 		if {$datatype eq "PS" && $k eq "Name"} {
@@ -12534,6 +12554,9 @@ proc SetObjectAttribute {id kvlist} {
 		}
 	}
 	if {$datatype eq "PS"} {
+		if {$move_to_Gx ne {} && $move_to_Gy ne {}} {
+			MoveSomeone $canvas $id $move_to_Gx $move_to_Gy
+		}
 		RefreshMOBs
 		FlashMob $canvas $id 3
 	} else {
