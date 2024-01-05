@@ -3,8 +3,8 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.21-alpha.0          <!-- @@##@@ -->
- * Effective Date: 31-Dec-2023               <!-- @@##@@ -->
+ * This Package Version: 4.21          <!-- @@##@@ -->
+ * Effective Date: 05-Jan-2024               <!-- @@##@@ -->
 
 ## Compatibility
  * GMA Core API Library Version: 6.12 <!-- @@##@@ -->
@@ -16,10 +16,13 @@ The support for old server protocols (<400) and map file formats (<20) will be d
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
-# 4.21 (alpha)
+# 4.21
 ## Enancements
  * Protocol 411
    * Adds timestamps to chat messages and die-roll results, along with preferences settings to allow users to choose whether, and how, to display them.
+## Fixes
+ * Fixes [Issue #185](https://github.com/MadScienceZone/gma-mapper/issues/185). When the mapper is set to follow the current combatant, the map should keep scrolling as needed to keep that combatant in view even as that token is moved.
+ * Fixes [Issue #179](https://github.com/MadScienceZone/gma-mapper/issues/179). When a creature token is hidden, it is still revealed in the distance-measuring tool.
 
 # 4.20.1
 ## Fixes
