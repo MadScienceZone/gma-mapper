@@ -6943,7 +6943,7 @@ proc _server_ping_reply {d} {
 
 proc DistanceFromGrid {x y z_ft} {
 	global MOBdata canvas
-	global iscale
+	global iscale is_GM
 	global _preferences colortheme
 	lassign [ScreenXYToGridXY $x $y -exact] Gx Gy
 
@@ -6961,9 +6961,19 @@ proc DistanceFromGrid {x y z_ft} {
 	set namelen [string length "TARGET"]
 
 	foreach target [array names MOBdata] {
+		# exclude hidden MOBs
+		if {[dict get $MOBdata($target) Hidden]} {
+			if {$is_GM} {
+				set name($target) [format "(%s)" [::gmaclock::nameplate_text [dict get $MOBdata($target) Name]]]
+			} else {
+				continue
+			}
+		} else {
+			set name($target) [::gmaclock::nameplate_text [dict get $MOBdata($target) Name]]
+		}
+
 		set centerdist($target) [DistanceToTarget3D $Gx $Gy $z_ft $target]
 		set dimension($target) [expr [dict get $MOBdata($target) Elev] == $z_ft ? {{2D}} : {{3D}}]
-		set name($target) [::gmaclock::nameplate_text [dict get $MOBdata($target) Name]]
 		lassign [set nearest($target) [NearestCreatureGridToPoint $Gx $Gy $z_ft $target]] neardist nearX nearY nearLbl
 		$canvas create line {*}[GridXYToCenterPoint $Gx $Gy] {*}[lrange [MOBCenterPoint $target] 0 1] \
 			-fill yellow -width 5 -tags distanceTracer -arrow last -arrowshape [list 15 18 8]
@@ -6991,7 +7001,7 @@ proc SortByValue {arrname i j} {
 
 proc DistanceFromMob {MobID} {
 	global MOBdata canvas
-	global iscale
+	global iscale is_GM
 	global _preferences colortheme
 	lassign [MOBCenterPoint $MobID] MobX MobY MobR
 	set Cx [expr int($MobX/$iscale)]
@@ -7001,6 +7011,10 @@ proc DistanceFromMob {MobID} {
 	set MGx1 [expr ($MobX+$MobR)/$iscale]
 	set MGy0 [expr ($MobY-$MobR)/$iscale]
 	set MGy1 [expr ($MobY+$MobR)/$iscale]
+
+	if {[dict get $MOBdata($MobID) Hidden] && !$is_GM} {
+		return
+	}
 
 	create_dialog .dfg
 	wm title .dfg "Distance from [dict get $MOBdata($MobID) Name]"
@@ -7017,11 +7031,19 @@ proc DistanceFromMob {MobID} {
 
 	foreach target [array names MOBdata] {
 		if {$target eq $MobID} continue
+		if {[dict get $MOBdata($target) Hidden]} {
+			if {$is_GM} {
+				set name($target) [format "(%s)" [::gmaclock::nameplate_text [dict get $MOBdata($target) Name]]]
+			} else {
+				continue
+			}
+		} else {
+			set name($target) [::gmaclock::nameplate_text [dict get $MOBdata($target) Name]]
+		}
 		
 		# get center-to-center distance
 		set centerdist($target) [DistanceToTarget3D $Cx $Cy $z_ft $target]
 		set dimension($target) [expr [dict get $MOBdata($target) Elev] == $z_ft ? {{2D}} : {{3D}}]
-		set name($target) [dict get $MOBdata($target) Name]
 		set namelen [expr max($namelen, [string length $name($target)])]
 		$canvas create line $MobX $MobY {*}[lrange [MOBCenterPoint $target] 0 1] \
 			-fill yellow -width 5 -tags distanceTracer -arrow last -arrowshape [list 15 18 8]
