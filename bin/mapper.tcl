@@ -113,6 +113,7 @@ set ClockProgress 0
 set progress_stack {}
 set is_GM false
 set LastDisplayedChatDate {}
+set CombatantSelected {}
 proc begin_progress { id title max args } {
     if {[catch {
         DEBUG 1 "begin_progress [list $id $title $max $args]"
@@ -5046,13 +5047,18 @@ proc MoveSomeone {w id x y} {
 	global CombatantScrollEnabled
 	global CombatantSelected
 	global is_GM
+	global MOB_COMBATMODE
 
 	if {[info exists MOBdata($id)]} {
 		dict set MOBdata($id) Gx $x
 		dict set MOBdata($id) Gy $y
 		if {$CombatantScrollEnabled && $CombatantSelected eq $id && [info exists MOBdata($CombatantSelected)] && (![dict get $MOBdata($CombatantSelected) Hidden] || $is_GM)} {
-			ScrollToCenterScreenXY [GridToCanvas [dict get $MOBdata($CombatantSelected) Gx]] \
-			                       [GridToCanvas [dict get $MOBdata($CombatantSelected) Gy]]
+			if {!$MOB_COMBATMODE} {
+				set CombatantSelected {}
+			} else {
+				ScrollToCenterScreenXY [GridToCanvas [dict get $MOBdata($CombatantSelected) Gx]] \
+						       [GridToCanvas [dict get $MOBdata($CombatantSelected) Gy]]
+			}
 		}
 		RenderSomeone $w $id
 	}
