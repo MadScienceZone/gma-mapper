@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___       _______  _______      __         #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___   )(  __   )    /  \        #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  || (  )  |    \/) )       #
-# | |      | || || || (___) | Assistant  / (_) (_        /   )| | /   |      | |       #
-# | | ____ | |(_)| ||  ___  |           (____   _)     _/   / | (/ /) |      | |       #
-# | | \_  )| |   | || (   ) |                ) (      /   _/  |   / | |      | |       #
-# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\|  (__) | _  __) (_      #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/(_______)(_) \____/      #
+#  _______  _______  _______                ___       _______   __                     #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___   ) /  \                    #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  | \/) )                   #
+# | |      | || || || (___) | Assistant  / (_) (_        /   )   | |                   #
+# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /    | |                   #
+# | | \_  )| |   | || (   ) |                ) (      /   _/     | |                   #
+# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\ __) (_                  #
+# (_______)|/     \||/     \| Client         (_)  (_)\_______/ \____/                  #
 #                                                                                      #
 ########################################################################################
 #
@@ -49,7 +49,7 @@
 # 	::report_progress message
 # 	::say message
 
-package provide gmaproto 1.2
+package provide gmaproto 1.3
 package require Tcl 8.5
 package require json 1.3.3
 package require json::write 1.0.3
@@ -57,9 +57,9 @@ package require base64 2.4.2
 package require uuid 1.0.1
 
 namespace eval ::gmaproto {
-	variable protocol 410
+	variable protocol 411
 	variable min_protocol 333
-	variable max_protocol 410
+	variable max_protocol 411
 	variable max_max_protocol 499
 	variable debug_f {}
 	variable legacy false
@@ -169,11 +169,11 @@ namespace eval ::gmaproto {
 		PS      {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l PolyGM ? Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}}}
 		READY   {}
 		REDIRECT {Host s Port i Reason s}
-		ROLL    {Sender s Recipients l MessageID i ToAll ? ToGM ? Title s Result {o {InvalidRequest ? ResultSuppressed ? Result i Details {a {Type s Value s}}}} RequestID s MoreResults ?}
+		ROLL    {Sender s Recipients l MessageID i ToAll ? ToGM ? Title s Result {o {InvalidRequest ? ResultSuppressed ? Result i Details {a {Type s Value s}}}} RequestID s MoreResults ? Sent s}
 		SYNC    {}
 		SYNC-CHAT {Target i}
 		TB      {Enabled ?}
-		TO      {Sender s Recipients l MessageID i ToAll ? ToGM ? Text s}
+		TO      {Sender s Recipients l MessageID i ToAll ? ToGM ? Text s Sent s}
 		UPDATES {Packages {a {Name s Instances {a {OS s Arch s Version s Token s}}}}}
 		WORLD   {Calendar s ClientSettings {o {MkdirPath s ImageBaseURL s ModuleCode s SCPDestination s ServerHostname s}}}
 		/CONN   {}
@@ -309,10 +309,11 @@ proc ::gmaproto::redial {} {
 	fconfigure $::gmaproto::sock -blocking 0
 #	fileevent $::gmaproto::sock readable "::gmaproto::_receive $::gmaproto::sock"
 	if {![catch {set existing_daemon [after info $::gmaproto::recv_daemon]}]} {
-		::gmaproto::DEBUG "Stopping existing receiver daemon $existing_daemon"
-		after cancel [lindex $existing_daemon 0]
+		::gmaproto::DEBUG "Stopping existing receiver daemon $::gmaproto::recv_daemon ($existing_daemon)"
+		after cancel $::gmaproto::recv_daemon
 	}
 	set ::gmaproto::recv_daemon [after 10 ::gmaproto::_receive $::gmaproto::sock]
+	::gmaproto::DEBUG "Started new receiver daemon $::gmaproto::recv_daemon"
 
 	if [catch {::gmaproto::_login} err] {
 		::say "Attempt to sign on to server failed: $err"
@@ -333,7 +334,7 @@ proc ::gmaproto::_receive {s} {
 		}
 
 		if {[eof $s]} {
-			::gmaproto::DEBUG 0 "Lost connection to map server"
+			::DEBUG 0 "Lost connection to map server"
 			close $s
 			set ::gmaproto::sock {}
 			set ::gmaproto::pending_login true
@@ -2293,7 +2294,7 @@ proc ::gmaproto::normalize_dict {cmd d} {
 	return [::gmaproto::new_dict_from_json $cmd [::gmaproto::json_from_dict $cmd $d]]
 }
 
-# @[00]@| GMA-Mapper 4.20.1
+# @[00]@| GMA-Mapper 4.21
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
