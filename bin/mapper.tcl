@@ -761,6 +761,7 @@ proc InitializeChatHistory {} {
 		}
 		set ICH_tries 10
 		set prog_id [begin_progress * "Loading cached chat messages" *]
+		DEBUG 1 "prog_id $prog_id"
 		set ChatHistoryFile [file join $path_cache "${IThost}-${ITport}-${local_user}-chat.history"]
 		DEBUG 1 "Loading chat history from $ChatHistoryFile"
 		if {! [file exists $ChatHistoryFile]} {
@@ -1052,7 +1053,23 @@ proc create_main_menu {use_button} {
 		$mm.edit.gridsnap add radiobutton -command [list gridsnap $value] -label $label -selectcolor $check_menu_color -variable OBJ_SNAP -value $value
 	}
 
-	$mm.edit add command -command setwidth -label "Cycle Line Thickness to 6 \[now 5\]"
+	# setwidth 0-9
+	menu $mm.edit.setwidth
+	$mm.edit add cascade -menu $mm.edit.setwidth -state normal -label "Set line thickness"
+	foreach {value label} {
+		0 {0 (Thinnest)}
+		1 1
+		2 2
+		3 3
+		4 4
+		5 5
+		6 6
+		7 7
+		8 8
+		9 {9 (Thickest)}
+	} {
+		$mm.edit.setwidth add radiobutton -command [list setwidth $value] -label $label -selectcolor $check_menu_color -variable OBJ_WIDTH -value $value
+	}
 
 	$mm.edit add separator
 	$mm.edit add command -command {unloadfile {}} -label "Remove Elements from File..."
@@ -2126,7 +2143,7 @@ grid \
 	 [button .toolbar.cline -image $icon_outline_color -bg $initialColor -command {colorpick line}] \
 	 [button .toolbar.cstip -image $icon_stipple_100 -command {cycleStipple -cycle}] \
 	 [button .toolbar.snap -image $icon_snap_0 -command {gridsnap -cycle}] \
-	 [button .toolbar.width -image [set icon_width_$initialwidth] -command setwidth] \
+	 [button .toolbar.width -image [set icon_width_$initialwidth] -command {setwidth -cycle}] \
 	 [label  .toolbar.sp2  -text "   "] \
 	 [button .toolbar.clear -image $icon_clear -command {cleargrid; ::gmaproto::clear E*}] \
 	 [button .toolbar.clearp -image $icon_clear_players -command {clearplayers *; ::gmaproto::clear P*; ::gmaproto::clear M*}] \
@@ -2338,7 +2355,6 @@ proc cycleStipple {{newStipple -cycle}} {
 			set StipplePattern {nil}
 		}
 	}
-	DEBUG 0 "Setting StipplePattern to ($StipplePattern)"
 }
 
 
@@ -3187,14 +3203,16 @@ proc gridsnap {{newsnap -cycle}} {
 	.toolbar.snap configure -image [set icon_snap_$OBJ_SNAP]
 }
 
-proc setwidth {} {
+proc setwidth {{newwidth -cycle}} {
 	global OBJ_WIDTH MAIN_MENU
 
-	set OBJ_WIDTH [expr ($OBJ_WIDTH+1)%10]
-	set nextw [expr ($OBJ_WIDTH+1)%10]
+	if {$newwidth eq {-cycle}} {
+		set OBJ_WIDTH [expr ($OBJ_WIDTH+1)%10]
+	} else {
+		set OBJ_WIDTH [expr $newwidth % 10]
+	}
 	global icon_width_$OBJ_WIDTH
 	.toolbar.width configure -image [set icon_width_$OBJ_WIDTH]
-	$MAIN_MENU.edit entryconfigure "Cycle Line Thickness*" -label "Cycle Line Thickness to $nextw \[now $OBJ_WIDTH\]"
 }
 
 proc playtool {} {
@@ -5040,7 +5058,6 @@ proc PopSomeoneToFront {w id} {
 proc PlaceSomeone {w d} {
 	global MOBdata MOBid NextMOBID OBJ_NEXT_Z canvas
 
-	DEBUG 0 "PlaceSomeone $w $d"
 
 	set n [dict get $d Name]
 	set id [dict get $d ID]
@@ -5079,7 +5096,6 @@ proc MoveSomeone {w id x y} {
 	global is_GM
 	global MOB_COMBATMODE
 
-	DEBUG 0 "MoveSomeone $w $id $x $y"
 
 	if {[info exists MOBdata($id)]} {
 		dict set MOBdata($id) Gx $x
@@ -5755,7 +5771,6 @@ proc RenderSomeone {w id {norecurse false}} {
 	global ShowHealthStats is_GM
 	set lower_neighbors {}
 
-	DEBUG 0 "RenderSomeone $id [dict get $MOBdata($id) Gx] [dict get $MOBdata($id) Gy]"
 
 
 	#
