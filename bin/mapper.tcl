@@ -13,6 +13,8 @@
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
 # TODO note that in server INIT file, Skin= must be set; the mapper does not use the * field in monsters,
 #      it just does as instructed based on Skin index
+# TODO CreatureGridSnap: threat spaces not aligned to fractional boundaries
+# TODO CreatureGridSnap: where to grab the token not aligned to fractional boundaries
 #
 # GMA Mapper Client with background I/O processing.
 #
@@ -114,6 +116,7 @@ set progress_stack {}
 set is_GM false
 set LastDisplayedChatDate {}
 set CombatantSelected {}
+set CreatureGridSnap nil
 proc begin_progress { id title max args } {
     if {[catch {
         DEBUG 1 "begin_progress [list $id $title $max $args]"
@@ -962,7 +965,7 @@ frame .toolbar2
 set MAIN_MENU {}
 proc update_main_menu {} {
 	global check_menu_color MAIN_MENU
-	foreach menu {view edit play edit.stipple edit.gridsnap} {
+	foreach menu {view edit play edit.stipple edit.gridsnap edit.setwidth play.gridsnap} {
 		for {set i 0} {$i <= [$MAIN_MENU.$menu index last]} {incr i} {
 			if {[set mtype [$MAIN_MENU.$menu type $i]] eq {radiobutton} || $mtype eq {checkbutton}} {
 				$MAIN_MENU.$menu entryconfigure $i -selectcolor $check_menu_color
@@ -1099,6 +1102,18 @@ proc create_main_menu {use_button} {
 	$mm.play add command -command {rulertool} -label "Measure Distance Along Line(s)"
 	$mm.play add command -command {DisplayChatMessage {}} -label "Show Chat/Die-roll Window"
 	$mm.play add command -command {display_initiative_clock} -label "Show Initiative Clock"
+	$mm.play add separator
+	# gridsnap nil .25 .5 1
+	menu $mm.play.gridsnap
+	$mm.play add cascade -menu $mm.play.gridsnap -state normal -label "Creature token grid snap"
+	foreach {value label} {
+		nil {By creature size}
+		1   {full square}
+		.5  {1/2 square}
+		.25 {1/4 grid squares}
+	} {
+		$mm.play.gridsnap add radiobutton -label $label -selectcolor $check_menu_color -variable CreatureGridSnap -value $value
+	}
 	$mm.play add separator
 	$mm.play add command -command {ClearSelection} -label "Deselect All"
 	$mm.play add separator
@@ -5771,8 +5786,6 @@ proc RenderSomeone {w id {norecurse false}} {
 	global ShowHealthStats is_GM
 	set lower_neighbors {}
 
-
-
 	#
 	# find out where everyone is
 	# TODO: This would be more efficient to do less frequently than every time we call RenderSomeone
@@ -5805,12 +5818,13 @@ proc RenderSomeone {w id {norecurse false}} {
 
 	# If somehow we have a misaligned creature that's at least "small",
 	# snap to even grid boundary
-	if {$mob_size >= 1 && ($x != int($x) || $y != int($y))} {
-		set x [expr int($x)]
-		set y [expr int($y)]
-		dict set MOBdata($id) Gx $x
-		dict set MOBdata($id) Gy $y
-	}
+# XXX no longer needed or wanted now that we have CreatureGridSnap
+#	if {$mob_size >= 1 && ($x != int($x) || $y != int($y))} {
+#		set x [expr int($x)]
+#		set y [expr int($y)]
+#		dict set MOBdata($id) Gx $x
+#		dict set MOBdata($id) Gy $y
+#	}
 
 	if {[animation_obj_exists $id]} {
 		animation_destroy_instance $w * $id
@@ -6622,7 +6636,7 @@ proc ScreenXYToGridXY {x y args} {
 
 	if {$args ne {-exact} && $MOB_MOVING ne {}} {
 		DEBUG 3 "ScreenXYToGridXY $x $y $args for MOB $MOB_MOVING"
-		if {$CreatureGridSnap ne {}} {
+		if {$CreatureGridSnap ne {nil}} {
 			set mob_size $CreatureGridSnap
 		} else {
 			set mob_size [MonsterSizeValue [CreatureDisplayedSize $MOB_MOVING]]
