@@ -430,7 +430,7 @@ namespace eval ::gmaprofile {
 			blur_all false \
 			blur_pct 0 \
 			suppress_chat false \
-			chat_limit 0 \
+			chat_limit 500 \
 			chat_log {} \
 			curl_server {} \
 			update_url {} \
