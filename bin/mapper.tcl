@@ -13,11 +13,13 @@
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
 # TODO note that in server INIT file, Skin= must be set; the mapper does not use the * field in monsters,
 #      it just does as instructed based on Skin index
+# TODO CreatureGridSnap: threat spaces not aligned to fractional boundaries
+# TODO CreatureGridSnap: where to grab the token not aligned to fractional boundaries
 #
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.21}     ;# @@##@@
+set GMAMapperVersion {4.22-alpha.0}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {411}         ;# @@##@@
 set CoreVersionNumber {6.12}            ;# @@##@@
@@ -114,6 +116,7 @@ set progress_stack {}
 set is_GM false
 set LastDisplayedChatDate {}
 set CombatantSelected {}
+set CreatureGridSnap nil
 proc begin_progress { id title max args } {
     if {[catch {
         DEBUG 1 "begin_progress [list $id $title $max $args]"
@@ -761,6 +764,7 @@ proc InitializeChatHistory {} {
 		}
 		set ICH_tries 10
 		set prog_id [begin_progress * "Loading cached chat messages" *]
+		DEBUG 1 "prog_id $prog_id"
 		set ChatHistoryFile [file join $path_cache "${IThost}-${ITport}-${local_user}-chat.history"]
 		DEBUG 1 "Loading chat history from $ChatHistoryFile"
 		if {! [file exists $ChatHistoryFile]} {
@@ -961,25 +965,18 @@ frame .toolbar2
 set MAIN_MENU {}
 proc update_main_menu {} {
 	global check_menu_color MAIN_MENU
-	$MAIN_MENU.view entryconfigure "*Follow Combatants*" -selectcolor $check_menu_color
-	$MAIN_MENU.edit entryconfigure "*Force Drawn Elements*" -selectcolor $check_menu_color
-	$MAIN_MENU.edit entryconfigure "*Normal Play Mode*" -selectcolor $check_menu_color
-	$MAIN_MENU.edit entryconfigure "*Draw*" -selectcolor $check_menu_color
-	$MAIN_MENU.edit entryconfigure "*Add Text*" -selectcolor $check_menu_color
-	$MAIN_MENU.edit entryconfigure "*Remove Objects*" -selectcolor $check_menu_color
-	$MAIN_MENU.edit entryconfigure "*Move Objects*" -selectcolor $check_menu_color
-	$MAIN_MENU.edit entryconfigure "*Stamp Objects*" -selectcolor $check_menu_color
-	$MAIN_MENU.edit entryconfigure "*Fill Shapes*" -selectcolor $check_menu_color
-	$MAIN_MENU.view entryconfigure "*Show Toolbar*" -selectcolor $check_menu_color
-	$MAIN_MENU.view entryconfigure "*Show Map Grid*" -selectcolor $check_menu_color
-	$MAIN_MENU.view entryconfigure "*Show Health Stats*" -selectcolor $check_menu_color
-	$MAIN_MENU.play entryconfigure "*Combat Mode*" -selectcolor $check_menu_color
-
+	foreach menu {view edit play edit.stipple edit.gridsnap edit.setwidth play.gridsnap} {
+		for {set i 0} {$i <= [$MAIN_MENU.$menu index last]} {incr i} {
+			if {[set mtype [$MAIN_MENU.$menu type $i]] eq {radiobutton} || $mtype eq {checkbutton}} {
+				$MAIN_MENU.$menu entryconfigure $i -selectcolor $check_menu_color
+			}
+		}
+	}
 }
 
 proc create_main_menu {use_button} {
 	global MAIN_MENU connmenuidx CombatantScrollEnabled check_menu_color
-	global ForceElementsToTop NoFill d_OBJ_MODE
+	global ForceElementsToTop NoFill d_OBJ_MODE StipplePattern
 	if {$MAIN_MENU ne {}} {
 		return
 	}
@@ -1032,10 +1029,51 @@ proc create_main_menu {use_button} {
 	$mm.edit add checkbutton -command _showNoFill -label "Fill Shapes" -onvalue 0 -offvalue 1 -variable NoFill -selectcolor $check_menu_color
 	$mm.edit add command -command {colorpick fill} -label "Choose Fill Color..."
 	$mm.edit add command -command {colorpick line} -label "Choose Outline Color..."
-	$mm.edit add command -command {cycleStipple} -label "Cycle Fill Pattern to 12% \[now none\]"
+	# cycleStipple {} gray12 gray25 gray50 gray75
+	menu $mm.edit.stipple
+	$mm.edit add cascade -menu $mm.edit.stipple -state normal -label "Select fill pattern"
+	foreach {value label} {
+		{nil} {None}
+		gray12 12%
+		gray25 25%
+		gray50 50%
+		gray75 75%
+	} {
+		$mm.edit.stipple add radiobutton -command [list cycleStipple $value] -label $label -selectcolor $check_menu_color -variable StipplePattern -value $value
+	}
+	#$mm.edit add command -command {cycleStipple -cycle} -label "Cycle Fill Pattern to 12% \[now none\]"
 	$mm.edit add separator
-	$mm.edit add command -command gridsnap -label "Cycle Grid Snap to 1 \[now none\]"
-	$mm.edit add command -command setwidth -label "Cycle Line Thickness to 6 \[now 5\]"
+	# gridsnap 0 1 2 3 4
+	menu $mm.edit.gridsnap
+	$mm.edit add cascade -menu $mm.edit.gridsnap -state normal -label "Set grid snap"
+	foreach {value label} {
+		0 {None}
+		1 {Full grid squares}
+		2 {1/2 square}
+		3 {1/3 square}
+		4 {1/4 square}
+	} {
+		$mm.edit.gridsnap add radiobutton -command [list gridsnap $value] -label $label -selectcolor $check_menu_color -variable OBJ_SNAP -value $value
+	}
+
+	# setwidth 0-9
+	menu $mm.edit.setwidth
+	$mm.edit add cascade -menu $mm.edit.setwidth -state normal -label "Set line thickness"
+	foreach {value label} {
+		0 {0 (Thinnest)}
+		1 1
+		2 2
+		3 3
+		4 4
+		5 5
+		6 6
+		7 7
+		8 8
+		9 {9 (Thickest)}
+	} {
+		$mm.edit.setwidth add radiobutton -command [list setwidth $value] -label $label -selectcolor $check_menu_color -variable OBJ_WIDTH -value $value
+	}
+
 	$mm.edit add separator
 	$mm.edit add command -command {unloadfile {}} -label "Remove Elements from File..."
 	$mm.edit add separator
@@ -1064,6 +1102,18 @@ proc create_main_menu {use_button} {
 	$mm.play add command -command {rulertool} -label "Measure Distance Along Line(s)"
 	$mm.play add command -command {DisplayChatMessage {}} -label "Show Chat/Die-roll Window"
 	$mm.play add command -command {display_initiative_clock} -label "Show Initiative Clock"
+	$mm.play add separator
+	# gridsnap nil .25 .5 1
+	menu $mm.play.gridsnap
+	$mm.play add cascade -menu $mm.play.gridsnap -state disabled -label "\[future\] Creature token grid snap"
+	foreach {value label} {
+		nil {By creature size}
+		1   {full square}
+		.5  {1/2 square}
+		.25 {1/4 grid squares}
+	} {
+		$mm.play.gridsnap add radiobutton -state disabled -label $label -selectcolor $check_menu_color -variable CreatureGridSnap -value $value
+	}
 	$mm.play add separator
 	$mm.play add command -command {ClearSelection} -label "Deselect All"
 	$mm.play add separator
@@ -2106,9 +2156,9 @@ grid \
 	 [button .toolbar.nfill -image $icon_no_fill -command toggleNoFill]\
 	 [button .toolbar.cfill -image $icon_fill_color -bg $initialColor -command {colorpick fill}] \
 	 [button .toolbar.cline -image $icon_outline_color -bg $initialColor -command {colorpick line}] \
-	 [button .toolbar.cstip -image $icon_stipple_100 -command {cycleStipple}] \
-	 [button .toolbar.snap -image $icon_snap_0 -command gridsnap] \
-	 [button .toolbar.width -image [set icon_width_$initialwidth] -command setwidth] \
+	 [button .toolbar.cstip -image $icon_stipple_100 -command {cycleStipple -cycle}] \
+	 [button .toolbar.snap -image $icon_snap_0 -command {gridsnap -cycle}] \
+	 [button .toolbar.width -image [set icon_width_$initialwidth] -command {setwidth -cycle}] \
 	 [label  .toolbar.sp2  -text "   "] \
 	 [button .toolbar.clear -image $icon_clear -command {cleargrid; ::gmaproto::clear E*}] \
 	 [button .toolbar.clearp -image $icon_clear_players -command {clearplayers *; ::gmaproto::clear P*; ::gmaproto::clear M*}] \
@@ -2282,33 +2332,42 @@ proc toggleNoFill {} {
 	_showNoFill
 }
 
-set StipplePattern {}
-proc cycleStipple {} {
+set StipplePattern {nil}
+proc cycleStipple {{newStipple -cycle}} {
 	global StipplePattern MAIN_MENU
 	global icon_stipple_100 icon_stipple_75 icon_stipple_50 icon_stipple_25 icon_stipple_12 icon_stipple_88
 
-	switch -exact -- $StipplePattern {
-		""		{ set n 12; set i 88; set nextpct "25%" }
-		"gray12"	{ set n 25; set i 75; set nextpct "50%" }
-		"gray25"	{ set n 50; set i 50; set nextpct "75%" }
-		"gray50"	{ set n 75; set i 25; set nextpct "none" }
-		"gray75"	{ set n 100; set i 100; set nextpct "12%" }
-		default		{ set n 100; set i 100; set nextpct "12%" }
+	if {$newStipple eq {-cycle}} {
+		switch -exact -- $StipplePattern {
+			"nil"		{ set n 12; set i 88 }
+			"gray12"	{ set n 25; set i 75 }
+			"gray25"	{ set n 50; set i 50 }
+			"gray50"	{ set n 75; set i 25 }
+			"gray75"	{ set n 100; set i 100 }
+			default		{ set n 100; set i 100 }
+		}
+	} else {
+		switch -exact -- $newStipple {
+			"gray12"	{ set n 12; set i 88 }
+			"gray25"	{ set n 25; set i 75 }
+			"gray50"	{ set n 50; set i 50 }
+			"gray75"	{ set n 75; set i 25 }
+			"nil"		{ set n 100; set i 100 }
+			default		{ set n 100; set i 100 }
+		}
 	}
+
 	if {$n == 100} {
 		.toolbar.cstip configure -image $icon_stipple_100
-		$MAIN_MENU.edit entryconfigure "Cycle Fill Pattern*" -label "Cycle Fill Pattern to 12% \[now none\]"
-		set StipplePattern {}
+		set StipplePattern {nil}
 	} else {
 		if {[catch {
 			.toolbar.cstip configure -image [set icon_stipple_$i]
-			$MAIN_MENU.edit entryconfigure "Cycle Fill Pattern*" -label "Cycle Fill Pattern to $nextpct \[now $n%\]"
 			set StipplePattern "gray$n"
 		} err]} {
 			DEBUG 1 "Unable to set stipple pattern $StipplePattern on toolbar button: $err"
 			.toolbar.cstip configure -image $icon_stipple_100
-			$MAIN_MENU.edit entryconfigure "Cycle Fill Pattern*" -label "Cycle Fill Pattern to 12% \[now none\]"
-			set StipplePattern {}
+			set StipplePattern {nil}
 		}
 	}
 }
@@ -3147,34 +3206,28 @@ proc refreshScreen {} {
 	DEBUG 3 "                all monsters/players:  [$canvas bbox allMOB]"
 }
 
-proc fmt_gridsnap {s} {
-	if {$s == 0} {
-		return none
-	} 
-	if {$s == 1} {
-		return 1
-	}
-	return "1/$s"
-}
-
-proc gridsnap {} {
+proc gridsnap {{newsnap -cycle}} {
 	global OBJ_SNAP MAIN_MENU
 
-	set OBJ_SNAP [expr ($OBJ_SNAP + 1) % 5]
-	set next_snap [expr ($OBJ_SNAP + 1) % 5]
+	if {$newsnap eq {-cycle}} {
+		set OBJ_SNAP [expr ($OBJ_SNAP + 1) % 5]
+	} else {
+		set OBJ_SNAP [expr $newsnap % 5]
+	}
 	global icon_snap_$OBJ_SNAP
 	.toolbar.snap configure -image [set icon_snap_$OBJ_SNAP]
-	$MAIN_MENU.edit entryconfigure "Cycle Grid Snap*" -label "Cycle Grid Snap to [fmt_gridsnap $next_snap] \[now [fmt_gridsnap $OBJ_SNAP]\]"
 }
 
-proc setwidth {} {
+proc setwidth {{newwidth -cycle}} {
 	global OBJ_WIDTH MAIN_MENU
 
-	set OBJ_WIDTH [expr ($OBJ_WIDTH+1)%10]
-	set nextw [expr ($OBJ_WIDTH+1)%10]
+	if {$newwidth eq {-cycle}} {
+		set OBJ_WIDTH [expr ($OBJ_WIDTH+1)%10]
+	} else {
+		set OBJ_WIDTH [expr $newwidth % 10]
+	}
 	global icon_width_$OBJ_WIDTH
 	.toolbar.width configure -image [set icon_width_$OBJ_WIDTH]
-	$MAIN_MENU.edit entryconfigure "Cycle Line Thickness*" -label "Cycle Line Thickness to $nextw \[now $OBJ_WIDTH\]"
 }
 
 proc playtool {} {
@@ -3722,6 +3775,9 @@ proc RefreshGrid {show} {
 			} else {
 				set Stipple {}
 			}
+			if {[set _Stipple $Stipple] eq {nil}} {
+				set _Stipple {}
+			}
 			set Dash [::gmaproto::from_enum Dash ${_Dash}]
 			
 			#
@@ -3745,31 +3801,31 @@ proc RefreshGrid {show} {
 			switch $OBJtype($id) {
 				arc {
 					$canvas create arc "$X $Y $Points"\
-						-fill $Fill -outline $Line -stipple $Stipple \
+						-fill $Fill -outline $Line -stipple $_Stipple \
 						-style [::gmaproto::from_enum ArcMode [dict get $OBJdata($id) ArcMode]] \
 						-start [dict get $OBJdata($id) Start] -extent [dict get $OBJdata($id) Extent] \
 						-dash $Dash -width $Width -tags [list obj$id allOBJ]
 				}
 				circ {
 					$canvas create oval "$X $Y $Points"\
-						-fill $Fill -outline $Line -stipple $Stipple -width $Width -dash $Dash -tags [list obj$id allOBJ]
+						-fill $Fill -outline $Line -stipple $_Stipple -width $Width -dash $Dash -tags [list obj$id allOBJ]
 				}
 				line {
 					$canvas create line "$X $Y $Points"\
-						-fill $Fill -width $Width -stipple $Stipple -tags [list obj$id allOBJ] \
+						-fill $Fill -width $Width -stipple $_Stipple -tags [list obj$id allOBJ] \
 						-dash $Dash -arrow [::gmaproto::from_enum Arrow [dict get $OBJdata($id) Arrow]] \
 						-arrowshape [list 15 18  8]
 				}
 				poly {
 					set Spline [dict get $OBJdata($id) Spline]
 					$canvas create polygon "$X $Y $Points"\
-						-fill $Fill -outline $Line -stipple $Stipple -width $Width -tags [list obj$id allOBJ]\
+						-fill $Fill -outline $Line -stipple $_Stipple -width $Width -tags [list obj$id allOBJ]\
 						-joinstyle [::gmaproto::from_enum Join [dict get $OBJdata($id) Join]] \
 						-smooth [expr $Spline != 0] -splinesteps $Spline -dash $Dash
 				}
 				rect {
 					$canvas create rectangle "$X $Y $Points"\
-						-fill $Fill -outline $Line -stipple $Stipple -width $Width -dash $Dash -tags [list obj$id allOBJ]
+						-fill $Fill -outline $Line -stipple $_Stipple -width $Width -dash $Dash -tags [list obj$id allOBJ]
 				}
 				aoe - saoe {
 					$canvas create line [expr $X-10] $Y [expr $X+10] $Y $X $Y $X [expr $Y-10] $X [expr $Y+10]\
@@ -3785,7 +3841,7 @@ proc RefreshGrid {show} {
 					#::gmautil::dassign $Font Family FontFamily Size FontSize WeightFontWei
 					set Anchor [::gmaproto::from_enum Anchor ${_Anchor}]
 
-					$canvas create text $X $Y -fill $Fill -stipple $Stipple -anchor $Anchor -font [ScaleFont [GMAFontToTkFont $Font] $zoom] \
+					$canvas create text $X $Y -fill $Fill -stipple $_Stipple -anchor $Anchor -font [ScaleFont [GMAFontToTkFont $Font] $zoom] \
 						-justify left -text $Text -tags [list obj$id allOBJ]
 				}
 				tile {
@@ -4070,6 +4126,10 @@ proc StartObj {w x y} {
 	global animatePlacement
 	global ForceElementsToTop
 
+	if {[set _StipplePattern $StipplePattern] eq {nil}} {
+		set _StipplePattern {}
+	}
+
 	modifiedflag - 1
 	#
 	# special case for aoebound tool; there is only one of these
@@ -4101,6 +4161,7 @@ proc StartObj {w x y} {
 	if {$ForceElementsToTop} {
 		incr z 999999999
 	}
+	
 
 	switch $OBJ_MODE {
 		nil - kill - move { 
@@ -4149,9 +4210,9 @@ proc StartObj {w x y} {
 			set OBJtype($OBJ_CURRENT) arc
 			set OBJdata($OBJ_CURRENT) [::gmaproto::new_dict LS-ARC ID $OBJ_CURRENT \
 				X [expr [SnapCoord $x] / $zoom] Y [expr [SnapCoord $y] / $zoom] Z $z \
-				Stipple $StipplePattern Fill $fill_color Line $OBJ_COLOR(line) Width $OBJ_WIDTH \
+				Stipple $_StipplePattern Fill $fill_color Line $OBJ_COLOR(line) Width $OBJ_WIDTH \
 				Dash $dash Layer $layer]
-			$canvas create arc  [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] -fill [dict get $OBJdata($OBJ_CURRENT) Fill] -stipple $StipplePattern -outline $OBJ_COLOR(line) -width $OBJ_WIDTH -tags [list obj$OBJ_CURRENT allOBJ] -style $ARCMODE -start 0 -extent 359 -dash $DASHSTYLE
+			$canvas create arc  [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] -fill [dict get $OBJdata($OBJ_CURRENT) Fill] -stipple $_StipplePattern -outline $OBJ_COLOR(line) -width $OBJ_WIDTH -tags [list obj$OBJ_CURRENT allOBJ] -style $ARCMODE -start 0 -extent 359 -dash $DASHSTYLE
 			bind $canvas <1> "LastArcPoint $canvas %x %y"
 			dict set OBJdata($OBJ_CURRENT) ArcMode [::gmaproto::to_enum ArcMode $ARCMODE]
 		}
@@ -4159,9 +4220,9 @@ proc StartObj {w x y} {
 			set OBJtype($OBJ_CURRENT) circ
 			set OBJdata($OBJ_CURRENT) [::gmaproto::new_dict LS-CIRC ID $OBJ_CURRENT \
 				X [expr [SnapCoord $x] / $zoom] Y [expr [SnapCoord $y] / $zoom] Z $z \
-				Fill $fill_color Stipple $StipplePattern Line $OBJ_COLOR(line) \
+				Fill $fill_color Stipple $_StipplePattern Line $OBJ_COLOR(line) \
 				Width $OBJ_WIDTH Dash $dash Layer $layer]
-			$canvas create oval [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] -fill $fill_color -stipple $StipplePattern -outline $OBJ_COLOR(line) -width $OBJ_WIDTH -tags [list obj$OBJ_CURRENT allOBJ] -dash $DASHSTYLE
+			$canvas create oval [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] -fill $fill_color -stipple $_StipplePattern -outline $OBJ_COLOR(line) -width $OBJ_WIDTH -tags [list obj$OBJ_CURRENT allOBJ] -dash $DASHSTYLE
 			bind $canvas <1> "LastPoint $canvas %x %y"
 		}
 		line { 
@@ -4171,27 +4232,27 @@ proc StartObj {w x y} {
 				X [expr [SnapCoord $x] / $zoom] Y [expr [SnapCoord $y] / $zoom] Z $z \
 				Fill $fill_color Line $OBJ_COLOR(line) Width $OBJ_WIDTH \
 				Dash $dash Layer $layer Arrow $arrow]
-			$canvas create line [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] -stipple $StipplePattern -fill $fill_color -width $OBJ_WIDTH -tags [list obj$OBJ_CURRENT allOBJ] -dash $DASHSTYLE -arrow $ARROWSTYLE -arrowshape [list 15 18 8]
+			$canvas create line [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] -stipple $_StipplePattern -fill $fill_color -width $OBJ_WIDTH -tags [list obj$OBJ_CURRENT allOBJ] -dash $DASHSTYLE -arrow $ARROWSTYLE -arrowshape [list 15 18 8]
 			bind $canvas <1> "NextPoint $canvas %x %y"
 		}
 		poly {
 			set OBJtype($OBJ_CURRENT) poly
 			set OBJdata($OBJ_CURRENT) [::gmaproto::new_dict LS-POLY ID $OBJ_CURRENT \
 				X [expr [SnapCoord $x] / $zoom] Y [expr [SnapCoord $y] / $zoom] Z $z \
-				Stipple $StipplePattern Fill $fill_color Line $OBJ_COLOR(line) Width $OBJ_WIDTH Dash $dash Layer $layer\
+				Stipple $_StipplePattern Fill $fill_color Line $OBJ_COLOR(line) Width $OBJ_WIDTH Dash $dash Layer $layer\
 				Join [::gmaproto::to_enum Join $JOINSTYLE] \
 				Spline $SPLINE \
 			]
-			$canvas create polygon [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] -stipple $StipplePattern -fill $fill_color -width $OBJ_WIDTH -outline $OBJ_COLOR(line) -tags [list obj$OBJ_CURRENT allOBJ] -joinstyle $JOINSTYLE -smooth [expr $SPLINE != 0] -splinesteps $SPLINE -dash $DASHSTYLE
+			$canvas create polygon [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] -stipple $_StipplePattern -fill $fill_color -width $OBJ_WIDTH -outline $OBJ_COLOR(line) -tags [list obj$OBJ_CURRENT allOBJ] -joinstyle $JOINSTYLE -smooth [expr $SPLINE != 0] -splinesteps $SPLINE -dash $DASHSTYLE
 			bind $canvas <1> "NextPoint $canvas %x %y"
 		}
 		rect {
 			set OBJtype($OBJ_CURRENT) rect
 			set OBJdata($OBJ_CURRENT) [::gmaproto::new_dict LS-RECT ID $OBJ_CURRENT \
 				X [expr [SnapCoord $x] / $zoom] Y [expr [SnapCoord $y] / $zoom] Z $z \
-				Stipple $StipplePattern Fill $fill_color Line $OBJ_COLOR(line) Width $OBJ_WIDTH \
+				Stipple $_StipplePattern Fill $fill_color Line $OBJ_COLOR(line) Width $OBJ_WIDTH \
 				Dash $dash Layer $layer]
-			$canvas create rectangle [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] -stipple $StipplePattern -fill $fill_color -outline $OBJ_COLOR(line) -width $OBJ_WIDTH -tags [list obj$OBJ_CURRENT allOBJ] -dash $DASHSTYLE
+			$canvas create rectangle [SnapCoord $x] [SnapCoord $y] [SnapCoord $x] [SnapCoord $y] -stipple $_StipplePattern -fill $fill_color -outline $OBJ_COLOR(line) -width $OBJ_WIDTH -tags [list obj$OBJ_CURRENT allOBJ] -dash $DASHSTYLE
 			bind $canvas <1> "LastPoint $canvas %x %y"
 		}
 		ruler {
@@ -4217,14 +4278,14 @@ proc StartObj {w x y} {
 					-justify left \
 					-text $CurrentTextString \
 					-fill $fill_color \
-					-stipple $StipplePattern \
+					-stipple $_StipplePattern \
 					-tags "tiles obj$OBJ_CURRENT"
 
 				set OBJtype($OBJ_CURRENT) text
 				set OBJdata($OBJ_CURRENT) [::gmaproto::new_dict LS-TEXT ID $OBJ_CURRENT \
 					X [expr [SnapCoord $x] / $zoom] Y [expr [SnapCoord $y] / $zoom] Z $z \
 					Fill $fill_color Layer $layer Text $CurrentTextString \
-					Stipple $StipplePattern \
+					Stipple $_StipplePattern \
 					Font [TkFontToGMAFont $CURRENT_FONT] \
 					Anchor [::gmaproto::to_enum Anchor $CurrentAnchor]\
 				]
@@ -5012,6 +5073,7 @@ proc PopSomeoneToFront {w id} {
 proc PlaceSomeone {w d} {
 	global MOBdata MOBid NextMOBID OBJ_NEXT_Z canvas
 
+
 	set n [dict get $d Name]
 	set id [dict get $d ID]
 	if {[info exists MOBid($n)] && $id ne $MOBid($n)} {
@@ -5048,6 +5110,7 @@ proc MoveSomeone {w id x y} {
 	global CombatantSelected
 	global is_GM
 	global MOB_COMBATMODE
+
 
 	if {[info exists MOBdata($id)]} {
 		dict set MOBdata($id) Gx $x
@@ -5723,7 +5786,6 @@ proc RenderSomeone {w id {norecurse false}} {
 	global ShowHealthStats is_GM
 	set lower_neighbors {}
 
-
 	#
 	# find out where everyone is
 	# TODO: This would be more efficient to do less frequently than every time we call RenderSomeone
@@ -5756,12 +5818,13 @@ proc RenderSomeone {w id {norecurse false}} {
 
 	# If somehow we have a misaligned creature that's at least "small",
 	# snap to even grid boundary
-	if {$mob_size >= 1 && ($x != int($x) || $y != int($y))} {
-		set x [expr int($x)]
-		set y [expr int($y)]
-		dict set MOBdata($id) Gx $x
-		dict set MOBdata($id) Gy $y
-	}
+# XXX no longer needed or wanted now that we have CreatureGridSnap
+#	if {$mob_size >= 1 && ($x != int($x) || $y != int($y))} {
+#		set x [expr int($x)]
+#		set y [expr int($y)]
+#		dict set MOBdata($id) Gx $x
+#		dict set MOBdata($id) Gy $y
+#	}
 
 	if {[animation_obj_exists $id]} {
 		animation_destroy_instance $w * $id
@@ -6569,10 +6632,15 @@ proc ScreenXYToGridXY {x y args} {
 	#return [list [expr int(($x + ($xview*$cansw))/50)] \
 		#[expr int(($y + ($yview*$cansh))/50)]]
 	global canvas iscale MOB_MOVING MOBdata
+	global CreatureGridSnap
 
 	if {$args ne {-exact} && $MOB_MOVING ne {}} {
 		DEBUG 3 "ScreenXYToGridXY $x $y $args for MOB $MOB_MOVING"
-		set mob_size [MonsterSizeValue [CreatureDisplayedSize $MOB_MOVING]]
+		if {$CreatureGridSnap ne {nil}} {
+			set mob_size $CreatureGridSnap
+		} else {
+			set mob_size [MonsterSizeValue [CreatureDisplayedSize $MOB_MOVING]]
+		}
 		DEBUG 3 "--size $mob_size"
 		if {$mob_size < 1} {
 			DEBUG 3 "-- calc as [list [expr int([$canvas canvasx $x]/($iscale*$mob_size))*$mob_size] [expr int([$canvas canvasy $y]/($iscale*$mob_size))*$mob_size]]"
