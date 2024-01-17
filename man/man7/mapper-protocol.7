@@ -190,11 +190,11 @@ since all communications are asynchronous.
 '\"  \z{CONN}   &C$\leftarrow$S     &---        &N/A&\acronym{JSON}&Notify of all connected peers\\
 '\"  \z{CS}     &C$\leftrightarrow$S&---        &yes&\acronym{JSON}&Change the current time of day\\
 '\"  \z{D}      &C$\rightarrow$S    &\z{ROLL}   &no &\acronym{JSON}&Initiate a die roll\\
-'\"  \z{DD}     &C$\leftarrow$S     &\z{DD=}    &no &\acronym{JSON}&Store new presets for user\\
-'\"  \z{DD+}    &C$\rightarrow$S    &\z{DD=}    &no &\acronym{JSON}&Add presets to user's set\\
-'\"  \z{DD/}    &C$\rightarrow$S    &\z{DD=}    &N/A&\acronym{JSON}&Filter user's presets\\
+'\"  \z{DD}     &C$\leftarrow$S     &\z{DD=}    &maybe&\acronym{JSON}&Store new presets for user\\
+'\"  \z{DD+}    &C$\rightarrow$S    &\z{DD=}    &maybe&\acronym{JSON}&Add presets to user's set\\
+'\"  \z{DD/}    &C$\rightarrow$S    &\z{DD=}    &maybe&\acronym{JSON}&Filter user's presets\\
 '\"  \z{DD=}    &C$\leftarrow$S     &---        &N/A&\acronym{JSON}&Receive user's presets\\
-'\"  \z{DDD}    &C$\rightarrow$S    &\z{DD=}    &N/A&\acronym{JSON}&Define preset delegates\\
+'\"  \z{DDD}    &C$\rightarrow$S    &\z{DD=}    &maybe&\acronym{JSON}&Define preset delegates\\
 '\"  \z{DENIED} &C$\leftarrow$S     &---        &N/A&\acronym{JSON}&Server denies access\\
 '\"  \z{DR}     &C$\rightarrow$S    &\z{DD=}    &no &none          &Request user's presets\\
 '\"  \z{DSM}    &C$\leftrightarrow$S&---        &yes&\acronym{JSON}&Define creature status marker\\
@@ -261,11 +261,11 @@ ClearChat	CC	C\[<>]S	\fR\(em\fP	no	JSON	Clear the chat history
 ClearFrom	CLR@	C\[<>]S	\fR\(em\fP	no	JSON	Remove elements from a map file
 CombatMode	CO	C\[<>]S	\fR\(em\fP	yes	JSON	Turn on/off combat mode
 Comment	//	C\[<>]S	\fR\(em\fP	no	any	Human-readable comment
-DefineDicePresets	DD	C\[->]S	DD=	no	JSON	Store new presets for user
-DefineDiceDelegates	DDD	C\[->]S	DD=	no	JSON	Assign die-roll delegates
+DefineDicePresets	DD	C\[->]S	DD=	maybe	JSON	Store new presets for user
+DefineDiceDelegates	DDD	C\[->]S	DD=	maybe	JSON	Assign die-roll delegates
 Denied	DENIED	C\[<-]S	\fR\(em\fP	N/A	JSON	Server denies access
 Echo	ECHO	C\[<>]S	ECHO	no	JSON	Send data for server to echo back to client
-FilterDicePresets	DD/	C\[->]S	DD=	no	JSON	Remove some presets for user
+FilterDicePresets	DD/	C\[->]S	DD=	maybe	JSON	Remove some presets for user
 FilterImages	AI/	C\[->]S	\fR\(em\fP	yes	JSON	Filter saved image definitions
 Granted	GRANTED	C\[<-]S	\fR\(em\fP	N/A	JSON	Server grants access
 LoadArcObject	LS-ARC	C\[<>]S	\fR\(em\fP	no	JSON	Add an arc to the map
@@ -363,6 +363,11 @@ have a JSON data payload attached to them. The protocol version number is
 simply sent as an ASCII string of digits separated from the 
 .B PROTOCOL
 command word by a space.
+'\" <<New>>
+The reason for this is that this data format is valid in all protocol
+versions, including those before version 400, so it can be used to
+unambiguously identify the server's protocol to all possible clients.
+'\" <</New>>
 .RS
 .LP
 Servers which implement protocol versions 400 and later MUST send this message
@@ -1040,13 +1045,18 @@ The JSON payload includes:
 .RS
 '\" <<list>>
 .TP
+.B For
+The user for whom these delegates are being defined. If empty or
+missing, the default is to define them for the requesting user.
+Only the GM may set delegates for someone else.
+.TP
 '\" <</ital-is-var>>
 .BI "Delegates " "(list of strings)"
 '\" <<ital-is-var>>
 The list of usernames who are allowed to access the requesting user's
 die-roll presets. This replaces the previous set of delegates. If the list
 is empty (or the
-.B Deleages
+.B Delegates
 field missing), then all delegates are removed.
 .RE
 '\" <</>>
@@ -1058,23 +1068,21 @@ Clients send this command to the server to request it to store a set of
 die-roll presets for it to retrieve for use in subsequent sessions.
 The JSON payload is identical to the one sent by the server in the
 .B DD=
-command, with the addition of the following optional field:
-.RS
-'\" <<list>>
-.TP
-.B For
-The name of the user whose presets are being affected. This is optional;
-if omitted, the presets of the user making this request are affected. Only
+command, 
 '\" <<New>>
-a designated delegate or
-'\" <</New>.
-the GM may change other users' presets.
-'\" <</>>
+except that it does not contain a
+.B Delegates
+field.
+'\" <</New>>
+.RS
 .LP
 The server SHOULD respond by issuing a
 .B DD=
 command to all peer clients logged in with the same username as the
-affected user. 
+affected user
+'\" <<New>>
+as well as any authorized delegates. 
+'\" <</New>>
 .RE
 .TP
 .B DD+
@@ -1130,6 +1138,10 @@ The JSON payload includes the following fields:
 .B For
 The username of the player for whom these presets were stored. The default, if no
 name is given or if it is empty, is the currently logged-in user.
+'\" <<New>>
+Only the GM may send a request to alter the die-roll presets or
+delegate list for another user.
+'\" <</New>>
 .TP
 '\" <</ital-is-var>>
 .BI Delegates " (list of strings)"
