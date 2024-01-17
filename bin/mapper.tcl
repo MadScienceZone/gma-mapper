@@ -1105,14 +1105,14 @@ proc create_main_menu {use_button} {
 	$mm.play add separator
 	# gridsnap nil .25 .5 1
 	menu $mm.play.gridsnap
-	$mm.play add cascade -menu $mm.play.gridsnap -state normal -label "Creature token grid snap"
+	$mm.play add cascade -menu $mm.play.gridsnap -state disabled -label "\[future\] Creature token grid snap"
 	foreach {value label} {
 		nil {By creature size}
 		1   {full square}
 		.5  {1/2 square}
 		.25 {1/4 grid squares}
 	} {
-		$mm.play.gridsnap add radiobutton -label $label -selectcolor $check_menu_color -variable CreatureGridSnap -value $value
+		$mm.play.gridsnap add radiobutton -state disabled -label $label -selectcolor $check_menu_color -variable CreatureGridSnap -value $value
 	}
 	$mm.play add separator
 	$mm.play add command -command {ClearSelection} -label "Deselect All"
