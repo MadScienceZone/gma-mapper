@@ -1,5 +1,5 @@
 '\" t
-'\" *** 411 ***
+'\" *** 412 ***
 '\" <<ital-is-var>>
 '\" <<bold-is-fixed>>
 .TH MAPPER-PROTOCOL 7 "GMA-Mapper 4.3.4" 16-Mar-2023 "Games" \" @@mp@@
@@ -76,7 +76,7 @@ be implemented to wait synchronously for a server
 response during the authentication negotiation stage.
 .LP
 '\" <</bold-is-fixed>>
-.B "This describes protocol version 411."
+.B "This describes protocol version 412."
 '\" <<bold-is-fixed>>
 These notes are intended to be 
 detailed enough to implement a client from and should be considered
@@ -194,6 +194,7 @@ since all communications are asynchronous.
 '\"  \z{DD+}    &C$\rightarrow$S    &\z{DD=}    &no &\acronym{JSON}&Add presets to user's set\\
 '\"  \z{DD/}    &C$\rightarrow$S    &\z{DD=}    &N/A&\acronym{JSON}&Filter user's presets\\
 '\"  \z{DD=}    &C$\leftarrow$S     &---        &N/A&\acronym{JSON}&Receive user's presets\\
+'\"  \z{DDD}    &C$\rightarrow$S    &\z{DD=}    &N/A&\acronym{JSON}&Define preset delegates\\
 '\"  \z{DENIED} &C$\leftarrow$S     &---        &N/A&\acronym{JSON}&Server denies access\\
 '\"  \z{DR}     &C$\rightarrow$S    &\z{DD=}    &no &none          &Request user's presets\\
 '\"  \z{DSM}    &C$\leftrightarrow$S&---        &yes&\acronym{JSON}&Define creature status marker\\
@@ -261,6 +262,7 @@ ClearFrom	CLR@	C\[<>]S	\fR\(em\fP	no	JSON	Remove elements from a map file
 CombatMode	CO	C\[<>]S	\fR\(em\fP	yes	JSON	Turn on/off combat mode
 Comment	//	C\[<>]S	\fR\(em\fP	no	any	Human-readable comment
 DefineDicePresets	DD	C\[->]S	DD=	no	JSON	Store new presets for user
+DefineDiceDelegates	DDD	C\[->]S	DD=	no	JSON	Assign die-roll delegates
 Denied	DENIED	C\[<-]S	\fR\(em\fP	N/A	JSON	Server denies access
 Echo	ECHO	C\[<>]S	ECHO	no	JSON	Send data for server to echo back to client
 FilterDicePresets	DD/	C\[->]S	DD=	no	JSON	Remove some presets for user
@@ -318,7 +320,6 @@ This is a server comment.  The entire command SHOULD be ignored by all clients. 
 to inject informative context and messages into the client/server conversation which may be
 of interest for debugging or interactive use.
 .RS
-'\" <<New>>
 .LP
 The mapper client will interpret a server comment beginning with the text
 .RB \*(lq notice: \*(rq
@@ -330,7 +331,6 @@ The text following the word
 is posted in an alert box. Clients MUST recognize the string in all lower-case
 if they choose to implement this feature; they MAY also recognize it regardless
 of case.
-'\" <</New>>
 .LP
 '\" <</ital-is-var>>
 .I "This is one of two exceptions to the rule that a command contains a JSON parameter"
@@ -418,7 +418,6 @@ commands as of protocol version 400.)
 The payload is a JSON object with the following fields:
 '\" <<list>>
 .RS
-'\" <<New>>
 .TP
 '\" <</ital-is-var>>
 .BI Animation " (object)"
@@ -458,7 +457,6 @@ If present and non-zero, the animation will play this many times before stopping
 the animation plays forever.
 .RE
 '\" <</>>
-'\" <</New>>
 .TP
 .B Name
 The name of the image as known within the mapper.
@@ -1026,9 +1024,36 @@ If this field is empty, the previous die-roll from this client is repeated,
 or \*(lq1d20\*(rq if there was no previous one.
 '\" <</>>
 .RE
+'\" <<New>>
+.TP
+.B DDD
+Define Die-roll Delegate.
+Clients send this command to the server to indicate that other user(s)
+are allowed to retrieve and store their die-roll presets.
+The server SHOULD immediately send 
+.B DD=
+commands to the requesting user and all delegates. From this point on, any
+updates to the requesting user's presets will result in
+.B DD=
+commands sent to all delegates as well.
+The JSON payload includes:
+.RS
+'\" <<list>>
+.TP
+'\" <</ital-is-var>>
+.BI "Delegates " "(list of strings)"
+'\" <<ital-is-var>>
+The list of usernames who are allowed to access the requesting user's
+die-roll presets. This replaces the previous set of delegates. If the list
+is empty (or the
+.B Deleages
+field missing), then all delegates are removed.
+.RE
+'\" <</>>
+'\" <</New>>
 .TP
 .B DD
-Store Die-Roll Presets.
+Define (store) Die-Roll Presets.
 Clients send this command to the server to request it to store a set of
 die-roll presets for it to retrieve for use in subsequent sessions.
 The JSON payload is identical to the one sent by the server in the
@@ -1040,6 +1065,9 @@ command, with the addition of the following optional field:
 .B For
 The name of the user whose presets are being affected. This is optional;
 if omitted, the presets of the user making this request are affected. Only
+'\" <<New>>
+a designated delegate or
+'\" <</New>.
 the GM may change other users' presets.
 '\" <</>>
 .LP
@@ -1097,8 +1125,18 @@ in protocol versions prior to 400.
 The JSON payload includes the following fields:
 '\" <<list>>
 .RS
+'\" <<New>>
+.TP
+.B For
+The username of the player for whom these presets were stored. The default, if no
+name is given or if it is empty, is the currently logged-in user.
 .TP
 '\" <</ital-is-var>>
+.BI Delegates " (list of strings)"
+The list of delegates who also have visibility and control for the owner's presets.
+If empty or missing, there are no delegates.
+'\" <</New>>
+.TP
 .BI Presets " (list of objects)"
 '\" <<ital-is-var>>
 Each element in this list describes a single preset. It has the following
@@ -1232,9 +1270,7 @@ for that creature's
 .B StatusList
 attribute.
 The mapper comes with the following conditions pre-defined:
-'\" <<New>>
 .BR "ability damage" ,
-'\" <</New>>
 .BR "ability drained" ,
 .BR bleed ,
 .BR blinded ,
@@ -1242,9 +1278,7 @@ The mapper comes with the following conditions pre-defined:
 .BR cowering ,
 .BR dazed ,
 .BR dazzled ,
-'\" <<New>>
 .BR dead ,
-'\" <</New>>
 .BR deafened ,
 .BR disabled ,
 .BR dying ,
@@ -1443,7 +1477,6 @@ An arbitrary boolean value.
 .BI "o " (object)
 An arbitrary set of key/value pairs, with each value having any type.
 .LP
-'\" <<New>>
 The server will also populate the following additional fields in its reply, which
 a client can use to calculate the round-trip time for the request and identify
 how much of that was internal to the server and how much was network latency.
@@ -1454,7 +1487,6 @@ The time when the server received the packet from the client.
 .BI "SentTime " "(RFC 3339-formatted datetime string)"
 The time when the server sent the response packet to the client.
 '\" <<ital-is-var>>
-'\" <</New>>
 .RE
 
 '\" <</>>
@@ -1923,9 +1955,7 @@ The name of the font family as recognized by Tk.
 .TP
 .BI Size " (float)"
 The font size as recognized by Tk.
-'\" <<New>>
 The client MAY truncate this to an integer if it can't handle fractional point sizes.
-'\" <</New>>
 .TP
 .BI Weight " (int)"
 The type wight to use. This may be 0 for normal or 1 for boldface.
@@ -2296,13 +2326,11 @@ The grid
 .I y
 coordinate for the creature's reference point. Note that this is in
 grids, not pixel units.
-'\" <<New>>
 .TP
 .BI PolyGM " (bool)"
 If true, only the GM may access the polymorph capabilities of this creature.
 Map clients not logged in as GM MUST not display any information indicating
 that there are different skins available, nor allow the user to select among them.
-'\" <</New>>
 .TP
 .BI Skin " (int)"
 If 0, show the default appearance on the creature's token. Otherwise, show
@@ -2350,7 +2378,6 @@ and
 .I space
 is a custom creature space diameter in feet (if different than the standard for that size category).
 (Changed in protocol 406.)
-'\" <<New>>
 .LP
 This is now DEPRECATED. If present and the
 .B SkinSize
@@ -2363,7 +2390,6 @@ The preferred usage going forward is to not set the
 field at all, and just use
 .B SkinSize
 alone. If there is only one skin for the creature, this value will have only a single value.
-'\" <</New>>
 .RE
 '\".TP
 '\".BI Area
@@ -2471,7 +2497,6 @@ but indicates the distance for reach weapons.
 The server sends this to the client to indicate that all preliminary
 data has been sent, authentication (if applicable) has been successful,
 and the client may proceed to carry out normal operations now.
-'\" <<New>>
 .TP
 .B REDIRECT
 Instructs the client to use a different server for this session. This is used when
@@ -2508,7 +2533,6 @@ a different server,
 .B REDIRECT
 should be the first item in the server's init file.
 .RE
-'\" <</New>>
 .TP
 .B ROLL
 Reports the results of a die roll initiated by the
@@ -2541,7 +2565,6 @@ The
 .B RequestID
 string passed by the client when requesting this die roll, or the empty string
 if they didn't.
-'\" <<New>>
 .TP
 .BI Sent " (RFC 3339-formatted datetime string)"
 The date and time the message was sent.
@@ -2552,7 +2575,6 @@ Note that the special value
 .RB \*(lq "0001-01-01T00:00:00Z" \*(rq
 is the \*(lqzero\*(rq value for dates and indicates that the date is not known (as is the case if this
 field is omitted entirely or is the empty string).
-'\" <</New>>
 .TP
 .BI ToAll " (bool)"
 If true, this is a global message sent to all clients.
@@ -2697,7 +2719,6 @@ global messages, this should be
 .BI MessageID " (int)"
 The unique number assigned by the server for this chat message. Clients SHOULD NOT
 set this field.
-'\" <<New>>
 .TP
 .BI Sent " (RFC 3339-formatted datetime string)"
 The date and time the message was sent.
@@ -2708,7 +2729,6 @@ Note that the special value
 .RB \*(lq "0001-01-01T00:00:00Z" \*(rq
 is the \*(lqzero\*(rq value for dates and indicates that the date is not known (as is the case if this
 field is omitted entirely or is the empty string).
-'\" <</New>>
 .TP
 .BI ToAll " (bool)"
 If true, this is a global message sent to all clients.
@@ -2755,7 +2775,6 @@ Each element in this list is a JSON object with the following fields:
 .TP
 .B Name
 The name of the software package, such as \*(lqmapper\*(rq, \*(lqgo-gma\*(rq, or \*(lqcore\*(rq.
-'\" <<New>>
 .TP
 .B MinimumVersion
 If a server wishes to limit clients from this package to only those with a minimum version number
@@ -2792,7 +2811,6 @@ field described above.
 '\" <</ital-is-var>>
 .I "This field should be used only in server init files. Clients SHOULD NOT use this field, nor expect it to be sent by the server."
 '\" <<ital-is-var>>
-'\" <</New>>
 .TP
 .BI Instances " (list of objects)"
 A list of all available instances of the named package. Each is a JSON object
@@ -2848,7 +2866,6 @@ The name of the calendar system in play, as known to the GMA game clock.
 prior to protocol version 400.)
 
 Declares which calendaring system the various dates and times are based upon.
-'\" <<New>>
 '\" <</ital-is-var>>
 .TP
 .BI "ClientSettings " (object)
@@ -2879,7 +2896,6 @@ for the GM to upload mapper content to the server.
 .RE
 '\" <</>>
 '\" <<ital-is-var>>
-'\" <</New>>
 '\" <</>>
 .LP
 Example:
@@ -2900,10 +2916,14 @@ and
 Steve Willoughby / steve@madscience.zone;
 John Mechalas (elevation and movement modes).
 .SH HISTORY
-.LP
 '\" <<New>>
-This document defines map protocol version 411,
-which added timestamps to chat messages and die-roll results.
+.LP
+This document defines map protocol version 412,
+which added support for sharing die-roll presets.
+'\" <</New>>
+.LP
+Protocol 411
+added timestamps to chat messages and die-roll results.
 .LP
 Protocol 410
 added the
@@ -2922,7 +2942,6 @@ pattern fill attribute.
 Protocol version 408 introduced the
 .B PolyGM
 creature attribute.
-'\" <</New>>
 .LP
 Protocol version 407
 added the image animation features.
