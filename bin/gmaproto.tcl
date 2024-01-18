@@ -140,7 +140,8 @@ namespace eval ::gmaproto {
 		DD      {For s Presets {a {Name s Description s DieRollSpec s}}}
 		DD+     {For s Presets {a {Name s Description s DieRollSpec s}}}
 		DD/     {For s Filter s}
-		DD=     {Presets {a {Name s Description s DieRollSpec s}}}
+		DD=     {For s Presets {a {Name s Description s DieRollSpec s}} DelegateFor l Delegates l}
+		DDD	{For s Delegates l}
 		DENIED  {Reason s}
 		DR      {}
 		DSM     {Condition s Shape s Color s Description s Transparent ?}
