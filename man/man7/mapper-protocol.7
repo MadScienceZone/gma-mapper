@@ -1038,9 +1038,11 @@ The JSON payload is identical to the one sent by the server in the
 .B DD=
 command, 
 '\" <<New>>
-except that it does not contain a
+except that it does not contain
+.B DelegateFor
+or
 .B Delegates
-field.
+fields.
 '\" <</New>>
 .RS
 .LP
@@ -1122,6 +1124,9 @@ delegate list for another user.
 '\" <</New>>
 .TP
 '\" <</ital-is-var>>
+.BI DelegateFor " (list of strings)"
+The list of all the other users for whom the target user is a delegate.
+.TP
 .BI Delegates " (list of strings)"
 The list of delegates who also have visibility and control for the owner's presets.
 If empty or missing, there are no delegates.
