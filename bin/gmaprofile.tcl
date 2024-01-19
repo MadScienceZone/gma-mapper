@@ -278,7 +278,7 @@ namespace eval ::gmaprofile {
 		return [dict create \
 			animate         false\
 			button_size     small\
-			chat_timestamp  false\
+			chat_timestamp  true\
 			colorize_die_rolls true\
 			curl_path       [::gmautil::searchInPath curl]\
 			curl_insecure   false\
