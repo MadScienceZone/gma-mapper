@@ -9723,23 +9723,31 @@ proc DoCommandCONN {d} {
 
 proc DoCommandDD= {d} {
 	# define die-roll preset list
-	global SuppressChat dice_preset_data
+	global SuppressChat dice_preset_data local_user
+	
+	if {[set target [dict get $d For]] eq {}} {
+		set target $local_user
+	}
 
 	if {! $SuppressChat} {
 		if {[catch {
-			DisplayChatMessage {}; # force window open
-			set wp [sframe content .chatwindow.p.preset.sf]
-			for {set i 0} {$i < [array size dice_preset_data]} {incr i} {
-				DEBUG 1 "destroy $wp.preset$i"
-				destroy $wp.preset$i
-				global DRPS_en$i
-				catch {unset DRPS_en$i}
+			if {$target ne $local_user} {
+				DisplayChatMessage {} -for $target
+			} else {
+				DisplayChatMessage {}; # force window open
+				set wp [sframe content .chatwindow.p.preset.sf]
+				for {set i 0} {$i < [array size dice_preset_data]} {incr i} {
+					DEBUG 1 "destroy $wp.preset$i"
+					destroy $wp.preset$i
+					global DRPS_en$i
+					catch {unset DRPS_en$i}
+				}
+				array unset dice_preset_data
+				foreach preset [dict get $d Presets] {
+					set dice_preset_data([dict get $preset Name]) $preset
+				}
+				_render_die_roller $wp 0 0 preset -noclear
 			}
-			array unset dice_preset_data
-			foreach preset [dict get $d Presets] {
-				set dice_preset_data([dict get $preset Name]) $preset
-			}
-			_render_die_roller $wp 0 0 preset -noclear
 		} err]} {
 			DEBUG 0 "Error updating die preset info: $err"
 		}
@@ -11427,7 +11435,7 @@ proc EDRPcheckVar {i} {
 		set EDRP_mod_g$i 0
 	}
 }
-# DisplayChatMessage d ?-noopen? ?-system?
+# DisplayChatMessage d ?-noopen? ?-system? ?-for user?
 proc DisplayChatMessage {d args} {
 	global dark_mode SuppressChat CHAT_TO CHAT_text check_select_color
 	global icon_die16 icon_info20 icon_arrow_refresh check_menu_color
@@ -11441,6 +11449,16 @@ proc DisplayChatMessage {d args} {
 		lassign {} from recipientlist message date_sent
 	}
 
+	set for_user {}
+	if {[set foridx [lsearch -exact $args "-for"]] >= 0} {
+		incr foridx
+		if {$foridx < [llength $args]} {
+			set for_user [lindex $args $foridx]
+		} else {
+			error "usage: DisplayChatMessage dict ?-noopen? ?-system? ?-for user?"
+		}
+	}
+
 	if {$SuppressChat} return
 	if {![::gmaproto::is_connected]} {
 		tk_messageBox -type ok -icon error -title "No Connection to Server" \
@@ -11448,7 +11466,7 @@ proc DisplayChatMessage {d args} {
 		return
 	}
 
-	set w .chatwindow
+	set w .chatwindow$for_user
 	set wc   $w.p.chat
 	set wrsf $w.p.recent
 	set wpsf $w.p.preset
@@ -11509,9 +11527,17 @@ proc DisplayChatMessage {d args} {
 		# | [name________] [desc___________] [rollspec_______] [x]as [_______] [-][^][v]
 		# |_______________________________________________________________
 		#
-		wm title $w "Chat and Die Rolls"
 		ttk::panedwindow $w.p -orient vertical 
-		ttk::labelframe $wc -text "Chat Messages"
+		if {$for_user eq {}} {
+			wm title $w "Chat and Die Rolls"
+		} else {
+			wm title $w "Die Rolls for $for_user"
+		}
+		if {$for_user eq {}} {
+			ttk::labelframe $wc -text "Chat Messages"
+		} else {
+			ttk::labelframe $wc -text "Dice for $for_user"
+		}
 		ttk::labelframe $wrsf -text "Recent Rolls"
 		ttk::labelframe $wpsf -text "Preset Rolls"
 		pack [sframe new $wrsf.sf -anchor w] -side top -fill both -expand 1
@@ -11551,8 +11577,10 @@ proc DisplayChatMessage {d args} {
 			 [frame $wc.3]\
 			-side top -expand 0 -fill x
 
-		pack [text $wc.1.text -yscrollcommand "$wc.1.sb set" -height 10 -width 10 -state disabled] -side left -expand 1 -fill both
-		pack [scrollbar $wc.1.sb -orient vertical -command "$wc.1.text yview"] -side right -expand 0 -fill y
+		if {$for_user eq {}} {
+			pack [text $wc.1.text -yscrollcommand "$wc.1.sb set" -height 10 -width 10 -state disabled] -side left -expand 1 -fill both
+			pack [scrollbar $wc.1.sb -orient vertical -command "$wc.1.text yview"] -side right -expand 0 -fill y
+		}
 		pack [button $wc.3.tc -image $icon_colorwheel \
 			-command "EditColorBoxTitle CHAT_dice"] -side left -padx 2
 		pack [label $wc.3.l -text Roll: -anchor nw] -side left -padx 2
@@ -11578,57 +11606,63 @@ proc DisplayChatMessage {d args} {
 		::tooltip::tooltip $wc.2.send "Refresh the list of recipients for messages."
 		bind $wc.2.entry <Return> SendChatFromWindow
 		bind $wc.3.dice <Return> SendDieRollFromWindow
+
+		# TODO all of these need to be target-specific
 		set CHAT_TO(GM) 0
 		update_chat_to
 		UpdatePeerList		;# set up what we may have already received
 		RefreshPeerList		;# ask for an update as well
 
-		foreach tag {
-			begingroup best bonus constant critlabel critspec dc diebonus diespec discarded
-			endgroup exceeded fail from fullmax fullresult iteration label max maximized maxroll 
-			met min moddelim normal operator repeat result roll separator short sf success 
-			title to until worst system subtotal error notice timestamp
-		} {
-			if {![dict exists $_preferences styles dierolls components $tag]} {
-				DEBUG 0 "Preferences profile is missing a definition for $tag; using default"
-				dict set _preferences styles dierolls components $tag [::gmaprofile::default_dieroll_style]
-			}
-			set options {}
-			$wc.1.text tag delete $tag
-			foreach {k o t} {
-				fg         -foreground c
-				bg         -background c
-				overstrike -overstrike ?
-				underline  -underline  ?
-				offset     -offset     i
-				font       -font       f
+		if {$for_user eq {}} {
+			foreach tag {
+				begingroup best bonus constant critlabel critspec dc diebonus diespec discarded
+				endgroup exceeded fail from fullmax fullresult iteration label max maximized maxroll 
+				met min moddelim normal operator repeat result roll separator short sf success 
+				title to until worst system subtotal error notice timestamp
 			} {
-				set v [dict get $_preferences styles dierolls components $tag $k]
-				switch -exact $t {
-					c {
-						if {$v eq {}} continue
-						set v [dict get $v $colortheme]
-						if {$v eq {}} continue
-					}
-					f { set v [::gmaprofile::lookup_font $_preferences $v] }
-					? { if {$v eq {} || !$v} continue }
-					i { if {$v == 0} continue }
+				if {![dict exists $_preferences styles dierolls components $tag]} {
+					DEBUG 0 "Preferences profile is missing a definition for $tag; using default"
+					dict set _preferences styles dierolls components $tag [::gmaprofile::default_dieroll_style]
 				}
-				lappend options $o $v
-			}
+				set options {}
+				$wc.1.text tag delete $tag
+				foreach {k o t} {
+					fg         -foreground c
+					bg         -background c
+					overstrike -overstrike ?
+					underline  -underline  ?
+					offset     -offset     i
+					font       -font       f
+				} {
+					set v [dict get $_preferences styles dierolls components $tag $k]
+					switch -exact $t {
+						c {
+							if {$v eq {}} continue
+							set v [dict get $v $colortheme]
+							if {$v eq {}} continue
+						}
+						f { set v [::gmaprofile::lookup_font $_preferences $v] }
+						? { if {$v eq {} || !$v} continue }
+						i { if {$v == 0} continue }
+					}
+					lappend options $o $v
+				}
 
-			$wc.1.text tag configure $tag {*}$options
-			DEBUG 3 "Configure tag $tag as $options"
+				$wc.1.text tag configure $tag {*}$options
+				DEBUG 3 "Configure tag $tag as $options"
+			}
 		}
 
-		RequestDicePresets
+		RequestDicePresets	;#TODO for user
 		inhibit_resize_task 0 recent
 		inhibit_resize_task 0 preset
 
-		LoadChatHistory
+		if {$for_user eq {}} {
+			LoadChatHistory
+		}
 	}
 
-	if {$d eq {}} {
+	if {$d eq {} || $for_user ne {}} {
 		return
 	}
 
