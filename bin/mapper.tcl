@@ -19,9 +19,9 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.22-alpha.0}     ;# @@##@@
+set GMAMapperVersion {4.22-alpha.1}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
-set GMAMapperProtocol {411}         ;# @@##@@
+set GMAMapperProtocol {412}         ;# @@##@@
 set CoreVersionNumber {6.12}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
@@ -9722,7 +9722,7 @@ proc DoCommandCONN {d} {
 }
 
 proc DoCommandDD= {d} {
-	# define die-roll preset list
+	# define die-roll preset list (updates us from the server's stored presets)
 	global SuppressChat dice_preset_data local_user
 	
 	if {[set target [dict get $d For]] eq {}} {
@@ -9735,21 +9735,28 @@ proc DoCommandDD= {d} {
 				DisplayChatMessage {} -for $target
 			} else {
 				DisplayChatMessage {}; # force window open
-				set wp [sframe content .chatwindow.p.preset.sf]
-				for {set i 0} {$i < [array size dice_preset_data]} {incr i} {
-					DEBUG 1 "destroy $wp.preset$i"
-					destroy $wp.preset$i
-					global DRPS_en$i
-					catch {unset DRPS_en$i}
-				}
-				array unset dice_preset_data
-				foreach preset [dict get $d Presets] {
-					set dice_preset_data([dict get $preset Name]) $preset
-				}
-				_render_die_roller $wp 0 0 preset -noclear
 			}
+			foreach k [array names dice_preset_data -glob "w,$target,*"] {
+				set w $dice_preset_data($k)
+				DEBUG 1 "destroy $w preset widget"
+				destroy $w
+				set v "en[string range $k 1 end]"
+				if {[info exists dice_preset_data($v)]} {
+					global $dice_preset_data($v)
+					catch {unset $dice_preset_data($v)}
+				} else {
+					DEBUG 1 "no variable $v exists"
+				}
+			}
+			array unset dice_preset_data "*,$target,*"
+			foreach preset [dict get $d Presets] {
+				set dice_preset_data(preset,$target,[dict get $preset Name]) $preset
+			}
+			set dice_preset_data(delegates,$target) [dict get $d Delegates]
+			set dice_preset_data(delegate_for,$target) [dict get $d DelegateFor]
+			_render_die_roller $wp 0 0 preset -noclear -for $target
 		} err]} {
-			DEBUG 0 "Error updating die preset info: $err"
+			DEBUG 0 "Error updating die preset info for $target: $err"
 		}
 	}
 }
@@ -13419,7 +13426,22 @@ proc ConnectToServerByIdx {idx} {
 #   .../<name>@<zoom>.<ext>
 #   .../<name>@<zoom>/:<frame>:<name>@<zoom>.<ext>
 #   .../<name>.map
-
+#
+# support for multi-user die-roll presets
+# DoCommandDD= receives incoming preset updates; now looks for "For" attribute
+# 	default (old) behavior: call DisplayChatMessage to force window creation
+# 	new (if For): DisplayChatMessage -for <user>
+#
+# DisplayChatMessage -for <user>	create mini-window for presets, store per-user presets
+# _render_die_roller -for <user>	update per-user preset window
+#
+# ::dice_preset_data(name)=preset		==> ::dice_preset_data(preset,user,name)=preset	(user=$local_user by default)
+# [sframe .chatwindow.p.preset.sf].preset<i>	==> ::dice_preset_data(w,user,name) 		widget displaying preset <i> from set
+# ::DRPS_en<i>					==> ::dice_preset_data(en,user,name)
+# (new)						==> ::dice_preset_data(delegates,user)=list
+# (new)						==> ::dice_preset_data(delegate_for,user)=list
+#
+#
 # @[00]@| GMA-Mapper 4.21
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
