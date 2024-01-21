@@ -1386,11 +1386,11 @@ proc ::gmaproto::comment {text} {
 	::gmaproto::_protocol_send_raw "// $text"
 }
 
-proc ::gmaproto::define_dice_presets {plist app} {
+proc ::gmaproto::define_dice_presets {plist app {for_user {}}} {
 	if {$app} {
-		::gmaproto::_protocol_send DD+ Presets $plist
+		::gmaproto::_protocol_send DD+ Presets $plist For $for_user
 	} else {
-		::gmaproto::_protocol_send DD Presets $plist
+		::gmaproto::_protocol_send DD Presets $plist For $for_user
 	}
 }
 
@@ -1406,8 +1406,8 @@ proc ::gmaproto::mark {x y} {
 	::gmaproto::_protocol_send MARK X $x Y $y
 }
 
-proc ::gmaproto::query_dice_presets {} {
-	::gmaproto::_protocol_send DR
+proc ::gmaproto::query_dice_presets {for_user} {
+	::gmaproto::_protocol_send DR For $for_user
 }
 
 proc ::gmaproto::add_image {name sizes {frames 0} {speed 0} {loops 0}} {
