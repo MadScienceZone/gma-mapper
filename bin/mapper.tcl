@@ -2096,7 +2096,7 @@ foreach icon_name {
 	arrow_both arrow_first arrow_none arrow_last arrow_refresh heart
 	saf saf_open saf_merge saf_unload saf_group_go die16 die16c information info20 die20 die20c
 	delete add clock dieb16 -- *hourglass *hourglass_go *arrow_right *cross *bullet_go menu
-	stipple_100 stipple_75 stipple_50 stipple_25 stipple_12 stipple_88
+	stipple_100 stipple_75 stipple_50 stipple_25 stipple_12 stipple_88 lock unlock
 } {
 	if {$icon_name eq {--}} {
 		if {$ImageFormat eq {png}} {
@@ -10277,7 +10277,7 @@ proc format_with_style {value format} {
 
 set drd_id 0
 proc DisplayDieRoll {d} {
-	global icon_dieb16 icon_die16 icon_die16c SuppressChat drd_id LastDisplayedChatDate
+	global icon_dieb16 icon_die16 icon_die16c SuppressChat drd_id LastDisplayedChatDate dice_preset_data
 
 	if {$SuppressChat} {
 		return
@@ -10382,7 +10382,9 @@ proc DisplayDieRoll {d} {
 	}
 	$w.1.text insert end "\n"
 	$w.1.text see end
-	$w.1.text configure -state disabled
+	if {![info exists dice_preset_data(chat_lock)] || $dice_preset_data(chat_lock)} {
+		$w.1.text configure -state disabled
+	}
 }
 
 proc assert_recent_die_rolls {tkey} {
@@ -11712,6 +11714,12 @@ proc DisplayChatMessage {d for_user args} {
 		pack $wc.2.to -side left 
 		pack [entry $wc.2.entry -relief sunken -textvariable dice_preset_data(CHAT_text,$tkey)] -side left -fill x -expand 1
 		pack [button $wc.2.send -command RefreshPeerList -image $icon_arrow_refresh] -side right
+		if {$for_user eq $local_user} {
+			global icon_unlock
+			pack [button $wc.2.lock -command [list ToggleChatLock $wc.2.lock $wc.1.text] -image $icon_unlock] -side right
+			::tooltip::tooltip $wc.2.lock "Unlock the chat window for editing/copying text."
+			set dice_preset_data(chat_lock) true
+		}
 		::tooltip::tooltip $wc.2.send "Refresh the list of recipients for messages."
 		bind $wc.2.entry <Return> [list SendChatFromWindow $for_user $tkey]
 		bind $wc.3.dice <Return> [list SendDieRollFromWindow $w $wr $for_user $tkey]
@@ -11783,8 +11791,23 @@ proc DisplayChatMessage {d for_user args} {
 	}
 }
 
+proc ToggleChatLock {buttonw textw} {
+	global icon_unlock icon_lock dice_preset_data
+	if {![info exists dice_preset_data(chat_lock)] || $dice_preset_data(chat_lock)} {
+		set dice_preset_data(chat_lock) false
+		$textw configure -state normal
+		$buttonw configure -image $icon_lock
+		::tooltip::tooltip $buttonw "Lock the chat window from editing/copying text."
+	} else {
+		set dice_preset_data(chat_lock) true
+		$textw configure -state disabled
+		$buttonw configure -image $icon_unlock
+		::tooltip::tooltip $buttonw "Unlock the chat window for editing/copying text."
+	}
+}
+
 proc _render_chat_message {w system message recipientlist from toall togm {date_sent {}}} {
-	global SuppressChat _preferences LastDisplayedChatDate
+	global SuppressChat _preferences LastDisplayedChatDate dice_preset_data
 
 	if {!$SuppressChat && [winfo exists $w]} {
 		$w configure -state normal
@@ -11811,7 +11834,9 @@ proc _render_chat_message {w system message recipientlist from toall togm {date_
 			$w insert end "$message\n" normal
 		}
 		$w see end
-		$w configure -state disabled
+		if {![info exists dice_preset_data(chat_lock)] || $dice_preset_data(chat_lock)} {
+			$w configure -state disabled
+		}
 	}
 }
 
@@ -11990,7 +12015,9 @@ proc BlankChatHistoryDisplay {} {
 		set tkey [root_user_key] 
 		$dice_preset_data(cw,$tkey).p.chat.1.text configure -state normal
 		$dice_preset_data(cw,$tkey).p.chat.1.text delete 1.0 end
-		$dice_preset_data(cw,$tkey).p.chat.1.text configure -state disabled
+		if {![info exists dice_preset_data(chat_lock)] || $dice_preset_data(chat_lock)} {
+			$dice_preset_data(cw,$tkey).p.chat.1.text configure -state disabled
+		}
 		update
 	}
 }
