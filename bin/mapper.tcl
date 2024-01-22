@@ -1208,6 +1208,22 @@ proc EditDelegateList {} {
 	pack [button $w.buttons.refresh -text "Refresh" -command "RefreshDelegates $w"] -side left
 	pack [button $w.buttons.cancel -text "Cancel" -command "destroy $w"] -side left
 	pack [button $w.buttons.save -text "Save" -command "SaveDelegates $w"] -side right
+	::tooltip::tooltip $w.buttons.refresh "Update the delegate list from the server."
+	::tooltip::tooltip $w.buttons.cancel "Abandon any changes you made here."
+	::tooltip::tooltip $w.buttons.save "Save this delegate list to the server."
+	::tooltip::tooltip $w.del "Remove the selected delegate from the list."
+	::tooltip::tooltip $w.add "Add a new delegate to the list."
+}
+#			set dice_preset_data(delegates,$tkey) [dict get $d Delegates]
+#			set dice_preset_data(delegate_for,$tkey) [dict get $d DelegateFor]
+#
+proc AddDelegate {w} {
+}
+proc DelDelegate {w} {
+}
+proc RefreshDelegates {w} {
+}
+proc SaveDelegates {s} {
 }
 
 #
