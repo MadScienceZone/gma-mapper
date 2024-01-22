@@ -1166,6 +1166,8 @@ proc create_main_menu {use_button} {
 	$mm.tools add command -command {CleanupImageCache 60} -label "Clear Image Cache (over 60 days)"
 	$mm.tools add command -command {CleanupImageCache -update} -label "Update Cached Images from Server..."
 	$mm.tools add separator
+	$mm.tools add command -command {EditDelegateList} -label "Manage Die-Roll Preset Delegates..."
+	$mm.tools add separator
 	$mm.tools add command -command ServerPingTest -label "Test server response time..."
 
 	menu $mm.tools.rch
@@ -1176,6 +1178,36 @@ proc create_main_menu {use_button} {
 
 	menu $mm.help
 	$mm.help add command -command {aboutMapper} -label "About Mapper..."
+}
+
+#
+# Manage Delegates
+# The users in this list will have access to modify and use your die-roll presets.
+#  _________
+# |name1    |   [Add Delegate...]
+# |name2    |   [Remove <name>]
+# |_________|
+#
+# [Refresh] [Cancel]               [Save]
+#
+proc EditDelegateList {} {
+	set w .delegates
+
+	if {[winfo exists $w]} {
+		destroy $w
+	}
+	toplevel $w
+	wm title $w "Manage Delegate List"
+	pack [label $w.info1 -text "The users in this list will be able to use" -anchor w] -side top
+	pack [label $w.info2 -text "and modify your die-roll presets." -anchor w] -side top
+	pack [frame $w.buttons] -side bottom -fill x -expand 1
+	pack [listbox $w.lb -yscrollcommand "$w.s set" -selectmode browse -selectforeground white -selectbackground blue -exportselection false] -side left -fill y -expand 1
+	pack [scrollbar $w.s -orient vertical -command "$w.lb yview"] -side left -fill y -expand 1
+	pack [button $w.add -text "Add Delegate..." -command "AddDelegate $w"] -side top
+	pack [button $w.del -text "Remove" -state disabled -foreground red -command "DelDelegate $w"] -side bottom
+	pack [button $w.buttons.refresh -text "Refresh" -command "RefreshDelegates $w"] -side left
+	pack [button $w.buttons.cancel -text "Cancel" -command "destroy $w"] -side left
+	pack [button $w.buttons.save -text "Save" -command "SaveDelegates $w"] -side right
 }
 
 #
@@ -10194,6 +10226,7 @@ proc chat_to_all {for_user tkey} {
 proc update_chat_to {for_user tkey} {
 	global dice_preset_data
 	set q 0
+	set klen [string length "CHAT_TO,$tkey,"]
 	foreach name [array names dice_preset_data "CHAT_TO,$tkey,*"] {
 		if {$dice_preset_data($name)} {
 			if {$q > 0} {
@@ -10201,7 +10234,7 @@ proc update_chat_to {for_user tkey} {
 				return
 			}
 			set q 1
-			$dice_preset_data(cw,$tkey).p.chat.2.to configure -text "To $name:"
+			$dice_preset_data(cw,$tkey).p.chat.2.to configure -text "To [string range $name $klen end]:"
 		}
 	}
 	if {$q == 0} {
@@ -10694,7 +10727,7 @@ proc EditDieRollPresets {for_user tkey} {
 	set i 0
 	foreach preset [dict get $dice_preset_data(tmp_presets,$tkey) Rolls] {
 		grid [entry $wnr.name$i] [entry $wnr.desc$i] \
-		     [button $wnr.color$i -image $icon_colorwheel -command [list EditColorBoxTitle dice_preset_data(EDRP_text,$tkey,$i)]] \
+		     [button $wnr.color$i -image $icon_colorwheel -command [list EditColorBoxTitle "EDRP_text,$tkey,$i"]] \
 		     [entry $wnr.dspec$i -textvariable dice_preset_data(EDRP_text,$tkey,$i)] \
 		     [button $wnr.up$i -image $icon_anchor_n -command [list EDRPraise $w $for_user $tkey $i]] \
 		     [button $wnr.dn$i -image $icon_anchor_s -command [list EDRPlower $w $for_user $tkey $i]] \
@@ -10730,7 +10763,7 @@ proc EditDieRollPresets {for_user tkey} {
 	grid [label $wnm.t0 -text On] [label $wnm.t1 -text Name] [label $wnm.t2 -text Description] [label $wnm.t3 -text Expression] \
 		x x x x x x [button $wnm.add -image $icon_add -command [list EDRPaddModifier $w $for_user $tkey]] -sticky ew
 	foreach preset [dict get $dice_preset_data(tmp_presets,$tkey) Modifiers] {
-		grid [ttk::checkbutton $wnm.en$i -text On -offvalue false -onvalue true -variable dice_preset_data(EDRP_mod_en,$tkey,$i)] \
+		grid [ttk::checkbutton $wnm.en$i -text On -offvalue 0 -onvalue 1 -variable dice_preset_data(EDRP_mod_en,$tkey,$i)] \
 		     [entry $wnm.name$i] \
 		     [entry $wnm.desc$i] \
 		     [entry $wnm.dspec$i] \
@@ -10794,15 +10827,15 @@ proc EditDieRollPresets {for_user tkey} {
 # ≡ 2261
 # ‖ 2016
 set ECBTstate(seq) 0
-proc EditColorBoxTitle {var} {
+proc EditColorBoxTitle {key} {
 	global ECBTstate
 	global global_bg_color
 	global icon_add
+	global dice_preset_data
 	set w .ecbt[incr ECBTstate(seq)]
 	set ECBTstate($w,size) 0
-	set ECBTstate($w,var) $var
-	global $var
-	set title [string map {<= ≤ >= ≥} [set $var]]
+	set ECBTstate($w,key) $key
+	set title [string map {<= ≤ >= ≥} $dice_preset_data($key)]
 
 	if {[llength [set parts [split $title =]]] < 2} {
 		set ECBTstate($w,spec) $title
@@ -10840,6 +10873,7 @@ proc ECBT_cancel {w} {
 
 proc ECBT_ok {w} {
 	global ECBTstate
+	global dice_preset_data
 	set titles [ECBT_get_titles $w]
 	set parts {}
 	foreach t $titles {
@@ -10853,11 +10887,10 @@ proc ECBT_ok {w} {
 		lappend parts $txt
 	}
 	
-	global $ECBTstate($w,var)
 	if {$parts eq {}} {
-		set $ECBTstate($w,var) $ECBTstate($w,spec)
+		set dice_preset_data($ECBTstate($w,key)) $ECBTstate($w,spec)
 	} else {
-		set $ECBTstate($w,var) "[join $parts \u2016]=$ECBTstate($w,spec)"
+		set dice_preset_data($ECBTstate($w,key)) "[join $parts \u2016]=$ECBTstate($w,spec)"
 	}
 	ECBT_cancel $w
 }
@@ -11321,7 +11354,7 @@ proc EDRPadd {w for_user tkey} {
 	dict lappend dice_preset_data(tmp_presets,$tkey) Rolls [dict create Name {} DisplayName {} DieRollSpec {} DisplaySeq {} Description {}]
 	set i [expr [llength [dict get $dice_preset_data(tmp_presets,$tkey) Rolls]] - 1]
 	grid [entry $wnr.name$i] [entry $wnr.desc$i] \
-	     [button $wnr.color$i -image $icon_colorwheel -command [list EditColorBoxTitle dice_preset_data(EDRP_text,$tkey,$i)]] \
+	     [button $wnr.color$i -image $icon_colorwheel -command [list EditColorBoxTitle "EDRP_text,$tkey,$i"]] \
 	     [entry $wnr.dspec$i -textvariable dice_preset_data(EDRP_text,$tkey,$i)] \
 	     [button $wnr.up$i -image $icon_anchor_n -command [list EDRPraise $w $for_user $tkey $i]] \
 	     [button $wnr.dn$i -image $icon_anchor_s -command [list EDRPlower $w $for_user $tkey $i]] \
@@ -11343,7 +11376,7 @@ proc EDRPaddModifier {w for_user tkey} {
 	set dice_preset_data(EDRP_mod_en,$tkey,$i) 0
 	set dice_preset_data(EDRP_mod_ven,$tkey,$i) 0
 	set dice_preset_data(EDRP_mod_g,$tkey,$i) 0
-	grid [ttk::checkbutton $wnm.en$i -text On -onvalue true -offvalue false -variable dice_preset_data(EDRP_mod_en,$tkey,$i)] 
+	grid [ttk::checkbutton $wnm.en$i -text On -onvalue 1 -offvalue 0 -variable dice_preset_data(EDRP_mod_en,$tkey,$i)] 
 	grid	[entry $wnm.name$i] \
 		[entry $wnm.desc$i] \
 		[entry $wnm.dspec$i] \
@@ -11387,8 +11420,6 @@ proc PresetLists {arrayname for_user tkey args} {
 	set pkeylen [string length "preset,$tkey,"]
 	foreach pkey [lsort [array names presets "preset,$tkey,*"]] {
 		set pname [string range $pkey $pkeylen end]
-		puts "pkey=$pkey"
-		puts " pname=$pname"
 		if {[string range $pname 0 0] eq {§}} {
 			set d $presets($pkey)
 			set parts [split [string range $pname 1 end] |]
@@ -11644,7 +11675,7 @@ proc DisplayChatMessage {d for_user args} {
 			pack [scrollbar $wc.1.sb -orient vertical -command "$wc.1.text yview"] -side right -expand 0 -fill y
 		}
 		pack [button $wc.3.tc -image $icon_colorwheel \
-			-command [list EditColorBoxTitle dice_preset_data(CHAT_dice,$tkey)]] -side left -padx 2
+			-command [list EditColorBoxTitle "CHAT_dice,$tkey"]] -side left -padx 2
 		pack [label $wc.3.l -text Roll: -anchor nw] -side left -padx 2
 
 		pack [entry $wc.3.dice -textvariable dice_preset_data(CHAT_dice,$tkey) -relief sunken] -side left -fill x -expand 1
