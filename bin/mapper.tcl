@@ -1130,12 +1130,13 @@ proc create_main_menu {use_button} {
 	$mm.view add command -command {animation_stop -all} -label "Stop Animations"
 	menu $mm.play
 	menu $mm.play.servers
+	menu $mm.play.delegatemenu
 	$mm.play add checkbutton -onvalue 1 -offvalue 0 -selectcolor $check_menu_color -variable MOB_COMBATMODE -label "Combat Mode" -command setcombatfrommenu
 	$mm.play add command -command {aoetool} -label "Indicate Area of Effect"
 	$mm.play add command -command {rulertool} -label "Measure Distance Along Line(s)"
 	$mm.play add command -command {DisplayChatMessage {} {}} -label "Show Chat/Die-roll Window"
+	$mm.play add cascade -menu $mm.play.delegatemenu -state disabled -label "Access Die Rolls For..."
 	$mm.play add command -command {display_initiative_clock} -label "Show Initiative Clock"
-	$mm.play add separator
 	# gridsnap nil .25 .5 1
 	menu $mm.play.gridsnap
 	$mm.play add cascade -menu $mm.play.gridsnap -state disabled -label "\[future\] Creature token grid snap"
@@ -1198,8 +1199,8 @@ proc EditDelegateList {} {
 	}
 	toplevel $w
 	wm title $w "Manage Delegate List"
-	pack [label $w.info1 -text "The users in this list will be able to use" -anchor w] -side top
-	pack [label $w.info2 -text "and modify your die-roll presets." -anchor w] -side top
+	pack [label $w.info1 -text "" -anchor w] -side top
+	pack [label $w.info2 -text "" -anchor w] -side top
 	pack [frame $w.buttons] -side bottom -fill x -expand 1
 	pack [listbox $w.lb -yscrollcommand "$w.s set" -selectmode browse -selectforeground white -selectbackground blue -exportselection false] -side left -fill y -expand 1
 	pack [scrollbar $w.s -orient vertical -command "$w.lb yview"] -side left -fill y -expand 1
@@ -1208,22 +1209,95 @@ proc EditDelegateList {} {
 	pack [button $w.buttons.refresh -text "Refresh" -command "RefreshDelegates $w"] -side left
 	pack [button $w.buttons.cancel -text "Cancel" -command "destroy $w"] -side left
 	pack [button $w.buttons.save -text "Save" -command "SaveDelegates $w"] -side right
+	bind $w.lb <<ListboxSelect>> "SelectDelegateByIdx $w \[%W curselection\]"
 	::tooltip::tooltip $w.buttons.refresh "Update the delegate list from the server."
 	::tooltip::tooltip $w.buttons.cancel "Abandon any changes you made here."
 	::tooltip::tooltip $w.buttons.save "Save this delegate list to the server."
 	::tooltip::tooltip $w.del "Remove the selected delegate from the list."
 	::tooltip::tooltip $w.add "Add a new delegate to the list."
+	_update_delegate_list $w
 }
-#			set dice_preset_data(delegates,$tkey) [dict get $d Delegates]
-#			set dice_preset_data(delegate_for,$tkey) [dict get $d DelegateFor]
-#
+proc SelectDelegateByIdx {w idx} {
+	puts "Select $w $idx"
+	if {$idx eq {}} {
+		$w.del configure -state disabled -text "Delete"
+		$w.lb selection clear 0 end
+	} else {
+		set name [$w.lb get [lindex $idx 0]]
+		$w.del configure -state normal -text "Delete $name"
+	}
+}
+
 proc AddDelegate {w} {
+	global AddDelegateName
+	if {[::getstring::tk_getString .delegates_entry AddDelegateName {User name of delegate:} -title {Add Delegate}]} {
+		foreach existing [$w.lb get 0 end] {
+			if {$AddDelegateName eq $existing} {
+				return
+			}
+		}
+		$w.lb insert end $AddDelegateName
+	}
 }
+
 proc DelDelegate {w} {
+	if {[set idx [$w.lb curselection]] ne {}} {
+		$w.lb delete [lindex $idx 0]
+		$w.lb selection clear 0 end
+	}
+	SelectDelegateByIdx $w {}
 }
+
 proc RefreshDelegates {w} {
+	global local_user
+	::gmaproto::query_dice_presets $local_user
 }
-proc SaveDelegates {s} {
+
+proc SaveDelegates {w} {
+	global local_user
+	::gmaproto::define_dice_delegates $local_user [$w.lb get 0 end]
+	destroy $w
+}
+
+proc _update_delegate_list {w} {
+	global dice_preset_data
+	global MAIN_MENU
+	set updated false
+	set tkey [root_user_key]
+
+	if {[info exists dice_preset_data(delegate_for,$tkey)]} {
+		$MAIN_MENU.play.delegatemenu delete 0 end
+		if {[llength $dice_preset_data(delegate_for,$tkey)] > 0} {
+			if {[winfo exists $w.info1]} {
+				$w.info1 configure -text {}
+				$w.info2 configure -text "You are a delegate for: [join $dice_preset_data(delegate_for,$tkey) {, }]"
+			}
+			if {$MAIN_MENU ne {}} {
+				foreach player $dice_preset_data(delegate_for,$tkey) {
+					$MAIN_MENU.play.delegatemenu add command -label $player -command [list DisplayChatMessage {} $player]
+				}
+				$MAIN_MENU.play entryconfigure "Access Die Rolls For*" -state normal
+			}
+		} else {
+			if {$MAIN_MENU ne {}} {
+				$MAIN_MENU.play entryconfigure "Access Die Rolls For*" -state disabled
+			}
+		}
+	}
+	if {[winfo exists $w.lb] && [info exists dice_preset_data(delegates,$tkey)]} {
+		set existing [$w.lb get 0 end]
+		foreach delegate $dice_preset_data(delegates,[root_user_key]) {
+			if {[lsearch -exact $existing $delegate] < 0} {
+				set updated true
+				$w.lb insert end $delegate
+				lappend delegates $delegate
+			}
+		}
+		if {$updated} {
+			$w.info1 configure -text "**List updated from server [clock format [clock seconds]]**"
+		}
+	}
+
 }
 
 #
@@ -9376,8 +9450,8 @@ proc DoCommandAV {d} {
 
 proc DoCommandPRIV {d} {
 	tk_messageBox -type ok -icon error -title "Permission Denied" \
-		-message "You are not allowed to send command \"[dict get $d Command]\" to the server. ([dict get $d Reason])" \
-		-detail "The operation you attempted to carry out which sent the command shown here is only allowed for privileged users, and in the words of Chevy Chase, \"you're not.\""
+		-message "[dict get $d Reason]" \
+		-detail "The operation you attempted to carry out which sent the command shown here is only allowed for privileged users, and in the words of Chevy Chase, \"you're not.\"\n\nAttempted command:\n[dict get $d Command]"
 }
 
 
@@ -9844,6 +9918,7 @@ proc DoCommandDD= {d} {
 			DEBUG 0 "Error updating die preset info for $target: $err"
 		}
 	}
+	after 500 {_update_delegate_list .delegates}
 }
 
 proc DoCommandDSM {d} {
@@ -10382,9 +10457,10 @@ proc DisplayDieRoll {d} {
 	}
 	$w.1.text insert end "\n"
 	$w.1.text see end
-	if {![info exists dice_preset_data(chat_lock)] || $dice_preset_data(chat_lock)} {
-		$w.1.text configure -state disabled
-	}
+#	if {![info exists dice_preset_data(chat_lock)] || $dice_preset_data(chat_lock)} {
+#		$w.1.text configure -state disabled
+#	}
+	$w.1.text configure -state disabled
 }
 
 proc assert_recent_die_rolls {tkey} {
@@ -11714,12 +11790,12 @@ proc DisplayChatMessage {d for_user args} {
 		pack $wc.2.to -side left 
 		pack [entry $wc.2.entry -relief sunken -textvariable dice_preset_data(CHAT_text,$tkey)] -side left -fill x -expand 1
 		pack [button $wc.2.send -command RefreshPeerList -image $icon_arrow_refresh] -side right
-		if {$for_user eq $local_user} {
-			global icon_unlock
-			pack [button $wc.2.lock -command [list ToggleChatLock $wc.2.lock $wc.1.text] -image $icon_unlock] -side right
-			::tooltip::tooltip $wc.2.lock "Unlock the chat window for editing/copying text."
-			set dice_preset_data(chat_lock) true
-		}
+#		if {$for_user eq $local_user} {
+#			global icon_unlock
+#			pack [button $wc.2.lock -command [list ToggleChatLock $wc.2.lock $wc.1.text] -image $icon_unlock] -side right
+#			::tooltip::tooltip $wc.2.lock "Unlock the chat window for editing/copying text."
+#			set dice_preset_data(chat_lock) true
+#		}
 		::tooltip::tooltip $wc.2.send "Refresh the list of recipients for messages."
 		bind $wc.2.entry <Return> [list SendChatFromWindow $for_user $tkey]
 		bind $wc.3.dice <Return> [list SendDieRollFromWindow $w $wr $for_user $tkey]
@@ -11775,6 +11851,8 @@ proc DisplayChatMessage {d for_user args} {
 
 		if {$for_user eq $local_user} {
 			LoadChatHistory
+		} else {
+			RequestDicePresets $for_user
 		}
 	}
 
@@ -11791,20 +11869,20 @@ proc DisplayChatMessage {d for_user args} {
 	}
 }
 
-proc ToggleChatLock {buttonw textw} {
-	global icon_unlock icon_lock dice_preset_data
-	if {![info exists dice_preset_data(chat_lock)] || $dice_preset_data(chat_lock)} {
-		set dice_preset_data(chat_lock) false
-		$textw configure -state normal
-		$buttonw configure -image $icon_lock
-		::tooltip::tooltip $buttonw "Lock the chat window from editing/copying text."
-	} else {
-		set dice_preset_data(chat_lock) true
-		$textw configure -state disabled
-		$buttonw configure -image $icon_unlock
-		::tooltip::tooltip $buttonw "Unlock the chat window for editing/copying text."
-	}
-}
+#proc ToggleChatLock {buttonw textw} {
+#	global icon_unlock icon_lock dice_preset_data
+#	if {![info exists dice_preset_data(chat_lock)] || $dice_preset_data(chat_lock)} {
+#		set dice_preset_data(chat_lock) false
+#		$textw configure -state normal
+#		$buttonw configure -image $icon_lock
+#		::tooltip::tooltip $buttonw "Lock the chat window from editing/copying text."
+#	} else {
+#		set dice_preset_data(chat_lock) true
+#		$textw configure -state disabled
+#		$buttonw configure -image $icon_unlock
+#		::tooltip::tooltip $buttonw "Unlock the chat window for editing/copying text."
+#	}
+#}
 
 proc _render_chat_message {w system message recipientlist from toall togm {date_sent {}}} {
 	global SuppressChat _preferences LastDisplayedChatDate dice_preset_data
@@ -11834,9 +11912,10 @@ proc _render_chat_message {w system message recipientlist from toall togm {date_
 			$w insert end "$message\n" normal
 		}
 		$w see end
-		if {![info exists dice_preset_data(chat_lock)] || $dice_preset_data(chat_lock)} {
-			$w configure -state disabled
-		}
+#		if {![info exists dice_preset_data(chat_lock)] || $dice_preset_data(chat_lock)} {
+#			$w configure -state disabled
+#		}
+		$w configure -state disabled
 	}
 }
 
@@ -12015,9 +12094,10 @@ proc BlankChatHistoryDisplay {} {
 		set tkey [root_user_key] 
 		$dice_preset_data(cw,$tkey).p.chat.1.text configure -state normal
 		$dice_preset_data(cw,$tkey).p.chat.1.text delete 1.0 end
-		if {![info exists dice_preset_data(chat_lock)] || $dice_preset_data(chat_lock)} {
-			$dice_preset_data(cw,$tkey).p.chat.1.text configure -state disabled
-		}
+#		if {![info exists dice_preset_data(chat_lock)] || $dice_preset_data(chat_lock)} {
+#			$dice_preset_data(cw,$tkey).p.chat.1.text configure -state disabled
+#		}
+		$dice_preset_data(cw,$tkey).p.chat.1.text configure -state disabled
 		update
 	}
 }

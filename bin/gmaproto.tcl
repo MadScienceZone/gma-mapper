@@ -1410,6 +1410,10 @@ proc ::gmaproto::query_dice_presets {for_user} {
 	::gmaproto::_protocol_send DR For $for_user
 }
 
+proc ::gmaproto::define_dice_delegates {for_user delegate_list} {
+	::gmaproto::_protocol_send DDD For $for_user Delegates $delegate_list
+}
+
 proc ::gmaproto::add_image {name sizes {frames 0} {speed 0} {loops 0}} {
 	::gmaproto::_protocol_send AI Name $name Sizes $sizes Animation [dict create Frames $frames FrameSpeed $speed Loops $loops]
 }
