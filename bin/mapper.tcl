@@ -1582,6 +1582,7 @@ proc usage {} {
 	puts $stderr {       --help:        Print this information and exit}
 	puts $stderr {   -h, --host:        Hostname for initiative tracker [none]}
 	puts $stderr {   -k, --keep-tools:  Don't allow remote disabling of the toolbar}
+	puts $stderr {   -L, --list-profiles: Print available profiles you can use with --select}
 	puts $stderr {   -l, --preload:     Load all cached images at startup}
 	puts $stderr {   -M, --module:      Set module ID (SaF GM role only)}
 	puts $stderr {   -n, --no-chat:		Do not display incoming chat messages}
@@ -1720,6 +1721,19 @@ for {set argi 0} {$argi < $optc} {incr argi} {
 		-S - --select     { 
 			set CurrentProfileName [getarg -S]
 			ApplyPreferences $PreferencesData -override
+		}
+		-L - --list-profiles { 
+			puts "The following server profiles are defined in your preferences data."
+			puts "You may use one of these as the argument to the --select option (-S):"
+			foreach server [dict get $PreferencesData profiles] {
+				puts [format "  profile: %-20s user: %-10s host: %s:%s" \
+					[dict get $server name] \
+					[dict get $server username] \
+					[dict get $server host] \
+					[dict get $server port] \
+				]
+			}
+			exit 0
 		}
 		-s - --style      { puts "The --style option is deprecated." }
 		-t - --transcript { set ChatTranscript [getarg -t] }
@@ -13549,7 +13563,7 @@ proc ConnectToServerByIdx {idx} {
 		return
 	}
 	set profilename [dict get $newdata current_profile]
-	tk_messageBox -type ok -icon warning -title "Not Recommended" -message "We will attempt to reconnect you now to your \"$profilename\" server profile; however, this is not guaranteed to work 100% due to some known issues with the implementation of this feature.\n\nInstead, we recommend either of these methods which will work perfectly:\n(1) On the command line, add a --select '$profilename' switch to the mapper command;\n(2) Select Edit -> Preferences from the menu, click the Servers tab, click on $profilename, save, and click Yes to have the mapper restart with those settings."
+	tk_messageBox -type ok -icon warning -title "Not Recommended" -message "We will attempt to reconnect you now to your \"$profilename\" server profile; however, this is not guaranteed to work 100% due to some known issues with the implementation of this feature.\n\nInstead, we recommend either of these methods which will work perfectly:\n(1) On the command line, add a --select '$profilename' switch to the mapper command;\n(2) Select Edit -> Preferences from the menu, click the Servers tab, click on $profilename, save, and click Yes to have the mapper restart with those settings.\nTo see a list of available profiles, run the mapper with the --list-profiles option."
 	set PreferencesData $newdata
 	#::gmaprofile::save $preferences_path $newdata
 	ApplyPreferences $newdata
