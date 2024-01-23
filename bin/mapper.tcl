@@ -1571,7 +1571,7 @@ for {set argi 0} {$argi < $optc} {incr argi} {
 			puts "The following server profiles are defined in your preferences data."
 			puts "You may use one of these as the argument to the --select option (-S):"
 			foreach server [dict get $PreferencesData profiles] {
-				puts [format "  profile: %-20s: user: %-10s host: %s:%s" \
+				puts [format "  profile: %-20s user: %-10s host: %s:%s" \
 					[dict get $server name] \
 					[dict get $server username] \
 					[dict get $server host] \
