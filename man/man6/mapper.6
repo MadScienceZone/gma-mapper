@@ -41,6 +41,7 @@ mapper \- GMA battle grid map
 .RB [ \-h
 .IR hostname ]
 .RB [ \-k ]
+.RB [ \-L ]
 .RB [ \-l ]
 .RB [ \-M
 .IR module ]
@@ -122,6 +123,7 @@ mapper \- GMA battle grid map
 .RB [ \-\-image\-format
 .IR fmt ]
 .RB [ \-\-keep\-tools ]
+.RB [ \-\-list\-profiles ]
 .RB [ \-\-major
 .IR n [\fB+\fP x [\fB:\fP y ]]]
 .RB [ \-\-mkdir\-path
@@ -575,6 +577,17 @@ his console as needed.  If this option is given, this causes the client to uncon
 display its toolbar anyway. This is used for the main map run by the GM or whomever else is
 managing the group map and needs the toolbar active, or if people just want to keep the toolbar all
 the time.
+'\" <<New>>
+.TP
+.BR \-L ", " \-\-list\-profiles
+List all the available profiles in the current preferences settings (either the default set for
+the mapper client or the one specified with the
+.B \-\-preferences
+option). This list is printed to the standard output and then the mapper exits.
+These are the profile names which may be given to the
+.B \-\-select
+option.
+'\" <</New>>
 .TP
 .BI "\-G\fR, \fP\-\-major " n
 Make every
