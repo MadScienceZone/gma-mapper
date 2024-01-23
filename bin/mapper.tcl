@@ -1218,7 +1218,6 @@ proc EditDelegateList {} {
 	_update_delegate_list $w
 }
 proc SelectDelegateByIdx {w idx} {
-	puts "Select $w $idx"
 	if {$idx eq {}} {
 		$w.del configure -state disabled -text "Delete"
 		$w.lb selection clear 0 end
@@ -1478,6 +1477,8 @@ proc restartMapper {} {
 	global argv
 	global env
 	set searchlist {}
+	set err {unknown error}
+	set tries {}
 	if {[info exists env(GMA_WISH)]} {
 		lappend searchlist $env(GMA_WISH)
 	}
@@ -1490,10 +1491,12 @@ proc restartMapper {} {
 			if {![catch {exec $argv0 {*}$argv &} err]} {
 				exit 0
 			}
+			lappend tries " -  $argv0 $argv"
 		} else {
 			if {[set cmd [::gmautil::searchInPath $i]] eq {}} {
 				DEBUG 1 "Skipping $i; not found in \$PATH"
 				puts "Skipping $i; not found in \$PATH"
+				lappend tries "(skipped $i since it was not in your PATH)"
 				continue
 			}
 			DEBUG 1 "Trying to run $cmd $argv0 $argv"
@@ -1501,9 +1504,11 @@ proc restartMapper {} {
 			if {![catch {exec $cmd $argv0 {*}$argv &} err]} {
 				exit 0
 			}
+			lappend tries " -  $cmd $argv0 $argv"
 		}
 	}
-	tk_messageBox -type ok -icon error -title "Unable to restart" -message "Sorry, we were unable to relaunch the mapper. If you want to restart it, you need to manually exit and restart the mapper." -detail $err
+	
+	tk_messageBox -type ok -icon error -title "Unable to restart" -message "Sorry, we were unable to relaunch the mapper. If you want to restart it, you need to manually exit and restart the mapper." -detail "$err\n\nWe tried:\n[join $tries \n]"
 	return
 }
 
@@ -10311,9 +10316,9 @@ proc UpgradeAvailable {args} {
 		}; # end of (not) in git area
 	} elseif {$comp > 0} {
 		if {$from_github} {
-			INFO "You appear to be running a newer mapper ($GMAMapperVersion) than the latest public release ($new_version $for). If this isn't expected, you may want to nudge your GM and/or system administrator to update the server's advertised version, or follow their advice on which version you should be running."
+			INFO "You are running a newer mapper ($GMAMapperVersion) than the latest public release ($new_version $for). If this isn't expected, you may want to nudge your GM and/or system administrator to update the server's advertised version, or follow their advice on which version you should be running."
 		} else {
-			INFO "You appear to be running a newer mapper ($GMAMapperVersion) than the latest version offered by your server ($new_version $for). If this isn't expected, you may want to nudge your GM and/or system administrator to update the server's advertised version."
+			INFO "You are running a newer mapper ($GMAMapperVersion) than the latest version offered by your server ($new_version $for). If this isn't expected, you may want to nudge your GM and/or system administrator to update the server's advertised version."
 		}
 	}
 }
