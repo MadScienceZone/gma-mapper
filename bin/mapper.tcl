@@ -1135,7 +1135,11 @@ proc create_main_menu {use_button} {
 	$mm.play add command -command {aoetool} -label "Indicate Area of Effect"
 	$mm.play add command -command {rulertool} -label "Measure Distance Along Line(s)"
 	$mm.play add command -command {DisplayChatMessage {} {}} -label "Show Chat/Die-roll Window"
+	$mm.play add separator
 	$mm.play add cascade -menu $mm.play.delegatemenu -state disabled -label "Access Die Rolls For..."
+	$mm.play add command -command {EditDelegateList} -label "Manage Die-Roll Preset Delegates..."
+	$mm.play add command -command {RefreshDelegates .delegates} -label "Refresh Die-Roll and Delegate Data from Server"
+	$mm.play add separator
 	$mm.play add command -command {display_initiative_clock} -label "Show Initiative Clock"
 	# gridsnap nil .25 .5 1
 	menu $mm.play.gridsnap
@@ -1165,9 +1169,7 @@ proc create_main_menu {use_button} {
 	$mm.tools add separator
 	$mm.tools add command -command {CleanupImageCache 0} -label "Clear Image Cache"
 	$mm.tools add command -command {CleanupImageCache 60} -label "Clear Image Cache (over 60 days)"
-	$mm.tools add command -command {CleanupImageCache -update} -label "Update Cached Images from Server..."
-	$mm.tools add separator
-	$mm.tools add command -command {EditDelegateList} -label "Manage Die-Roll Preset Delegates..."
+	$mm.tools add command -command {CleanupImageCache -update} -label "Update Cached Images from Server"
 	$mm.tools add separator
 	$mm.tools add command -command ServerPingTest -label "Test server response time..."
 
@@ -1278,10 +1280,17 @@ proc _update_delegate_list {w} {
 				$MAIN_MENU.play entryconfigure "Access Die Rolls For*" -state normal
 			}
 		} else {
+			if {[winfo exists $w.info2]} {
+				$w.info2 configure -text "You are not a delegate for any users."
+			}
 			if {$MAIN_MENU ne {}} {
 				$MAIN_MENU.play entryconfigure "Access Die Rolls For*" -state disabled
 			}
 		}
+	} else {
+		$w.info1 configure -text "Loading delegate data from server..."
+		update
+		RefreshDelegates $w
 	}
 	if {[winfo exists $w.lb] && [info exists dice_preset_data(delegates,$tkey)]} {
 		set existing [$w.lb get 0 end]
@@ -1293,10 +1302,9 @@ proc _update_delegate_list {w} {
 			}
 		}
 		if {$updated} {
-			$w.info1 configure -text "**List updated from server [clock format [clock seconds]]**"
+			$w.info1 configure -text "List updated from server (click Refresh to update again)"
 		}
 	}
-
 }
 
 #
@@ -11263,7 +11271,7 @@ proc EDRPdelModifier {w for_user tkey i} {
 	set wnr [sframe content $w.n.r]
 	set wnm [sframe content $w.n.m]
 	EDRPgetValues $w $for_user $tkey
-	dict set dice_preset_data(tmp_presets,$tkey) Modifiers [lreplace [dict get $tmp_presets Modifiers] $i $i]
+	dict set dice_preset_data(tmp_presets,$tkey) Modifiers [lreplace [dict get $dice_preset_data(tmp_presets,$tkey) Modifiers] $i $i]
 	set i [llength [dict get $dice_preset_data(tmp_presets,$tkey) Modifiers]]
 	grid forget $wnm.en$i $wnm.name$i $wnm.desc$i $wnm.dspec$i $wnm.varp$i $wnm.var$i $wnm.rb$i $wnm.up$i $wnm.dn$i $wnm.del$i $wnm.g$i
 	destroy $wnm.en$i $wnm.name$i $wnm.desc$i $wnm.dspec$i $wnm.varp$i $wnm.var$i $wnm.rb$i $wnm.up$i $wnm.dn$i $wnm.del$i $wnm.g$i
@@ -11489,8 +11497,8 @@ proc EDRPaddModifier {w for_user tkey} {
 	set dice_preset_data(EDRP_mod_en,$tkey,$i) 0
 	set dice_preset_data(EDRP_mod_ven,$tkey,$i) 0
 	set dice_preset_data(EDRP_mod_g,$tkey,$i) 0
-	grid [ttk::checkbutton $wnm.en$i -text On -onvalue 1 -offvalue 0 -variable dice_preset_data(EDRP_mod_en,$tkey,$i)] 
-	grid	[entry $wnm.name$i] \
+	grid [ttk::checkbutton $wnm.en$i -text On -onvalue 1 -offvalue 0 -variable dice_preset_data(EDRP_mod_en,$tkey,$i)] \
+	        [entry $wnm.name$i] \
 		[entry $wnm.desc$i] \
 		[entry $wnm.dspec$i] \
 		[ttk::checkbutton $wnm.varp$i -text "as symbol <" -variable dice_preset_data(EDRP_mod_ven,$tkey,$i) -command [list EDRPcheckVar $w $for_user $tkey $i]]\
