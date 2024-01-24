@@ -1201,9 +1201,10 @@ proc EditDelegateList {} {
 	}
 	toplevel $w
 	wm title $w "Manage Delegate List"
-	pack [label $w.info1 -text "" -anchor w] -side top
-	pack [label $w.info2 -text "" -anchor w] -side top
 	pack [frame $w.buttons] -side bottom -fill x -expand 1
+	pack [label $w.info2 -text "" -anchor w] -side bottom -fill x
+	pack [label $w.info1 -text "" -anchor w] -side bottom -fill x
+	pack [label $w.heading -text "Your delegates:" -anchor w] -fill both -expand 1
 	pack [listbox $w.lb -yscrollcommand "$w.s set" -selectmode browse -selectforeground white -selectbackground blue -exportselection false] -side left -fill y -expand 1
 	pack [scrollbar $w.s -orient vertical -command "$w.lb yview"] -side left -fill y -expand 1
 	pack [button $w.add -text "Add Delegate..." -command "AddDelegate $w"] -side top
