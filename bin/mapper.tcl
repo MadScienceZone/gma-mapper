@@ -19,9 +19,9 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.22-alpha.0}     ;# @@##@@
+set GMAMapperVersion {4.22-alpha.2}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
-set GMAMapperProtocol {411}         ;# @@##@@
+set GMAMapperProtocol {412}         ;# @@##@@
 set CoreVersionNumber {6.12}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
@@ -923,6 +923,39 @@ proc new_id {} {
 	return [string tolower [string map {- {}} [::uuid::uuid generate]]]
 }
 
+# sanitize username to a key that can be used in a comma-separated array name
+set user_key_map {}
+for {set c 0} {$c < 256} {incr c} {
+	set cs [format %c $c]
+	if {![string is alnum -strict $cs]} {
+		lappend user_key_map $cs [format %%%02x $c]
+	}
+}
+DEBUG 2 "Initialized user_key map to $user_key_map"
+
+#
+# sanitize a user name to use it as a lookup key more safely
+#
+proc user_key {name} {
+	global user_key_map
+	return [string map $user_key_map $name]
+}
+proc root_user_key {} {
+	global local_user
+	return [user_key $local_user]
+}
+
+#
+# convert a string like a user key or user name to an alphanumeric (and _ and -) value
+# suitable for use as a widget pathname component
+#
+proc to_window_id {s} {
+	return [string map {+ _ / - = {}} [::base64::encode [::md5::md5 $s]]]
+}
+proc root_user_window_id {base} {
+	return "$base[to_window_id [root_user_key]]"
+}
+
 if {$tcl_platform(os) eq "Darwin"} {
 	set BUTTON_RIGHT <2>
 	set BUTTON_MIDDLE <3>
@@ -1097,12 +1130,17 @@ proc create_main_menu {use_button} {
 	$mm.view add command -command {animation_stop -all} -label "Stop Animations"
 	menu $mm.play
 	menu $mm.play.servers
+	menu $mm.play.delegatemenu
 	$mm.play add checkbutton -onvalue 1 -offvalue 0 -selectcolor $check_menu_color -variable MOB_COMBATMODE -label "Combat Mode" -command setcombatfrommenu
 	$mm.play add command -command {aoetool} -label "Indicate Area of Effect"
 	$mm.play add command -command {rulertool} -label "Measure Distance Along Line(s)"
-	$mm.play add command -command {DisplayChatMessage {}} -label "Show Chat/Die-roll Window"
-	$mm.play add command -command {display_initiative_clock} -label "Show Initiative Clock"
+	$mm.play add command -command {DisplayChatMessage {} {}} -label "Show Chat/Die-roll Window"
 	$mm.play add separator
+	$mm.play add cascade -menu $mm.play.delegatemenu -state disabled -label "Access Die Rolls For..."
+	$mm.play add command -command {EditDelegateList} -label "Manage Die-Roll Preset Delegates..."
+	$mm.play add command -command {RefreshDelegates .delegates} -label "Refresh Die-Roll and Delegate Data from Server"
+	$mm.play add separator
+	$mm.play add command -command {display_initiative_clock} -label "Show Initiative Clock"
 	# gridsnap nil .25 .5 1
 	menu $mm.play.gridsnap
 	$mm.play add cascade -menu $mm.play.gridsnap -state disabled -label "\[future\] Creature token grid snap"
@@ -1131,7 +1169,7 @@ proc create_main_menu {use_button} {
 	$mm.tools add separator
 	$mm.tools add command -command {CleanupImageCache 0} -label "Clear Image Cache"
 	$mm.tools add command -command {CleanupImageCache 60} -label "Clear Image Cache (over 60 days)"
-	$mm.tools add command -command {CleanupImageCache -update} -label "Update Cached Images from Server..."
+	$mm.tools add command -command {CleanupImageCache -update} -label "Update Cached Images from Server"
 	$mm.tools add separator
 	$mm.tools add command -command ServerPingTest -label "Test server response time..."
 
@@ -1143,6 +1181,130 @@ proc create_main_menu {use_button} {
 
 	menu $mm.help
 	$mm.help add command -command {aboutMapper} -label "About Mapper..."
+}
+
+#
+# Manage Delegates
+# The users in this list will have access to modify and use your die-roll presets.
+#  _________
+# |name1    |   [Add Delegate...]
+# |name2    |   [Remove <name>]
+# |_________|
+#
+# [Refresh] [Cancel]               [Save]
+#
+proc EditDelegateList {} {
+	set w .delegates
+
+	if {[winfo exists $w]} {
+		destroy $w
+	}
+	toplevel $w
+	wm title $w "Manage Delegate List"
+	pack [label $w.info1 -text "" -anchor w] -side top
+	pack [label $w.info2 -text "" -anchor w] -side top
+	pack [frame $w.buttons] -side bottom -fill x -expand 1
+	pack [listbox $w.lb -yscrollcommand "$w.s set" -selectmode browse -selectforeground white -selectbackground blue -exportselection false] -side left -fill y -expand 1
+	pack [scrollbar $w.s -orient vertical -command "$w.lb yview"] -side left -fill y -expand 1
+	pack [button $w.add -text "Add Delegate..." -command "AddDelegate $w"] -side top
+	pack [button $w.del -text "Remove" -state disabled -foreground red -command "DelDelegate $w"] -side bottom
+	pack [button $w.buttons.refresh -text "Refresh" -command "RefreshDelegates $w"] -side left
+	pack [button $w.buttons.cancel -text "Cancel" -command "destroy $w"] -side left
+	pack [button $w.buttons.save -text "Save" -command "SaveDelegates $w"] -side right
+	bind $w.lb <<ListboxSelect>> "SelectDelegateByIdx $w \[%W curselection\]"
+	::tooltip::tooltip $w.buttons.refresh "Update the delegate list from the server."
+	::tooltip::tooltip $w.buttons.cancel "Abandon any changes you made here."
+	::tooltip::tooltip $w.buttons.save "Save this delegate list to the server."
+	::tooltip::tooltip $w.del "Remove the selected delegate from the list."
+	::tooltip::tooltip $w.add "Add a new delegate to the list."
+	_update_delegate_list $w
+}
+proc SelectDelegateByIdx {w idx} {
+	if {$idx eq {}} {
+		$w.del configure -state disabled -text "Delete"
+		$w.lb selection clear 0 end
+	} else {
+		set name [$w.lb get [lindex $idx 0]]
+		$w.del configure -state normal -text "Delete $name"
+	}
+}
+
+proc AddDelegate {w} {
+	global AddDelegateName
+	if {[::getstring::tk_getString .delegates_entry AddDelegateName {User name of delegate:} -title {Add Delegate}]} {
+		foreach existing [$w.lb get 0 end] {
+			if {$AddDelegateName eq $existing} {
+				return
+			}
+		}
+		$w.lb insert end $AddDelegateName
+	}
+}
+
+proc DelDelegate {w} {
+	if {[set idx [$w.lb curselection]] ne {}} {
+		$w.lb delete [lindex $idx 0]
+		$w.lb selection clear 0 end
+	}
+	SelectDelegateByIdx $w {}
+}
+
+proc RefreshDelegates {w} {
+	global local_user
+	::gmaproto::query_dice_presets $local_user
+}
+
+proc SaveDelegates {w} {
+	global local_user
+	::gmaproto::define_dice_delegates $local_user [$w.lb get 0 end]
+	destroy $w
+}
+
+proc _update_delegate_list {w} {
+	global dice_preset_data
+	global MAIN_MENU
+	set updated false
+	set tkey [root_user_key]
+
+	if {[info exists dice_preset_data(delegate_for,$tkey)]} {
+		$MAIN_MENU.play.delegatemenu delete 0 end
+		if {[llength $dice_preset_data(delegate_for,$tkey)] > 0} {
+			if {[winfo exists $w.info1]} {
+				$w.info1 configure -text {}
+				$w.info2 configure -text "You are a delegate for: [join $dice_preset_data(delegate_for,$tkey) {, }]"
+			}
+			if {$MAIN_MENU ne {}} {
+				foreach player $dice_preset_data(delegate_for,$tkey) {
+					$MAIN_MENU.play.delegatemenu add command -label $player -command [list DisplayChatMessage {} $player]
+				}
+				$MAIN_MENU.play entryconfigure "Access Die Rolls For*" -state normal
+			}
+		} else {
+			if {[winfo exists $w.info2]} {
+				$w.info2 configure -text "You are not a delegate for any users."
+			}
+			if {$MAIN_MENU ne {}} {
+				$MAIN_MENU.play entryconfigure "Access Die Rolls For*" -state disabled
+			}
+		}
+	} else {
+		$w.info1 configure -text "Loading delegate data from server..."
+		update
+		RefreshDelegates $w
+	}
+	if {[winfo exists $w.lb] && [info exists dice_preset_data(delegates,$tkey)]} {
+		set existing [$w.lb get 0 end]
+		foreach delegate $dice_preset_data(delegates,[root_user_key]) {
+			if {[lsearch -exact $existing $delegate] < 0} {
+				set updated true
+				$w.lb insert end $delegate
+				lappend delegates $delegate
+			}
+		}
+		if {$updated} {
+			$w.info1 configure -text "List updated from server (click Refresh to update again)"
+		}
+	}
 }
 
 #
@@ -1323,6 +1485,8 @@ proc restartMapper {} {
 	global argv
 	global env
 	set searchlist {}
+	set err {unknown error}
+	set tries {}
 	if {[info exists env(GMA_WISH)]} {
 		lappend searchlist $env(GMA_WISH)
 	}
@@ -1335,10 +1499,12 @@ proc restartMapper {} {
 			if {![catch {exec $argv0 {*}$argv &} err]} {
 				exit 0
 			}
+			lappend tries " -  $argv0 $argv"
 		} else {
 			if {[set cmd [::gmautil::searchInPath $i]] eq {}} {
 				DEBUG 1 "Skipping $i; not found in \$PATH"
 				puts "Skipping $i; not found in \$PATH"
+				lappend tries "(skipped $i since it was not in your PATH)"
 				continue
 			}
 			DEBUG 1 "Trying to run $cmd $argv0 $argv"
@@ -1346,9 +1512,11 @@ proc restartMapper {} {
 			if {![catch {exec $cmd $argv0 {*}$argv &} err]} {
 				exit 0
 			}
+			lappend tries " -  $cmd $argv0 $argv"
 		}
 	}
-	tk_messageBox -type ok -icon error -title "Unable to restart" -message "Sorry, we were unable to relaunch the mapper. If you want to restart it, you need to manually exit and restart the mapper." -detail $err
+	
+	tk_messageBox -type ok -icon error -title "Unable to restart" -message "Sorry, we were unable to relaunch the mapper. If you want to restart it, you need to manually exit and restart the mapper." -detail "$err\n\nWe tried:\n[join $tries \n]"
 	return
 }
 
@@ -2029,7 +2197,7 @@ foreach icon_name {
 	arrow_both arrow_first arrow_none arrow_last arrow_refresh heart
 	saf saf_open saf_merge saf_unload saf_group_go die16 die16c information info20 die20 die20c
 	delete add clock dieb16 -- *hourglass *hourglass_go *arrow_right *cross *bullet_go menu
-	stipple_100 stipple_75 stipple_50 stipple_25 stipple_12 stipple_88
+	stipple_100 stipple_75 stipple_50 stipple_25 stipple_12 stipple_88 lock unlock
 } {
 	if {$icon_name eq {--}} {
 		if {$ImageFormat eq {png}} {
@@ -2183,7 +2351,7 @@ grid \
 	 [button .toolbar.aoebound -image $icon_wandbound -command aoeboundtool] \
 	 [button .toolbar.ruler -image $icon_ruler -command rulertool] \
 	 [button .toolbar.griden -image $icon_snap_1 -command toggleGridEnable] \
-	 [button .toolbar.chat -image $icon_die20 -command {DisplayChatMessage {}}] \
+	 [button .toolbar.chat -image $icon_die20 -command {DisplayChatMessage {} {}}] \
 	 [button .toolbar.iniclock -image $icon_clock -command {display_initiative_clock}] \
 	 [label  .toolbar.sp4  -text "   "] \
 	 [button .toolbar.zi   -image $icon_zoom_in -command {zoomInBy 2}] \
@@ -9309,8 +9477,8 @@ proc DoCommandAV {d} {
 
 proc DoCommandPRIV {d} {
 	tk_messageBox -type ok -icon error -title "Permission Denied" \
-		-message "You are not allowed to send command \"[dict get $d Command]\" to the server. ([dict get $d Reason])" \
-		-detail "The operation you attempted to carry out which sent the command shown here is only allowed for privileged users, and in the words of Chevy Chase, \"you're not.\""
+		-message "[dict get $d Reason]" \
+		-detail "The operation you attempted to carry out which sent the command shown here is only allowed for privileged users, and in the words of Chevy Chase, \"you're not.\"\n\nAttempted command:\n[dict get $d Command]"
 }
 
 
@@ -9732,32 +9900,52 @@ proc DoCommandCONN {d} {
 			DEBUG 2 "Excluding $peer (not authenticated)"
 		}
 	}
-	UpdatePeerList
+	global dice_preset_data
+	foreach rkey [array names dice_preset_data "cw,*"] {
+		set tkey [string range $rkey 3 end]
+		set for_user $dice_preset_data(user,$tkey)
+		UpdatePeerList $for_user $tkey
+	}
 }
 
 proc DoCommandDD= {d} {
-	# define die-roll preset list
-	global SuppressChat dice_preset_data
+	# define die-roll preset list (updates us from the server's stored presets)
+	global SuppressChat dice_preset_data local_user
+	
+	if {[set target [dict get $d For]] eq {}} {
+		set target $local_user
+	}
 
 	if {! $SuppressChat} {
 		if {[catch {
-			DisplayChatMessage {}; # force window open
-			set wp [sframe content .chatwindow.p.preset.sf]
-			for {set i 0} {$i < [array size dice_preset_data]} {incr i} {
-				DEBUG 1 "destroy $wp.preset$i"
-				destroy $wp.preset$i
-				global DRPS_en$i
-				catch {unset DRPS_en$i}
+			DisplayChatMessage {} $target
+			set tkey [user_key $target]
+			foreach k [array names dice_preset_data -glob "w,$tkey,*"] {
+				set w $dice_preset_data($k)
+				DEBUG 1 "destroy $w preset widget"
+				destroy $w
 			}
-			array unset dice_preset_data
+			array unset dice_preset_data "preset,$tkey,*"
+			array unset dice_preset_data "w,$tkey,*"
+			# NO, don't do this every time or you'll keep getting enabled presets
+			# setting themselves on anytime the presets are refreshed.
+			# --- array unset dice_preset_data "en,$tkey,*"
+			array unset dice_preset_data "delegates,$tkey"
+			array unset dice_preset_data "delegate_for,$tkey"
+			# TODO array unset dice_preset_data "recent_die_rolls,$tkey" ??
+			# TODO array unset DieRollPresetState $tkey,* ??
 			foreach preset [dict get $d Presets] {
-				set dice_preset_data([dict get $preset Name]) $preset
+				set dice_preset_data(preset,$tkey,[dict get $preset Name]) $preset
 			}
-			_render_die_roller $wp 0 0 preset -noclear
+			set dice_preset_data(delegates,$tkey) [dict get $d Delegates]
+			set dice_preset_data(delegate_for,$tkey) [dict get $d DelegateFor]
+			set wp [sframe content $dice_preset_data(cw,$tkey).p.preset.sf]
+			_render_die_roller $wp 0 0 preset $target $tkey -noclear
 		} err]} {
-			DEBUG 0 "Error updating die preset info: $err"
+			DEBUG 0 "Error updating die preset info for $target: $err"
 		}
 	}
+	after 500 {_update_delegate_list .delegates}
 }
 
 proc DoCommandDSM {d} {
@@ -9929,7 +10117,7 @@ proc DoCommandROLL {d} {
 }
 
 proc DoCommandTO {d} {
-	DisplayChatMessage $d
+	DisplayChatMessage $d {}
 	ChatHistoryAppend [list TO $d [dict get $d MessageID]]
 }
 
@@ -10136,38 +10324,39 @@ proc UpgradeAvailable {args} {
 		}; # end of (not) in git area
 	} elseif {$comp > 0} {
 		if {$from_github} {
-			INFO "You appear to be running a newer mapper ($GMAMapperVersion) than the latest public release ($new_version $for). If this isn't expected, you may want to nudge your GM and/or system administrator to update the server's advertised version, or follow their advice on which version you should be running."
+			INFO "You are running a newer mapper ($GMAMapperVersion) than the latest public release ($new_version $for). If this isn't expected, you may want to nudge your GM and/or system administrator to update the server's advertised version, or follow their advice on which version you should be running."
 		} else {
-			INFO "You appear to be running a newer mapper ($GMAMapperVersion) than the latest version offered by your server ($new_version $for). If this isn't expected, you may want to nudge your GM and/or system administrator to update the server's advertised version."
+			INFO "You are running a newer mapper ($GMAMapperVersion) than the latest version offered by your server ($new_version $for). If this isn't expected, you may want to nudge your GM and/or system administrator to update the server's advertised version."
 		}
 	}
 }
 		
 		
-proc chat_to_all {} {
-	global CHAT_TO
+proc chat_to_all {for_user tkey} {
+	global dice_preset_data local_user
 
-	foreach recipient [array names CHAT_TO] {
-		set CHAT_TO($recipient) 0
+	foreach recipient [array names dice_preset_data "CHAT_TO,$tkey,*"] {
+		set dice_preset_data($recipient) 0
 	}
-	update_chat_to
+	update_chat_to $for_user $tkey
 }
 
-proc update_chat_to {} {
-	global CHAT_TO
+proc update_chat_to {for_user tkey} {
+	global dice_preset_data
 	set q 0
-	foreach name [array names CHAT_TO] {
-		if {$CHAT_TO($name)} {
+	set klen [string length "CHAT_TO,$tkey,"]
+	foreach name [array names dice_preset_data "CHAT_TO,$tkey,*"] {
+		if {$dice_preset_data($name)} {
 			if {$q > 0} {
-				.chatwindow.p.chat.2.to configure -text "To (multiple):"
+				$dice_preset_data(cw,$tkey).p.chat.2.to configure -text "To (multiple):"
 				return
 			}
 			set q 1
-			.chatwindow.p.chat.2.to configure -text "To $name:"
+			$dice_preset_data(cw,$tkey).p.chat.2.to configure -text "To [string range $name $klen end]:"
 		}
 	}
 	if {$q == 0} {
-		.chatwindow.p.chat.2.to configure -text "To all:"
+		$dice_preset_data(cw,$tkey).p.chat.2.to configure -text "To all:"
 	}
 }
 
@@ -10190,7 +10379,7 @@ proc format_with_style {value format} {
 
 set drd_id 0
 proc DisplayDieRoll {d} {
-	global icon_dieb16 icon_die16 icon_die16c SuppressChat drd_id LastDisplayedChatDate
+	global icon_dieb16 icon_die16 icon_die16c SuppressChat drd_id LastDisplayedChatDate dice_preset_data
 
 	if {$SuppressChat} {
 		return
@@ -10206,10 +10395,14 @@ proc DisplayDieRoll {d} {
 		{Result ResultSuppressed} is_blind \
 		Sent             date_sent
 
-	set w .chatwindow.p.chat
+	global local_user dice_preset_data
+	if {![info exists dice_preset_data(cw,[root_user_key])]} {
+		DisplayChatMessage {} {}
+	}
+	set w $dice_preset_data(cw,[root_user_key]).p.chat
 
 	if {![winfo exists $w]} {
-		DisplayChatMessage {}
+		DisplayChatMessage {} {}
 	}
 	set icon $icon_die16
 	foreach dd $details {
@@ -10291,40 +10484,61 @@ proc DisplayDieRoll {d} {
 	}
 	$w.1.text insert end "\n"
 	$w.1.text see end
+#	if {![info exists dice_preset_data(chat_lock)] || $dice_preset_data(chat_lock)} {
+#		$w.1.text configure -state disabled
+#	}
 	$w.1.text configure -state disabled
 }
 
-array set resize_task {
-	recent	{}
-	preset 	{}
+proc assert_recent_die_rolls {tkey} {
+	global dice_preset_data
+	if {![info exists dice_preset_data(recent_die_rolls,$tkey)]} {
+		set dice_preset_data(recent_die_rolls,$tkey) {}
+	}
 }
-array set last_known_size {
-	recent,width	0
-	recent,height	0
-	preset,width	0
-	preset,height	0
+proc assert_resize_task {tkey} {
+	global resize_task
+	foreach subkey {recent preset} {
+		if {![info exists resize_task($tkey,$subkey)]} {
+			set resize_task($tkey,$subkey) {}
+		}
+	}
 }
+proc assert_last_known_size {tkey} {
+	global last_known_size
+	foreach subkey {recent,width recent,height preset,width preset,height} {
+		if {![info exists last_known_size($tkey,$subkey)]} {
+			set last_known_size($tkey,$subkey) 0
+		}
+	}
+}
+assert_resize_task [root_user_key]
+assert_last_known_size [root_user_key]
+assert_recent_die_rolls [root_user_key]
 
-proc ResizeDieRoller {w width height type} {
+proc ResizeDieRoller {w width height type for_user tkey} {
 	global resize_task last_known_size
 
-	if {$resize_task($type) ne {}} {
-		if {$resize_task($type) eq NO} {
+	assert_resize_task $tkey
+	assert_last_known_size $tkey
+
+	if {$resize_task($tkey,$type) ne {}} {
+		if {$resize_task($tkey,$type) eq NO} {
 			return
 		}
-		after cancel $resize_task($type)
+		after cancel $resize_task($tkey,$type)
 	}
-	if {$last_known_size($type,width) != $width || $last_known_size($type,height) != $height} {
-		set resize_task($type) [after 250 "_resize_die_roller $w $width $height $type"]
+	if {$last_known_size($tkey,$type,width) != $width || $last_known_size($tkey,$type,height) != $height} {
+		set resize_task($tkey,$type) [after 250 "_resize_die_roller $w $width $height $type $for_user $tkey"]
 	}
 }
 
-proc inhibit_resize_task {flag type} {
+proc inhibit_resize_task {flag type for_user tkey} {
 	global resize_task
 	if {$flag} {
-		set resize_task($type) NO
+		set resize_task($tkey,$type) NO
 	} else {
-		set resize_task($type) {}
+		set resize_task($tkey,$type) {}
 	}
 }
 
@@ -10376,11 +10590,12 @@ proc _pop_open_extra {w i} {
 	}
 }
 
-proc _collapse_extra {w i} {
+proc _collapse_extra {w i for_user tkey} {
 	$w configure -width [expr max(3,[string length [$w get]])]
 	if {$i >= 0} {
-		global recent_die_rolls
-		set recent_die_rolls [lreplace $recent_die_rolls $i $i [list [lindex [lindex $recent_die_rolls $i] 0] [$w get]]]
+		global dice_preset_data
+		assert_recent_die_rolls $tkey
+		set dice_preset_data(recent_die_rolls,$tkey) [lreplace $dice_preset_data(recent_die_rolls,$tkey) $i $i [list [lindex [lindex $dice_preset_data(recent_die_rolls,$tkey) $i] 0] [$w get]]]
 	}
 }
 
@@ -10397,12 +10612,13 @@ proc cleanupDieRollSpec {spec} {
 }
 
 		
-proc _render_die_roller {w width height type args} {
-	global dice_preset_data recent_die_rolls icon_delete icon_die16
-	global dark_mode last_known_size _preferences colortheme
+proc _render_die_roller {w width height type for_user tkey args} {
+	global dice_preset_data last_known_size icon_delete icon_die16
+	global dark_mode _preferences colortheme
 
+	assert_last_known_size $tkey
 	if {$width <= 0} {
-		set width $last_known_size($type,width)
+		set width $last_known_size($tkey,$type,width)
 	}
 
 	set row_bg {}
@@ -10419,12 +10635,13 @@ proc _render_die_roller {w width height type args} {
 
 	switch -exact $type {
 		recent {
-			for {set i 0} {$i < [llength $recent_die_rolls] && $i < 10} {incr i} {
-				$w.$i.spec configure -text [lindex [lindex $recent_die_rolls $i] 0]
-				$w.$i.extra configure -width [expr max(3,[string length [lindex [lindex $recent_die_rolls $i] 1]])] -state normal
+			assert_recent_die_rolls $tkey
+			for {set i 0} {$i < [llength $dice_preset_data(recent_die_rolls,$tkey)] && $i < 10} {incr i} {
+				$w.$i.spec configure -text [lindex [lindex $dice_preset_data(recent_die_rolls,$tkey) $i] 0]
+				$w.$i.extra configure -width [expr max(3,[string length [lindex [lindex $dice_preset_data(recent_die_rolls,$tkey) $i] 1]])] -state normal
 				$w.$i.extra delete 0 end
-				$w.$i.extra insert end [lindex [lindex $recent_die_rolls $i] 1]
-				if {$last_known_size(recent,$i) eq {blank}} {
+				$w.$i.extra insert end [lindex [lindex $dice_preset_data(recent_die_rolls,$tkey) $i] 1]
+				if {$last_known_size($tkey,recent,$i) eq {blank}} {
 					# first time, pack them since they weren't there before
 					pack $w.$i.roll $w.$i.plus $w.$i.extra -side left
 					pack $w.$i.spec -side left -expand 1 -fill x
@@ -10434,33 +10651,33 @@ proc _render_die_roller {w width height type args} {
 						$w.$i.spec configure {*}[lindex $row_bg [expr $i % 2]]
 					}
 					bind $w.$i.extra <FocusIn> "_pop_open_extra $w.$i.extra $i"
-					bind $w.$i.extra <FocusOut> "_collapse_extra $w.$i.extra $i"
-					set last_known_size(recent,$i) 1
+					bind $w.$i.extra <FocusOut> "_collapse_extra $w.$i.extra $i $for_user $tkey"
+					set last_known_size($tkey,recent,$i) 1
 				} else {
 					pack configure $w.$i.spec -expand 1 -fill x
 				}
 			}
 			if {[dict get $_preferences styles dierolls compact_recents]} {
 				update
-				for {set i 0} {$i < [llength $recent_die_rolls] && $i < 10} {incr i} {
+				for {set i 0} {$i < [llength $dice_preset_data(recent_die_rolls,$tkey)] && $i < 10} {incr i} {
 					set needed_width [expr [winfo width $w.$i.spec] + [winfo width $w.$i.roll] + [winfo width $w.$i.extra] + [winfo width $w.$i.plus]]
 					if {$width > 0 && $needed_width >= $width} {
-						if {$last_known_size(recent,$i) != 2} {
+						if {$last_known_size($tkey,recent,$i) != 2} {
 							# rearrange widgets into 2 rows to allow more room
 							pack forget $w.$i.spec $w.$i.plus $w.$i.extra $w.$i.roll
 							pack $w.$i.spec -side bottom -anchor w -expand 1 -fill x
 							pack $w.$i.roll $w.$i.plus $w.$i.extra -side left 
-							set last_known_size(recent,$i) 2
+							set last_known_size($tkey,recent,$i) 2
 						} else {
 							pack configure $w.$i.spec -expand 1 -fill x
 						}
 					} else {
-						if {$last_known_size(recent,$i) != 1} {
+						if {$last_known_size($tkey,recent,$i) != 1} {
 							# rearrange widgets into 1 row
 							pack forget $w.$i.spec $w.$i.plus $w.$i.extra $w.$i.roll
 							pack $w.$i.roll $w.$i.plus $w.$i.extra -side left
 							pack $w.$i.spec -side left -expand 1 -fill x
-							set last_known_size(recent,$i) 1
+							set last_known_size($tkey,recent,$i) 1
 						} else {
 							pack configure $w.$i.spec -expand 1 -fill x
 						}
@@ -10470,68 +10687,78 @@ proc _render_die_roller {w width height type args} {
 		}
 		preset {
 			if {[lsearch -exact $args -noclear] < 0} {
-				for {set i 0} {$i < [array size dice_preset_data]} {incr i} {
-					DEBUG 1 "destroy $w.preset$i"
-					destroy $w.preset$i
+				foreach pk [array names dice_preset_data "w,$tkey,*"] {
+					DEBUG 1 "destroy $dice_preset_data($pk)"
+					destroy $dice_preset_data($pk)
 				}
+				array unset dice_preset_data "w,$tkey,*"
 			}
-			set preset_data [PresetLists dice_preset_data -export]
+			set preset_data [PresetLists dice_preset_data $for_user $tkey -export]
 			set i 0
 			#
 			# Modifiers
 			#
 			global DieRollPresetState
 			foreach preset [dict get $preset_data Modifiers] {
-				global DRPS_en$i
-				DEBUG 4 "create frame $w.preset$i"
-				pack [frame $w.preset$i] -side top -expand 0 -fill x
+				set wpi $w.preset$i
+				DEBUG 4 "create frame $wpi"
+				set dname [dict get $preset DisplayName]
+				set pname [dict get $preset Name]
+				set dice_preset_data(w,$tkey,$pname) $wpi
+				pack [frame $wpi] -side top -expand 0 -fill x
 				if {[set id [string trim [dict get $preset Variable]]] eq {}} {
 					set id [dict get $preset DisplaySeq]
 					if {[dict get $preset Global]} {
-						set t "[dict get $preset DisplayName]: (...)[dict get $preset DieRollSpec]"
+						set t "$dname: (...)[dict get $preset DieRollSpec]"
 					} else {
-						set t "[dict get $preset DisplayName]: [dict get $preset DieRollSpec]"
+						set t "$dname: [dict get $preset DieRollSpec]"
 					}
-					pack [ttk::checkbutton $w.preset$i.enabled -variable DRPS_en$i -command "DRPScheckVarEn $i $id"\
+					pack [ttk::checkbutton $wpi.enabled -variable dice_preset_data(en,$tkey,$pname) \
+						-command [list DRPScheckVarEn "en,$tkey,$pname" $id $for_user $tkey]\
 						-text $t] -side left
 				} else {
-					pack [ttk::checkbutton $w.preset$i.enabled -variable DRPS_en$i -command "DRPScheckVarEn $i $id"\
+					pack [ttk::checkbutton $wpi.enabled -variable dice_preset_data(en,$tkey,$pname) \
+						-command [list DRPScheckVarEn "en,$tkey,$pname" $id $for_user $tkey]\
 						-text "[dict get $preset DisplayName] (as \$\{$id\}): [dict get $preset DieRollSpec]"\
 					] -side left
 				}
-				if {![info exists DRPS_en$i]} {
-					set DRPS_en$i [::gmaproto::int_bool [dict get $preset Enabled]]
+				if {![info exists dice_preset_data(en,$tkey,$dname)]} {
+					set dice_preset_data(en,$tkey,$dname) [::gmaproto::int_bool [dict get $preset Enabled]]
 				}
-				::tooltip::tooltip $w.preset$i.enabled "* [dict get $preset Description]"
+				::tooltip::tooltip $wpi.enabled "* [dict get $preset Description]"
 				incr i
 			}
 
 			set _plist [dict get $preset_data Rolls]
 			lappend _plist {*}[dict get $preset_data CustomRolls]
 			foreach preset $_plist {
-				set pname [dict get $preset DisplayName]
+				set pname [dict get $preset Name]
+				set dname [dict get $preset DisplayName]
 				set desc [dict get $preset Description]
 				set def [dict get $preset DieRollSpec]
 
-				pack [frame $w.preset$i] -side top -expand 0 -fill x
-				pack [button $w.preset$i.roll -image $icon_die16 -command "RollPreset [list $w.preset$i $i [dict get $preset Name]]"] -side left
+				set wpi $w.preset$i
+				set dice_preset_data(w,$tkey,$pname) $wpi
+
+				pack [frame $wpi] -side top -expand 0 -fill x
+				pack [button $wpi.roll -image $icon_die16 -command "[list RollPreset $wpi $i $pname $for_user $tkey]"] -side left
 				pack [label $w.preset$i.plus -text +] -side left
 				pack [entry $w.preset$i.extra -width 3] -side left
-				pack [label $w.preset$i.name -text ${pname}: -anchor w -font Tf12 \
+				pack [label $w.preset$i.name -text ${dname}: -anchor w -font Tf12 \
 					-foreground [dict get $_preferences styles dialogs preset_name $colortheme] \
 					{*}[lindex $row_bg [expr $i % 2]]] -side left -padx 2
 				pack [label $w.preset$i.def -text [cleanupDieRollSpec $def] -anchor w {*}[lindex $row_bg [expr $i % 2]]] -side left -expand 1 -fill x
-				#pack [button $w.preset$i.del -image $icon_delete -command "DeleteDieRollPreset {$preset_name}"] -side right
+				#pack [button $w.preset$i.del -image $icon_delete -command [list DeleteDieRollPreset $preset_name $for_user]] -side right
 				::tooltip::tooltip $w.preset$i.name "* $desc"
 				::tooltip::tooltip $w.preset$i.def "* $desc"
 				bind $w.preset$i.extra <FocusIn> "_pop_open_extra $w.preset$i.extra -1"
-				bind $w.preset$i.extra <FocusOut> "_collapse_extra $w.preset$i.extra -1"
+				bind $w.preset$i.extra <FocusOut> "_collapse_extra $w.preset$i.extra -1 $for_user $tkey"
 				incr i
 			}
 			if {[dict get $_preferences styles dierolls compact_recents]} {
 				update
 				set i 0
-				foreach preset_name [lsort -dictionary [array names dice_preset_data]] {
+				foreach preset_name [lsort -dictionary [array names dice_preset_data "preset,$tkey,*"]] {
 					set needed_width [expr [winfo width $w.preset$i.name] + \
 								   [winfo width $w.preset$i.def] + \
 								   [winfo width $w.preset$i.roll] + \
@@ -10558,42 +10785,47 @@ proc _render_die_roller {w width height type args} {
 	}
 }
 
-proc DRPScheckVarEn {i id} {
+proc DRPScheckVarEn {key id for_user tkey} {
 	global DieRollPresetState
-	global DRPS_en$i
-	set DieRollPresetState(on,$id) [::gmaproto::json_bool [set DRPS_en$i]]
+	global dice_preset_data
+	set DieRollPresetState($tkey,on,$id) [::gmaproto::json_bool $dice_preset_data($key)]
 }
 
-proc _resize_die_roller {w width height type} {
+proc _resize_die_roller {w width height type for_user tkey} {
 	global resize_task
 
-	if {$resize_task($type) eq NO} {
+	assert_resize_task $tkey
+	if {$resize_task($tkey,$type) eq NO} {
 		return
 	}
 	if {[catch {
 		global last_known_size
-		_render_die_roller $w $width $height $type
-		set last_known_size($type,width) $width
-		set last_known_size($type,height) $height
+		_render_die_roller $w $width $height $type $for_user $tkey
+		set last_known_size($tkey,$type,width) $width
+		set last_known_size($tkey,$type,height) $height
 	} err]} {
-		DEBUG 0 "_render_die_roller($w, $width, $height, $type) failed with error '$err'"
+		DEBUG 0 "_render_die_roller($w, $width, $height, $type, $for_user, $tkey) failed with error '$err'"
 	}
-	set resize_task($type) {}
+	set resize_task($tkey,$type) {}
 }
 
-proc EditDieRollPresets {} {
+proc EDRPsaveAndDestroy {w for_user tkey} {
+	EDRPsaveValues $w $for_user $tkey
+	destroy $w
+}
+proc EditDieRollPresets {for_user tkey} {
 	global dice_preset_data
-	global tmp_presets
 	global icon_colorwheel
 
-	if {[winfo exists .edrp]} {
-		DEBUG 0 "There is already a die roll preset editor window open; not making another."
+	set w .edrp[to_window_id $tkey]
+
+	if {[winfo exists $w]} {
+		DEBUG 0 "There is already a die roll preset editor window open for user $for_user; not making another."
 		return
 	}
 
-	set w .edrp
 	toplevel $w
-	wm title $w "Manage Die-Roll Presets"
+	wm title $w "Manage Die-Roll Presets for $for_user"
 	ttk::notebook $w.n
 	sframe new $w.n.r
 	sframe new $w.n.m
@@ -10604,27 +10836,26 @@ proc EditDieRollPresets {} {
 	$w.n add $w.n.r -state normal -sticky news -text Rolls
 	$w.n add $w.n.m -state normal -sticky news -text Modifiers
 	pack $w.n -expand 1 -fill both
-	pack [button $w.can -text Cancel -command "if \[tk_messageBox -type yesno -parent $w -icon warning -title {Confirm Cancel} -message {Are you sure you wish to abandon any changes you made to the die-roll preset list?} -default no\] {destroy $w}"] -side left
-	pack [button $w.ok -text Save -command "EDRPsaveValues; destroy $w"] -side right
+	pack [button $w.can -text Cancel -command "if \[tk_messageBox -type yesno -parent $w -icon warning -title {Confirm Cancel} -message {Are you sure you wish to abandon any changes you made to the die-roll preset list?} -default no] {destroy $w}"] -side left
+	pack [button $w.ok -text Save -command [list EDRPsaveAndDestroy $w $for_user $tkey]] -side right
 
 	global icon_anchor_n icon_anchor_s icon_delete icon_add
 	grid [label $wnr.t1 -text Name] [label $wnr.t2 -text Description] [label $wnr.t3 -text {Die-Roll Specification}] - \
-		x x [button $wnr.add -image $icon_add -command "EDRPadd"] -sticky we
+		x x [button $wnr.add -image $icon_add -command [list EDRPadd $w $for_user $tkey]] -sticky we
 	::tooltip::tooltip $wnr.add "Add a new die-roll preset"
 
-	set tmp_presets [PresetLists dice_preset_data]
+	set dice_preset_data(tmp_presets,$tkey) [PresetLists dice_preset_data $for_user $tkey]
 	set i 0
-	foreach preset [dict get $tmp_presets Rolls] {
+	foreach preset [dict get $dice_preset_data(tmp_presets,$tkey) Rolls] {
 		grid [entry $wnr.name$i] [entry $wnr.desc$i] \
-		     [button $wnr.color$i -image $icon_colorwheel -command "EditColorBoxTitle EDRP_text$i"] \
-		     [entry $wnr.dspec$i -textvariable EDRP_text$i] \
-		     [button $wnr.up$i -image $icon_anchor_n -command "EDRPraise $i"] \
-		     [button $wnr.dn$i -image $icon_anchor_s -command "EDRPlower $i"] \
-		     [button $wnr.del$i -image $icon_delete -command "EDRPdel $i"] -sticky we
+		     [button $wnr.color$i -image $icon_colorwheel -command [list EditColorBoxTitle "EDRP_text,$tkey,$i"]] \
+		     [entry $wnr.dspec$i -textvariable dice_preset_data(EDRP_text,$tkey,$i)] \
+		     [button $wnr.up$i -image $icon_anchor_n -command [list EDRPraise $w $for_user $tkey $i]] \
+		     [button $wnr.dn$i -image $icon_anchor_s -command [list EDRPlower $w $for_user $tkey $i]] \
+		     [button $wnr.del$i -image $icon_delete -command [list EDRPdel $w $for_user $tkey $i]] -sticky we
 		$wnr.name$i insert 0 [dict get $preset DisplayName]
 		$wnr.desc$i insert 0 [dict get $preset Description]
-		global EDRP_text$i
-		set EDRP_text$i [dict get $preset DieRollSpec]
+		set dice_preset_data(EDRP_text,$tkey,$i) [dict get $preset DieRollSpec]
 		#$wnr.dspec$i insert 0 [dict get $preset DieRollSpec]
 		::tooltip::tooltip $wnr.color$i "Edit color(s) for die-roll title string"
 		::tooltip::tooltip $wnr.up$i "Move this die-roll up in the list"
@@ -10639,9 +10870,9 @@ proc EditDieRollPresets {} {
 		$wnr.dn[expr $i - 1] configure -state disabled
 	}
 	set i 0
-	foreach preset [dict get $tmp_presets CustomRolls] {
+	foreach preset [dict get $dice_preset_data(tmp_presets,$tkey) CustomRolls] {
 		grid [entry $wnr.nameC$i] [entry $wnr.descC$i] x [entry $wnr.dspecC$i] \
-		     x x [button $wnr.delC$i -image $icon_delete -command "EDRPdelCustom $i"] -sticky we
+		     x x [button $wnr.delC$i -image $icon_delete -command [list EDRPdelCustom $w $for_user $tkey $i]] -sticky we
 		$wnr.nameC$i insert 0 [dict get $preset Name]
 		$wnr.descC$i insert 0 [dict get $preset Description]
 		$wnr.dspecC$i insert 0 [dict get $preset DieRollSpec]
@@ -10650,41 +10881,38 @@ proc EditDieRollPresets {} {
 	}
 
 	set i 0
-	grid [label $wnm.t1 -text Name] [label $wnm.t2 -text Description] [label $wnm.t3 -text Expression] \
-		x x x x x x [button $wnm.add -image $icon_add -command "EDRPaddModifier"] -sticky ew
-	foreach preset [dict get $tmp_presets Modifiers] {
-		global EDRP_mod_en$i
-		global EDRP_mod_ven$i
-		global EDRP_mod_g$i
-#		grid [ttk::checkbutton $wnm.en$i -text On -variable EDRP_mod_en$i] 
-		grid [entry $wnm.name$i] \
+	grid [label $wnm.t0 -text On] [label $wnm.t1 -text Name] [label $wnm.t2 -text Description] [label $wnm.t3 -text Expression] \
+		x x x x x x [button $wnm.add -image $icon_add -command [list EDRPaddModifier $w $for_user $tkey]] -sticky ew
+	foreach preset [dict get $dice_preset_data(tmp_presets,$tkey) Modifiers] {
+		grid [ttk::checkbutton $wnm.en$i -text On -offvalue 0 -onvalue 1 -variable dice_preset_data(EDRP_mod_en,$tkey,$i)] \
+		     [entry $wnm.name$i] \
 		     [entry $wnm.desc$i] \
 		     [entry $wnm.dspec$i] \
-		     [ttk::checkbutton $wnm.varp$i -text "as symbol $\{" -variable EDRP_mod_ven$i -command "EDRPcheckVar $i"]\
+		     [ttk::checkbutton $wnm.varp$i -text "as symbol $\{" -variable dice_preset_data(EDRP_mod_ven,$tkey,$i) -command [list EDRPcheckVar $w $for_user $tkey $i]]\
 		     [entry $wnm.var$i -width 6]\
 		     [label $wnm.rb$i -text \} -anchor w] \
-		     [ttk::checkbutton $wnm.g$i -text "()x" -variable EDRP_mod_g$i] \
-		     [button $wnm.up$i -image $icon_anchor_n -command "EDRPraiseModifier $i"] \
-		     [button $wnm.dn$i -image $icon_anchor_s -command "EDRPlowerModifier $i"] \
-		     [button $wnm.del$i -image $icon_delete -command "EDRPdelModifier $i"] -sticky ew
+		     [ttk::checkbutton $wnm.g$i -text "()x" -variable dice_preset_data(EDRP_mod_g,$tkey,$i)] \
+		     [button $wnm.up$i -image $icon_anchor_n -command [list EDRPraiseModifier $w $for_user $tkey $i]] \
+		     [button $wnm.dn$i -image $icon_anchor_s -command [list EDRPlowerModifier $w $for_user $tkey $i]] \
+		     [button $wnm.del$i -image $icon_delete -command [list EDRPdelModifier $w $for_user $tkey $i]] -sticky ew
 	     	::tooltip::tooltip $wnm.g$i "If checked, adds (...) around expression before adding this modifier."
 	     	::tooltip::tooltip $wnm.up$i "Move this modifier up in the list"
 	     	::tooltip::tooltip $wnm.dn$i "Move this modifier down in the list"
 	     	::tooltip::tooltip $wnm.del$i "Remove this modifier from the list"
-	     	#::tooltip::tooltip $wnm.en$i "If checked, the modifier is in-play"
+	     	::tooltip::tooltip $wnm.en$i "If checked, the modifier is in-play"
 	     	::tooltip::tooltip $wnm.varp$i "If checked, the modifier is used in place of <var>, otherwise added to all die rolls"
-#		set EDRP_mod_en$i [::gmaproto::int_bool [dict get $preset Enabled]]
-		set EDRP_mod_en$i false
-		set EDRP_mod_g$i [::gmaproto::int_bool [dict get $preset Global]]
+		set dice_preset_data(EDRP_mod_en,$tkey,$i) [::gmaproto::int_bool [dict get $preset Enabled]]
+#		set dice_preset_data(EDRP_mod_en,$tkey,$i) false
+		set dice_preset_data(EDRP_mod_g,$tkey,$i) [::gmaproto::int_bool [dict get $preset Global]]
 		if {[dict get $preset Variable] eq {}} {
-			set EDRP_mod_ven$i 0
+			set dice_preset_data(EDRP_mod_ven,$tkey,$i) 0
 			$wnm.var$i configure -state disabled
 			$wnm.g$i configure -state normal
 		} else {
-			set EDRP_mod_ven$i 1
+			set dice_preset_data(EDRP_mod_ven,$tkey,$i) 1
 			$wnm.var$i insert 0 [dict get $preset Variable]
 			$wnm.g$i configure -state disabled
-			set EDRP_mod_g$i 0
+			set dice_preset_data(EDRP_mod_g,$tkey,$i) 0
 		}
 		$wnm.name$i insert 0 [dict get $preset DisplayName]
 		$wnm.desc$i insert 0 [dict get $preset Description]
@@ -10720,15 +10948,15 @@ proc EditDieRollPresets {} {
 # ≡ 2261
 # ‖ 2016
 set ECBTstate(seq) 0
-proc EditColorBoxTitle {var} {
+proc EditColorBoxTitle {key} {
 	global ECBTstate
 	global global_bg_color
 	global icon_add
+	global dice_preset_data
 	set w .ecbt[incr ECBTstate(seq)]
 	set ECBTstate($w,size) 0
-	set ECBTstate($w,var) $var
-	global $var
-	set title [string map {<= ≤ >= ≥} [set $var]]
+	set ECBTstate($w,key) $key
+	set title [string map {<= ≤ >= ≥} $dice_preset_data($key)]
 
 	if {[llength [set parts [split $title =]]] < 2} {
 		set ECBTstate($w,spec) $title
@@ -10766,6 +10994,7 @@ proc ECBT_cancel {w} {
 
 proc ECBT_ok {w} {
 	global ECBTstate
+	global dice_preset_data
 	set titles [ECBT_get_titles $w]
 	set parts {}
 	foreach t $titles {
@@ -10779,11 +11008,10 @@ proc ECBT_ok {w} {
 		lappend parts $txt
 	}
 	
-	global $ECBTstate($w,var)
 	if {$parts eq {}} {
-		set $ECBTstate($w,var) $ECBTstate($w,spec)
+		set dice_preset_data($ECBTstate($w,key)) $ECBTstate($w,spec)
 	} else {
-		set $ECBTstate($w,var) "[join $parts \u2016]=$ECBTstate($w,spec)"
+		set dice_preset_data($ECBTstate($w,key)) "[join $parts \u2016]=$ECBTstate($w,spec)"
 	}
 	ECBT_cancel $w
 }
@@ -10965,11 +11193,11 @@ proc ECBT_add {w} {
 # It will send them back to us which will force an update
 # in the client at that time.
 #
-proc EDRPsaveValues {} {
-	global tmp_presets
+proc EDRPsaveValues {w for_user tkey} {
+	global dice_preset_data
 	set newpresets {}
-	EDRPgetValues
-	foreach p [dict get $tmp_presets Rolls] {
+	EDRPgetValues $w $for_user $tkey
+	foreach p [dict get $dice_preset_data(tmp_presets,$tkey) Rolls] {
 		if {[scan [dict get $p DisplaySeq] %d%s seq _] != 1} {
 			DEBUG 0 "ERROR interpreting sequence \"[dict get $p DisplaySeq]\"; can't save presets"
 			return
@@ -10978,12 +11206,12 @@ proc EDRPsaveValues {} {
 						Description [dict get $p Description]\
 						DieRollSpec [dict get $p DieRollSpec]]
 	}
-	foreach p [dict get $tmp_presets CustomRolls] {
+	foreach p [dict get $dice_preset_data(tmp_presets,$tkey) CustomRolls] {
 		lappend newpresets [dict create Name [dict get $p Name] \
 						Description [dict get $p Description]\
 						DieRollSpec [dict get $p DieRollSpec]]
 	}
-	foreach p [dict get $tmp_presets Modifiers] {
+	foreach p [dict get $dice_preset_data(tmp_presets,$tkey) Modifiers] {
 		set flags {}
 		if {[dict get $p Enabled]} {
 			append flags e
@@ -11016,188 +11244,173 @@ proc EDRPsaveValues {} {
 							DieRollSpec [dict get $p DieRollSpec]]
 		}
 	}
-	UpdateDicePresets $newpresets
+	UpdateDicePresets $newpresets $for_user
 }
 
 # remove item #i from rolls
-proc EDRPdel {i} {
-	global tmp_presets
-	set w .edrp
-
+proc EDRPdel {w for_user tkey i} {
+	global dice_preset_data
 	set wnr [sframe content $w.n.r]
 	set wnm [sframe content $w.n.m]
-	EDRPgetValues
-	dict set tmp_presets Rolls [lreplace [dict get $tmp_presets Rolls] $i $i]
-	set i [llength [dict get $tmp_presets Rolls]]
+	EDRPgetValues $w $for_user $tkey
+	dict set dice_preset_data(tmp_presets,$tkey) Rolls [lreplace [dict get $dice_preset_data(tmp_presets,$tkey) Rolls] $i $i]
+	set i [llength [dict get $dice_preset_data(tmp_presets,$tkey) Rolls]]
 	grid forget $wnr.name$i $wnr.desc$i $wnr.dspec$i $wnr.up$i $wnr.dn$i $wnr.del$i
 	destroy $wnr.name$i $wnr.desc$i $wnr.dspec$i $wnr.up$i $wnr.dn$i $wnr.del$i
 	catch {
 		grid forget $wnr.color$i
 		destroy $wnr.color$i
 	}
-	EDRPresequence
-	EDRPupdateGUI
+	EDRPresequence $w $for_user $tkey
+	EDRPupdateGUI $w $for_user $tkey
 }
 
-proc EDRPdelModifier {i} {
-	global tmp_presets
-	set w .edrp
+proc EDRPdelModifier {w for_user tkey i} {
+	global dice_preset_data
 
 	set wnr [sframe content $w.n.r]
 	set wnm [sframe content $w.n.m]
-	EDRPgetValues
-	dict set tmp_presets Modifiers [lreplace [dict get $tmp_presets Modifiers] $i $i]
-	set i [llength [dict get $tmp_presets Modifiers]]
-#	grid forget $wnm.en$i $wnm.name$i $wnm.desc$i $wnm.dspec$i $wnm.varp$i $wnm.var$i $wnm.rb$i $wnm.up$i $wnm.dn$i $wnm.del$i $wnm.g$i
-	grid forget $wnm.name$i $wnm.desc$i $wnm.dspec$i $wnm.varp$i $wnm.var$i $wnm.rb$i $wnm.up$i $wnm.dn$i $wnm.del$i $wnm.g$i
-#	destroy $wnm.en$i $wnm.name$i $wnm.desc$i $wnm.dspec$i $wnm.varp$i $wnm.var$i $wnm.rb$i $wnm.up$i $wnm.dn$i $wnm.del$i $wnm.g$i
-	destroy $wnm.name$i $wnm.desc$i $wnm.dspec$i $wnm.varp$i $wnm.var$i $wnm.rb$i $wnm.up$i $wnm.dn$i $wnm.del$i $wnm.g$i
-	EDRPresequence
-	EDRPupdateGUI
+	EDRPgetValues $w $for_user $tkey
+	dict set dice_preset_data(tmp_presets,$tkey) Modifiers [lreplace [dict get $dice_preset_data(tmp_presets,$tkey) Modifiers] $i $i]
+	set i [llength [dict get $dice_preset_data(tmp_presets,$tkey) Modifiers]]
+	grid forget $wnm.en$i $wnm.name$i $wnm.desc$i $wnm.dspec$i $wnm.varp$i $wnm.var$i $wnm.rb$i $wnm.up$i $wnm.dn$i $wnm.del$i $wnm.g$i
+	destroy $wnm.en$i $wnm.name$i $wnm.desc$i $wnm.dspec$i $wnm.varp$i $wnm.var$i $wnm.rb$i $wnm.up$i $wnm.dn$i $wnm.del$i $wnm.g$i
+	EDRPresequence $w $for_user $tkey
+	EDRPupdateGUI $w $for_user $tkey
 }
 
-proc EDRPdelCustom {i} {
-	global tmp_presets
-	set w .edrp
-
+proc EDRPdelCustom {w for_user tkey i} {
+	global dice_preset_data
 	set wnr [sframe content $w.n.r]
 	set wnm [sframe content $w.n.m]
-	EDRPgetValues
-	dict set tmp_presets CustomRolls [lreplace [dict get $tmp_presets CustomRolls] $i $i]
-	set i [llength [dict get $tmp_presets CustomRolls]]
+	EDRPgetValues $w $for_user $tkey
+	dict set dice_preset_data(tmp_presets,$tkey) CustomRolls [lreplace [dict get $dice_preset_data(tmp_presets,$tkey) CustomRolls] $i $i]
+	set i [llength [dict get $dice_preset_data(tmp_presets,$tkey) CustomRolls]]
 	grid forget $wnr.nameC$i $wnr.descC$i $wnr.dspecC$i $wnr.delC$i
 	destroy $wnr.nameC$i $wnr.descC$i $wnr.dspecC$i $wnr.delC$i
-	EDRPupdateGUI
+	EDRPupdateGUI $w $for_user $tkey
 }
 
 # move item #i down one slot
-proc EDRPlower {i} {
-	global tmp_presets
-	set w .edrp
-	EDRPgetValues
-	set n [llength [dict get $tmp_presets Rolls]]
+proc EDRPlower {w for_user tkey i} {
+	global dice_preset_data
+	EDRPgetValues $w $for_user $tkey
+	set n [llength [dict get $dice_preset_data(tmp_presets,$tkey) Rolls]]
 	if {$i < $n-1} {
-		set l [dict get $tmp_presets Rolls]
-		dict set tmp_presets Rolls [lreplace $l $i $i+1 [lindex $l $i+1] [lindex $l $i]]
+		set l [dict get $dice_preset_data(tmp_presets,$tkey) Rolls]
+		dict set dice_preset_data(tmp_presets,$tkey) Rolls [lreplace $l $i $i+1 [lindex $l $i+1] [lindex $l $i]]
 	}
-	EDRPresequence
-	EDRPupdateGUI
+	EDRPresequence $w $for_user $tkey
+	EDRPupdateGUI $w $for_user $tkey
 }
 
-proc EDRPlowerModifier {i} {
-	global tmp_presets
-	set w .edrp
-	EDRPgetValues
-	set n [llength [dict get $tmp_presets Modifiers]]
+proc EDRPlowerModifier {w for_user tkey i} {
+	global dice_preset_data
+	EDRPgetValues $w $for_user $tkey
+	set n [llength [dict get $dice_preset_data(tmp_presets,$tkey) Modifiers]]
 	if {$i < $n-1} {
-		set l [dict get $tmp_presets Modifiers]
-		dict set tmp_presets Modifiers [lreplace $l $i $i+1 [lindex $l $i+1] [lindex $l $i]]
+		set l [dict get $dice_preset_data(tmp_presets,$tkey) Modifiers]
+		dict set dice_preset_data(tmp_presets,$tkey) Modifiers [lreplace $l $i $i+1 [lindex $l $i+1] [lindex $l $i]]
 	}
-	EDRPresequence
-	EDRPupdateGUI
+	EDRPresequence $w $for_user $tkey
+	EDRPupdateGUI $w $for_user $tkey
 }
 
-proc EDRPraise {i} {
-	global tmp_presets
-	set w .edrp
-	EDRPgetValues
-	set n [llength [dict get $tmp_presets Rolls]]
+proc EDRPraise {w for_user tkey i} {
+	global dice_preset_data
+	EDRPgetValues $w $for_user $tkey
+	set n [llength [dict get $dice_preset_data(tmp_presets,$tkey) Rolls]]
 	if {$i > 0} {
-		set l [dict get $tmp_presets Rolls]
-		dict set tmp_presets Rolls [lreplace $l $i-1 $i [lindex $l $i] [lindex $l $i-1]]
+		set l [dict get $dice_preset_data(tmp_presets,$tkey) Rolls]
+		dict set dice_preset_data(tmp_presets,$tkey) Rolls [lreplace $l $i-1 $i [lindex $l $i] [lindex $l $i-1]]
 	}
-	EDRPresequence
-	EDRPupdateGUI
+	EDRPresequence $w $for_user $tkey
+	EDRPupdateGUI $w $for_user $tkey
 }
 
-proc EDRPraiseModifier {i} {
-	global tmp_presets
-	set w .edrp
-	EDRPgetValues
-	set n [llength [dict get $tmp_presets Modifiers]]
+proc EDRPraiseModifier {w for_user tkey i} {
+	global dice_preset_data
+	EDRPgetValues $w $for_user $tkey
+	set n [llength [dict get $dice_preset_data(tmp_presets,$tkey) Modifiers]]
 	if {$i > 0} {
-		set l [dict get $tmp_presets Modifiers]
-		dict set tmp_presets Modifiers [lreplace $l $i-1 $i [lindex $l $i] [lindex $l $i-1]]
+		set l [dict get $dice_preset_data(tmp_presets,$tkey) Modifiers]
+		dict set dice_preset_data(tmp_presets,$tkey) Modifiers [lreplace $l $i-1 $i [lindex $l $i] [lindex $l $i-1]]
 	}
-	EDRPresequence
-	EDRPupdateGUI
+	EDRPresequence $w $for_user $tkey
+	EDRPupdateGUI $w $for_user $tkey
 }
 
 # add a new item at the end of the Rolls list
-proc EDRPresequence {} {
-	global tmp_presets
-	set roll_list [dict get $tmp_presets Rolls]
-	dict set tmp_presets Rolls {}
+proc EDRPresequence {w for_user tkey} {
+	global dice_preset_data
+	set roll_list [dict get $dice_preset_data(tmp_presets,$tkey) Rolls]
+	dict set dice_preset_data(tmp_presets,$tkey) Rolls {}
 	set i 0
 	foreach d $roll_list {
 		dict set d DisplaySeq [format %3d [incr i]]
-		dict lappend tmp_presets Rolls $d
+		dict lappend dice_preset_data(tmp_presets,$tkey) Rolls $d
 	}
 
-	set mod_list [dict get $tmp_presets Modifiers]
-	dict set tmp_presets Modifiers {}
+	set mod_list [dict get $dice_preset_data(tmp_presets,$tkey) Modifiers]
+	dict set dice_preset_data(tmp_presets,$tkey) Modifiers {}
 	set i 0
 	foreach d $mod_list {
 		dict set d DisplaySeq [format %3d [incr i]]
-		dict lappend tmp_presets Modifiers $d
+		dict lappend dice_preset_data(tmp_presets,$tkey) Modifiers $d
 	}
 }
 
 # pull field values into tmp_presets
-proc EDRPgetValues {} {
-	global tmp_presets
-	set w .edrp
+proc EDRPgetValues {w for_user tkey} {
+	global dice_preset_data
 	set wnr [sframe content $w.n.r]
 	set wnm [sframe content $w.n.m]
-	set n [llength [dict get $tmp_presets Rolls]]
-	dict set tmp_presets Rolls {}
+	set n [llength [dict get $dice_preset_data(tmp_presets,$tkey) Rolls]]
+	dict set dice_preset_data(tmp_presets,$tkey) Rolls {}
 	for {set i 0} {$i < $n} {incr i} {
-		dict lappend tmp_presets Rolls [dict create \
+		dict lappend dice_preset_data(tmp_presets,$tkey) Rolls [dict create \
 			DisplaySeq [format %03d $i] \
 			DisplayName [$wnr.name$i get] \
 			Description [$wnr.desc$i get] \
 			DieRollSpec [$wnr.dspec$i get]]
 	}
 
-	set n [llength [dict get $tmp_presets CustomRolls]]
-	dict set tmp_presets CustomRolls {}
+	set n [llength [dict get $dice_preset_data(tmp_presets,$tkey) CustomRolls]]
+	dict set dice_preset_data(tmp_presets,$tkey) CustomRolls {}
 	for {set i 0} {$i < $n} {incr i} {
-		dict lappend tmp_presets CustomRolls [dict create \
+		dict lappend dice_preset_data(tmp_presets,$tkey) CustomRolls [dict create \
 			Name        [$wnr.nameC$i get] \
 			Description [$wnr.descC$i get] \
 			DieRollSpec [$wnr.dspecC$i get]]
 	}
 
-	set n [llength [dict get $tmp_presets Modifiers]]
-	dict set tmp_presets Modifiers {}
+	set n [llength [dict get $dice_preset_data(tmp_presets,$tkey) Modifiers]]
+	dict set dice_preset_data(tmp_presets,$tkey) Modifiers {}
 	for {set i 0} {$i < $n} {incr i} {
-#		global EDRP_mod_en$i
-		global EDRP_mod_g$i
 		set v [string trim [$wnm.var$i get]]
 		if {$v ne {}} {
 			set g false
 		} else {
-			set g [::gmaproto::json_bool [set EDRP_mod_g$i]]
+			set g [::gmaproto::json_bool $dice_preset_data(EDRP_mod_g,$tkey,$i)]
 		}
-		dict lappend tmp_presets Modifiers [dict create \
+		dict lappend dice_preset_data(tmp_presets,$tkey) Modifiers [dict create \
 			Variable $v\
 			DisplayName [$wnm.name$i get] \
 			DisplaySeq [format %3d $i] \
 			Description [$wnm.desc$i get] \
 			DieRollSpec [$wnm.dspec$i get] \
-			Enabled false\
+			Enabled [::gmaproto::json_bool $dice_preset_data(EDRP_mod_en,$tkey,$i)] \
 			Global $g]
 	}
 }
 
 # refresh the existing editor window fields from the data
-proc EDRPupdateGUI {} {
-	global tmp_presets
-	set w .edrp
+proc EDRPupdateGUI {w for_user tkey} {
+	global dice_preset_data
 	set wnr [sframe content $w.n.r]
 	set wnm [sframe content $w.n.m]
 	set i 0
-	foreach p [dict get $tmp_presets Rolls] {
+	foreach p [dict get $dice_preset_data(tmp_presets,$tkey) Rolls] {
 		foreach {ww fld} {name DisplayName desc Description dspec DieRollSpec} {
 			$wnr.$ww$i delete 0 end
 			$wnr.$ww$i insert 0 [dict get $p $fld]
@@ -11215,7 +11428,7 @@ proc EDRPupdateGUI {} {
 	}
 
 	set i 0
-	foreach p [dict get $tmp_presets CustomRolls] {
+	foreach p [dict get $dice_preset_data(tmp_presets,$tkey) CustomRolls] {
 		foreach {ww fld} {nameC Name descC Description dspecC DieRollSpec} {
 			$wnr.$ww$i delete 0 end
 			$wnr.$ww$i insert 0 [dict get $p $fld]
@@ -11224,26 +11437,23 @@ proc EDRPupdateGUI {} {
 	}
 
 	set i 0
-	foreach p [dict get $tmp_presets Modifiers] {
+	foreach p [dict get $dice_preset_data(tmp_presets,$tkey) Modifiers] {
 		$wnm.var$i configure -state normal
 		foreach {ww fld} {name DisplayName desc Description dspec DieRollSpec var Variable} {
 			$wnm.$ww$i delete 0 end
 			$wnm.$ww$i insert 0 [dict get $p $fld]
 		}
-		global EDRP_mod_ven$i
-#		global EDRP_mod_en$i
-		global EDRP_mod_g$i
-		set EDRP_mod_g$i [::gmaproto::int_bool [dict get $p Global]]
+		set dice_preset_data(EDRP_mod_g,$tkey,$i) [::gmaproto::int_bool [dict get $p Global]]
 		if {[dict get $p Variable] eq {}} {
-			set EDRP_mod_ven$i 0
+			set dice_preset_data(EDRP_mod_ven,$tkey,$i) 0
 			$wnm.var$i configure -state disabled
 			$wnm.g$i configure -state normal
 		} else {
-			set EDRP_mod_ven$i 1
-			set EDRP_mod_g$i 0
+			set dice_preset_data(EDRP_mod_ven,$tkey,$i) 1
+			set dice_preset_data(EDRP_mod_g,$tkey,$i) 0
 			$wnm.g$i configure -state disabled
 		}
-#		set EDRP_mod_en$i [::gmaproto::int_bool [dict get $p Enabled]]
+		set dice_preset_data(EDRP_mod_en,$tkey,$i) [::gmaproto::int_bool [dict get $p Enabled]]
 
 		if {$i == 0} {
 			$wnm.up$i configure -state disabled
@@ -11258,60 +11468,56 @@ proc EDRPupdateGUI {} {
 	}
 }
 
-proc EDRPadd {} {
-	global tmp_presets icon_anchor_n icon_anchor_s icon_delete icon_colorwheel
-	set w .edrp
+proc EDRPadd {w for_user tkey} {
+	global dice_preset_data icon_anchor_n icon_anchor_s icon_delete icon_colorwheel
 	set wnr [sframe content $w.n.r]
 	set wnm [sframe content $w.n.m]
-	dict lappend tmp_presets Rolls [dict create Name {} DisplayName {} DieRollSpec {} DisplaySeq {} Description {}]
-	set i [expr [llength [dict get $tmp_presets Rolls]] - 1]
+	dict lappend dice_preset_data(tmp_presets,$tkey) Rolls [dict create Name {} DisplayName {} DieRollSpec {} DisplaySeq {} Description {}]
+	set i [expr [llength [dict get $dice_preset_data(tmp_presets,$tkey) Rolls]] - 1]
 	grid [entry $wnr.name$i] [entry $wnr.desc$i] \
-	     [button $wnr.color$i -image $icon_colorwheel -command "EditColorBoxTitle EDRP_text$i"] \
-	     [entry $wnr.dspec$i -textvariable EDRP_text$i] \
-	     [button $wnr.up$i -image $icon_anchor_n -command "EDRPraise $i"] \
-	     [button $wnr.dn$i -image $icon_anchor_s -command "EDRPlower $i"] \
-	     [button $wnr.del$i -image $icon_delete -command "EDRPdel $i"] -sticky we
+	     [button $wnr.color$i -image $icon_colorwheel -command [list EditColorBoxTitle "EDRP_text,$tkey,$i"]] \
+	     [entry $wnr.dspec$i -textvariable dice_preset_data(EDRP_text,$tkey,$i)] \
+	     [button $wnr.up$i -image $icon_anchor_n -command [list EDRPraise $w $for_user $tkey $i]] \
+	     [button $wnr.dn$i -image $icon_anchor_s -command [list EDRPlower $w $for_user $tkey $i]] \
+	     [button $wnr.del$i -image $icon_delete -command [list EDRPdel $w $for_user $tkey $i]] -sticky we
 	::tooltip::tooltip $wnr.color$i "Edit color(s) for die-roll title string"
 	::tooltip::tooltip $wnr.up$i "Move this die-roll up in the list"
 	::tooltip::tooltip $wnr.dn$i "Move this die-roll down in the list"
 	::tooltip::tooltip $wnr.del$i "Remove this die-roll from the list"
-	EDRPgetValues
-	EDRPresequence
-	EDRPupdateGUI
+	EDRPgetValues $w $for_user $tkey
+	EDRPresequence $w $for_user $tkey
+	EDRPupdateGUI $w $for_user $tkey
 }
-proc EDRPaddModifier {} {
-	global tmp_presets icon_anchor_n icon_anchor_s icon_delete
-	set w .edrp
+proc EDRPaddModifier {w for_user tkey} {
+	global dice_preset_data icon_anchor_n icon_anchor_s icon_delete
 	set wnr [sframe content $w.n.r]
 	set wnm [sframe content $w.n.m]
-	dict lappend tmp_presets Modifiers [dict create Global false Enabled false Variable {} Name {} DisplayName {} DieRollSpec {} DisplaySeq {} Description {}]
-	set i [expr [llength [dict get $tmp_presets Modifiers]] - 1]
-	global EDRP_mod_en$i EDRP_mod_ven$i
-	global EDRP_mod_g$i
-	set EDRP_mod_en$i 0
-	set EDRP_mod_ven$i 0
-	set EDRP_mod_g$i 0
-#	grid [ttk::checkbutton $wnm.en$i -text On -variable EDRP_mod_en$i] 
-	grid	[entry $wnm.name$i] \
+	dict lappend dice_preset_data(tmp_presets,$tkey) Modifiers [dict create Global false Enabled false Variable {} Name {} DisplayName {} DieRollSpec {} DisplaySeq {} Description {}]
+	set i [expr [llength [dict get $dice_preset_data(tmp_presets,$tkey) Modifiers]] - 1]
+	set dice_preset_data(EDRP_mod_en,$tkey,$i) 0
+	set dice_preset_data(EDRP_mod_ven,$tkey,$i) 0
+	set dice_preset_data(EDRP_mod_g,$tkey,$i) 0
+	grid [ttk::checkbutton $wnm.en$i -text On -onvalue 1 -offvalue 0 -variable dice_preset_data(EDRP_mod_en,$tkey,$i)] \
+	        [entry $wnm.name$i] \
 		[entry $wnm.desc$i] \
 		[entry $wnm.dspec$i] \
-		[ttk::checkbutton $wnm.varp$i -text "as symbol <" -variable EDRP_mod_ven$i -command "EDRPcheckVar $i"]\
+		[ttk::checkbutton $wnm.varp$i -text "as symbol <" -variable dice_preset_data(EDRP_mod_ven,$tkey,$i) -command [list EDRPcheckVar $w $for_user $tkey $i]]\
 		[entry $wnm.var$i -width 6] \
 		[label $wnm.rb$i -text > -anchor w] \
-		[ttk::checkbutton $wnm.g$i -text "()x" -variable EDRP_mod_g$i]\
-		[button $wnm.up$i -image $icon_anchor_n -command "EDRPraiseModifier $i"]\
-		[button $wnm.dn$i -image $icon_anchor_s -command "EDRPlowerModifier $i"]\
-		[button $wnm.del$i -image $icon_delete -command "EDRPdelModifier $i"]\
+		[ttk::checkbutton $wnm.g$i -text "()x" -variable dice_preset_data(EDRP_mod_g,$tkey,$i)]\
+		[button $wnm.up$i -image $icon_anchor_n -command [list EDRPraiseModifier $w $for_user $tkey $i]]\
+		[button $wnm.dn$i -image $icon_anchor_s -command [list EDRPlowerModifier $w $for_user $tkey $i]]\
+		[button $wnm.del$i -image $icon_delete -command [list EDRPdelModifier $w $for_user $tkey $i]]\
 		-sticky ew
 	::tooltip::tooltip $wnm.g$i "If checked, adds (...) around expression before adding this modifier."
 	::tooltip::tooltip $wnm.up$i "Move this modifier up in the list"
 	::tooltip::tooltip $wnm.dn$i "Move this modifier down in the list"
 	::tooltip::tooltip $wnm.del$i "Remove this modifier from the list"
-#	::tooltip::tooltip $wnm.en$i "If checked, the modifier is in-play"
+	::tooltip::tooltip $wnm.en$i "If checked, the modifier is in-play"
 	::tooltip::tooltip $wnm.varp$i "If checked, the modifier is used in place of <var>, otherwise added to all die rolls"
-	EDRPgetValues
-	EDRPresequence
-	EDRPupdateGUI
+	EDRPgetValues $w $for_user $tkey
+	EDRPresequence $w $for_user $tkey
+	EDRPupdateGUI $w $for_user $tkey
 }
 
 # PresetLists arrayname ?-export? -> dict of Rolls, CustomRolls, Modifiers which hold sorted lists of dicts
@@ -11320,7 +11526,7 @@ proc EDRPaddModifier {} {
 # 		(global,<name>) = list of strings to apply to all die rolls
 # 		(on,<name>) = bool	true if (var,<name>) or (global,<name>) are enabled
 #
-proc PresetLists {arrayname args} {
+proc PresetLists {arrayname for_user tkey args} {
 	upvar $arrayname presets
 	global DieRollPresetState
 	set export [expr [lsearch -exact $args -export] >= 0]
@@ -11329,12 +11535,14 @@ proc PresetLists {arrayname args} {
 	set custom {}
 	set seq 0
 	if {$export} {
-		array unset DieRollPresetState
-		set DieRollPresetState(apply_order) {}
+		array unset DieRollPresetState "$tkey,*"
+		set DieRollPresetState($tkey,apply_order) {}
 	}
-	foreach pname [lsort [array names presets]] {
+	set pkeylen [string length "preset,$tkey,"]
+	foreach pkey [lsort [array names presets "preset,$tkey,*"]] {
+		set pname [string range $pkey $pkeylen end]
 		if {[string range $pname 0 0] eq {§}} {
-			set d $presets($pname)
+			set d $presets($pkey)
 			set parts [split [string range $pname 1 end] |]
 			if {[llength $parts] == 1} {
 				dict set d DisplayName {unnamed modifier}
@@ -11381,24 +11589,24 @@ proc PresetLists {arrayname args} {
 					if {[string is alpha -strict [string range $varname 0 0]] &&
 					([string length $varname] == 1 ||
 					[string is alnum -strict [string range $varname 1 end]])} {
-						set DieRollPresetState(var,$varname) [dict get $d DieRollSpec]
-						set DieRollPresetState(on,$varname) [dict get $d Enabled]
-						set DieRollPresetState(g,$varname) false
+						set DieRollPresetState($tkey,var,$varname) [dict get $d DieRollSpec]
+						set DieRollPresetState($tkey,on,$varname) [dict get $d Enabled]
+						set DieRollPresetState($tkey,g,$varname) false
 					} else {
 						DEBUG 0 "Invalid modifier variable name <$varname>. This variable will be ignored."
 						DEBUG 0 "Variables must begin with a letter and include only letters and numbers."
 					}
 				} else {
 					set id [dict get $d DisplaySeq]
-					set DieRollPresetState(global,$id) [dict get $d DieRollSpec]
-					set DieRollPresetState(on,$id) [dict get $d Enabled]
-					set DieRollPresetState(g,$id) [dict get $d Global]
-					lappend DieRollPresetState(apply_order) $id
+					set DieRollPresetState($tkey,global,$id) [dict get $d DieRollSpec]
+					set DieRollPresetState($tkey,on,$id) [dict get $d Enabled]
+					set DieRollPresetState($tkey,g,$id) [dict get $d Global]
+					lappend DieRollPresetState($tkey,apply_order) $id
 				}
 			}
 		} else {
 			set pieces [split $pname |]
-			set d $presets($pname)
+			set d $presets($pkey)
 			if {[llength $pieces] < 2} {
 				dict set d DisplayName $pname 
 				dict set d DisplaySeq [incr seq]
@@ -11426,33 +11634,36 @@ proc PresetLists {arrayname args} {
 	return [dict create Modifiers $mods Rolls $rolls CustomRolls $custom]
 }
 
-proc EDRPcheckVar {i} {
-	global EDRP_mod_ven$i EDRP_mod_g$i
-	set w .edrp
+proc EDRPcheckVar {w for_user tkey i} {
+	global dice_preset_data
 	set wnr [sframe content $w.n.r]
 	set wnm [sframe content $w.n.m]
 	$wnm.var$i configure -state normal
-	if {![set EDRP_mod_ven$i]} {
+	if {! $dice_preset_data(EDRP_mod_ven,$tkey,$i)} {
 		$wnm.var$i delete 0 end
 		$wnm.var$i configure -state disabled
 		$wnm.g$i configure -state normal
 	} else {
 		$wnm.g$i configure -state disabled
-		set EDRP_mod_g$i 0
+		set dice_preset_data(EDRP_mod_g,$tkey,$i) 0
 	}
 }
-# DisplayChatMessage d ?-noopen? ?-system?
-proc DisplayChatMessage {d args} {
-	global dark_mode SuppressChat CHAT_TO CHAT_text check_select_color
+# DisplayChatMessage d ?for_user? ?-noopen? ?-system?
+proc DisplayChatMessage {d for_user args} {
+	global dark_mode SuppressChat check_select_color
 	global icon_die16 icon_info20 icon_arrow_refresh check_menu_color
 	global icon_delete icon_add icon_open icon_save ChatTranscript icon_colorwheel
-	global last_known_size CHAT_blind global_bg_color IThost
-	global _preferences colortheme
+	global last_known_size global_bg_color IThost
+	global _preferences colortheme dice_preset_data local_user
 
 	if {$d ne {}} {
 		::gmautil::dassign $d Sender from Recipients recipientlist Text message Sent date_sent
 	} else {
 		lassign {} from recipientlist message date_sent
+	}
+
+	if {$for_user eq {}} {
+		set for_user $local_user
 	}
 
 	if {$SuppressChat} return
@@ -11462,7 +11673,15 @@ proc DisplayChatMessage {d args} {
 		return
 	}
 
-	set w .chatwindow
+	set tkey [user_key $for_user]
+
+	if {![info exists dice_preset_data(cw,$tkey)]} {
+		set dice_preset_data(cw,$tkey) .[new_id]
+		set dice_preset_data(user,$tkey) $for_user
+		DEBUG 1 "Created new toplevel window $dice_preset_data(cw,$tkey) for $for_user's die rolls"
+	}
+
+	set w $dice_preset_data(cw,$tkey)
 	set wc   $w.p.chat
 	set wrsf $w.p.recent
 	set wpsf $w.p.preset
@@ -11473,8 +11692,8 @@ proc DisplayChatMessage {d args} {
 			# just ignore it
 			return
 		}
-		inhibit_resize_task 1 recent
-		inhibit_resize_task 1 preset
+		inhibit_resize_task 1 recent $for_user $tkey
+		inhibit_resize_task 1 preset $for_user $tkey
 		toplevel $w -background $global_bg_color
 
 		#  ____________________________________
@@ -11523,17 +11742,22 @@ proc DisplayChatMessage {d args} {
 		# | [name________] [desc___________] [rollspec_______] [x]as [_______] [-][^][v]
 		# |_______________________________________________________________
 		#
-		wm title $w "Chat and Die Rolls"
 		ttk::panedwindow $w.p -orient vertical 
-		ttk::labelframe $wc -text "Chat Messages"
+		if {$for_user eq $local_user} {
+			wm title $w "Chat and Die Rolls"
+			ttk::labelframe $wc -text "Chat Messages"
+		} else {
+			wm title $w "Die Rolls for $for_user"
+			ttk::labelframe $wc -text "Dice for $for_user"
+		}
 		ttk::labelframe $wrsf -text "Recent Rolls"
 		ttk::labelframe $wpsf -text "Preset Rolls"
 		pack [sframe new $wrsf.sf -anchor w] -side top -fill both -expand 1
 		pack [sframe new $wpsf.sf -anchor w] -side top -fill both -expand 1
 		set wr [sframe content $wrsf.sf]
 		set wp [sframe content $wpsf.sf]
-		bind $wrsf <Configure> "ResizeDieRoller $wr %w %h recent"
-		bind $wpsf <Configure> "ResizeDieRoller $wp %w %h preset"
+		bind $wrsf <Configure> "ResizeDieRoller $wr %w %h recent $for_user $tkey"
+		bind $wpsf <Configure> "ResizeDieRoller $wp %w %h preset $for_user $tkey"
 
 		$w.p add $wc
 		$w.p add $wrsf
@@ -11543,106 +11767,123 @@ proc DisplayChatMessage {d args} {
 		for {set i 0} {$i < 10} {incr i} {
 			pack [frame $wr.$i] -side top -expand 0 -fill x
 			label $wr.$i.spec -anchor w
-			button $wr.$i.roll -state disabled -image $icon_die16 -command "Reroll $wr.$i $i"
+			button $wr.$i.roll -state disabled -image $icon_die16 -command "Reroll $wr.$i $i $for_user $tkey"
 			entry $wr.$i.extra -width 3 -state disabled
 			label $wr.$i.plus -text +
-			set last_known_size(recent,$i) blank
+			set last_known_size($tkey,recent,$i) blank
 		}
 		pack [frame $wp.add] -side bottom -expand 0 -fill x
-		#pack [button $wp.add.add -image $icon_add -command AddDieRollPreset] -side left
+		#pack [button $wp.add.add -image $icon_add -command AddDieRollPreset $for_user $tkey] -side left
 		#pack [label $wp.add.label -text "Add new die-roll preset" -anchor w] -side left -expand 1 -fill x
-		pack [button $wp.add.add -text "Edit presets..." -command EditDieRollPresets] -side left
-		pack [button $wp.add.save -image $icon_save -command "SaveDieRollPresets $w"] -side right
-		pack [button $wp.add.load -image $icon_open -command "LoadDieRollPresets $w"] -side right
-		pack [button $wp.add.upd -image $icon_arrow_refresh -command RequestDicePresets] -side right
+		pack [button $wp.add.add -text "Edit presets..." -command [list EditDieRollPresets $for_user $tkey]] -side left
+		pack [button $wp.add.save -image $icon_save -command [list SaveDieRollPresets $w $for_user $tkey]] -side right
+		pack [button $wp.add.load -image $icon_open -command [list LoadDieRollPresets $w $for_user $tkey]] -side right
+		pack [button $wp.add.upd -image $icon_arrow_refresh -command [list RequestDicePresets $for_user]] -side right
 
 		::tooltip::tooltip $wp.add.save "Export presets to disk file"
 		::tooltip::tooltip $wp.add.load "Import presets from disk file"
 		::tooltip::tooltip $wp.add.upd "Refresh preset list from server"
 
-		pack [frame $wc.1] -side top -expand 1 -fill both
+		if {$for_user eq $local_user} {
+			pack [frame $wc.1] -side top -expand 1 -fill both
+		}
 		pack [frame $wc.2]\
 			 [frame $wc.3]\
 			-side top -expand 0 -fill x
 
-		pack [text $wc.1.text -yscrollcommand "$wc.1.sb set" -height 10 -width 10 -state disabled] -side left -expand 1 -fill both
-		pack [scrollbar $wc.1.sb -orient vertical -command "$wc.1.text yview"] -side right -expand 0 -fill y
+		if {$for_user eq $local_user} {
+			pack [text $wc.1.text -yscrollcommand "$wc.1.sb set" -height 10 -width 10 -state disabled] -side left -expand 1 -fill both
+			pack [scrollbar $wc.1.sb -orient vertical -command "$wc.1.text yview"] -side right -expand 0 -fill y
+		}
 		pack [button $wc.3.tc -image $icon_colorwheel \
-			-command "EditColorBoxTitle CHAT_dice"] -side left -padx 2
+			-command [list EditColorBoxTitle "CHAT_dice,$tkey"]] -side left -padx 2
 		pack [label $wc.3.l -text Roll: -anchor nw] -side left -padx 2
 
-		pack [entry $wc.3.dice -textvariable CHAT_dice -relief sunken] -side left -fill x -expand 1
+		pack [entry $wc.3.dice -textvariable dice_preset_data(CHAT_dice,$tkey) -relief sunken] -side left -fill x -expand 1
 		pack [button $wc.3.info -image $icon_info20 -command ShowDiceSyntax] -side right
 		::tooltip::tooltip $wc.3.info "Display help for how to write die rolls and use the chat window."
-		set CHAT_blind 0
-		pack [ttk::checkbutton $wc.3.blind -text GM -variable CHAT_blind] -side right
+		set dice_preset_data(CHAT_blind,$tkey) 0
+		pack [ttk::checkbutton $wc.3.blind -text GM -variable dice_preset_data(CHAT_blind,$tkey)] -side right
 		#-selectcolor $check_select_color
 		#-indicatoron 1 
 
 		menubutton $wc.2.to -menu $wc.2.to.menu -text To: -relief raised
 		menu $wc.2.to.menu -tearoff 0
-		$wc.2.to.menu add command -label (all) -command chat_to_all
-		$wc.2.to.menu add checkbutton -label GM -onvalue 1 -offvalue 0 -variable CHAT_TO(GM) -command update_chat_to -selectcolor $check_menu_color
+		$wc.2.to.menu add command -label (all) -command [list chat_to_all $for_user $tkey]
+		$wc.2.to.menu add checkbutton -label GM -onvalue 1 -offvalue 0 -variable dice_preset_data(CHAT_TO,$tkey,GM) -command [list update_chat_to $for_user $tkey] -selectcolor $check_menu_color
 
-		set CHAT_text {}
+		set dice_preset_data(CHAT_text,$tkey) {}
 
 		pack $wc.2.to -side left 
-		pack [entry $wc.2.entry -relief sunken -textvariable CHAT_text] -side left -fill x -expand 1
-		pack [button $wc.2.send -command {RefreshPeerList} -image $icon_arrow_refresh] -side right
+		pack [entry $wc.2.entry -relief sunken -textvariable dice_preset_data(CHAT_text,$tkey)] -side left -fill x -expand 1
+		pack [button $wc.2.send -command RefreshPeerList -image $icon_arrow_refresh] -side right
+#		if {$for_user eq $local_user} {
+#			global icon_unlock
+#			pack [button $wc.2.lock -command [list ToggleChatLock $wc.2.lock $wc.1.text] -image $icon_unlock] -side right
+#			::tooltip::tooltip $wc.2.lock "Unlock the chat window for editing/copying text."
+#			set dice_preset_data(chat_lock) true
+#		}
 		::tooltip::tooltip $wc.2.send "Refresh the list of recipients for messages."
-		bind $wc.2.entry <Return> SendChatFromWindow
-		bind $wc.3.dice <Return> SendDieRollFromWindow
-		set CHAT_TO(GM) 0
-		update_chat_to
-		UpdatePeerList		;# set up what we may have already received
-		RefreshPeerList		;# ask for an update as well
+		bind $wc.2.entry <Return> [list SendChatFromWindow $for_user $tkey]
+		bind $wc.3.dice <Return> [list SendDieRollFromWindow $w $wr $for_user $tkey]
 
-		foreach tag {
-			begingroup best bonus constant critlabel critspec dc diebonus diespec discarded
-			endgroup exceeded fail from fullmax fullresult iteration label max maximized maxroll 
-			met min moddelim normal operator repeat result roll separator short sf success 
-			title to until worst system subtotal error notice timestamp
-		} {
-			if {![dict exists $_preferences styles dierolls components $tag]} {
-				DEBUG 0 "Preferences profile is missing a definition for $tag; using default"
-				dict set _preferences styles dierolls components $tag [::gmaprofile::default_dieroll_style]
-			}
-			set options {}
-			$wc.1.text tag delete $tag
-			foreach {k o t} {
-				fg         -foreground c
-				bg         -background c
-				overstrike -overstrike ?
-				underline  -underline  ?
-				offset     -offset     i
-				font       -font       f
+		set dice_preset_data(CHAT_TO,$tkey,GM) 0
+		update_chat_to $for_user $tkey
+		UpdatePeerList $for_user $tkey		;# set up what we may have already received
+		RefreshPeerList				;# ask for an update as well
+
+		if {$for_user eq $local_user} {
+			foreach tag {
+				begingroup best bonus constant critlabel critspec dc diebonus diespec discarded
+				endgroup exceeded fail from fullmax fullresult iteration label max maximized maxroll 
+				met min moddelim normal operator repeat result roll separator short sf success 
+				title to until worst system subtotal error notice timestamp
 			} {
-				set v [dict get $_preferences styles dierolls components $tag $k]
-				switch -exact $t {
-					c {
-						if {$v eq {}} continue
-						set v [dict get $v $colortheme]
-						if {$v eq {}} continue
-					}
-					f { set v [::gmaprofile::lookup_font $_preferences $v] }
-					? { if {$v eq {} || !$v} continue }
-					i { if {$v == 0} continue }
+				if {![dict exists $_preferences styles dierolls components $tag]} {
+					DEBUG 0 "Preferences profile is missing a definition for $tag; using default"
+					dict set _preferences styles dierolls components $tag [::gmaprofile::default_dieroll_style]
 				}
-				lappend options $o $v
-			}
+				set options {}
+				$wc.1.text tag delete $tag
+				foreach {k o t} {
+					fg         -foreground c
+					bg         -background c
+					overstrike -overstrike ?
+					underline  -underline  ?
+					offset     -offset     i
+					font       -font       f
+				} {
+					set v [dict get $_preferences styles dierolls components $tag $k]
+					switch -exact $t {
+						c {
+							if {$v eq {}} continue
+							set v [dict get $v $colortheme]
+							if {$v eq {}} continue
+						}
+						f { set v [::gmaprofile::lookup_font $_preferences $v] }
+						? { if {$v eq {} || !$v} continue }
+						i { if {$v == 0} continue }
+					}
+					lappend options $o $v
+				}
 
-			$wc.1.text tag configure $tag {*}$options
-			DEBUG 3 "Configure tag $tag as $options"
+				$wc.1.text tag configure $tag {*}$options
+				DEBUG 3 "Configure tag $tag as $options"
+			}
 		}
 
-		RequestDicePresets
-		inhibit_resize_task 0 recent
-		inhibit_resize_task 0 preset
+		RequestDicePresets $for_user
+		inhibit_resize_task 0 recent $for_user $tkey
+		inhibit_resize_task 0 preset $for_user $tkey
 
-		LoadChatHistory
+		if {$for_user eq $local_user} {
+			LoadChatHistory
+		} else {
+			RequestDicePresets $for_user
+		}
 	}
 
-	if {$d eq {}} {
+	if {$d eq {} || $for_user ne $local_user} {
 		return
 	}
 
@@ -11655,8 +11896,23 @@ proc DisplayChatMessage {d args} {
 	}
 }
 
+#proc ToggleChatLock {buttonw textw} {
+#	global icon_unlock icon_lock dice_preset_data
+#	if {![info exists dice_preset_data(chat_lock)] || $dice_preset_data(chat_lock)} {
+#		set dice_preset_data(chat_lock) false
+#		$textw configure -state normal
+#		$buttonw configure -image $icon_lock
+#		::tooltip::tooltip $buttonw "Lock the chat window from editing/copying text."
+#	} else {
+#		set dice_preset_data(chat_lock) true
+#		$textw configure -state disabled
+#		$buttonw configure -image $icon_unlock
+#		::tooltip::tooltip $buttonw "Unlock the chat window for editing/copying text."
+#	}
+#}
+
 proc _render_chat_message {w system message recipientlist from toall togm {date_sent {}}} {
-	global SuppressChat _preferences LastDisplayedChatDate
+	global SuppressChat _preferences LastDisplayedChatDate dice_preset_data
 
 	if {!$SuppressChat && [winfo exists $w]} {
 		$w configure -state normal
@@ -11683,6 +11939,9 @@ proc _render_chat_message {w system message recipientlist from toall togm {date_
 			$w insert end "$message\n" normal
 		}
 		$w see end
+#		if {![info exists dice_preset_data(chat_lock)] || $dice_preset_data(chat_lock)} {
+#			$w configure -state disabled
+#		}
 		$w configure -state disabled
 	}
 }
@@ -11857,10 +12116,15 @@ proc ClearChatHistory {d} {
 }
 
 proc BlankChatHistoryDisplay {} {
+	global dice_preset_data local_user
 	catch {
-		.chatwindow.p.chat.1.text configure -state normal
-		.chatwindow.p.chat.1.text delete 1.0 end
-		.chatwindow.p.chat.1.text configure -state disabled
+		set tkey [root_user_key] 
+		$dice_preset_data(cw,$tkey).p.chat.1.text configure -state normal
+		$dice_preset_data(cw,$tkey).p.chat.1.text delete 1.0 end
+#		if {![info exists dice_preset_data(chat_lock)] || $dice_preset_data(chat_lock)} {
+#			$dice_preset_data(cw,$tkey).p.chat.1.text configure -state disabled
+#		}
+		$dice_preset_data(cw,$tkey).p.chat.1.text configure -state disabled
 		update
 	}
 }
@@ -11868,8 +12132,8 @@ proc BlankChatHistoryDisplay {} {
 # Load up the chat window with what's in our in-memory chat history list.
 #
 proc LoadChatHistory {} {
-	global ChatHistory
-	set w .chatwindow.p.chat.1.text
+	global ChatHistory dice_preset_data
+	set w $dice_preset_data(cw,[root_user_key]).p.chat.1.text
 
 	set prog_id [begin_progress * "Loading chat messages" [set prog_max [llength $ChatHistory]]]
 	set prog_i 0
@@ -12020,35 +12284,35 @@ proc Chat_text_attribution {from recipientlist toall togm} {
 	}
 }
 
-proc AddDieRollPreset {} {
+#proc AddDieRollPreset {for_user tkey} {
+#	global dice_preset_data
+#	set w .adrp[to_window_id $tkey]
+#	create_dialog $w
+#	wm title $w "Add Die-Roll Preset for $for_user"
+#	#
+#	# Preset Name: [___________________]
+#	# Description: [___________________]
+#	# Die Roll:    [___________________]
+#	#
+#	# [Cancel]                    [Save]
+#	#
+#
+#	grid [label $w.nl -text "Preset Name:" -anchor w] \
+#	     [entry $w.ne] -sticky news
+#	grid [label $w.dl -text "Description:" -anchor w] \
+#	     [entry $w.de] -sticky news
+#	grid [label $w.rl -text "Die Roll:" -anchor w] \
+#	     [entry $w.re] -sticky news
+#	grid [button $w.c -text Cancel -command "destroy $w"] -sticky sw
+#	grid [button $w.s -text Save -command [list CommitNewPreset $for_user $tkey]] -sticky se -row 3 -column 1
+#	grid columnconfigure $w 1 -weight 1
+#	grid rowconfigure $w 3 -weight 1
+#}
 
-	set w .adrp
-	create_dialog $w
-	wm title $w "Add Die-Roll Preset"
-	#
-	# Preset Name: [___________________]
-	# Description: [___________________]
-	# Die Roll:    [___________________]
-	#
-	# [Cancel]                    [Save]
-	#
-
-	grid [label $w.nl -text "Preset Name:" -anchor w] \
-	     [entry $w.ne] -sticky news
-	grid [label $w.dl -text "Description:" -anchor w] \
-	     [entry $w.de] -sticky news
-	grid [label $w.rl -text "Die Roll:" -anchor w] \
-	     [entry $w.re] -sticky news
-	grid [button $w.c -text Cancel -command "destroy $w"] -sticky sw
-	grid [button $w.s -text Save -command "CommitNewPreset"] -sticky se -row 3 -column 1
-	grid columnconfigure $w 1 -weight 1
-	grid rowconfigure $w 3 -weight 1
-}
-
-proc SaveDieRollPresets {w} {
+proc SaveDieRollPresets {w for_user tkey} {
 	global dice_preset_data
 
-	if {[array size dice_preset_data] == 0} {
+	if {[llength [array names dice_preset_data "preset,$tkey,*"]] == 0 } {
 		tk_messageBox -parent $w -type ok -icon error -title "No Presets to Save" -message "You have no presets to save."
 		return
 	}
@@ -12056,7 +12320,7 @@ proc SaveDieRollPresets {w} {
 	if {[set file [tk_getSaveFile -defaultextension .dice -filetypes {
 		{{GMA Die Roll Preset Files} {.dice}}
 		{{All Files}        *}
-	} -parent $w -title "Save current die-roll presets as..."]] eq {}} return
+	} -parent $w -title "Save current die-roll presets for $for_user as..."]] eq {}} return
 
 	while {[catch {set f [open $file w]} err]} {
 		if {[tk_messageBox -type retrycancel -icon error -default cancel -title "Error opening file"\
@@ -12067,7 +12331,7 @@ proc SaveDieRollPresets {w} {
 
 	if {[catch {
 		set plist {}
-		foreach {_ d} [array get dice_preset_data] {
+		foreach {_ d} [array get dice_preset_data "preset,$tkey,*"] {
 			lappend plist $d
 		}
 		::gmafile::save_dice_presets_to_file $f [list [dict create] $plist]
@@ -12078,17 +12342,17 @@ proc SaveDieRollPresets {w} {
 	}
 }
 
-proc LoadDieRollPresets {w} {
+proc LoadDieRollPresets {w for_user tkey} {
 	global dice_preset_data
 
-	set old_n [array size dice_preset_data]
+	set old_n [llength [array names dice_preset_data "preset,$tkey,*"]]
 	array unset new_preset_list
 	if {$old_n > 0} {
 		set answer [tk_messageBox -type yesnocancel -parent $w -icon question -title "Merge with existing presets?" \
 			-message "You already have $old_n preset[expr $old_n==1 ? {{}} : {{s}}] defined. Do you want the new ones to be MERGED with those?"\
 			-detail "If you answer YES, any presets from the file will overwrite existing ones with the same name, and any new ones will be added to your existing set. If you answer NO, all current presets will be deleted and only the ones from the file will exist." -default yes]
 		if {$answer eq {yes}} {
-			array set new_preset_list [array get dice_preset_data]
+			array set new_preset_list [array get dice_preset_data "preset,$tkey,*"]
 		} elseif {$answer ne {no}} {
 			return
 		}
@@ -12097,7 +12361,7 @@ proc LoadDieRollPresets {w} {
 	if {[set file [tk_getOpenFile -defaultextension .dice -filetypes {
 		{{GMA Die Roll Preset Files} {.dice}}
 		{{All Files}        *}
-		} -parent $w -title "Load die roll presets from..."]] eq {}} return
+		} -parent $w -title "Load die roll presets for $for_user from..."]] eq {}} return
 
 	while {[catch {set f [open $file r]} err]} {
 		if {[tk_messageBox -type retrycancel -icon error -default cancel -title "Error opening file"\
@@ -12125,13 +12389,13 @@ proc LoadDieRollPresets {w} {
 	foreach {_ p} [array get new_preset_list] {
 		lappend deflist $p
 	}
-	UpdateDicePresets $deflist
-	RequestDicePresets
+	UpdateDicePresets $deflist $for_user
+	RequestDicePresets $for_user
 }
 
-proc CommitNewPreset {} {
+proc CommitNewPreset {for_user tkey} {
 	global dice_preset_data
-	set w .adrp
+	set w .adrp[to_window_id $tkey]
 
 	set name [string trim [$w.ne get]]
 	set desc [string trim [$w.de get]]
@@ -12147,21 +12411,21 @@ proc CommitNewPreset {} {
 			-message "You didn't specify a die roll expression to store."
 		return
 	}
-	if {[info exists dice_preset_data($name)]} {
+	if {[info exists dice_preset_data(preset,$tkey,$name)]} {
 		if {! [tk_messageBox -type yesno -icon question -title "Overwrite previous preset?" \
-			-message "There is already a preset called \"$name\". Do you want to replace it with this one?" \
+			-message "There is already a preset for $for_user called \"$name\". Do you want to replace it with this one?" \
 			-default no]} {
 			return
 		}
 	}
 
-	set dice_preset_data($name) [dict create Name $name Description $desc DieRollSpec $def]
+	set dice_preset_data(preset,$tkey,$name) [dict create Name $name Description $desc DieRollSpec $def]
 	set deflist {}
-	foreach {_ p} [array get dice_preset_data] {
+	foreach {_ p} [array get dice_preset_data "preset,$tkey,*"] {
 		lappend deflist $p
 	}
-	UpdateDicePresets $deflist
-	RequestDicePresets
+	UpdateDicePresets $deflist $for_user
+	RequestDicePresets $for_user
 	destroy $w
 }
 
@@ -12176,18 +12440,18 @@ proc ChatAttribution {w from recipientlist toall togm} {
 	}
 }
 
-proc UpdatePeerList {} {
+proc UpdatePeerList {for_user tkey} {
 	# Update chat window widgets from peer list
-	global PeerList CHAT_TO LastKnownPeers check_menu_color
+	global PeerList LastKnownPeers check_menu_color dice_preset_data
 
-	DEBUG 3 "UpdatePeerList: PeerList=$PeerList, CHAT_TO=[array get CHAT_TO]"
 	if {[catch {
-		.chatwindow.p.chat.2.to.menu delete 2 end
+		set tomenu $dice_preset_data(cw,$tkey).p.chat.2.to.menu
+		$tomenu delete 2 end
 		foreach name [lsort -dictionary -unique $PeerList] {
 			if {$name ne {GM}} {
-				.chatwindow.p.chat.2.to.menu add checkbutton -label $name -onvalue 1 -offvalue 0 -variable CHAT_TO($name) -command update_chat_to -selectcolor $check_menu_color
-				if {![info exists CHAT_TO($name)]} {
-					set CHAT_TO($name) 0
+				$tomenu add checkbutton -label $name -onvalue 1 -offvalue 0 -variable dice_preset_data(CHAT_TO,$tkey,$name) -command [list update_chat_to $for_user $tkey] -selectcolor $check_menu_color
+				if {![info exists dice_preset_data(CHAT_TO,$tkey,$name)]} {
+					set dice_preset_data(CHAT_TO,$tkey,$name) 0
 				}
 			}
 		}
@@ -12195,18 +12459,21 @@ proc UpdatePeerList {} {
 		DEBUG 1 "UpdatePeerList failed: $err"
 	}
 
-	foreach peer_name [array names LastKnownPeers] {
-		if {[lsearch -exact $PeerList $peer_name] < 0} {
-			unset LastKnownPeers($peer_name)
-			DisplayChatMessage [::gmaproto::new_dict TO Text "$peer_name disconnected."] -noopen -system
-			ChatHistoryAppend [list -system "$peer_name disconnected." -1]
+	global local_user
+	if {$for_user eq $local_user} {
+		foreach peer_name [array names LastKnownPeers] {
+			if {[lsearch -exact $PeerList $peer_name] < 0} {
+				unset LastKnownPeers($peer_name)
+				DisplayChatMessage [::gmaproto::new_dict TO Text "$peer_name disconnected."] {} -noopen -system
+				ChatHistoryAppend [list -system "$peer_name disconnected." -1]
+			}
 		}
-	}
-	foreach peer_name $PeerList {
-		if {! [info exists LastKnownPeers($peer_name)]} {
-			set LastKnownPeers($peer_name) 1
-			DisplayChatMessage [::gmaproto::new_dict TO Text "$peer_name joined."] -noopen -system
-			ChatHistoryAppend [list -system "$peer_name joined." -1]
+		foreach peer_name $PeerList {
+			if {! [info exists LastKnownPeers($peer_name)]} {
+				set LastKnownPeers($peer_name) 1
+				DisplayChatMessage [::gmaproto::new_dict TO Text "$peer_name joined."] {} -noopen -system
+				ChatHistoryAppend [list -system "$peer_name joined." -1]
+			}
 		}
 	}
 }
@@ -12215,8 +12482,8 @@ proc SendDieRoll {recipients dice blind_p} {
 	set d [ParseRecipientList $recipients TO ToGM $blind_p]
 	::gmaproto::roll_dice $dice [dict get $d Recipients] [dict get $d ToAll] [dict get $d ToGM]
 }
-proc UpdateDicePresets {deflist} {::gmaproto::define_dice_presets $deflist false}
-proc RequestDicePresets {} {::gmaproto::query_dice_presets}
+proc UpdateDicePresets {deflist for_user} {::gmaproto::define_dice_presets $deflist false $for_user}
+proc RequestDicePresets {for_user} {::gmaproto::query_dice_presets $for_user}
 
 proc SendChatMessage {recipients message} {
 	set d [ParseRecipientList $recipients TO]
@@ -12225,19 +12492,16 @@ proc SendChatMessage {recipients message} {
 	}
 }
 
+proc SendDieRollFromWindow {w wr for_user tkey} {
+	global dice_preset_data
 
-
-set recent_die_rolls {}
-proc SendDieRollFromWindow {} {
-	global CHAT_dice recent_die_rolls CHAT_blind
-	set wr [sframe content .chatwindow.p.recent.sf]
-
-	if {$CHAT_dice != {}} {
-		_do_roll $CHAT_dice {} .chatwindow
+	if {$dice_preset_data(CHAT_dice,$tkey) != {}} {
+		_do_roll $dice_preset_data(CHAT_dice,$tkey) {} $w $for_user $tkey
 
 		# update list of most recent 10 rolls
-		for {set index -1; set i 0} {$i < [llength $recent_die_rolls]} {incr i} {
-			if {[lindex [lindex $recent_die_rolls $i] 0] eq $CHAT_dice} {
+		assert_recent_die_rolls $tkey
+		for {set index -1; set i 0} {$i < [llength $dice_preset_data(recent_die_rolls,$tkey)]} {incr i} {
+			if {[lindex [lindex $dice_preset_data(recent_die_rolls,$tkey) $i] 0] eq $dice_preset_data(CHAT_dice,$tkey)} {
 				set index $i
 				break
 			}
@@ -12245,22 +12509,23 @@ proc SendDieRollFromWindow {} {
 		if {$index >= 0} {
 			if {$index > 0} {
 				# move to the top of the list
-				set recent_die_rolls [linsert [lreplace $recent_die_rolls $index $index] 0 [list $CHAT_dice {}]]
+				set dice_preset_data(recent_die_rolls,$tkey) [linsert [lreplace $dice_preset_data(recent_die_rolls,$tkey) $index $index] 0 [list $dice_preset_data(CHAT_dice,$tkey) {}]]
 			}
 		} else {
-			set recent_die_rolls [linsert [lrange $recent_die_rolls 0 9] 0 [list $CHAT_dice {}]]
+			set dice_preset_data(recent_die_rolls,$tkey) [linsert [lrange $dice_preset_data(recent_die_rolls,$tkey) 0 9] 0 [list $dice_preset_data(CHAT_dice,$tkey) {}]]
 		}
-		set CHAT_dice {}
-		_render_die_roller $wr 0 0 recent
+		set dice_preset_data(CHAT_dice,$tkey) {}
+		_render_die_roller $wr 0 0 recent $for_user $tkey
 	}
 }
 
-proc Reroll {w index} {
-	global recent_die_rolls
+proc Reroll {w index for_user tkey} {
+	global dice_preset_data
+	assert_recent_die_rolls $tkey
 
-	if {$index >= 0 && $index < [llength $recent_die_rolls]} {
+	if {$index >= 0 && $index < [llength $dice_preset_data(recent_die_rolls,$tkey)]} {
 		set extra [string trim [$w.extra get]]
-		_do_roll [lindex [lindex $recent_die_rolls $index] 0] $extra $w
+		_do_roll [lindex [lindex $dice_preset_data(recent_die_rolls,$tkey) $index] 0] $extra $w $for_user $tkey
 	}
 }
 
@@ -12305,7 +12570,7 @@ proc _apply_die_roll_mods {spec extra label {g false}} {
 	return $newspec
 }
 
-proc _apply_die_roll_variables {rollspec} {
+proc _apply_die_roll_variables {rollspec for_user tkey} {
 	global DieRollPresetState
 	set it 0
 	foreach varform {
@@ -12318,14 +12583,14 @@ proc _apply_die_roll_variables {rollspec} {
 			error "too many iterations (circular reference?)"
 		}
 		set varname [string range $rollspec {*}$varidx]
-		if {[info exists DieRollPresetState(var,$varname)]} {
-			if {$DieRollPresetState(on,$varname)} {
-				set rollspec [string replace $rollspec {*}$fieldidx $DieRollPresetState(var,$varname)]
+		if {[info exists DieRollPresetState($tkey,var,$varname)]} {
+			if {$DieRollPresetState($tkey,on,$varname)} {
+				set rollspec [string replace $rollspec {*}$fieldidx $DieRollPresetState($tkey,var,$varname)]
 			} else {
 				set rollspec [string replace $rollspec {*}$fieldidx]
 			}
 		} else {
-			error "variable <$varname> does not exist."
+			error "variable <$varname> does not exist for $for_user."
 		}
 	    }
 	}
@@ -12333,23 +12598,23 @@ proc _apply_die_roll_variables {rollspec} {
 	return $rollspec
 }
 
-proc _do_roll {roll_string extra w} {
-	global CHAT_blind
+proc _do_roll {roll_string extra w for_user tkey} {
+	global dice_preset_data local_user
 	global DieRollPresetState
-	DEBUG 1 "_do_roll($roll_string, $extra)"
+	DEBUG 1 "_do_roll($roll_string, $extra, $w, $for_user, $tkey)"
 
 	if {[catch {
 		set rollspec [_apply_die_roll_mods $roll_string $extra { ad hoc}]
 		DEBUG 1 " after ad hoc: $rollspec"
-		if {[info exists DieRollPresetState(apply_order)]} {
-			foreach id $DieRollPresetState(apply_order) {
-				if {$DieRollPresetState(on,$id)} {
-					set rollspec [_apply_die_roll_mods $rollspec $DieRollPresetState(global,$id) {} $DieRollPresetState(g,$id)]
-					DEBUG 1 " after $DieRollPresetState(global,$id): $rollspec"
+		if {[info exists DieRollPresetState($tkey,apply_order)]} {
+			foreach id $DieRollPresetState($tkey,apply_order) {
+				if {$DieRollPresetState($tkey,on,$id)} {
+					set rollspec [_apply_die_roll_mods $rollspec $DieRollPresetState($tkey,global,$id) {} $DieRollPresetState($tkey,g,$id)]
+					DEBUG 1 " after $DieRollPresetState($tkey,global,$id): $rollspec"
 				}
 			}
 		}
-		set rollspec [_apply_die_roll_variables $rollspec]
+		set rollspec [_apply_die_roll_variables $rollspec $for_user $tkey]
 	} err]} {
 		tk_messageBox -type ok -icon error -title "Unable to complete die roll"\
 			-message "There was a problem with your die-roll request. It was not sent to the server."\
@@ -12357,50 +12622,66 @@ proc _do_roll {roll_string extra w} {
 		return
 	}
 	DEBUG 1 " sending $rollspec"
-	SendDieRoll [_recipients] $rollspec $CHAT_blind
+	if {$for_user ne $local_user} {
+		set rollspec [AddToDieRollTitle $rollspec "(for $for_user)"]
+	}
+	SendDieRoll [_recipients $for_user $tkey] $rollspec $dice_preset_data(CHAT_blind,$tkey)
 }
 
-proc RollPreset {w idx name} {
+proc AddToDieRollTitle {rollspec s} {
+	if {[set eqidx [string first = $rollspec]] >= 0} {
+		return "$s $rollspec"
+	}
+	return "$s=$rollspec"
+}
+
+proc RollPreset {w idx name for_user tkey} {
 	global dice_preset_data
 
-	if {[info exists dice_preset_data($name)]} {
+	if {[info exists dice_preset_data(preset,$tkey,$name)]} {
 		set extra [string trim [$w.extra get]]
-		_do_roll [dict get $dice_preset_data($name) DieRollSpec] $extra $w
+		_do_roll [dict get $dice_preset_data(preset,$tkey,$name) DieRollSpec] $extra $w $for_user $tkey
 	}
 }
 
-proc DeleteDieRollPreset {name} {
-	global dice_preset_data
-	array set new_set [array get dice_preset_data]
-	catch {unset new_set($name)}
-	set deflist {}
-	foreach {_ p} [array get new_set] {
-		lappend deflist $p
-	}
-	UpdateDicePresets $deflist
-	RequestDicePresets
-}
+#proc DeleteDieRollPreset {name for_user} {
+#	global dice_preset_data
+#	array set new_set [array get dice_preset_data]
+#	catch {unset new_set($name)}
+#	set deflist {}
+#	foreach {_ p} [array get new_set] {
+#		lappend deflist $p
+#	}
+#	UpdateDicePresets $deflist $for_user
+#	RequestDicePresets
+#}
 
-proc SendChatFromWindow {} {
-	global CHAT_text CHAT_blind
+proc SendChatFromWindow {for_user tkey} {
+	global dice_preset_data local_user
 
-	if {$CHAT_text != {}} {
-		if {$CHAT_blind} {
-			::gmaproto::chat_message $CHAT_text {} {} false true
-		} else {
-			SendChatMessage [_recipients] $CHAT_text
+	if {$dice_preset_data(CHAT_text,$tkey) != {}} {
+		set ctext $dice_preset_data(CHAT_text,$tkey)
+		if {$for_user != $local_user} {
+			set ctext [format "(for %s) %s" $for_user $ctext]
 		}
-		set CHAT_text {}
+
+		if {$dice_preset_data(CHAT_blind,$tkey)} {
+			::gmaproto::chat_message $ctext {} {} false true
+		} else {
+			SendChatMessage [_recipients $for_user $tkey] $ctext
+		}
+		set dice_preset_data(CHAT_text,$tkey) {}
 	}
 }
 
-proc _recipients {} {
-	global CHAT_TO
+proc _recipients {for_user tkey} {
+	global dice_preset_data
 
 	set recip_list {}
-	foreach name [array names CHAT_TO] {
-		if {$CHAT_TO($name)} {
-			lappend recip_list $name
+	set recip_idx [string length "CHAT_TO,$tkey,"]
+	foreach name [array names dice_preset_data "CHAT_TO,$tkey,*"] {
+		if {$dice_preset_data($name)} {
+			lappend recip_list [string range $name $recip_idx end]
 		}
 	}
 	if {[llength $recip_list] == 0} {
@@ -13399,7 +13680,87 @@ proc ConnectToServerByIdx {idx} {
 #   .../<name>@<zoom>.<ext>
 #   .../<name>@<zoom>/:<frame>:<name>@<zoom>.<ext>
 #   .../<name>.map
-
+#
+# support for multi-user die-roll presets
+# DoCommandDD= receives incoming preset updates; now looks for "For" attribute
+# 	default (old) behavior: call DisplayChatMessage to force window creation
+# 	new (if For): DisplayChatMessage -for <user>
+#
+#*DisplayChatMessage <d> <USER>|{} ...
+#*_render_die_roller <frame> _ _ <type> <USER> <TKEY> ...	update per-user preset window
+#*_resize_die_roller <w> <wid> <ht> <type> <USER> <TKEY>
+#*ResizeDieRoller <w> <wd> <ht> <type> <USER> <TKEY>
+#*::resize_task(type)					==> ::resize_task(<tkey>,<type>)
+#*inhibit_resize_task <flag> <type> <USER> <TKEY>
+#
+#*::dice_preset_data(name)=preset			==> ::dice_preset_data(preset,<tkey>,<name>)=preset	(user=$local_user by default)
+#*[sframe .chatwindow.p.preset.sf].preset<i>		==> ::dice_preset_data(w,<tkey>,<name>)		widget displaying preset <i> from set
+#*::DRPS_en<i>						==> ::dice_preset_data(en,<tkey>,<name>)
+#*::EDRP_text<i>					==> ::dice_preset_data(EDRP_text,<tkey>,<i>)
+#*::EDRP_mod_en<i>					==> ::dice_preset_data(EDRP_mod_en,<tkey>,<i>)
+#*::EDRP_mod_ven<i>					==> ::dice_preset_data(EDRP_mod_ven,<tkey>,<i>)
+#*::EDRP_mod_g<i>					==> ::dice_preset_data(EDRP_mod_g,<tkey>,<i>)
+# (new)							==> ::dice_preset_data(delegates,<tkey>)=list
+# (new)							==> ::dice_preset_data(delegate_for,<tkey>)=list
+#*.chatwindow (toplevel)				==> ::dice_preset_data(cw,<tkey>)
+#*.adrp							==> .adrp[to_window_id $tkey]
+#*.edrp							==> .edrp[to_window_id $tkey]
+#*::last_known_size(k)					==> ::last_known_size(<tkey>,<k>)
+#*.chatwindow.p.chat.1 only created for the local use
+#*::CHAT_dice						==> ::dice_preset_data(CHAT_dice,<tkey>)
+#*::CHAT_blind						==> ::dice_preset_data(CHAT_blind,<tkey>)
+#*::CHAT_TO(<recipient>)				==> ::dice_preset_data(CHAT_TO,<tkey>,<recipient>)
+#*::CHAT_text						==> ::dice_preset_data(CHAT_text,<tkey>)
+#*::recent_die_rolls					==> ::dice_preset_data(recent_die_rolls,<tkey>)
+#*_collapse_extra <w> <i> <USER> <TKEY>
+#*::DieRollPresetState(<k>)				==> ::DieRollPresetState(<tkey>,<k>)
+#*_apply_die_roll_variables <spec> <USER> <TKEY>
+#*::tmp_presets						==> ::dice_preset_data(tmp_presets,<tkey>)
+#*chat_to_all <USER> <TKEY>
+#*update_chat_to <USER> <TKEY>
+# panels:
+#   recent:
+#     from dice_preset_data(recent_die_rolls,<tkey>) (list of roll history) $w.$i.* widgets for element #i
+#   preset:
+#     from dice_preset_data(preset,<tkey>,<presetname>)=presetdata;
+#          dice_preset_data(w,<tkey>,<presetname>)=widget path for preset ($w.preset$i)
+#
+#*EditDieRollPresets <USER> <TKEY>
+#*EDRPgetValues <W> <USER> <TKEY>
+#*EDRPsaveValues <W> <USER> <TKEY>
+#*DeleteDieRollpreset <name> <USER>
+#*UpdateDicePresets <newpresets> <USER>
+#*EDRPadd <W> <USER> <TKEY>
+#*EDRPraise <W> <USER> <TKEY> <I>
+#*EDRPlower <W> <USER> <TKEY> <I>
+#*EDRPdel <W> <USER> <TKEY> <I>
+#*EDRPdelCustom <W> <USER> <TKEY> <I>
+#*EDRPaddModifier <W> <USER> <TKEY>
+#*EDRPcheckVar <W> <USER> <TKEY> <I>
+#*EDRPraiseModifier <W> <USER> <TKEY> <I>
+#*EDRPlowerModifier <W> <USER> <TKEY> <I>
+#*EDRPdelModifier <W> <USER> <TKEY> <I>
+#*EDRPresequence <W> <USER> <TKEY>
+#*EDRPupdateGUI <W> <USER> <TKEY>
+#*SaveDieRollPresets <w> <USER> <TKEY>
+#*LoadDieRollPresets <w> <USER> <TKEY>
+#*RequestDicePresets <USER>
+#*RefreshPeerList **NO CHANGE** **NO PARAMS**
+#*SendChatFromWindow <USER> <TKEY>
+#*SendDieRollFromWindow <W> <RECENT-W> <USER> <TKEY>
+#*UpdatePeerList <USER> <TKEY>
+#*_recipients <USER> <TKEY>
+#*_do_roll <DICE> <EXTRA> <W> <USER> <TKEY>
+#*PresetLists dice_preset_data <USER> <TKEY> -export
+#*DRPScheckVarEn <i> <id>  ==> DRPScheckVarEn <key> <id> <USER> <TKEY>
+#*DisplayDieRoll <d>
+#*RollPreset <w> <i> <pname> <USER> <TKEY>
+#*Reroll <w> <index> <USER> <TKEY>
+#*CommitNewPreset <USER> <TKEY>
+#*AddDieRollPreset <USER> <TKEY>
+#
+#*user_key name -> sanitized_name
+#
 # @[00]@| GMA-Mapper 4.21
 # @[01]@|
 # @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
