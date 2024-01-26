@@ -19,7 +19,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.22-beta}     ;# @@##@@
+set GMAMapperVersion {4.22-beta.1}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {412}         ;# @@##@@
 set CoreVersionNumber {6.13}            ;# @@##@@
@@ -10705,6 +10705,7 @@ proc _render_die_roller {w width height type for_user tkey args} {
 				DEBUG 4 "create frame $wpi"
 				set dname [dict get $preset DisplayName]
 				set pname [dict get $preset Name]
+				set piname [to_window_id $pname]
 				set dice_preset_data(w,$tkey,$pname) $wpi
 				pack [frame $wpi] -side top -expand 0 -fill x
 				if {[set id [string trim [dict get $preset Variable]]] eq {}} {
@@ -10714,17 +10715,20 @@ proc _render_die_roller {w width height type for_user tkey args} {
 					} else {
 						set t "$dname: [dict get $preset DieRollSpec]"
 					}
-					pack [ttk::checkbutton $wpi.enabled -variable dice_preset_data(en,$tkey,$pname) \
-						-command [list DRPScheckVarEn "en,$tkey,$pname" $id $for_user $tkey]\
+					pack [ttk::checkbutton $wpi.enabled -variable dice_preset_data(en,$tkey,$piname) \
+						-command [list DRPScheckVarEn "en,$tkey,$piname" $id $for_user $tkey]\
 						-text $t] -side left
 				} else {
-					pack [ttk::checkbutton $wpi.enabled -variable dice_preset_data(en,$tkey,$pname) \
-						-command [list DRPScheckVarEn "en,$tkey,$pname" $id $for_user $tkey]\
+					pack [ttk::checkbutton $wpi.enabled -variable dice_preset_data(en,$tkey,$piname) \
+						-command [list DRPScheckVarEn "en,$tkey,$piname" $id $for_user $tkey]\
 						-text "[dict get $preset DisplayName] (as \$\{$id\}): [dict get $preset DieRollSpec]"\
 					] -side left
 				}
-				if {![info exists dice_preset_data(en,$tkey,$dname)]} {
-					set dice_preset_data(en,$tkey,$dname) [::gmaproto::int_bool [dict get $preset Enabled]]
+				if {![info exists dice_preset_data(en,$tkey,$piname)]} {
+					trace add variable dice_preset_data(en,$tkey,$piname) {array read write unset} TRACEvar
+					set dice_preset_data(en,$tkey,$piname) [::gmaproto::int_bool [dict get $preset Enabled]]
+				} else {
+					TRACE "variable dice_preset_data(en,$tkey,$piname) already exists with value $dice_preset_data(en,$tkey,$piname)"
 				}
 				::tooltip::tooltip $wpi.enabled "* [dict get $preset Description]"
 				incr i
@@ -10902,6 +10906,7 @@ proc EditDieRollPresets {for_user tkey} {
 	     	::tooltip::tooltip $wnm.del$i "Remove this modifier from the list"
 	     	::tooltip::tooltip $wnm.en$i "If checked, the modifier is in-play"
 	     	::tooltip::tooltip $wnm.varp$i "If checked, the modifier is used in place of <var>, otherwise added to all die rolls"
+		trace add variable dice_preset_data(EDRP_mod_en,$tkey,$i) {array read write unset} TRACEvar
 		set dice_preset_data(EDRP_mod_en,$tkey,$i) [::gmaproto::int_bool [dict get $preset Enabled]]
 #		set dice_preset_data(EDRP_mod_en,$tkey,$i) false
 		set dice_preset_data(EDRP_mod_g,$tkey,$i) [::gmaproto::int_bool [dict get $preset Global]]
@@ -11495,6 +11500,7 @@ proc EDRPaddModifier {w for_user tkey} {
 	set wnm [sframe content $w.n.m]
 	dict lappend dice_preset_data(tmp_presets,$tkey) Modifiers [dict create Global false Enabled false Variable {} Name {} DisplayName {} DieRollSpec {} DisplaySeq {} Description {}]
 	set i [expr [llength [dict get $dice_preset_data(tmp_presets,$tkey) Modifiers]] - 1]
+	trace add variable dice_preset_data(EDRP_mod_en,$tkey,$i) {array read write unset} TRACEvar
 	set dice_preset_data(EDRP_mod_en,$tkey,$i) 0
 	set dice_preset_data(EDRP_mod_ven,$tkey,$i) 0
 	set dice_preset_data(EDRP_mod_g,$tkey,$i) 0
@@ -13173,6 +13179,25 @@ global socks_idlist
 
 proc TRACE args {
 	puts "[info level 0]"
+}
+
+proc TRACEvar {name1 name2 op} {
+	switch $op {
+		array 	{ 
+			puts "TRACE array $name1" 
+		}
+		read -
+		write -
+		unset {
+			upvar $name1 v
+			if {$name2 eq {}} {
+				puts "TRACE $op $name1=$v"
+			} else {
+				puts "TRACE $op ${name1}($name2)=$v($name2)"
+			}
+		}
+		default	{ puts "TRACE var $name1 $name2 $op" }
+	}
 }
 
 proc connectToServer {} {
