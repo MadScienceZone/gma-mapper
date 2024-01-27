@@ -8941,6 +8941,11 @@ proc highlightMob {w id} {
 proc FlashMob {w id step} {FlashGeneric $w $id $step MF#}
 proc FlashElement {w id step} {FlashGeneric $w $id $step obj}
 proc FlashGeneric {w id step pfx} {
+	global _preferences
+	if {![dict exists $_preferences flash_updates] || ![dict get $_preferences flash_updates]} {
+		return
+	}
+
   if {[catch {
 	global animatePlacement
 	DEBUG 3 "Flash* $w $id $step $pfx"
