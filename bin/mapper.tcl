@@ -10862,7 +10862,7 @@ proc EditDieRollPresets {for_user tkey} {
 		if {![dict exists $preset Group] || [set pgroup [dict get $preset Group]] eq {}} {
 			set pgroup {}
 		}
-		grid [button $wnr.gbtn$i -image $icon_bullet_arrow_right -command [list EditDRPGroup $wnr.group$i]] \
+		grid [button $wnr.gbtn$i -image $icon_bullet_arrow_right -command [list EditDRPGroup $wnr.group$i "Groups for Preset #$i"]] \
 		     [label $wnr.group$i -text $pgroup] \
 		     [entry $wnr.name$i] [entry $wnr.desc$i] \
 		     [button $wnr.color$i -image $icon_colorwheel -command [list EditColorBoxTitle "EDRP_text,$tkey,$i"]] \
@@ -10906,11 +10906,13 @@ proc EditDieRollPresets {for_user tkey} {
 	}
 
 	set i 0
-	grid [label $wnm.t0 -text On] [label $wnm.t1 -text Name] [label $wnm.t2 -text Description] [label $wnm.t3 -text Expression] \
+	grid x [label $wnm.tg -text Group] [label $wnm.t0 -text On] [label $wnm.t1 -text Name] [label $wnm.t2 -text Description] [label $wnm.t3 -text Expression] \
 		x x x x x x [button $wnm.add -image $icon_add -command [list EDRPaddModifier $w $for_user $tkey]] -sticky ew
 	foreach preset [dict get $dice_preset_data(tmp_presets,$tkey) Modifiers] {
 		set dice_preset_data(tmp_presets,$tkey,M,$i) $preset
-		grid [ttk::checkbutton $wnm.en$i -text On -offvalue 0 -onvalue 1 -variable dice_preset_data(EDRP_mod_en,$tkey,$i)] \
+		grid [button $wnm.gbtn$i -image $icon_bullet_arrow_right -command [list EditDRPGroup $wnm.group$i "Groups for Modifier #$i"]] \
+		     [label $wnm.group$i -text {}] \
+		     [ttk::checkbutton $wnm.en$i -text On -offvalue 0 -onvalue 1 -variable dice_preset_data(EDRP_mod_en,$tkey,$i)] \
 		     [entry $wnm.name$i] \
 		     [entry $wnm.desc$i] \
 		     [entry $wnm.dspec$i] \
@@ -10944,6 +10946,7 @@ proc EditDieRollPresets {for_user tkey} {
 		$wnm.name$i insert 0 [dict get $preset DisplayName]
 		$wnm.desc$i insert 0 [dict get $preset Description]
 		$wnm.dspec$i insert 0 [dict get $preset DieRollSpec]
+		$wnm.group$i configure -text [dict get $preset Group]
 		if {$i == 0} {
 			$wnm.up$i configure -state disabled
 		}
@@ -10953,7 +10956,7 @@ proc EditDieRollPresets {for_user tkey} {
 		$wnm.dn[expr $i - 1] configure -state disabled
 	}
 	grid columnconfigure $wnr 5 -weight 2
-	grid columnconfigure $wnm 2 -weight 2
+	grid columnconfigure $wnm 4 -weight 2
 	grid columnconfigure $wnc 2 -weight 2
 
 
@@ -11240,7 +11243,7 @@ proc EDRPsaveValues {w for_user tkey} {
 			set dname $n
 		}
 		if {[dict exists $p Group] && [set grp [dict get $p Group]] ne {}} {
-			append dname "\u25B6" [join $grp "\u25B6"]
+			append dname "\u25B6$grp"
 		}
 		if {[set dn [dict get $p DisplayName]] ne {}} {
 			append dname "|$dn"
@@ -11256,12 +11259,12 @@ proc EDRPsaveValues {w for_user tkey} {
 	}
 	foreach p [dict get $dice_preset_data(tmp_presets,$tkey) Modifiers] {
 		# Name:
-		#   §<seq>;<var>;<flags>[;<client>]|<name>
-		#    \___/ \___/ \_____/  \______/  \____/
-		#      |     |      |      ClientData DisplayName
-		#      |     |      Global
-		#      |     |      Enabled
-		#      |     Variable
+		#   §<seq><group>;<var>;<flags>[;<client>]|<name>
+		#    \___/\_____/ \___/ \_____/  \______/  \____/
+		#      |     |      |      |      ClientData DisplayName
+		#      |     |      |      Global
+		#      |     |      |      Enabled
+		#      |     Group  Variable
 		#      DisplaySeq
 		set flags {}
 		if {[dict get $p Enabled]} {
@@ -11275,7 +11278,7 @@ proc EDRPsaveValues {w for_user tkey} {
 		}
 		set dname "\u00A7$n"
 		if {[dict exists $p Group] && [set grp [dict get $p Group]] ne {}} {
-			append dname "\u25B6" [join $grp "\u25B6"]
+			append dname "\u25B6$grp"
 		}
 		append dname ";[dict get $p Variable];$flags"
 		if {[dict exists $p ClientData] && [set cdata [dict get $p ClientData]] ne {}} {
@@ -11450,7 +11453,7 @@ proc EDRPgetValues {w for_user tkey} {
 		dict set d Description [$wnm.desc$i get]
 		dict set d DieRollSpec [$wnm.dspec$i get]
 		dict set d Enabled [::gmaproto::json_bool $dice_preset_data(EDRP_mod_en,$tkey,$i)]
-		# TODO Group
+		dict set d Group [$wnm.group$i cget -text]
 		dict lappend dice_preset_data(tmp_presets,$tkey) Modifiers $d
 	}
 }
@@ -11507,6 +11510,7 @@ proc EDRPupdateGUI {w for_user tkey} {
 			$wnm.g$i configure -state disabled
 		}
 		set dice_preset_data(EDRP_mod_en,$tkey,$i) [::gmaproto::int_bool [dict get $p Enabled]]
+		$wnm.group$i configure -text [dict get $p Group]
 
 		if {$i == 0} {
 			$wnm.up$i configure -state disabled
@@ -11521,13 +11525,70 @@ proc EDRPupdateGUI {w for_user tkey} {
 	}
 }
 
+proc EditDRPGroup {l title} {
+	global EDRPdata icon_add
+
+	set w .edrpgrp[set lid [to_window_id $l]]
+	if {[winfo exists $w]} {
+		DEBUG 0 "There is already a dialog open to edit $title; not making another."
+		return
+	}
+	toplevel $w
+	wm title $w $title
+	grid [label $w.desc1 -text "Edit the group name(s) or leave any of them blank to remove them."] - -sticky w
+	grid [label $w.desc2 -text "Click the \[+\] button to add a sub-group."] - -sticky w
+	if {[set EDRPdata($lid,n) [llength [set groups [split [$l cget -text] "\u25B6"]]]] == 0} {
+		set EDRPdata($lid,n) 1
+	}
+
+	for {set i 0} {$i < $EDRPdata($lid,n)} {incr i} {
+		if {$i == 0} {
+			grid [label $w.g$i -text Group:] [entry $w.e$i] [button $w.add -image $icon_add -command "EDRPgrpAdd $lid $w"]
+		} else {
+			grid [label $w.g$i -text Subgroup:] [entry $w.e$i]
+		}
+		$w.e$i insert 0 [lindex $groups $i]
+	}
+	grid [button $w.cancel -command "EDRPgrpDest $lid $w" -text Cancel] \
+  	     [button $w.ok -command "EDRPgrpSave $lid $w $l" -text OK]
+	grid columnconfigure $w 1 -weight 2
+}
+
+proc EDRPgrpAdd {k w} {
+	global EDRPdata
+	grid forget $w.cancel $w.ok
+	grid [label $w.g$EDRPdata($k,n) -text Subgroup:] [entry $w.e$EDRPdata($k,n)]
+	grid $w.cancel $w.ok
+	incr EDRPdata($k,n)
+}
+
+proc EDRPgrpSave {k w l} {
+	global EDRPdata
+	set grp {}
+	for {set i 0} {$i < $EDRPdata($k,n)} {incr i} {
+		if {[set gp [string trim [$w.e$i get]]] ne {}} {
+			lappend grp $gp
+		}
+	}
+	$l configure -text [join $grp "\u25B6"]
+	EDRPgrpDest $k $w
+}
+
+proc EDRPgrpDest {k w} {
+	global EDRPdata
+	array unset EDRPdata "$k,*"
+	destroy $w
+}
+
 proc EDRPadd {w for_user tkey} {
 	global dice_preset_data icon_anchor_n icon_anchor_s icon_delete icon_colorwheel icon_bullet_arrow_right
 	set wnr [sframe content $w.n.r]
 	set wnm [sframe content $w.n.m]
-	dict lappend dice_preset_data(tmp_presets,$tkey) Rolls [dict create Name {} DisplayName {} DieRollSpec {} DisplaySeq {} Description {} AreaTag {} Group {}]
+	set d [dict create Name {} DisplayName {} DieRollSpec {} DisplaySeq {} Description {} AreaTag {} Group {}]
+	dict lappend dice_preset_data(tmp_presets,$tkey) Rolls $d
 	set i [expr [llength [dict get $dice_preset_data(tmp_presets,$tkey) Rolls]] - 1]
-	grid [button $wnr.gbtn$i -image $icon_bullet_arrow_right -command [list EditDRPGroup $wnr.group$i]] \
+	set dice_preset_data(tmp_presets,$tkey,R,$i) $d
+	grid [button $wnr.gbtn$i -image $icon_bullet_arrow_right -command [list EditDRPGroup $wnr.group$i "Groups for Preset #$i"]] \
 	     [label $wnr.group$i -text {}] \
 	     [entry $wnr.name$i] [entry $wnr.desc$i] \
 	     [button $wnr.color$i -image $icon_colorwheel -command [list EditColorBoxTitle "EDRP_text,$tkey,$i"]] \
@@ -11545,16 +11606,20 @@ proc EDRPadd {w for_user tkey} {
 	EDRPupdateGUI $w $for_user $tkey
 }
 proc EDRPaddModifier {w for_user tkey} {
-	global dice_preset_data icon_anchor_n icon_anchor_s icon_delete
+	global dice_preset_data icon_anchor_n icon_anchor_s icon_delete icon_bullet_arrow_right
 	set wnr [sframe content $w.n.r]
 	set wnm [sframe content $w.n.m]
-	dict lappend dice_preset_data(tmp_presets,$tkey) Modifiers [dict create Global false Enabled false Variable {} Name {} DisplayName {} DieRollSpec {} DisplaySeq {} Description {} Group {} ClientData {}]
+	set d [dict create Global false Enabled false Variable {} Name {} DisplayName {} DieRollSpec {} DisplaySeq {} Description {} Group {} ClientData {}]
+	dict lappend dice_preset_data(tmp_presets,$tkey) Modifiers $d
 	set i [expr [llength [dict get $dice_preset_data(tmp_presets,$tkey) Modifiers]] - 1]
+	set dice_preset_data(tmp_presets,$tkey,M,$i) $d
 	trace add variable dice_preset_data(EDRP_mod_en,$tkey,$i) {array read write unset} TRACEvar
 	set dice_preset_data(EDRP_mod_en,$tkey,$i) 0
 	set dice_preset_data(EDRP_mod_ven,$tkey,$i) 0
 	set dice_preset_data(EDRP_mod_g,$tkey,$i) 0
-	grid [ttk::checkbutton $wnm.en$i -text On -onvalue 1 -offvalue 0 -variable dice_preset_data(EDRP_mod_en,$tkey,$i)] \
+	grid [button $wnm.gbtn$i -image $icon_bullet_arrow_right -command [list EditDRPGroup $wnm.group$i "Groups for Modifier #$i"]] \
+	     [label $wnm.group$i -text {}] \
+	     [ttk::checkbutton $wnm.en$i -text On -onvalue 1 -offvalue 0 -variable dice_preset_data(EDRP_mod_en,$tkey,$i)] \
 	        [entry $wnm.name$i] \
 		[entry $wnm.desc$i] \
 		[entry $wnm.dspec$i] \
@@ -11598,7 +11663,7 @@ proc PresetLists {arrayname for_user tkey args} {
 	set pkeylen [string length "preset,$tkey,"]
 	foreach pkey [lsort [array names presets "preset,$tkey,*"]] {
 		set pname [string range $pkey $pkeylen end]
-		if {[regexp {^§(\d+);(.*?);(.*?)(?:;(.*?))?(?:\|(.*))?$} $pname _ sequence varname flags client dname]} {
+		if {[regexp {^§(.*?);(.*?);(.*?)(?:;([^|]*))?(?:\|(.*))?$} $pname _ sequence varname flags client dname]} {
 			set d $presets($pkey)
 			if {$dname eq {}} {
 				dict set d DisplayName {unnamed modifier}
@@ -11611,7 +11676,7 @@ proc PresetLists {arrayname for_user tkey args} {
 				e Enabled
 				g Global
 			} {
-				if {[lsearch -exact $flags $flagcode] >= 0} {
+				if {[string first $flagcode $flags] >= 0} {
 					dict set d $flagname true
 				} else {
 					dict set d $flagname false
