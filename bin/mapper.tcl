@@ -10818,6 +10818,7 @@ proc EDRPsaveAndDestroy {w for_user tkey} {
 	EDRPsaveValues $w $for_user $tkey
 	destroy $w
 }
+
 proc EditDieRollPresets {for_user tkey} {
 	global dice_preset_data
 	global icon_colorwheel
@@ -11187,9 +11188,9 @@ proc ECBT_add {w} {
 #
 # while editing, we keep the preset data in the global variable tmp_presets
 # which is a dict of
-# 	Rolls=> ordered list of dict with DisplayName and DisplaySeq
-# 	CustomRolls=>same but with no sequence data
-# 	Modifiers=>ordered list of dict of ?
+# 	Rolls=> ordered list of dict with DisplayName and DisplaySeq, AreaTag, Group
+# 	CustomRolls=>same but with no sequence data (since we couldn't understand it)
+# 	Modifiers=>ordered list of dict of ? +AreaTag, Group
 # permanent data is in dice_preset_data
 # which is an array of presetname=>dict Name Description DieRollSpec
 # presetname should track <DisplaySeq>|<DisplayName>
@@ -11233,7 +11234,7 @@ proc EDRPsaveValues {w for_user tkey} {
 			DEBUG 0 "ERROR interpreting sequence \"[dict get $p DisplaySeq]\"; can't save presets"
 			return
 		}
-		if {[dict exists $p Tag] && [set modtag [dict get $p Tag]] ne {}} {
+		if {[dict exists $p Tag] && [set modtag [dict get $p ClientData]] ne {}} {
 			lappend newpresets [dict create Name [format "§%03d;%s;%s;%s|%s" $seq \
 							[dict get $p Variable] \
 							$flags\
@@ -11548,38 +11549,32 @@ proc PresetLists {arrayname for_user tkey args} {
 	set pkeylen [string length "preset,$tkey,"]
 	foreach pkey [lsort [array names presets "preset,$tkey,*"]] {
 		set pname [string range $pkey $pkeylen end]
-		if {[string range $pname 0 0] eq {§}} {
+		if {[regexp {^§(\d+);(.*?);(.*?)(?:;(.*?))?(?:\|(.*))?$} $pname _ sequence varname flags client dname]} {
 			set d $presets($pkey)
-			set parts [split [string range $pname 1 end] |]
-			if {[llength $parts] == 1} {
+			if {$dname eq {}} {
 				dict set d DisplayName {unnamed modifier}
 			} else {
-				dict set d DisplayName [join [lrange $parts 1 end] |]
+				dict set d DisplayName $dname
 			}
-			set flags [split [lindex $parts 0] ";"]
-			if {[llength $flags] > 3} {
-				dict set d Tag [lindex $flags 3]
-			}
-			if {[llength $flags] > 2} {
-				if {[lsearch -exact [lindex $flags 2] e] >= 0} {
-					dict set d Enabled true
+			dict set d ClientData $client
+			dict set d Variable $varname
+			foreach {flagcode flagname} {
+				e Enabled
+				g Global
+			} {
+				if {[lsearch -exact $flags $flagcode] >= 0} {
+					dict set d $flagname true
 				} else {
-					dict set d Enabled false
-				}
-				if {[lsearch -exact [lindex $flags 2] g] >= 0} {
-					dict set d Global true
-				} else {
-					dict set d Global false
+					dict set d $flagname false
 				}
 			}
-			if {[llength $flags] > 1} {
-				dict set d Variable [string trim [lindex $flags 1]]
-			} else {
-				dict set d Variable {}
-			}
-			
-			set nstr [lindex $flags 0]
-			if {[scan $nstr %d%s n _] == 1} {
+
+			set sdata [split $sequence "\u25B6"]
+			if {[llength $sdata] > 1} {
+				dict set d Group [join [lrange $sdata 1 end] "\u25B6"]
+				set sdata [lindex $sdata 0]
+			} 
+			if {[scan $sdata %d%s n _] == 1} {
 				if {$n <= $seq} {
 					set n [incr seq]
 				} else {
@@ -11614,12 +11609,21 @@ proc PresetLists {arrayname for_user tkey args} {
 		} else {
 			set pieces [split $pname |]
 			set d $presets($pkey)
+
 			if {[llength $pieces] < 2} {
+				# no |, so this is just a simple name with no other fancy stuff.
+				# give it a seqence here, which we'll write out for it later.
 				dict set d DisplayName $pname 
 				dict set d DisplaySeq [incr seq]
 				lappend rolls $d
 			} else {
 				set nstr [lindex $pieces 0]
+				if {[regexp {^(\$\[.*?\])(.*)$} _ areatag rest]} {
+					set nstr $rest
+					dict set d AreaTag $areatag
+				}
+				if {[
+
 				if {[scan $nstr %d%s n _] == 1} {
 					if {$n <= $seq} {
 						set n [incr seq]
