@@ -1165,6 +1165,11 @@ of the bar, e.g.,
 .RB \*(lq 001|damage \*(rq,
 .RB \*(lq "002|fort save" \*(rq,
 etc. The numbers need not be strictly consecutive.
+'\" <<New>>
+Clients SHOULD use dictionary sorting for preset items so that the numeric sort-order sequence value
+is correctly arranged regardless of number of characters; however the recommendation here is also to
+pad them with zeroes to three digits for the benefit of clients which cannot or will not do so.
+'\" <</New>>
 .TP
 2.
 Stored variables MAY be stored as a die-roll preset with a
@@ -1208,10 +1213,57 @@ clients SHOULD interpret this to mean that the preset's value should not be assi
 to a variable name, but should be appended to any die-roll specification made while it
 is enabled.
 .RE
+'\" <<New>>
 .TP
 3.
+It is RECOMMENDED that clients allow for grouping of related presets and/or modifiers
+by appending one or more group names to the end of the numeric sort order digits. Each
+such name is separated from the digits and each other with a right-pointing triangle
+.RB (\*(lq \[u25B6] \*(rq)
+(Unicode U+25B6).
+For example,
+.B 012|attack
+is an ungrouped attack roll,
+.B 013\[u25B6]monster|attack
+is an attack roll belonging to the \*(lqmonster\*(rq group,
+.B 030\[u25B6]monster\[u25B6]save|Fortitde
+is a Fortitude saving throw belonging to the \*(lqsave\*(rq subgroup of the \*(lqmonster\*(rq group, and
+.B \[sc]042\[u25B6]monster;;|mod
+is a modifier in the \*(lqmonster\*(rq group.
+Clients SHOULD allow users to collapse all of the die rolls with the same group name(s) appearing consecutively
+in the die-roll preset list.
+.TP
+4.
 Clients SHOULD gracefully handle the existence of data formats not listed
 above without losing or corrupting any presets or metadata.
+.RS
+.LP
+Notably, the
+.BR gma (6)
+program itself automates the creation and destruction of ephemeral presets
+for combatants on an encounter-by-encounter basis. The names for these presets
+include an additional component,
+.IR area ,
+which identifies the dungeon location or encounter identifier. This means the
+preset names have these forms:
+.RS
+.br
+.BI $[ area ] sequence | area
+.br
+.BI $[ area ] sequence \[u25B6] monster | area
+.br
+.BI $[ area ] sequence \[u25B6] monster \[u25B6]saves| area
+.br
+.BI $[ area ] sequence \[u25B6] monster \[u25B6]other| area
+.br
+.BI $[ area ] sequence \[u25B6] monster \[u25B6]special| area
+.br
+.BI \[sc] sequence ; var ; flags ;$[ area ]| area
+.br
+.BI \[sc] sequence \[u25B6] monster ; var ; flags ;$[ area ]| area
+.RE
+.RE
+'\" <</New>>
 '\" <</>>
 .RE
 .TP
