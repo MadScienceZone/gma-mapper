@@ -10613,10 +10613,17 @@ proc cleanupDieRollSpec {spec} {
 	return [join [list [join $res "\u2016"] [lindex $parts 1]] =]
 }
 
+proc DRPexpand {w tkey piname j for_user} {
+	global dice_preset_data
+	set dice_preset_data(collapse,$tkey,$piname) \
+		[lreplace $dice_preset_data(collapse,$tkey,$piname) $j $j \
+			[expr ![lindex $dice_preset_data(collapse,$tkey,$piname) $j]]]
+	_render_die_roller $w 0 0 preset $for_user $tkey
+}
 		
 proc _render_die_roller {w width height type for_user tkey args} {
 	global dice_preset_data last_known_size icon_delete icon_die16
-	global dark_mode _preferences colortheme
+	global dark_mode _preferences colortheme icon_blank
 
 	assert_last_known_size $tkey
 	if {$width <= 0} {
@@ -10688,6 +10695,9 @@ proc _render_die_roller {w width height type for_user tkey args} {
 			}
 		}
 		preset {
+			global icon_bullet_arrow_down
+			global icon_bullet_arrow_right
+			set CONTINUE_OUTER_LOOP 42
 			if {[lsearch -exact $args -noclear] < 0} {
 				foreach pk [array names dice_preset_data "w,$tkey,*"] {
 					DEBUG 1 "destroy $dice_preset_data($pk)"
@@ -10701,14 +10711,103 @@ proc _render_die_roller {w width height type for_user tkey args} {
 			# Modifiers
 			#
 			global DieRollPresetState
+			set prev_grplist {}
+			set prev_collapse {}
 			foreach preset [dict get $preset_data Modifiers] {
 				set wpi $w.preset$i
 				DEBUG 4 "create frame $wpi"
 				set dname [dict get $preset DisplayName]
 				set pname [dict get $preset Name]
 				set piname [to_window_id $pname]
+
+				set grplist [split [dict get $preset Group] "\u25B6"]
+				if {![info exists dice_preset_data(collapse,$tkey,$piname)] || \
+					[llength $dice_preset_data(collapse,$tkey,$piname)] != [llength $grplist]} {
+						set dice_preset_data(collapse,$tkey,$piname) [lmap x $grplist { expr 0 }]
+				}
+				try {
+					set controls {}
+					for {set j 0} {$j < [llength $grplist]} {incr j} {
+						if {$j < [llength $prev_grplist] && [lindex $prev_grplist $j] eq [lindex $grplist $j]} {
+							if {![lindex $prev_collapse $j]} {
+								# part of closed group we already showed above.
+								# same level-j group as the previous line, and since that was closed
+								# we will be too. So we don't even need to show this preset at all.
+								return -level 0 -code $CONTINUE_OUTER_LOOP
+							}
+							# part of open group we already showed above. add a spacer here and keep looking.
+							lappend controls _
+							continue
+						} elseif {![lindex $dice_preset_data(collapse,$tkey,$piname) $j]} {
+							# start of new group at level j but we're closed here.
+							# set an expand button and stop.
+							lappend controls >
+							set prev_collapse [lreplace $prev_collapse $j end 0]
+							break
+						} else {
+							# start of new group at level j and we're open here.
+							# set a collapse button and continue.
+							lappend controls v
+							set prev_collapse [lreplace $prev_collapse $j end 1]
+						}
+					}
+				} on $CONTINUE_OUTER_LOOP {} {
+					continue
+				}
+				set prev_grplist $grplist
+				set wpi $w.preset$i
 				set dice_preset_data(w,$tkey,$pname) $wpi
 				pack [frame $wpi] -side top -expand 0 -fill x
+				set bgcolor [$wpi cget -background]
+				try {
+					for {set j 0} {$j < [llength $controls]} {incr j} {
+						switch [lindex $controls $j] {
+							_ {
+								pack [button $wpi.gb$j -image $icon_blank -relief flat] -side left
+								pack [label $wpi.gl$j -text [lindex $grplist $j] -fg $bgcolor -bg $bgcolor] -side left
+							}
+							> {
+								pack [button $wpi.gb$j -image $icon_bullet_arrow_right -relief flat -command [list DRPexpand $w $tkey $piname $j $for_user]] -side left
+								pack [label $wpi.gl$j -text [lindex $grplist $j]] -side left
+								return -level 0 -code $CONTINUE_OUTER_LOOP
+							}
+							v {
+								pack [button $wpi.gb$j -image $icon_bullet_arrow_down -relief flat -command [list DRPexpand $w $tkey $piname $j $for_user]] -side left
+								pack [label $wpi.gl$j -text [lindex $grplist $j]] -side left
+							}
+							default {
+								pack [label $wpi.gb$j -text "??"] -side left
+								pack [label $wpi.gl$j -text "??"] -side left
+							}
+						}
+					}
+				} on $CONTINUE_OUTER_LOOP {} {
+					incr i
+					continue
+				}
+
+
+
+#				set dice_preset_data(w,$tkey,$pname) $wpi
+#				pack [frame $wpi] -side top -expand 0 -fill x
+#				set grplist [split [dict get $preset Group] "\u25B6"]
+#				if {![info exists dice_preset_data(collapse,$tkey,$piname)] || \
+#					[llength $dice_preset_data(collapse,$tkey,$piname)] != [llength $grplist]} {
+#						set dice_preset_data(collapse,$tkey,$piname) [lmap x $grplist { expr 0 }]
+#				}
+#				for {set j 0} {$j < [llength $grplist]} {incr j} {
+#					if {[lindex $dice_preset_data(collapse,$tkey,$piname) $j]} {
+#						pack [button $wpi.gb$j -image $icon_bullet_arrow_down -relief flat -command [list DRPexpand $w $tkey $piname]] [label $wpi.gl$j -text [lindex $grplist $j]] -side left
+#					} else {
+#						pack [button $wpi.gb$j -image $icon_bullet_arrow_right -relief flat -command [list DRPexpand $w $tkey $piname]] [label $wpi.gl$j -text [lindex $grplist $j]] -side left
+#						break
+#					}
+#				}
+#				if {$j < [llength $grplist]} {
+#					incr i
+#					continue
+#				}
+
 				if {[set id [string trim [dict get $preset Variable]]] eq {}} {
 					set id [dict get $preset DisplaySeq]
 					if {[dict get $preset Global]} {
@@ -10735,18 +10834,100 @@ proc _render_die_roller {w width height type for_user tkey args} {
 				incr i
 			}
 
+			#
+			# open open closed
+			# skip all with same 3rd level as the closed one and identical 1st and 2nd
+			# ---- ---- process normally when 3rd level stops matching 
+			# ----
+			#
+			# always keep prevous set
+			# in loop:
+			# 	for group level 0..n in this preset
+			#	 	if group matches (implies there were this many levels in previous preset)
+			# 			if previous closed, skip this preset entirely
+			# 			else place spacer instead of button and label, continue to next level
+			# 		else if this level closed
+			# 			place button to open, continue to next preset
+			# 		else place button to close, continue to next level
+			# 	if we haven't abandoned the preset yet, finish rendering it
+			#
 			set _plist [dict get $preset_data Rolls]
 			lappend _plist {*}[dict get $preset_data CustomRolls]
+			set prev_grplist {}
+			set prev_collapse {}
 			foreach preset $_plist {
 				set pname [dict get $preset Name]
 				set dname [dict get $preset DisplayName]
 				set desc [dict get $preset Description]
 				set def [dict get $preset DieRollSpec]
+				set piname [to_window_id $pname]
 
+				set grplist [split [dict get $preset Group] "\u25B6"]
+				if {![info exists dice_preset_data(collapse,$tkey,$piname)] || \
+					[llength $dice_preset_data(collapse,$tkey,$piname)] != [llength $grplist]} {
+						set dice_preset_data(collapse,$tkey,$piname) [lmap x $grplist { expr 0 }]
+				}
+				try {
+					set controls {}
+					for {set j 0} {$j < [llength $grplist]} {incr j} {
+						if {$j < [llength $prev_grplist] && [lindex $prev_grplist $j] eq [lindex $grplist $j]} {
+							if {![lindex $prev_collapse $j]} {
+								# part of closed group we already showed above.
+								# same level-j group as the previous line, and since that was closed
+								# we will be too. So we don't even need to show this preset at all.
+								return -level 0 -code $CONTINUE_OUTER_LOOP
+							}
+							# part of open group we already showed above. add a spacer here and keep looking.
+							lappend controls _
+							continue
+						} elseif {![lindex $dice_preset_data(collapse,$tkey,$piname) $j]} {
+							# start of new group at level j but we're closed here.
+							# set an expand button and stop.
+							lappend controls >
+							set prev_collapse [lreplace $prev_collapse $j end 0]
+							break
+						} else {
+							# start of new group at level j and we're open here.
+							# set a collapse button and continue.
+							lappend controls v
+							set prev_collapse [lreplace $prev_collapse $j end 1]
+						}
+					}
+				} on $CONTINUE_OUTER_LOOP {} {
+					continue
+				}
+				set prev_grplist $grplist
 				set wpi $w.preset$i
 				set dice_preset_data(w,$tkey,$pname) $wpi
-
 				pack [frame $wpi] -side top -expand 0 -fill x
+				set bgcolor [$wpi cget -background]
+				try {
+					for {set j 0} {$j < [llength $controls]} {incr j} {
+						switch [lindex $controls $j] {
+							_ {
+								pack [button $wpi.gb$j -image $icon_blank -relief flat] -side left
+								pack [label $wpi.gl$j -text [lindex $grplist $j] -fg $bgcolor -bg $bgcolor] -side left
+							}
+							> {
+								pack [button $wpi.gb$j -image $icon_bullet_arrow_right -relief flat -command [list DRPexpand $w $tkey $piname $j $for_user]] -side left
+								pack [label $wpi.gl$j -text [lindex $grplist $j]] -side left
+								return -level 0 -code $CONTINUE_OUTER_LOOP
+							}
+							v {
+								pack [button $wpi.gb$j -image $icon_bullet_arrow_down -relief flat -command [list DRPexpand $w $tkey $piname $j $for_user]] -side left
+								pack [label $wpi.gl$j -text [lindex $grplist $j]] -side left
+							}
+							default {
+								pack [label $wpi.gb$j -text "??"] -side left
+								pack [label $wpi.gl$j -text "??"] -side left
+							}
+						}
+					}
+				} on $CONTINUE_OUTER_LOOP {} {
+					incr i
+					continue
+				}
+
 				pack [button $wpi.roll -image $icon_die16 -command "[list RollPreset $wpi $i $pname $for_user $tkey]"] -side left
 				pack [label $w.preset$i.plus -text +] -side left
 				pack [entry $w.preset$i.extra -width 3] -side left
