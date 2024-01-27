@@ -1143,14 +1143,14 @@ proc create_main_menu {use_button} {
 	$mm.play add command -command {display_initiative_clock} -label "Show Initiative Clock"
 	# gridsnap nil .25 .5 1
 	menu $mm.play.gridsnap
-	$mm.play add cascade -menu $mm.play.gridsnap -state disabled -label "\[future\] Creature token grid snap"
+	$mm.play add cascade -menu $mm.play.gridsnap -label "Creature token grid snap"
 	foreach {value label} {
 		nil {By creature size}
 		1   {full square}
 		.5  {1/2 square}
 		.25 {1/4 grid squares}
 	} {
-		$mm.play.gridsnap add radiobutton -state disabled -label $label -selectcolor $check_menu_color -variable CreatureGridSnap -value $value
+		$mm.play.gridsnap add radiobutton -label $label -selectcolor $check_menu_color -variable CreatureGridSnap -value $value
 	}
 	$mm.play add separator
 	$mm.play add command -command {ClearSelection} -label "Deselect All"
@@ -6078,7 +6078,8 @@ proc RenderSomeone {w id {norecurse false}} {
 			}
 		} else {
 			set Xstart [expr ($x-$mob_reach)]
-			set yy [expr int($y-$mob_reach)]
+			#set yy [expr int($y-$mob_reach)]
+			set yy [expr $y-$mob_reach]
 			switch [dict get $MOBdata($id) Reach] {
 				1 {
 					# reach weapons
@@ -6095,7 +6096,8 @@ proc RenderSomeone {w id {norecurse false}} {
 			}
 			set color [dict get $MOBdata($id) Color]
 			foreach row $mob_matrix {
-				set xx [expr int($Xstart)]
+#				set xx [expr int($Xstart)]
+				set xx $Xstart
 				foreach col $row {
 					if {$col & $hashbit} {
 						foreach {xa ya xb yb} {
@@ -6116,9 +6118,9 @@ proc RenderSomeone {w id {norecurse false}} {
 										   -tags "M#$id MF#$id MH#$id MT=$ctype allMOB"
 						}
 					}
-					incr xx
+					set xx [expr $xx + 1]
 				}
-				incr yy
+				set yy [expr $yy + 1]
 			}
 
 			$w create arc [expr ($x-$mob_area)*$iscale] [expr ($y-$mob_area)*$iscale] \
@@ -6834,6 +6836,7 @@ proc ScreenXYToGridXY {x y args} {
 
 	return [list [expr int(([$canvas canvasx $x])/$iscale)] \
 		[expr int(([$canvas canvasy $y])/$iscale)]]
+	global CreatureGridSnap
 }
 
 proc CanvasToGrid {x} {

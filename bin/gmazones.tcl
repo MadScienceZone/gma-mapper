@@ -307,6 +307,8 @@ proc ReachMatrix {size} {
 #
 proc FullCreatureAreaInfo {id} {
 	global MOBdata
+	global CreatureGridSnap
+
 
 	# if we have an explicit size override, take that first
 	set szparams [CreatureSizeParams [set disp_size [CreatureDisplayedSize $id]]]
