@@ -2199,6 +2199,7 @@ foreach icon_name {
 	saf saf_open saf_merge saf_unload saf_group_go die16 die16c information info20 die20 die20c
 	delete add clock dieb16 -- *hourglass *hourglass_go *arrow_right *cross *bullet_go menu
 	stipple_100 stipple_75 stipple_50 stipple_25 stipple_12 stipple_88 lock unlock
+	bullet_down bullet_right bullet_down16 bullet_right16
 } {
 	if {$icon_name eq {--}} {
 		if {$ImageFormat eq {png}} {
@@ -10818,6 +10819,7 @@ proc EDRPsaveAndDestroy {w for_user tkey} {
 	EDRPsaveValues $w $for_user $tkey
 	destroy $w
 }
+
 proc EditDieRollPresets {for_user tkey} {
 	global dice_preset_data
 	global icon_colorwheel
