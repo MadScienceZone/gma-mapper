@@ -2198,7 +2198,7 @@ foreach icon_name {
 	arrow_both arrow_first arrow_none arrow_last arrow_refresh heart
 	saf saf_open saf_merge saf_unload saf_group_go die16 die16c information info20 die20 die20c
 	delete add clock dieb16 -- *hourglass *hourglass_go *arrow_right *cross *bullet_go menu
-	stipple_100 stipple_75 stipple_50 stipple_25 stipple_12 stipple_88 lock unlock
+	stipple_100 stipple_75 stipple_50 stipple_25 stipple_12 stipple_88 lock unlock bullet_arrow_down bullet_arrow_right
 } {
 	if {$icon_name eq {--}} {
 		if {$ImageFormat eq {png}} {
@@ -10822,6 +10822,7 @@ proc EDRPsaveAndDestroy {w for_user tkey} {
 proc EditDieRollPresets {for_user tkey} {
 	global dice_preset_data
 	global icon_colorwheel
+	global icon_bullet_arrow_right
 
 	set w .edrp[to_window_id $tkey]
 
@@ -10835,25 +10836,34 @@ proc EditDieRollPresets {for_user tkey} {
 	ttk::notebook $w.n
 	sframe new $w.n.r
 	sframe new $w.n.m
-	#frame $w.n.r
-	#frame $w.n.m
+	sframe new $w.n.c
 	set wnr [sframe content $w.n.r]
 	set wnm [sframe content $w.n.m]
+	set wnc [sframe content $w.n.c]
 	$w.n add $w.n.r -state normal -sticky news -text Rolls
 	$w.n add $w.n.m -state normal -sticky news -text Modifiers
+	$w.n add $w.n.c -state disabled -sticky news -text Custom
 	pack $w.n -expand 1 -fill both
 	pack [button $w.can -text Cancel -command "if \[tk_messageBox -type yesno -parent $w -icon warning -title {Confirm Cancel} -message {Are you sure you wish to abandon any changes you made to the die-roll preset list?} -default no] {destroy $w}"] -side left
 	pack [button $w.ok -text Save -command [list EDRPsaveAndDestroy $w $for_user $tkey]] -side right
 
 	global icon_anchor_n icon_anchor_s icon_delete icon_add
-	grid [label $wnr.t1 -text Name] [label $wnr.t2 -text Description] [label $wnr.t3 -text {Die-Roll Specification}] - \
+	grid x [label $wnr.t0 -text Group] \
+		[label $wnr.t1 -text Name] [label $wnr.t2 -text Description] [label $wnr.t3 -text {Die-Roll Specification}] - \
 		x x [button $wnr.add -image $icon_add -command [list EDRPadd $w $for_user $tkey]] -sticky we
 	::tooltip::tooltip $wnr.add "Add a new die-roll preset"
 
 	set dice_preset_data(tmp_presets,$tkey) [PresetLists dice_preset_data $for_user $tkey]
+	array unset dice_preset_data "tmp_presets,$tkey,*"
 	set i 0
 	foreach preset [dict get $dice_preset_data(tmp_presets,$tkey) Rolls] {
-		grid [entry $wnr.name$i] [entry $wnr.desc$i] \
+		set dice_preset_data(tmp_presets,$tkey,R,$i) $preset
+		if {![dict exists $preset Group] || [set pgroup [dict get $preset Group]] eq {}} {
+			set pgroup {}
+		}
+		grid [button $wnr.gbtn$i -image $icon_bullet_arrow_right -command [list EditDRPGroup $wnr.group$i]] \
+		     [label $wnr.group$i -text $pgroup] \
+		     [entry $wnr.name$i] [entry $wnr.desc$i] \
 		     [button $wnr.color$i -image $icon_colorwheel -command [list EditColorBoxTitle "EDRP_text,$tkey,$i"]] \
 		     [entry $wnr.dspec$i -textvariable dice_preset_data(EDRP_text,$tkey,$i)] \
 		     [button $wnr.up$i -image $icon_anchor_n -command [list EDRPraise $w $for_user $tkey $i]] \
@@ -10863,6 +10873,7 @@ proc EditDieRollPresets {for_user tkey} {
 		$wnr.desc$i insert 0 [dict get $preset Description]
 		set dice_preset_data(EDRP_text,$tkey,$i) [dict get $preset DieRollSpec]
 		#$wnr.dspec$i insert 0 [dict get $preset DieRollSpec]
+		::tooltip::tooltip $wnr.gbtn$i "Edit group(s) to which this preset belongs"
 		::tooltip::tooltip $wnr.color$i "Edit color(s) for die-roll title string"
 		::tooltip::tooltip $wnr.up$i "Move this die-roll up in the list"
 		::tooltip::tooltip $wnr.dn$i "Move this die-roll down in the list"
@@ -10875,21 +10886,29 @@ proc EditDieRollPresets {for_user tkey} {
 	if {$i > 0} {
 		$wnr.dn[expr $i - 1] configure -state disabled
 	}
+
+	grid [label $wnc.t1 -text Name] [label $wnc.t2 -text Description] [label $wnc.t3 -text {Die-Roll Specification}] -sticky we
 	set i 0
-	foreach preset [dict get $dice_preset_data(tmp_presets,$tkey) CustomRolls] {
-		grid [entry $wnr.nameC$i] [entry $wnr.descC$i] x [entry $wnr.dspecC$i] \
-		     x x [button $wnr.delC$i -image $icon_delete -command [list EDRPdelCustom $w $for_user $tkey $i]] -sticky we
-		$wnr.nameC$i insert 0 [dict get $preset Name]
-		$wnr.descC$i insert 0 [dict get $preset Description]
-		$wnr.dspecC$i insert 0 [dict get $preset DieRollSpec]
-		::tooltip::tooltip $wnr.delC$i "Remove this die-roll from the list"
-		incr i
+	if {[llength [set custompresets [dict get $dice_preset_data(tmp_presets,$tkey) CustomRolls]]] > 0} {
+		$w.n tab 2 -state normal
+		grid [label $wnc.desc -text "These presets don't conform to standard conventions so we can't manage them"] - - - -sticky w
+		grid [label $wnc.desc1 -text "as normal. They appear here as-is from your server preset list."] - - - -sticky w
+		foreach preset $custompresets {
+			grid [entry $wnc.nameC$i] [entry $wnc.descC$i] [entry $wnc.dspecC$i] \
+			     [button $wnc.delC$i -image $icon_delete -command [list EDRPdelCustom $w $for_user $tkey $i]] -sticky we
+			$wnc.nameC$i insert 0 [dict get $preset Name]
+			$wnc.descC$i insert 0 [dict get $preset Description]
+			$wnc.dspecC$i insert 0 [dict get $preset DieRollSpec]
+			::tooltip::tooltip $wnc.delC$i "Remove this die-roll from the list"
+			incr i
+		}
 	}
 
 	set i 0
 	grid [label $wnm.t0 -text On] [label $wnm.t1 -text Name] [label $wnm.t2 -text Description] [label $wnm.t3 -text Expression] \
 		x x x x x x [button $wnm.add -image $icon_add -command [list EDRPaddModifier $w $for_user $tkey]] -sticky ew
 	foreach preset [dict get $dice_preset_data(tmp_presets,$tkey) Modifiers] {
+		set dice_preset_data(tmp_presets,$tkey,M,$i) $preset
 		grid [ttk::checkbutton $wnm.en$i -text On -offvalue 0 -onvalue 1 -variable dice_preset_data(EDRP_mod_en,$tkey,$i)] \
 		     [entry $wnm.name$i] \
 		     [entry $wnm.desc$i] \
@@ -10932,8 +10951,9 @@ proc EditDieRollPresets {for_user tkey} {
 	if {$i > 0} {
 		$wnm.dn[expr $i - 1] configure -state disabled
 	}
-	grid columnconfigure $wnr 3 -weight 2
+	grid columnconfigure $wnr 5 -weight 2
 	grid columnconfigure $wnm 2 -weight 2
+	grid columnconfigure $wnc 2 -weight 2
 
 
 	tkwait window $w
@@ -11204,12 +11224,27 @@ proc EDRPsaveValues {w for_user tkey} {
 	global dice_preset_data
 	set newpresets {}
 	EDRPgetValues $w $for_user $tkey
+	# Name:
+	#   $[<area>]<seq><group>|<name>
+	#   \_______/\___/\_____/ \____/
+	#   AreaTag    |   Group   Displayname
+	#              DisplaySeq
 	foreach p [dict get $dice_preset_data(tmp_presets,$tkey) Rolls] {
-		if {[scan [dict get $p DisplaySeq] %d%s seq _] != 1} {
-			DEBUG 0 "ERROR interpreting sequence \"[dict get $p DisplaySeq]\"; can't save presets"
-			return
+		if {[string is digit -strict [set n [dict get $p DisplaySeq]]]} {
+			set n [format "%03d" $n]
 		}
-		lappend newpresets [dict create Name [format %03d|%s $seq [dict get $p DisplayName]] \
+		if {[dict exists $p AreaTag] && [set at [dict get $p AreaTag]] ne {}} {
+			set dname "$at$n"
+		} else {
+			set dname $n
+		}
+		if {[dict exists $p Group] && [set grp [dict get $p Group]] ne {}} {
+			append dname "\u25B6" [join $grp "\u25B6"]
+		}
+		if {[set dn [dict get $p DisplayName]] ne {}} {
+			append dname "|$dn"
+		}
+		lappend newpresets [dict create Name $dname\
 						Description [dict get $p Description]\
 						DieRollSpec [dict get $p DieRollSpec]]
 	}
@@ -11219,6 +11254,14 @@ proc EDRPsaveValues {w for_user tkey} {
 						DieRollSpec [dict get $p DieRollSpec]]
 	}
 	foreach p [dict get $dice_preset_data(tmp_presets,$tkey) Modifiers] {
+		# Name:
+		#   §<seq>;<var>;<flags>[;<client>]|<name>
+		#    \___/ \___/ \_____/  \______/  \____/
+		#      |     |      |      ClientData DisplayName
+		#      |     |      Global
+		#      |     |      Enabled
+		#      |     Variable
+		#      DisplaySeq
 		set flags {}
 		if {[dict get $p Enabled]} {
 			append flags e
@@ -11226,30 +11269,23 @@ proc EDRPsaveValues {w for_user tkey} {
 		if {[dict get $p Global]} {
 			append flags g
 		}
-		if {[scan [dict get $p DisplaySeq] %d%s seq _] != 1} {
-			DEBUG 0 "ERROR interpreting sequence \"[dict get $p DisplaySeq]\"; can't save presets"
-			return
+		if {[string is digit -strict [set n [dict get $p DisplaySeq]]]} {
+			set n [format "%03d" $n]
 		}
-		if {[scan [dict get $p DisplaySeq] %d%s seq _] != 1} {
-			DEBUG 0 "ERROR interpreting sequence \"[dict get $p DisplaySeq]\"; can't save presets"
-			return
+		set dname "\u00A7$n"
+		if {[dict exists $p Group] && [set grp [dict get $p Group]] ne {}} {
+			append dname "\u25B6" [join $grp "\u25B6"]
 		}
-		if {[dict exists $p Tag] && [set modtag [dict get $p ClientData]] ne {}} {
-			lappend newpresets [dict create Name [format "§%03d;%s;%s;%s|%s" $seq \
-							[dict get $p Variable] \
-							$flags\
-							$modtag\
-							[dict get $p DisplayName]]\
-							Description [dict get $p Description]\
-							DieRollSpec [dict get $p DieRollSpec]]
-		} else {
-			lappend newpresets [dict create Name [format "§%03d;%s;%s|%s" $seq \
-							[dict get $p Variable] \
-							$flags\
-							[dict get $p DisplayName]]\
-							Description [dict get $p Description]\
-							DieRollSpec [dict get $p DieRollSpec]]
+		append dname ";[dict get $p Variable];$flags"
+		if {[dict exists $p ClientData] && [set cdata [dict get $p ClientData]] ne {}} {
+			append dname ";$cdata"
 		}
+		if {[set dn [dict get $p DisplayName]] ne {}} {
+			append dname "|$dn"
+		}
+		lappend newpresets [dict create Name $dname \
+						Description [dict get $p Description]\
+						DieRollSpec [dict get $p DieRollSpec]]
 	}
 	UpdateDicePresets $newpresets $for_user
 }
@@ -11262,8 +11298,8 @@ proc EDRPdel {w for_user tkey i} {
 	EDRPgetValues $w $for_user $tkey
 	dict set dice_preset_data(tmp_presets,$tkey) Rolls [lreplace [dict get $dice_preset_data(tmp_presets,$tkey) Rolls] $i $i]
 	set i [llength [dict get $dice_preset_data(tmp_presets,$tkey) Rolls]]
-	grid forget $wnr.name$i $wnr.desc$i $wnr.dspec$i $wnr.up$i $wnr.dn$i $wnr.del$i
-	destroy $wnr.name$i $wnr.desc$i $wnr.dspec$i $wnr.up$i $wnr.dn$i $wnr.del$i
+	grid forget $wnr.name$i $wnr.desc$i $wnr.dspec$i $wnr.up$i $wnr.dn$i $wnr.del$i $wnr.gbtn$i $wnr.group$i
+	destroy $wnr.name$i $wnr.desc$i $wnr.dspec$i $wnr.up$i $wnr.dn$i $wnr.del$i $wnr.gbtn$i $wnr.group$i
 	catch {
 		grid forget $wnr.color$i
 		destroy $wnr.color$i
@@ -11290,11 +11326,12 @@ proc EDRPdelCustom {w for_user tkey i} {
 	global dice_preset_data
 	set wnr [sframe content $w.n.r]
 	set wnm [sframe content $w.n.m]
+	set wnc [sframe content $w.n.c]
 	EDRPgetValues $w $for_user $tkey
 	dict set dice_preset_data(tmp_presets,$tkey) CustomRolls [lreplace [dict get $dice_preset_data(tmp_presets,$tkey) CustomRolls] $i $i]
 	set i [llength [dict get $dice_preset_data(tmp_presets,$tkey) CustomRolls]]
-	grid forget $wnr.nameC$i $wnr.descC$i $wnr.dspecC$i $wnr.delC$i
-	destroy $wnr.nameC$i $wnr.descC$i $wnr.dspecC$i $wnr.delC$i
+	grid forget $wnc.nameC$i $wnc.descC$i $wnc.dspecC$i $wnc.delC$i
+	destroy $wnc.nameC$i $wnc.descC$i $wnc.dspecC$i $wnc.delC$i
 	EDRPupdateGUI $w $for_user $tkey
 }
 
@@ -11372,42 +11409,48 @@ proc EDRPgetValues {w for_user tkey} {
 	global dice_preset_data
 	set wnr [sframe content $w.n.r]
 	set wnm [sframe content $w.n.m]
+	set wnc [sframe content $w.n.c]
 	set n [llength [dict get $dice_preset_data(tmp_presets,$tkey) Rolls]]
 	dict set dice_preset_data(tmp_presets,$tkey) Rolls {}
 	for {set i 0} {$i < $n} {incr i} {
-		dict lappend dice_preset_data(tmp_presets,$tkey) Rolls [dict create \
-			DisplaySeq [format %03d $i] \
-			DisplayName [$wnr.name$i get] \
-			Description [$wnr.desc$i get] \
-			DieRollSpec [$wnr.dspec$i get]]
+		set d $dice_preset_data(tmp_presets,$tkey,R,$i)
+		dict set d DisplaySeq [format %03d $i]
+		dict set d DisplayName [$wnr.name$i get] 
+		dict set d Description [$wnr.desc$i get] 
+		dict set d DieRollSpec [$wnr.dspec$i get]
+		dict set d Group [$wnr.group$i cget -text]
+
+		dict lappend dice_preset_data(tmp_presets,$tkey) Rolls $d
 	}
 
 	set n [llength [dict get $dice_preset_data(tmp_presets,$tkey) CustomRolls]]
 	dict set dice_preset_data(tmp_presets,$tkey) CustomRolls {}
 	for {set i 0} {$i < $n} {incr i} {
 		dict lappend dice_preset_data(tmp_presets,$tkey) CustomRolls [dict create \
-			Name        [$wnr.nameC$i get] \
-			Description [$wnr.descC$i get] \
-			DieRollSpec [$wnr.dspecC$i get]]
+			Name        [$wnc.nameC$i get] \
+			Description [$wnc.descC$i get] \
+			DieRollSpec [$wnc.dspecC$i get] \
+		]
 	}
 
 	set n [llength [dict get $dice_preset_data(tmp_presets,$tkey) Modifiers]]
 	dict set dice_preset_data(tmp_presets,$tkey) Modifiers {}
 	for {set i 0} {$i < $n} {incr i} {
+		set d $dice_preset_data(tmp_presets,$tkey,M,$i)
 		set v [string trim [$wnm.var$i get]]
 		if {$v ne {}} {
-			set g false
+			dict set d Global false
 		} else {
-			set g [::gmaproto::json_bool $dice_preset_data(EDRP_mod_g,$tkey,$i)]
+			dict set d Global [::gmaproto::json_bool $dice_preset_data(EDRP_mod_g,$tkey,$i)]
 		}
-		dict lappend dice_preset_data(tmp_presets,$tkey) Modifiers [dict create \
-			Variable $v\
-			DisplayName [$wnm.name$i get] \
-			DisplaySeq [format %3d $i] \
-			Description [$wnm.desc$i get] \
-			DieRollSpec [$wnm.dspec$i get] \
-			Enabled [::gmaproto::json_bool $dice_preset_data(EDRP_mod_en,$tkey,$i)] \
-			Global $g]
+		dict set d Variable $v
+		dict set d DisplayName [$wnm.name$i get]
+		dict set d DisplaySeq [format %03d $i]
+		dict set d Description [$wnm.desc$i get]
+		dict set d DieRollSpec [$wnm.dspec$i get]
+		dict set d Enabled [::gmaproto::json_bool $dice_preset_data(EDRP_mod_en,$tkey,$i)]
+		# TODO Group
+		dict lappend dice_preset_data(tmp_presets,$tkey) Modifiers $d
 	}
 }
 
@@ -11416,12 +11459,14 @@ proc EDRPupdateGUI {w for_user tkey} {
 	global dice_preset_data
 	set wnr [sframe content $w.n.r]
 	set wnm [sframe content $w.n.m]
+	set wnc [sframe content $w.n.c]
 	set i 0
 	foreach p [dict get $dice_preset_data(tmp_presets,$tkey) Rolls] {
 		foreach {ww fld} {name DisplayName desc Description dspec DieRollSpec} {
 			$wnr.$ww$i delete 0 end
 			$wnr.$ww$i insert 0 [dict get $p $fld]
 		}
+		$wnr.group$i configure -text [dict get $p Group]
 		if {$i == 0} {
 			$wnr.up$i configure -state disabled
 		} else {
@@ -11437,8 +11482,8 @@ proc EDRPupdateGUI {w for_user tkey} {
 	set i 0
 	foreach p [dict get $dice_preset_data(tmp_presets,$tkey) CustomRolls] {
 		foreach {ww fld} {nameC Name descC Description dspecC DieRollSpec} {
-			$wnr.$ww$i delete 0 end
-			$wnr.$ww$i insert 0 [dict get $p $fld]
+			$wnc.$ww$i delete 0 end
+			$wnc.$ww$i insert 0 [dict get $p $fld]
 		}
 		incr i
 	}
@@ -11476,17 +11521,20 @@ proc EDRPupdateGUI {w for_user tkey} {
 }
 
 proc EDRPadd {w for_user tkey} {
-	global dice_preset_data icon_anchor_n icon_anchor_s icon_delete icon_colorwheel
+	global dice_preset_data icon_anchor_n icon_anchor_s icon_delete icon_colorwheel icon_bullet_arrow_right
 	set wnr [sframe content $w.n.r]
 	set wnm [sframe content $w.n.m]
-	dict lappend dice_preset_data(tmp_presets,$tkey) Rolls [dict create Name {} DisplayName {} DieRollSpec {} DisplaySeq {} Description {}]
+	dict lappend dice_preset_data(tmp_presets,$tkey) Rolls [dict create Name {} DisplayName {} DieRollSpec {} DisplaySeq {} Description {} AreaTag {} Group {}]
 	set i [expr [llength [dict get $dice_preset_data(tmp_presets,$tkey) Rolls]] - 1]
-	grid [entry $wnr.name$i] [entry $wnr.desc$i] \
+	grid [button $wnr.gbtn$i -image $icon_bullet_arrow_right -command [list EditDRPGroup $wnr.group$i]] \
+	     [label $wnr.group$i -text {}] \
+	     [entry $wnr.name$i] [entry $wnr.desc$i] \
 	     [button $wnr.color$i -image $icon_colorwheel -command [list EditColorBoxTitle "EDRP_text,$tkey,$i"]] \
 	     [entry $wnr.dspec$i -textvariable dice_preset_data(EDRP_text,$tkey,$i)] \
 	     [button $wnr.up$i -image $icon_anchor_n -command [list EDRPraise $w $for_user $tkey $i]] \
 	     [button $wnr.dn$i -image $icon_anchor_s -command [list EDRPlower $w $for_user $tkey $i]] \
 	     [button $wnr.del$i -image $icon_delete -command [list EDRPdel $w $for_user $tkey $i]] -sticky we
+	::tooltip::tooltip $wnr.gbtn$i "Edit group(s) to which this preset belongs"
 	::tooltip::tooltip $wnr.color$i "Edit color(s) for die-roll title string"
 	::tooltip::tooltip $wnr.up$i "Move this die-roll up in the list"
 	::tooltip::tooltip $wnr.dn$i "Move this die-roll down in the list"
@@ -11499,7 +11547,7 @@ proc EDRPaddModifier {w for_user tkey} {
 	global dice_preset_data icon_anchor_n icon_anchor_s icon_delete
 	set wnr [sframe content $w.n.r]
 	set wnm [sframe content $w.n.m]
-	dict lappend dice_preset_data(tmp_presets,$tkey) Modifiers [dict create Global false Enabled false Variable {} Name {} DisplayName {} DieRollSpec {} DisplaySeq {} Description {}]
+	dict lappend dice_preset_data(tmp_presets,$tkey) Modifiers [dict create Global false Enabled false Variable {} Name {} DisplayName {} DieRollSpec {} DisplaySeq {} Description {} Group {} ClientData {}]
 	set i [expr [llength [dict get $dice_preset_data(tmp_presets,$tkey) Modifiers]] - 1]
 	trace add variable dice_preset_data(EDRP_mod_en,$tkey,$i) {array read write unset} TRACEvar
 	set dice_preset_data(EDRP_mod_en,$tkey,$i) 0
@@ -11573,7 +11621,9 @@ proc PresetLists {arrayname for_user tkey args} {
 			if {[llength $sdata] > 1} {
 				dict set d Group [join [lrange $sdata 1 end] "\u25B6"]
 				set sdata [lindex $sdata 0]
-			} 
+			} else {
+				dict set d Group {}
+			}
 			if {[scan $sdata %d%s n _] == 1} {
 				if {$n <= $seq} {
 					set n [incr seq]
@@ -11617,12 +11667,20 @@ proc PresetLists {arrayname for_user tkey args} {
 				dict set d DisplaySeq [incr seq]
 				lappend rolls $d
 			} else {
+				# content before the | can be $[<area>]<sequence><groups>
 				set nstr [lindex $pieces 0]
 				if {[regexp {^(\$\[.*?\])(.*)$} _ areatag rest]} {
 					set nstr $rest
 					dict set d AreaTag $areatag
+				} else {
+					dict set d AreaTag {}
 				}
-				if {[
+				if {[llength [set seqparts [split $nstr "\u25B6"]]] > 1} {
+					dict set d Group [join [lrange $seqparts 1 end] "\u25B6"]
+					set nstr [lindex $seqparts 0]
+				} else {
+					dict set d Group {}
+				}
 
 				if {[scan $nstr %d%s n _] == 1} {
 					if {$n <= $seq} {
@@ -11634,8 +11692,6 @@ proc PresetLists {arrayname for_user tkey args} {
 					dict set d DisplaySeq $n
 					lappend rolls $d
 				} else {
-					#dict set d DisplayName [join [lrange $pieces 1 end] |] 
-					#dict set d DisplaySeq [lindex $pieces 0]
 					dict set d DisplayName [join [lrange $pieces 1 end] |]
 					lappend custom $d
 				}
