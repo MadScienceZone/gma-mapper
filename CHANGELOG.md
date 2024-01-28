@@ -17,6 +17,10 @@ The support for old server protocols (<400) and map file formats (<20) will be d
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
+# 4.22.1 (unreleased)
+## Fixes
+ * Mitigates the scrolled frame scrollbar issue (it didn't recalculate scrollbar placement when the internal managed contents change).
+
 # 4.22
 ## Enhancements
  * Implements server protocol 412
