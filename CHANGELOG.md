@@ -10,6 +10,7 @@
  * GMA Core API Library Version: 6.13 <!-- @@##@@ -->
  * GMA Mapper File Format: 23	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 412        <!-- @@##@@ -->
+ * GMA Mapper Preferences File Format: 0 <!-- @@##@@ -->
 
 ## DEPRECATION NOTICE
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
