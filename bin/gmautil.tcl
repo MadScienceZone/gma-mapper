@@ -55,7 +55,7 @@
 #
 # General utility functions
 
-package provide gmautil 1.1
+package provide gmautil 1.2
 package require Tcl 8.6
 package require sha256
 
@@ -116,6 +116,24 @@ if {[catch {package require pki 0.10}]} {
 } else {
 	proc ::gmautil::_parse_public_key {k} {
 		return [::pki::pkcs::parse_public_key $k]
+	}
+}
+
+#
+# ::gmautil::trigger_size
+# slightly adjusts the toplevel window height in order to force a recalculation
+# of the managed widgets inside. scrolled frames seem to need this.
+#
+set ::gmautil::trigger_size_offset 0
+proc ::gmautil::trigger_size {w} {
+	global ::gmautil::trigger_size_offset
+	set ::gmautil::trigger_size_offset [expr ($::gmautil::trigger_size_offset + 1) % 2]
+
+	if {[catch {
+		set w [winfo toplevel $w]
+		wm geometry $w =[winfo width $w]x[expr [winfo height $w]+$::gmautil::trigger_size_offset]
+	} err]} {
+		::DEBUG 1 "Unable to send <Configure> to $w: $err"
 	}
 }
 
