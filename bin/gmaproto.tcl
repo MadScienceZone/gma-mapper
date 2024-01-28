@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___       _______   __                     #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___   ) /  \                    #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  | \/) )                   #
-# | |      | || || || (___) | Assistant  / (_) (_        /   )   | |                   #
-# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /    | |                   #
-# | | \_  )| |   | || (   ) |                ) (      /   _/     | |                   #
-# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\ __) (_                  #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/ \____/                  #
+#  _______  _______  _______                ___       _______  _______                 #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___   )/ ___   )                #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |\/   )  |                #
+# | |      | || || || (___) | Assistant  / (_) (_        /   )    /   )                #
+# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /   _/   /                 #
+# | | \_  )| |   | || (   ) |                ) (      /   _/   /   _/                  #
+# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\(   (__/\                #
+# (_______)|/     \||/     \| Client         (_)  (_)\_______/\_______/                #
 #                                                                                      #
 ########################################################################################
 #
@@ -57,9 +57,9 @@ package require base64 2.4.2
 package require uuid 1.0.1
 
 namespace eval ::gmaproto {
-	variable protocol 411
+	variable protocol 412
 	variable min_protocol 333
-	variable max_protocol 411
+	variable max_protocol 412
 	variable max_max_protocol 499
 	variable debug_f {}
 	variable legacy false
@@ -140,7 +140,8 @@ namespace eval ::gmaproto {
 		DD      {For s Presets {a {Name s Description s DieRollSpec s}}}
 		DD+     {For s Presets {a {Name s Description s DieRollSpec s}}}
 		DD/     {For s Filter s}
-		DD=     {Presets {a {Name s Description s DieRollSpec s}}}
+		DD=     {For s Presets {a {Name s Description s DieRollSpec s}} DelegateFor l Delegates l}
+		DDD	{For s Delegates l}
 		DENIED  {Reason s}
 		DR      {}
 		DSM     {Condition s Shape s Color s Description s Transparent ?}
@@ -1385,11 +1386,11 @@ proc ::gmaproto::comment {text} {
 	::gmaproto::_protocol_send_raw "// $text"
 }
 
-proc ::gmaproto::define_dice_presets {plist app} {
+proc ::gmaproto::define_dice_presets {plist app {for_user {}}} {
 	if {$app} {
-		::gmaproto::_protocol_send DD+ Presets $plist
+		::gmaproto::_protocol_send DD+ Presets $plist For $for_user
 	} else {
-		::gmaproto::_protocol_send DD Presets $plist
+		::gmaproto::_protocol_send DD Presets $plist For $for_user
 	}
 }
 
@@ -1405,8 +1406,12 @@ proc ::gmaproto::mark {x y} {
 	::gmaproto::_protocol_send MARK X $x Y $y
 }
 
-proc ::gmaproto::query_dice_presets {} {
-	::gmaproto::_protocol_send DR
+proc ::gmaproto::query_dice_presets {for_user} {
+	::gmaproto::_protocol_send DR For $for_user
+}
+
+proc ::gmaproto::define_dice_delegates {for_user delegate_list} {
+	::gmaproto::_protocol_send DDD For $for_user Delegates $delegate_list
 }
 
 proc ::gmaproto::add_image {name sizes {frames 0} {speed 0} {loops 0}} {
@@ -2294,15 +2299,16 @@ proc ::gmaproto::normalize_dict {cmd d} {
 	return [::gmaproto::new_dict_from_json $cmd [::gmaproto::json_from_dict $cmd $d]]
 }
 
-# @[00]@| GMA-Mapper 4.21
+# @[00]@| GMA-Mapper 4.22
 # @[01]@|
-# @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
+# @[10]@| Overall GMA package Copyright © 1992–2024 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
-# @[12]@| Aloha, Oregon, USA. All Rights Reserved.
-# @[13]@| Distributed under the terms and conditions of the BSD-3-Clause
-# @[14]@| License as described in the accompanying LICENSE file distributed
-# @[15]@| with GMA.
-# @[16]@|
+# @[12]@| Aloha, Oregon, USA. All Rights Reserved. Some components were introduced at different
+# @[13]@| points along that historical time line.
+# @[14]@| Distributed under the terms and conditions of the BSD-3-Clause
+# @[15]@| License as described in the accompanying LICENSE file distributed
+# @[16]@| with GMA.
+# @[17]@|
 # @[20]@| Redistribution and use in source and binary forms, with or without
 # @[21]@| modification, are permitted provided that the following conditions
 # @[22]@| are met:

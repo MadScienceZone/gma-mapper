@@ -3,18 +3,42 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.21          <!-- @@##@@ -->
- * Effective Date: 05-Jan-2024               <!-- @@##@@ -->
+ * This Package Version: 4.22          <!-- @@##@@ -->
+ * Effective Date: 28-Jan-2024               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.12 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.14 <!-- @@##@@ -->
  * GMA Mapper File Format: 23	     <!-- @@##@@ -->
- * GMA Mapper Protocol: 411        <!-- @@##@@ -->
+ * GMA Mapper Protocol: 412        <!-- @@##@@ -->
+ * GMA Mapper Preferences File Format: 6 <!-- @@##@@ -->
 
 ## DEPRECATION NOTICE
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.22
+## Enhancements
+ * Implements server protocol 412
+ * Adds the capability for users to designate other users as delegates to manage their die rolls for them. This allows the delegate to edit the other user's die-roll presets and to roll dice and send chat messages on behalf of the other user. It does not allow them to fully impersonate the other user and they won't receive private messages directed to that user. It just allows for users to help one another roll dice.
+ * Adds die-roll preset grouping to better organize long lists of presets.
+ * Adds the capability to change the grid snap factor for creature tokens, allowing them to locate in areas where the map doesn't align to the 5-foot grid points.
+ * The preferences option to show timestamps in chat messages is now on by default.
+ * The preferences option to limit chat message history now defaults to 500 messages (was unlimited).
+ * "Cycle" menus (e.g., cycle through grid snap sizes) now use cascading menus to allow direct setting of the desired value.
+ * Includes some (currently unused) code to allow for creature tokens to snap to fractional grid points.
+ * Adds `--list-profiles` (`-L`) option to list all the profile names defined in the current profile file. These may then be used with the `--select` option to start the mapper to connect to that profile without making it the new default for all invocations.
+ * Adds `flash_updates` to preferences list (bumping the file format version to 6) to allow users to decide if they want map elements to flash briefly when their attributes are updated.
+ * Moves unparsable die-roll preset names to their own tab on the preset editor dialog.
+
+
+## Fixes
+ * Improvements to several internal routines including how menus are updated for dark mode.
+ * Improved indicators on menus for current mode of play.
+ * Added better messaging to display in case the mapper is unable to re-launch itself.
+ * Corrected some bugs with the stipple fill patterns.
+ * Improved error message wording when attempting an unauthorized operation.
+ * Reinstated "default-on" flag for die-roll modifiers (more debugging required here to ensure that doens't make the flag keep turning itself on during play).
 
 # 4.21
 ## Enancements

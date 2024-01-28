@@ -1,26 +1,27 @@
 ########################################################################################
-#  _______  _______  _______                ___       _______   __                     #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___   ) /  \                    #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  | \/) )                   #
-# | |      | || || || (___) | Assistant  / (_) (_        /   )   | |                   #
-# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /    | |                   #
-# | | \_  )| |   | || (   ) |                ) (      /   _/     | |                   #
-# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\ __) (_                  #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/ \____/                  #
+#  _______  _______  _______                ___       _______  _______                 #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___   )/ ___   )                #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |\/   )  |                #
+# | |      | || || || (___) | Assistant  / (_) (_        /   )    /   )                #
+# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /   _/   /                 #
+# | | \_  )| |   | || (   ) |                ) (      /   _/   /   _/                  #
+# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\(   (__/\                #
+# (_______)|/     \||/     \| Client         (_)  (_)\_______/\_______/                #
 #                                                                                      #
 ########################################################################################
 # version 1.0, 17 July 2020.
 # Steve Willoughby <steve@madscience.zone>
 #
-# @[00]@| GMA-Mapper 4.21
+# @[00]@| GMA-Mapper 4.22
 # @[01]@|
-# @[10]@| Copyright © 1992–2023 by Steven L. Willoughby (AKA MadScienceZone)
+# @[10]@| Overall GMA package Copyright © 1992–2024 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
-# @[12]@| Aloha, Oregon, USA. All Rights Reserved.
-# @[13]@| Distributed under the terms and conditions of the BSD-3-Clause
-# @[14]@| License as described in the accompanying LICENSE file distributed
-# @[15]@| with GMA.
-# @[16]@|
+# @[12]@| Aloha, Oregon, USA. All Rights Reserved. Some components were introduced at different
+# @[13]@| points along that historical time line.
+# @[14]@| Distributed under the terms and conditions of the BSD-3-Clause
+# @[15]@| License as described in the accompanying LICENSE file distributed
+# @[16]@| with GMA.
+# @[17]@|
 # @[20]@| Redistribution and use in source and binary forms, with or without
 # @[21]@| modification, are permitted provided that the following conditions
 # @[22]@| are met:
