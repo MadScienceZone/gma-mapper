@@ -1,28 +1,26 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       _______  _______         ______  #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___   )/ ___   )       (  ___ \ #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |\/   )  |       | (   )  #
-# | |      | || || || (___) | Assistant  / (_) (_        /   )    /   ) _____ | (__/ / #
-# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /   _/   / (_____)|  __ (  #
-# | | \_  )| |   | || (   ) |                ) (      /   _/   /   _/         | (  \ \ #
-# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\(   (__/\       | )___)  #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/\_______/       |/ \___/ #
+#  _______  _______  _______                ___       _______  _______                 #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___   )/ ___   )                #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |\/   )  |                #
+# | |      | || || || (___) | Assistant  / (_) (_        /   )    /   )                #
+# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /   _/   /                 #
+# | | \_  )| |   | || (   ) |                ) (      /   _/   /   _/                  #
+# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\(   (__/\                #
+# (_______)|/     \||/     \| Client         (_)  (_)\_______/\_______/                #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
 # TODO note that in server INIT file, Skin= must be set; the mapper does not use the * field in monsters,
 #      it just does as instructed based on Skin index
-# TODO CreatureGridSnap: threat spaces not aligned to fractional boundaries
-# TODO CreatureGridSnap: where to grab the token not aligned to fractional boundaries
 #
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.22-beta.3}     ;# @@##@@
+set GMAMapperVersion {4.22}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {412}         ;# @@##@@
-set CoreVersionNumber {6.13}            ;# @@##@@
+set CoreVersionNumber {6.14}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -10833,10 +10831,10 @@ proc _render_die_roller {w width height type for_user tkey args} {
 					] -side left
 				}
 				if {![info exists dice_preset_data(en,$tkey,$piname)]} {
-					trace add variable dice_preset_data(en,$tkey,$piname) {array read write unset} TRACEvar
+#					trace add variable dice_preset_data(en,$tkey,$piname) {array read write unset} TRACEvar
 					set dice_preset_data(en,$tkey,$piname) [::gmaproto::int_bool [dict get $preset Enabled]]
 				} else {
-					TRACE "variable dice_preset_data(en,$tkey,$piname) already exists with value $dice_preset_data(en,$tkey,$piname)"
+					#TRACE "variable dice_preset_data(en,$tkey,$piname) already exists with value $dice_preset_data(en,$tkey,$piname)"
 				}
 				::tooltip::tooltip $wpi.enabled "* [dict get $preset Description]"
 				incr i
@@ -11118,7 +11116,7 @@ proc EditDieRollPresets {for_user tkey} {
 	     	::tooltip::tooltip $wnm.del$i "Remove this modifier from the list"
 	     	::tooltip::tooltip $wnm.en$i "If checked, the modifier is in-play"
 	     	::tooltip::tooltip $wnm.varp$i "If checked, the modifier is used in place of <var>, otherwise added to all die rolls"
-		trace add variable dice_preset_data(EDRP_mod_en,$tkey,$i) {array read write unset} TRACEvar
+#		trace add variable dice_preset_data(EDRP_mod_en,$tkey,$i) {array read write unset} TRACEvar
 		set dice_preset_data(EDRP_mod_en,$tkey,$i) [::gmaproto::int_bool [dict get $preset Enabled]]
 #		set dice_preset_data(EDRP_mod_en,$tkey,$i) false
 		set dice_preset_data(EDRP_mod_g,$tkey,$i) [::gmaproto::int_bool [dict get $preset Global]]
@@ -11803,7 +11801,7 @@ proc EDRPaddModifier {w for_user tkey} {
 	dict lappend dice_preset_data(tmp_presets,$tkey) Modifiers $d
 	set i [expr [llength [dict get $dice_preset_data(tmp_presets,$tkey) Modifiers]] - 1]
 	set dice_preset_data(tmp_presets,$tkey,M,$i) $d
-	trace add variable dice_preset_data(EDRP_mod_en,$tkey,$i) {array read write unset} TRACEvar
+#	trace add variable dice_preset_data(EDRP_mod_en,$tkey,$i) {array read write unset} TRACEvar
 	set dice_preset_data(EDRP_mod_en,$tkey,$i) 0
 	set dice_preset_data(EDRP_mod_ven,$tkey,$i) 0
 	set dice_preset_data(EDRP_mod_g,$tkey,$i) 0
@@ -14103,7 +14101,7 @@ proc ConnectToServerByIdx {idx} {
 #
 #*user_key name -> sanitized_name
 #
-# @[00]@| GMA-Mapper 4.22-beta
+# @[00]@| GMA-Mapper 4.22
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2024 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
