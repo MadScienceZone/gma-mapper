@@ -2,7 +2,7 @@
 '\" *** 412 ***
 '\" <<ital-is-var>>
 '\" <<bold-is-fixed>>
-.TH MAPPER-PROTOCOL 7 "GMA-Mapper 4.3.4" 16-Mar-2023 "Games" \" @@mp@@
+.TH MAPPER-PROTOCOL 7 "GMA-Mapper 4.22" 28-Jan-2024 "Protocols" \" @@mp@@
 .SH NAME
 mapper-protocol \- GMA client/server protocol specification
 .SH DESCRIPTION
@@ -1219,22 +1219,35 @@ is enabled.
 It is RECOMMENDED that clients allow for grouping of related presets and/or modifiers
 by appending one or more group names to the end of the numeric sort order digits. Each
 such name is separated from the digits and each other with a right-pointing triangle
-.RB (\*(lq \[u25B6] \*(rq)
-(Unicode U+25B6).
+'\" <<TeX>>
+'\" ``$\blacktriangleright$'' (Unicode U+25B6).
+Unicode U+25B6 (represented here as the 
+.RB \*(lq > \*(rq
+character).
 For example,
+'\" \z{012|attack} is an ungrouped attack roll,
 .B 012|attack
 is an ungrouped attack roll,
-.B 013\[u25B6]monster|attack
+'\" \z{013$\blacktriangleright$monster|attack} is an attack roll belonging to the ``monster'' group,
+.B 013>monster|attack
 is an attack roll belonging to the \*(lqmonster\*(rq group,
-.B 030\[u25B6]monster\[u25B6]save|Fortitde
+'\" \z{030$\blacktriangleright$monster$\blacktriangleright$save|Fortitude} is a Fortitude saving
+'\" throw belonging to the ``save'' subgroup of the ``monster'' group, and
+.B 030>monster>save|Fortitde
 is a Fortitude saving throw belonging to the \*(lqsave\*(rq subgroup of the \*(lqmonster\*(rq group, and
-.B \[sc]042\[u25B6]monster;;|mod
+'\" \z{\S042$\blacktriangleright$monster;;|mod} is a modifier in the ``monster'' group.
+.B \[sc]042>monster;;|mod
 is a modifier in the \*(lqmonster\*(rq group.
+'\" <</TeX>>
 Clients SHOULD allow users to collapse all of the die rolls with the same group name(s) appearing consecutively
 in the die-roll preset list.
 .TP
 4.
-Clients SHOULD gracefully handle the existence of data formats not listed
+Clients 
+'\" <<New>>
+MUST 
+'\" <</New>>
+gracefully handle the existence of data formats not listed
 above without losing or corrupting any presets or metadata.
 .RS
 .LP
@@ -1246,23 +1259,38 @@ include an additional component,
 .IR area ,
 which identifies the dungeon location or encounter identifier. This means the
 preset names have these forms:
+'\" <<TeX>>
+'\"
+'\" \z{\$[}\Var*{area}\z{]}\Var*{sequence}\z{|}\Var*{area}\\
+'\" \z{\$[}\Var*{area}\z{]}\Var*{sequence}$\blacktriangleright$\z{monster}\z{|}\Var*{area}\\
+'\" \z{\$[}\Var*{area}\z{]}\Var*{sequence}$\blacktriangleright$\z{monster}$\blacktriangleright$\z{saves|}\Var*{area}\\
+'\" \z{\$[}\Var*{area}\z{]}\Var*{sequence}$\blacktriangleright$\z{monster}$\blacktriangleright$\z{skills|}\Var*{area}\\
+'\" \z{\$[}\Var*{area}\z{]}\Var*{sequence}$\blacktriangleright$\z{monster}$\blacktriangleright$\z{other|}\Var*{area}\\
+'\" \z{\$[}\Var*{area}\z{]}\Var*{sequence}$\blacktriangleright$\z{monster}$\blacktriangleright$\z{special|}\Var*{area}\\
+'\" \z{\S}\Var*{sequence}\z{;}\Var*{var}\z{;}\Var*{flags}\z{;\$[}\Var*{area}\z{]|}\Var*{area}\\
+'\" \z{\S}\Var*{sequence}$\blacktriangleright$\Var*{monster}\z{;}\Var*{var}\z{;}\Var*{flags}\z{;\$[}\Var*{area}\z{]|}\Var*{area}
+'\"
 .RS
 .br
 .BI $[ area ] sequence | area
 .br
-.BI $[ area ] sequence \[u25B6] monster | area
+.BI $[ area ] sequence > monster | area
 .br
-.BI $[ area ] sequence \[u25B6] monster \[u25B6]saves| area
+.BI $[ area ] sequence > monster >saves| area
 .br
-.BI $[ area ] sequence \[u25B6] monster \[u25B6]skills| area
+.BI $[ area ] sequence > monster >skills| area
 .br
-.BI $[ area ] sequence \[u25B6] monster \[u25B6]other| area
+.BI $[ area ] sequence > monster >other| area
 .br
-.BI $[ area ] sequence \[u25B6] monster \[u25B6]special| area
+.BI $[ area ] sequence > monster >special| area
 .br
 .BI \[sc] sequence ; var ; flags ;$[ area ]| area
 .br
-.BI \[sc] sequence \[u25B6] monster ; var ; flags ;$[ area ]| area
+.BI \[sc] sequence > monster ; var ; flags ;$[ area ]| area
+.br
+(Again, the
+.B >
+here represents the Unicode codepoint U+25B6.)
 .RE
 .RE
 '\" <</New>>
