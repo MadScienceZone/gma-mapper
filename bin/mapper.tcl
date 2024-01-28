@@ -10971,6 +10971,7 @@ proc _render_die_roller {w width height type for_user tkey args} {
 					incr i
 				}
 			}
+			::gmautil::trigger_size $w
 		}
 		default {
 			DEBUG 0 "_render_die_roller passed unknown type '$type'"
