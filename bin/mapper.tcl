@@ -11095,7 +11095,7 @@ proc EditDieRollPresets {for_user tkey} {
 	}
 
 	set i 0
-	grid x [label $wnm.tg -text Group] [label $wnm.t0 -text On] [label $wnm.t1 -text Name] [label $wnm.t2 -text Description] [label $wnm.t3 -text Expression] \
+	grid [label $wnm.t_] [label $wnm.tg -text Group] [label $wnm.t0 -text On] [label $wnm.t1 -text Name] [label $wnm.t2 -text Description] [label $wnm.t3 -text Expression] \
 		x x x x x x [button $wnm.add -image $icon_add -command [list EDRPaddModifier $w $for_user $tkey]] -sticky ew
 	foreach preset [dict get $dice_preset_data(tmp_presets,$tkey) Modifiers] {
 		set dice_preset_data(tmp_presets,$tkey,M,$i) $preset
@@ -11423,8 +11423,9 @@ proc EDRPsaveValues {w for_user tkey} {
 	#   AreaTag    |   Group   Displayname
 	#              DisplaySeq
 	foreach p [dict get $dice_preset_data(tmp_presets,$tkey) Rolls] {
-		if {[string is digit -strict [set n [dict get $p DisplaySeq]]]} {
-			set n [format "%03d" $n]
+		if {[string is digit -strict [set n [dict get $p DisplaySeq]]] && [scan $n %d nn] == 1} {
+
+			set n [format "%03d" $nn]
 		}
 		if {[dict exists $p AreaTag] && [set at [dict get $p AreaTag]] ne {}} {
 			set dname "$at$n"
@@ -11462,8 +11463,8 @@ proc EDRPsaveValues {w for_user tkey} {
 		if {[dict get $p Global]} {
 			append flags g
 		}
-		if {[string is digit -strict [set n [dict get $p DisplaySeq]]]} {
-			set n [format "%03d" $n]
+		if {[string is digit -strict [set n [dict get $p DisplaySeq]]] && [scan $n %d nn] == 1} {
+			set n [format "%03d" $nn]
 		}
 		set dname "\u00A7$n"
 		if {[dict exists $p Group] && [set grp [dict get $p Group]] ne {}} {
@@ -11509,8 +11510,8 @@ proc EDRPdelModifier {w for_user tkey i} {
 	EDRPgetValues $w $for_user $tkey
 	dict set dice_preset_data(tmp_presets,$tkey) Modifiers [lreplace [dict get $dice_preset_data(tmp_presets,$tkey) Modifiers] $i $i]
 	set i [llength [dict get $dice_preset_data(tmp_presets,$tkey) Modifiers]]
-	grid forget $wnm.en$i $wnm.name$i $wnm.desc$i $wnm.dspec$i $wnm.varp$i $wnm.var$i $wnm.rb$i $wnm.up$i $wnm.dn$i $wnm.del$i $wnm.g$i
-	destroy $wnm.en$i $wnm.name$i $wnm.desc$i $wnm.dspec$i $wnm.varp$i $wnm.var$i $wnm.rb$i $wnm.up$i $wnm.dn$i $wnm.del$i $wnm.g$i
+	grid forget $wnm.en$i $wnm.name$i $wnm.desc$i $wnm.dspec$i $wnm.varp$i $wnm.var$i $wnm.rb$i $wnm.up$i $wnm.dn$i $wnm.del$i $wnm.g$i $wnm.gbtn$i $wnm.group$i
+	destroy $wnm.en$i $wnm.name$i $wnm.desc$i $wnm.dspec$i $wnm.varp$i $wnm.var$i $wnm.rb$i $wnm.up$i $wnm.dn$i $wnm.del$i $wnm.g$i $wnm.gbtn$i $wnm.group$i
 	EDRPresequence $w $for_user $tkey
 	EDRPupdateGUI $w $for_user $tkey
 }
@@ -11812,9 +11813,9 @@ proc EDRPaddModifier {w for_user tkey} {
 	        [entry $wnm.name$i] \
 		[entry $wnm.desc$i] \
 		[entry $wnm.dspec$i] \
-		[ttk::checkbutton $wnm.varp$i -text "as symbol <" -variable dice_preset_data(EDRP_mod_ven,$tkey,$i) -command [list EDRPcheckVar $w $for_user $tkey $i]]\
+		[ttk::checkbutton $wnm.varp$i -text "as symbol \${" -variable dice_preset_data(EDRP_mod_ven,$tkey,$i) -command [list EDRPcheckVar $w $for_user $tkey $i]]\
 		[entry $wnm.var$i -width 6] \
-		[label $wnm.rb$i -text > -anchor w] \
+		[label $wnm.rb$i -text "}" -anchor w] \
 		[ttk::checkbutton $wnm.g$i -text "()x" -variable dice_preset_data(EDRP_mod_g,$tkey,$i)]\
 		[button $wnm.up$i -image $icon_anchor_n -command [list EDRPraiseModifier $w $for_user $tkey $i]]\
 		[button $wnm.dn$i -image $icon_anchor_s -command [list EDRPlowerModifier $w $for_user $tkey $i]]\
@@ -11924,7 +11925,7 @@ proc PresetLists {arrayname for_user tkey args} {
 			} else {
 				# content before the | can be $[<area>]<sequence><groups>
 				set nstr [lindex $pieces 0]
-				if {[regexp {^(\$\[.*?\])(.*)$} _ areatag rest]} {
+				if {[regexp {^(\$\[.*?\])(.*)$} $nstr _ areatag rest]} {
 					set nstr $rest
 					dict set d AreaTag $areatag
 				} else {
