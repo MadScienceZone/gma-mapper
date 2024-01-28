@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___       _______   __                     #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___   ) /  \                    #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  | \/) )                   #
-# | |      | || || || (___) | Assistant  / (_) (_        /   )   | |                   #
-# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /    | |                   #
-# | | \_  )| |   | || (   ) |                ) (      /   _/     | |                   #
-# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\ __) (_                  #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/ \____/                  #
+#  _______  _______  _______                ___       _______  _______                 #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___   )/ ___   )                #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |\/   )  |                #
+# | |      | || || || (___) | Assistant  / (_) (_        /   )    /   )                #
+# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /   _/   /                 #
+# | | \_  )| |   | || (   ) |                ) (      /   _/   /   _/                  #
+# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\(   (__/\                #
+# (_______)|/     \||/     \| Client         (_)  (_)\_______/\_______/                #
 #                                                                                      #
 ########################################################################################
 # Profile editor
@@ -28,7 +28,7 @@ namespace eval ::gmaprofile {
 	variable font_repository
 	variable _default_color_table
 	variable minimum_file_version 1
-	variable maximum_file_version 5
+	variable maximum_file_version 6
 	array set _default_color_table {
 		fg,light           #000000
 		normal_fg,light    #000000
@@ -93,6 +93,7 @@ namespace eval ::gmaprofile {
 		dark ?
 		debug_level i
 		debug_proto ?
+		flash_updates ?
 		guide_lines {o {
 			major {o {
 				interval i
@@ -278,7 +279,7 @@ namespace eval ::gmaprofile {
 		return [dict create \
 			animate         false\
 			button_size     small\
-			chat_timestamp  false\
+			chat_timestamp  true\
 			colorize_die_rolls true\
 			curl_path       [::gmautil::searchInPath curl]\
 			curl_insecure   false\
@@ -286,6 +287,7 @@ namespace eval ::gmaprofile {
 			dark            false\
 			debug_level     0\
 			debug_proto     false\
+			flash_updates	false\
 			guide_lines [dict create \
 				major [dict create interval 0 offsets [dict create x 0 y 0]] \
 				minor [dict create interval 0 offsets [dict create x 0 y 0]] \
@@ -430,7 +432,7 @@ namespace eval ::gmaprofile {
 			blur_all false \
 			blur_pct 0 \
 			suppress_chat false \
-			chat_limit 0 \
+			chat_limit 500 \
 			chat_log {} \
 			curl_server {} \
 			update_url {} \
@@ -505,7 +507,7 @@ namespace eval ::gmaprofile {
 
 		json::write indented true
 		json::write aligned true
-		dict set data GMA_Mapper_preferences_version 5
+		dict set data GMA_Mapper_preferences_version 6
 		set f [open $filename w]
 		puts $f [::gmaproto::_encode_payload $data $_file_format]
 		close $f
@@ -567,7 +569,7 @@ namespace eval ::gmaprofile {
 		global animate colorize_die_rolls button_size bsizetext dark image_format keep_tools preload
 		global imgtext debug_level debug_proto curl_path curl_insecure profiles menu_button never_animate
 		global major_interval major_offset_x major_offset_y
-		global minor_interval minor_offset_x minor_offset_y
+		global minor_interval minor_offset_x minor_offset_y flash_updates
 		global chat_timestamp
 		variable _profile
 
@@ -581,6 +583,7 @@ namespace eval ::gmaprofile {
 			dark $dark \
 			debug_level $debug_level \
 			debug_proto $debug_proto \
+			flash_updates $flash_updates \
 			guide_lines [dict create \
 				major [dict create \
 					interval $major_interval \
@@ -750,7 +753,7 @@ namespace eval ::gmaprofile {
 		global animate button_size bsizetext colorize_die_rolls dark image_format keep_tools preload chat_timestamp
 		global imgtext debug_proto debug_level curl_path curl_insecure profiles menu_button never_animate
 		global major_interval major_offset_x major_offset_y
-		global minor_interval minor_offset_x minor_offset_y
+		global minor_interval minor_offset_x minor_offset_y flash_updates
 		global s_hostname s_port s_user s_pass s_blur_hp
 		variable _profile
 		variable _profile_backup
@@ -770,6 +773,7 @@ namespace eval ::gmaprofile {
 			dark dark \
 			debug_level debug_level \
 			debug_proto debug_proto \
+			flash_updates flash_updates\
 			guide_lines guides \
 			image_format image_format \
 			keep_tools keep_tools \
@@ -780,6 +784,7 @@ namespace eval ::gmaprofile {
 			current_profile current_profile
 
 		set animate [::gmaproto::int_bool $animate]
+		set flash_updates [::gmaproto::int_bool $flash_updates]
 		set colorize_die_rolls [::gmaproto::int_bool $colorize_die_rolls]
 		set chat_timestamp [::gmaproto::int_bool $chat_timestamp]
 		set dark [::gmaproto::int_bool $dark]
@@ -1061,6 +1066,7 @@ namespace eval ::gmaprofile {
 
 		grid [ttk::label $w.n.a.title -text "MAPPER APPEARANCE SETTINGS" -anchor center -foreground $sep_fg -background $sep_bg] - - - - - - -sticky we -pady 5
 		grid [ttk::checkbutton $w.n.a.animate -text "Animate updates" -variable animate] - - - - - - -sticky w
+		grid [ttk::checkbutton $w.n.a.flash -text "Flash objects when they are updated" -variable flash_updates] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.chat_timestamp -text "Show timestamp in chat messages" -variable chat_timestamp] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.cdr -text "Enable colors in die-roll titles" -variable colorize_die_rolls] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.dark -text "Dark theme" -variable dark] - - - - - - -sticky w
