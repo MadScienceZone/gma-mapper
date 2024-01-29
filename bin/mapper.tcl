@@ -634,6 +634,7 @@ proc DEBUG {level msg args} {
 				set dialogbg #cccccc
 			}
 			toplevel .debugwindow -background $dialogbg
+			wm title .debugwindow "Diagnostic Messages"
 			grid [text .debugwindow.text -yscrollcommand {.debugwindow.sb set}] \
 				[scrollbar .debugwindow.sb -orient vertical -command {.debugwindow.text yview}] -sticky news
 			foreach l {0 1 2 3} {
@@ -1146,7 +1147,7 @@ proc create_main_menu {use_button} {
 		nil {By creature size}
 		1   {full square}
 		.5  {1/2 square}
-		.25 {1/4 grid squares}
+		.25 {1/4 square}
 	} {
 		$mm.play.gridsnap add radiobutton -label $label -selectcolor $check_menu_color -variable CreatureGridSnap -value $value
 	}
