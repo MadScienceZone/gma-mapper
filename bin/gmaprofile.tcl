@@ -11,7 +11,7 @@
 ########################################################################################
 # Profile editor
 
-package provide gmaprofile 1.3
+package provide gmaprofile 1.4
 package require gmacolors
 package require json 1.3.3
 package require json::write 1.0.3
@@ -28,7 +28,7 @@ namespace eval ::gmaprofile {
 	variable font_repository
 	variable _default_color_table
 	variable minimum_file_version 1
-	variable maximum_file_version 6
+	variable maximum_file_version 7
 	array set _default_color_table {
 		fg,light           #000000
 		normal_fg,light    #000000
@@ -94,6 +94,7 @@ namespace eval ::gmaprofile {
 		debug_level i
 		debug_proto ?
 		flash_updates ?
+		scaling f
 		guide_lines {o {
 			major {o {
 				interval i
@@ -299,6 +300,7 @@ namespace eval ::gmaprofile {
 			preload      false\
 			profiles     [list [empty_server_profile offline]]\
 			fonts        [default_fonts]\
+			scaling      1.0\
 			styles       [default_styles]\
 		]
 	}
@@ -507,7 +509,7 @@ namespace eval ::gmaprofile {
 
 		json::write indented true
 		json::write aligned true
-		dict set data GMA_Mapper_preferences_version 6
+		dict set data GMA_Mapper_preferences_version 7
 		set f [open $filename w]
 		puts $f [::gmaproto::_encode_payload $data $_file_format]
 		close $f
@@ -566,7 +568,7 @@ namespace eval ::gmaprofile {
 		set _profile $_profile_backup
 	}
 	proc _save {} {
-		global animate colorize_die_rolls button_size bsizetext dark image_format keep_tools preload
+		global animate colorize_die_rolls button_size bsizetext scaling dark image_format keep_tools preload
 		global imgtext debug_level debug_proto curl_path curl_insecure profiles menu_button never_animate
 		global major_interval major_offset_x major_offset_y
 		global minor_interval minor_offset_x minor_offset_y flash_updates
@@ -605,6 +607,7 @@ namespace eval ::gmaprofile {
 			never_animate $never_animate\
 			keep_tools $keep_tools \
 			preload $preload \
+			scaling $scaling \
 		]
 	}
 	proc _save_server {w} {
@@ -750,7 +753,7 @@ namespace eval ::gmaprofile {
 	}
 
 	proc editor {w d} {
-		global animate button_size bsizetext colorize_die_rolls dark image_format keep_tools preload chat_timestamp
+		global animate button_size bsizetext colorize_die_rolls scaling dark image_format keep_tools preload chat_timestamp
 		global imgtext debug_proto debug_level curl_path curl_insecure profiles menu_button never_animate
 		global major_interval major_offset_x major_offset_y
 		global minor_interval minor_offset_x minor_offset_y flash_updates
@@ -781,7 +784,8 @@ namespace eval ::gmaprofile {
 			never_animate never_animate\
 			preload preload \
 			profiles profiles \
-			current_profile current_profile
+			current_profile current_profile \
+			scaling scaling
 
 		set animate [::gmaproto::int_bool $animate]
 		set flash_updates [::gmaproto::int_bool $flash_updates]
@@ -1070,6 +1074,7 @@ namespace eval ::gmaprofile {
 		grid [ttk::checkbutton $w.n.a.chat_timestamp -text "Show timestamp in chat messages" -variable chat_timestamp] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.cdr -text "Enable colors in die-roll titles" -variable colorize_die_rolls] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.dark -text "Dark theme" -variable dark] - - - - - - -sticky w
+		grid [ttk::label $w.n.a.scalingl -text "Visual scaling factor:"] [ttk::spinbox $w.n.a.scaling -textvariable scaling -from 1.0 -to 100.0 -increment 1.0 -format "%.1f" -width 5] -sticky we
 		grid [ttk::checkbutton $w.n.a.menu_button -text "Use menu button instead of menu bar" -variable menu_button] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.never_animate -text "Never play animated images" -variable never_animate] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.keep -text "Keep toolbar visible" -variable keep_tools] - - - - - - -sticky w

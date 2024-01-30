@@ -1379,6 +1379,13 @@ proc ApplyPreferences {data args} {
 	set servers {}
 	set cprof {}
 
+	if {[dict exists $data scaling]} {
+		tk scaling -displayof . [dict get $data scaling]
+		DEBUG 0 "Set scaling to [dict get $data scaling]"
+	} else {
+		DEBUG 0 "No scaling data"
+	}
+
 	gmautil::dassign $data \
 		animate      animatePlacement \
 		button_size  ButtonSize \
