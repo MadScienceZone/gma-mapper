@@ -20,6 +20,8 @@ versions.
 # 4.22.1 (unreleased)
 ## Fixes
  * Mitigates the scrolled frame scrollbar issue (it didn't recalculate scrollbar placement when the internal managed contents change).
+ * Mitigates the issue of dialogs and widgets having bad aspect ratios and sizes on high-res displays by providing a "Visual scaling factor" preferences setting. 
+   * Defaults to 1.0, but increase to 2.0 or 3.0 for high res displays (e.g., 4K).
 
 # 4.22
 ## Enhancements
