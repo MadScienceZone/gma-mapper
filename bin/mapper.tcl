@@ -17,7 +17,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.22}     ;# @@##@@
+set GMAMapperVersion {4.22.1-alpha}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {412}         ;# @@##@@
 set CoreVersionNumber {6.14}            ;# @@##@@
