@@ -275,6 +275,9 @@ namespace eval ::gmaprofile {
 		fix_missing_dieroll_styles p
 		fix_missing_dialog_styles p
 		fix_missing_clock_styles p
+		if {![dict exists $p scaling] || [dict get $p scaling] == 0.0} {
+			dict set p scaling 1.0
+		}
 	}
 	proc default_preferences {} {
 		return [dict create \
