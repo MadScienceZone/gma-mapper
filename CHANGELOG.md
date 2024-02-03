@@ -3,21 +3,21 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.22          <!-- @@##@@ -->
- * Effective Date: 28-Jan-2024               <!-- @@##@@ -->
+ * This Package Version: 4.22.1          <!-- @@##@@ -->
+ * Effective Date: 03-Feb-2024               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.14 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.15.1 <!-- @@##@@ -->
  * GMA Mapper File Format: 23	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 412        <!-- @@##@@ -->
- * GMA Mapper Preferences File Format: 6 <!-- @@##@@ -->
+ * GMA Mapper Preferences File Format: 7 <!-- @@##@@ -->
 
 ## DEPRECATION NOTICE
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
-# 4.22.1 (unreleased)
+# 4.22.1
 ## Fixes
  * Mitigates the scrolled frame scrollbar issue (it didn't recalculate scrollbar placement when the internal managed contents change).
  * Mitigates the issue of dialogs and widgets having bad aspect ratios and sizes on high-res displays by providing a "Visual scaling factor" preferences setting. 
