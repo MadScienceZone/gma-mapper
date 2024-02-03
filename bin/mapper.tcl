@@ -17,7 +17,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.22.1-alpha}     ;# @@##@@
+set GMAMapperVersion {4.22.1-alpha.1}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {412}         ;# @@##@@
 set CoreVersionNumber {6.14}            ;# @@##@@
@@ -1288,7 +1288,9 @@ proc _update_delegate_list {w} {
 			}
 		}
 	} else {
-		$w.info1 configure -text "Loading delegate data from server..."
+		if {[winfo exists $w.info1]} {
+			$w.info1 configure -text "Loading delegate data from server..."
+		}
 		update
 		RefreshDelegates $w
 	}
