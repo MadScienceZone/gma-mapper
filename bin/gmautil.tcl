@@ -1,18 +1,18 @@
 ########################################################################################
-#  _______  _______  _______                ___       _______  _______                 #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___   )/ ___   )                #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |\/   )  |                #
-# | |      | || || || (___) | Assistant  / (_) (_        /   )    /   )                #
-# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /   _/   /                 #
-# | | \_  )| |   | || (   ) |                ) (      /   _/   /   _/                  #
-# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\(   (__/\                #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/\_______/                #
+#  _______  _______  _______                ___       _______  _______      __         #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___   )/ ___   )    /  \        #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |\/   )  |    \/) )       #
+# | |      | || || || (___) | Assistant  / (_) (_        /   )    /   )      | |       #
+# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /   _/   /       | |       #
+# | | \_  )| |   | || (   ) |                ) (      /   _/   /   _/        | |       #
+# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\(   (__/\ _  __) (_      #
+# (_______)|/     \||/     \| Client         (_)  (_)\_______/\_______/(_) \____/      #
 #                                                                                      #
 ########################################################################################
 # version 1.0, 17 July 2020.
 # Steve Willoughby <steve@madscience.zone>
 #
-# @[00]@| GMA-Mapper 4.22
+# @[00]@| GMA-Mapper 4.22.1
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2024 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
@@ -55,7 +55,7 @@
 #
 # General utility functions
 
-package provide gmautil 1.1
+package provide gmautil 1.2
 package require Tcl 8.6
 package require sha256
 
@@ -116,6 +116,24 @@ if {[catch {package require pki 0.10}]} {
 } else {
 	proc ::gmautil::_parse_public_key {k} {
 		return [::pki::pkcs::parse_public_key $k]
+	}
+}
+
+#
+# ::gmautil::trigger_size
+# slightly adjusts the toplevel window height in order to force a recalculation
+# of the managed widgets inside. scrolled frames seem to need this.
+#
+set ::gmautil::trigger_size_offset 0
+proc ::gmautil::trigger_size {w} {
+	global ::gmautil::trigger_size_offset
+	set ::gmautil::trigger_size_offset [expr ($::gmautil::trigger_size_offset + 1) % 2]
+
+	if {[catch {
+		set w [winfo toplevel $w]
+		wm geometry $w =[winfo width $w]x[expr [winfo height $w]+$::gmautil::trigger_size_offset]
+	} err]} {
+		::DEBUG 1 "Unable to send <Configure> to $w: $err"
 	}
 }
 

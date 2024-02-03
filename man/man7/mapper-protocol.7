@@ -2,7 +2,7 @@
 '\" *** 412 ***
 '\" <<ital-is-var>>
 '\" <<bold-is-fixed>>
-.TH MAPPER-PROTOCOL 7 "GMA-Mapper 4.22" 28-Jan-2024 "Protocols" \" @@mp@@
+.TH MAPPER-PROTOCOL 7 "GMA-Mapper 4.22.1" 03-Feb-2024 "Protocols" \" @@mp@@
 .SH NAME
 mapper-protocol \- GMA client/server protocol specification
 .SH DESCRIPTION
@@ -1118,10 +1118,6 @@ The JSON payload includes the following fields:
 .B For
 The username of the player for whom these presets were stored. The default, if no
 name is given or if it is empty, is the currently logged-in user.
-'\" <<New>>
-Only the GM may send a request to alter the die-roll presets or
-delegate list for another user.
-'\" <</New>>
 .TP
 '\" <</ital-is-var>>
 .BI DelegateFor " (list of strings)"
@@ -1228,14 +1224,14 @@ For example,
 '\" \z{012|attack} is an ungrouped attack roll,
 .B 012|attack
 is an ungrouped attack roll,
-'\" \z{013$\blacktriangleright$monster|attack} is an attack roll belonging to the ``monster'' group,
+'\" \z{013}\allowbreak$\blacktriangleright$\z{monster|attack} is an attack roll belonging to the ``monster'' group,
 .B 013>monster|attack
 is an attack roll belonging to the \*(lqmonster\*(rq group,
-'\" \z{030$\blacktriangleright$monster$\blacktriangleright$save|Fortitude} is a Fortitude saving
+'\" \z{030}$\blacktriangleright$\z{monster}$\blacktriangleright$\z{save|Fortitude} is a Fortitude saving
 '\" throw belonging to the ``save'' subgroup of the ``monster'' group, and
 .B 030>monster>save|Fortitde
 is a Fortitude saving throw belonging to the \*(lqsave\*(rq subgroup of the \*(lqmonster\*(rq group, and
-'\" \z{\S042$\blacktriangleright$monster;;|mod} is a modifier in the ``monster'' group.
+'\" \z{\S042}$\blacktriangleright$\z{monster;;|mod} is a modifier in the ``monster'' group.
 .B \[sc]042>monster;;|mod
 is a modifier in the \*(lqmonster\*(rq group.
 '\" <</TeX>>
@@ -1257,16 +1253,16 @@ program itself automates the creation and destruction of ephemeral presets
 for combatants on an encounter-by-encounter basis. The names for these presets
 include an additional component,
 .IR area ,
-which identifies the dungeon location or encounter identifier. This means the
+which identifies the dungeon location or encounter identifier. This means the GMA
 preset names have these forms:
 '\" <<TeX>>
 '\"
 '\" \z{\$[}\Var*{area}\z{]}\Var*{sequence}\z{|}\Var*{area}\\
-'\" \z{\$[}\Var*{area}\z{]}\Var*{sequence}$\blacktriangleright$\z{monster}\z{|}\Var*{area}\\
-'\" \z{\$[}\Var*{area}\z{]}\Var*{sequence}$\blacktriangleright$\z{monster}$\blacktriangleright$\z{saves|}\Var*{area}\\
-'\" \z{\$[}\Var*{area}\z{]}\Var*{sequence}$\blacktriangleright$\z{monster}$\blacktriangleright$\z{skills|}\Var*{area}\\
-'\" \z{\$[}\Var*{area}\z{]}\Var*{sequence}$\blacktriangleright$\z{monster}$\blacktriangleright$\z{other|}\Var*{area}\\
-'\" \z{\$[}\Var*{area}\z{]}\Var*{sequence}$\blacktriangleright$\z{monster}$\blacktriangleright$\z{special|}\Var*{area}\\
+'\" \z{\$[}\Var*{area}\z{]}\Var*{sequence}$\blacktriangleright$\Var*{monster}\z{|}\Var*{area}\\
+'\" \z{\$[}\Var*{area}\z{]}\Var*{sequence}$\blacktriangleright$\Var*{monster}$\blacktriangleright$\z{saves|}\Var*{area}\\
+'\" \z{\$[}\Var*{area}\z{]}\Var*{sequence}$\blacktriangleright$\Var*{monster}$\blacktriangleright$\z{skills|}\Var*{area}\\
+'\" \z{\$[}\Var*{area}\z{]}\Var*{sequence}$\blacktriangleright$\Var*{monster}$\blacktriangleright$\z{other|}\Var*{area}\\
+'\" \z{\$[}\Var*{area}\z{]}\Var*{sequence}$\blacktriangleright$\Var*{monster}$\blacktriangleright$\z{special|}\Var*{area}\\
 '\" \z{\S}\Var*{sequence}\z{;}\Var*{var}\z{;}\Var*{flags}\z{;\$[}\Var*{area}\z{]|}\Var*{area}\\
 '\" \z{\S}\Var*{sequence}$\blacktriangleright$\Var*{monster}\z{;}\Var*{var}\z{;}\Var*{flags}\z{;\$[}\Var*{area}\z{]|}\Var*{area}
 '\"
@@ -1292,6 +1288,7 @@ preset names have these forms:
 .B >
 here represents the Unicode codepoint U+25B6.)
 .RE
+'\" <</TeX>>
 .RE
 '\" <</New>>
 '\" <</>>

@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       _______  _______                 #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___   )/ ___   )                #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |\/   )  |                #
-# | |      | || || || (___) | Assistant  / (_) (_        /   )    /   )                #
-# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /   _/   /                 #
-# | | \_  )| |   | || (   ) |                ) (      /   _/   /   _/                  #
-# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\(   (__/\                #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/\_______/                #
+#  _______  _______  _______                ___       _______  _______      __         #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___   )/ ___   )    /  \        #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |\/   )  |    \/) )       #
+# | |      | || || || (___) | Assistant  / (_) (_        /   )    /   )      | |       #
+# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /   _/   /       | |       #
+# | | \_  )| |   | || (   ) |                ) (      /   _/   /   _/        | |       #
+# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\(   (__/\ _  __) (_      #
+# (_______)|/     \||/     \| Client         (_)  (_)\_______/\_______/(_) \____/      #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -17,10 +17,10 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.22}     ;# @@##@@
+set GMAMapperVersion {4.22.1}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {412}         ;# @@##@@
-set CoreVersionNumber {6.14}            ;# @@##@@
+set CoreVersionNumber {6.15.1}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -634,6 +634,7 @@ proc DEBUG {level msg args} {
 				set dialogbg #cccccc
 			}
 			toplevel .debugwindow -background $dialogbg
+			wm title .debugwindow "Diagnostic Messages"
 			grid [text .debugwindow.text -yscrollcommand {.debugwindow.sb set}] \
 				[scrollbar .debugwindow.sb -orient vertical -command {.debugwindow.text yview}] -sticky news
 			foreach l {0 1 2 3} {
@@ -1146,7 +1147,7 @@ proc create_main_menu {use_button} {
 		nil {By creature size}
 		1   {full square}
 		.5  {1/2 square}
-		.25 {1/4 grid squares}
+		.25 {1/4 square}
 	} {
 		$mm.play.gridsnap add radiobutton -label $label -selectcolor $check_menu_color -variable CreatureGridSnap -value $value
 	}
@@ -1287,7 +1288,9 @@ proc _update_delegate_list {w} {
 			}
 		}
 	} else {
-		$w.info1 configure -text "Loading delegate data from server..."
+		if {[winfo exists $w.info1]} {
+			$w.info1 configure -text "Loading delegate data from server..."
+		}
 		update
 		RefreshDelegates $w
 	}
@@ -1377,6 +1380,10 @@ proc ApplyPreferences {data args} {
 	set current_profile {}
 	set servers {}
 	set cprof {}
+
+	if {[dict exists $data scaling]} {
+		tk scaling -displayof . [dict get $data scaling]
+	}
 
 	gmautil::dassign $data \
 		animate      animatePlacement \
@@ -10971,6 +10978,7 @@ proc _render_die_roller {w width height type for_user tkey args} {
 					incr i
 				}
 			}
+			::gmautil::trigger_size $w
 		}
 		default {
 			DEBUG 0 "_render_die_roller passed unknown type '$type'"
@@ -14101,7 +14109,7 @@ proc ConnectToServerByIdx {idx} {
 #
 #*user_key name -> sanitized_name
 #
-# @[00]@| GMA-Mapper 4.22
+# @[00]@| GMA-Mapper 4.22.1
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2024 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
