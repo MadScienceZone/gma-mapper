@@ -858,12 +858,32 @@ proc _refresh_clock_display {w} {
 # update_combat w ?new_delta_time=0?
 proc update_combat {w {new_delta_time 0}} {
 	variable _clock_state
-	_update_combat $w.timeclock 1 $new_delta_time
+	if {[set odt [dict get $_clock_state($w) delta_time]] < 5} {
+		_update_combat $w.timeclock 1 $new_delta_time
+	} else {
+		_animate_update_combat $w $odt $new_delta_time 1
+	}
+
 	$w.timedisp configure -text [to_string $w.timeclock 2]
 	$w.turndisp configure -text [delta_string [dict get $_clock_state($w.timeclock) delta_time]]
 	update_initiative_slots $w
 }
 
+proc _animate_update_combat {w odt ndt i} {
+	variable _clock_state
+	if {$i == 1} {
+		if {[info exists _clock_state($w,animation)]} {
+			after cancel $_clock_state($w,animation)
+		}
+	}
+	if {$i == 10} {
+		_update_combat $w.timeclock 1 $ndt
+		array unset _clock_state $w,animation
+	} else {
+		_update_combat $w.timeclock 1 [expr $odt + ((($ndt - $odt) / 10.0) * $i)]
+		set _clock_state($w,animation) [after 100 _animate_update_combat $w $odt $ndt [expr $i + 1]]
+	}
+}
 
 # current_initiative_slot w -> slot_no
 proc current_initiative_slot {w} {
