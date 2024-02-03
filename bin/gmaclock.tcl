@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___       _______  _______      __         #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___   )/ ___   )    /  \        #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |\/   )  |    \/) )       #
-# | |      | || || || (___) | Assistant  / (_) (_        /   )    /   )      | |       #
-# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /   _/   /       | |       #
-# | | \_  )| |   | || (   ) |                ) (      /   _/   /   _/        | |       #
-# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\(   (__/\ _  __) (_      #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/\_______/(_) \____/      #
+#  _______  _______  _______                ___       _______  _______     _______     #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___   )/ ___   )   / ___   )    #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |\/   )  |   \/   )  |    #
+# | |      | || || || (___) | Assistant  / (_) (_        /   )    /   )       /   )    #
+# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /   _/   /      _/   /     #
+# | | \_  )| |   | || (   ) |                ) (      /   _/   /   _/      /   _/      #
+# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\(   (__/\ _ (   (__/\    #
+# (_______)|/     \||/     \| Client         (_)  (_)\_______/\_______/(_)\_______/    #
 #                                                                                      #
 ########################################################################################
 #
@@ -858,12 +858,35 @@ proc _refresh_clock_display {w} {
 # update_combat w ?new_delta_time=0?
 proc update_combat {w {new_delta_time 0}} {
 	variable _clock_state
-	_update_combat $w.timeclock 1 $new_delta_time
-	$w.timedisp configure -text [to_string $w.timeclock 2]
-	$w.turndisp configure -text [delta_string [dict get $_clock_state($w.timeclock) delta_time]]
-	update_initiative_slots $w
+	if {$new_delta_time - [set odt [dict get $_clock_state($w.timeclock) delta_time]] < 5} {
+		_update_combat $w.timeclock 1 $new_delta_time
+		$w.timedisp configure -text [to_string $w.timeclock 2]
+		$w.turndisp configure -text [delta_string [dict get $_clock_state($w.timeclock) delta_time]]
+		update_initiative_slots $w
+	} else {
+		_animate_update_combat $w $odt $new_delta_time 1
+	}
+
 }
 
+proc _animate_update_combat {w odt ndt i} {
+	variable _clock_state
+	if {$i == 1} {
+		if {[info exists _clock_state($w,animation)]} {
+			after cancel $_clock_state($w,animation)
+		}
+	}
+	if {$i == 10} {
+		_update_combat $w.timeclock 1 $ndt
+		array unset _clock_state $w,animation
+		$w.timedisp configure -text [to_string $w.timeclock 2]
+		$w.turndisp configure -text [delta_string [dict get $_clock_state($w.timeclock) delta_time]]
+		update_initiative_slots $w
+	} else {
+		_update_combat $w.timeclock 1 [expr int($odt + ((($ndt - $odt) / 10.0) * $i))]
+		set _clock_state($w,animation) [after 100 ::gmaclock::_animate_update_combat $w $odt $ndt [expr $i + 1]]
+	}
+}
 
 # current_initiative_slot w -> slot_no
 proc current_initiative_slot {w} {
@@ -1056,7 +1079,7 @@ proc exists {w} {
 
 }
 #
-# @[00]@| GMA-Mapper 4.22.1
+# @[00]@| GMA-Mapper 4.22.2
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2024 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
