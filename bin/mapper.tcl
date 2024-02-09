@@ -1159,7 +1159,7 @@ proc create_main_menu {use_button} {
 	} else {
 		$mm.play add cascade -menu $mm.play.servers -label "\[DEPRECATED\] Connect to"
 	}
-	set connmenuidx 8
+	set connmenuidx 14
 	menu $mm.tools
 	$mm.tools add command -command {checkForUpdates} -label "Check for Updates..."
 	$mm.tools add separator
