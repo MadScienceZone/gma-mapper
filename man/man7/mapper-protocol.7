@@ -195,6 +195,7 @@ since all communications are asynchronous.
 '\"  \z{CONN}   &C$\leftarrow$S     &---        &N/A&\acronym{JSON}&Notify of all connected peers\\
 '\"  \z{CORE}   &C$\rightarrow$S    &\z{CORE=}  &no &\acronym{JSON}&Query the core game database\\
 '\"  \z{CORE=}  &C$\leftarrow$S     &---        &N/A&\acronym{JSON}&Core game data from the game database\\
+'\"  \z{CORE/}  &C$\rightarrow$S    &---        &yes&\acronym{JSON}&Filter availability of the game database\\
 '\"  \z{CS}     &C$\leftrightarrow$S&---        &yes&\acronym{JSON}&Change the current time of day\\
 '\"  \z{D}      &C$\rightarrow$S    &\z{ROLL}   &no &\acronym{JSON}&Initiate a die roll\\
 '\"  \z{DD}     &C$\leftarrow$S     &\z{DD=}    &maybe&\acronym{JSON}&Store new presets for user\\
@@ -272,6 +273,7 @@ DefineDicePresets	DD	C\[->]S	DD=	maybe	JSON	Store new presets for user
 DefineDiceDelegates	DDD	C\[->]S	DD=	maybe	JSON	Assign die-roll delegates
 Denied	DENIED	C\[<-]S	\fR\(em\fP	N/A	JSON	Server denies access
 Echo	ECHO	C\[<>]S	ECHO	no	JSON	Send data for server to echo back to client
+FilterCoreData	CORE/	C\[->]S	\fR\(em\fP	yes	JSON	Filter availability of the game database
 FilterDicePresets	DD/	C\[->]S	DD=	maybe	JSON	Remove some presets for user
 FilterImages	AI/	C\[->]S	\fR\(em\fP	yes	JSON	Filter saved image definitions
 Granted	GRANTED	C\[<-]S	\fR\(em\fP	N/A	JSON	Server grants access
@@ -1043,6 +1045,11 @@ The payload is a JSON object containing the requested data, with the following a
 If true, the requested entry was not found in the database. Otherwise (including the case where this attribute is
 missing) the remaining attributes contain the requested information.
 .TP
+.BI "IsHidden " (bool)
+If true, the requested entry is hidden from player view by the GM. No
+.B Data
+field will be given.
+.TP
 .BI "IsLocal " (bool)
 If present and true, this entry was a local addition to the database. Otherwise it was imported from publicly-available
 SRD data for the game system.
@@ -1749,6 +1756,134 @@ If true, this is a background skill.
 .BR "Data " "fields for" " spell " "type items:"
 '\" <<list>>
 .RS
+.TP
+.B School
+.TP
+.BI "Descriptors " (list)
+.TP
+.BI "Components " (object)
+'\" <<list>>
+.RS
+.TP
+.BI "Components " (list)
+.TP
+.B Material
+.TP
+.B Focus
+.TP
+.BI "HasCostlyComponents " (bool)
+.TP
+.BI "MaterialCosts " (int)
+'\" <</>>
+.RE
+.TP
+.BI "Casting " (object)
+'\" <<list>>
+.RS
+.TP
+.B Time
+.TP
+.B Special
+'\" <</>>
+.RE
+.TP
+.BI "Range " (object)
+'\" <<list>>
+.RS
+.TP
+.B Range
+.TP
+.BI "Distance " (int)
+.TP
+.BI "DistancePerLevel " (int)
+.TP
+.B DistanceSpecial
+'\" <</>>
+.RE
+.TP
+.BI "Effect " (object)
+'\" <<list>>
+.RS
+.TP
+.B Area
+.TP
+.B Effect
+.TP
+.B Targets
+'\" <</>>
+.RE
+.TP
+.BI "Duration " (object)
+'\" <<list>>
+.RS
+.TP
+.B Duration
+.TP
+.B Special
+.TP
+.BI "Concentration " (bool)
+.TP
+.BI "PerLevel " (bool)
+'\" <</>>
+.RE
+.TP
+.BI "SR " (object)
+'\" <<list>>
+.RS
+.TP
+.B SR
+.TP
+.B Special
+.TP
+.BI "Object " (bool)
+.TP
+.BI "Harmless " (bool)
+'\" <</>>
+.RE
+.TP
+.BI "Save " (object)
+'\" <<list>>
+.RS
+.TP
+.B SavingThrow
+.TP
+.B Effect
+.TP
+.B Special
+.TP
+.BI "Object " (bool)
+.TP
+.BI "Harmless " (bool)
+'\" <</>>
+.RE
+.TP
+.BI "IsDismissible " (bool)
+.TP
+.BI "IsDischarge " (bool)
+.TP
+.BI "IsShapeable " (bool)
+.TP
+.BI "ClassLevels " "(list of objects)"
+'\" <<list>>
+.RS
+.TP
+.B Class
+.TP
+.BI "Level " (int)
+'\" <</>>
+.RE
+.TP
+.B Deity
+.TP
+.B Domain
+.TP
+.B Description
+.TP
+.B Source
+.TP
+.B Bloodline
+.TP
+.B Patron
 .RE
 '\" <</>>
 .TP
@@ -1868,6 +2003,34 @@ and
 '\" <</>>
 .RE
 '\" <<ital-is-var>>
+.TP
+.B CORE/
+Filter the core database items which are visible to the players.
+The payload is a JSON object with the following fields:
+'\" <<list>>
+.RS
+.TP
+.B Filter
+This is a regular expression matching the
+.B Code
+value of all the entries to be affected by this command.
+.TP
+.B Type
+The type of core data entry to target.
+.TP
+.BI "IsHidden " (bool)
+If true, set the entries matching the
+.B Filter
+expression so they are hidden from the players. Otherwise, make them.
+.TP
+.BI "InvertSelection " (bool)
+If true, all entries which do
+.I not
+match
+.B Filter
+are affected.
+.RE
+'\" <</>>
 '\" <</New>>
 .TP
 .B CS
