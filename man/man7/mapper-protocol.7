@@ -5,6 +5,11 @@
 .TH MAPPER-PROTOCOL 7 "GMA-Mapper 4.22.3" 08-Feb-2024 "Protocols" \" @@mp@@
 .SH NAME
 mapper-protocol \- GMA client/server protocol specification
+'\" <<New>>
+.SH EXPERIMENTAL
+.LP
+.B "This document includes experimental changes to the protocol which have not yet been officially released."
+'\" <</New>>
 .SH DESCRIPTION
 .LP
 The
@@ -188,6 +193,8 @@ since all communications are asynchronous.
 '\"  \z{CLR@}   &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Remove elements from a map file\\
 '\"  \z{CO}     &C$\leftrightarrow$S&---        &yes&\acronym{JSON}&Turn on/off combat mode\\
 '\"  \z{CONN}   &C$\leftarrow$S     &---        &N/A&\acronym{JSON}&Notify of all connected peers\\
+'\"  \z{CORE}   &C$\rightarrow$S    &\z{CORE=}  &no &\acronym{JSON}&Query the core game database\\
+'\"  \z{CORE=}  &C$\leftarrow$S     &---        &N/A&\acronym{JSON}&Core game data from the game database\\
 '\"  \z{CS}     &C$\leftrightarrow$S&---        &yes&\acronym{JSON}&Change the current time of day\\
 '\"  \z{D}      &C$\rightarrow$S    &\z{ROLL}   &no &\acronym{JSON}&Initiate a die roll\\
 '\"  \z{DD}     &C$\leftarrow$S     &\z{DD=}    &maybe&\acronym{JSON}&Store new presets for user\\
@@ -284,6 +291,7 @@ PlaceSomeone	PS	C\[<>]S	\fR\(em\fP	no	JSON	Place creature token
 Polo	POLO	C\[->]S	\fR\(em\fP	no	none	Acknowledge server's ping
 Priv	PRIV	C\[<-]S	\fR\(em\fP	N/A	JSON	Priveleged command denied
 Protocol	PROTOCOL	C\[<-]S	\fR\(em\fP	N/A	int	Signal protocol version in use
+QueryCoreData	CORE	C\[->]S	CORE=	no	JSON	Query the core game database
 QueryDicePresets	DR	C\[->]S	DD=	maybe	JSON	Request user's presets
 QueryImage	AI?	C\[<>]S	AI	no	JSON	Ask for definition of image
 QueryPeers	/CONN	C\[->]S	CONN	no	none	Request list of peer clients
@@ -298,6 +306,7 @@ SyncChat	SYNC-CHAT	C\[->]S	CC	no	JSON	Request replay of messages
 \^	\^	\^	TO	\^	\^	\^
 Toolbar	TB	C\[<>]S	\fR\(em\fP	yes	JSON	Turn on/off client toolbar
 UpdateClock	CS	C\[<>]S	\fR\(em\fP	yes	JSON	Change the current time of day
+UpdateCoreData	CORE=	C\[<-]S	\fR\(em\fP	N/A	JSON	Update a core data item
 UpdateDicePresets	DD=	C\[<-]S	\fR\(em\fP	N/A	JSON	Receive user's presets
 UpdateInitiative	IL	C\[<>]S	\fR\(em\fP	yes	JSON	Update the initiative list
 UpdateObjAttributes	OA	C\[<>]S	\fR\(em\fP	no	JSON	Update object attributes
@@ -971,6 +980,895 @@ If true, this object describes the client which received this command.
 .RE
 '\" <</>>
 .RE
+'\" <<New>>
+.TP
+.B CORE
+Query the server's core SRD database. The server SHOULD respond with a
+.B CORE=
+message containing the requested item or indicating that no such item was found.
+The payload is a JSON object with the following attributes:
+'\" <<list>>
+.RS
+.TP
+.B Type
+The type of object being requested. Currently the supported types include
+.BR bestiary ,
+.BR class ,
+.BR feat ,
+.BR language ,
+.BR skill ,
+.BR spell ,
+and
+.BR weapon .
+.TP
+.B Code
+The GMA unique code that identifies the entry.
+May be blank since only one of
+.B Code
+and 
+.B Name
+is necessary.
+.TP
+.B Name
+The common name of the entry. 
+May be blank since only one of
+.B Code
+and 
+.B Name
+is necessary.
+.TP
+.B RequestID
+If you place an arbitrary string value in this field, it will be sent back to you
+in the corresponding
+.B CORE=
+response message.
+.RE
+'\" <</>>
+.TP
+.B CORE=
+This message from the server provides core SRD data for an item that the client might want to
+know about. Typically, this is in response to a
+.B CORE
+message from the client requesting this information. Clients MUST gracefully deal with the
+receipt of a
+.B CORE=
+message they didn't need or are no longer interested in, as well as the case where they requested
+core data but received no corresponding response.
+The payload is a JSON object containing the requested data, with the following attributes:
+'\" <<list>>
+.RS
+.TP
+'\" <</ital-is-var>>
+.BI "NoSuchEntry " (bool)
+If true, the requested entry was not found in the database. Otherwise (including the case where this attribute is
+missing) the remaining attributes contain the requested information.
+.TP
+.BI "IsLocal " (bool)
+If present and true, this entry was a local addition to the database. Otherwise it was imported from publicly-available
+SRD data for the game system.
+.TP
+.B Code
+The GMA code for the requested item.
+.TP
+.B Name
+The GMA name for the requested item.
+.TP
+.B Type
+The type of core data item being provided, as per the
+.B Type
+field of the
+.B CORE
+message (q.v.).
+.TP
+.B RequestID
+If present and non-empty, this is the
+.B RequestID
+value provided by the client when making the request that resulted in this reply.
+.TP
+.B Data
+This value is a JSON-encoded object containing the specific data relating to the item in question. Its format depends on
+the item
+.BR Type .
+'\" <</>>
+.LP
+The
+.B Data
+payload for each type is described in the following sections.
+.TP
+.BR "Data " "fields for" " bestiary " "type items:"
+'\" <<list>>
+.RS
+.TP
+.B Species
+The name of the species of the creature.
+.TP
+.B CR
+The challenge rating of the creature. Fractions may appear as, e.g.,
+.BR 1/2 .
+.TP
+.BI "XP " (int)
+XP reward for defeating the creature.
+.TP
+.B Class
+The class and levels if applicable.
+.TP
+.BI "Alignment " (object)
+The alignment for the creature, as an object with the following fields:
+'\" <<list>>
+.RS
+.TP
+.BI "Alignments " (list)
+A list of alignment codes
+.RB ( CG ,
+.BR LN ,
+etc.)
+which this creature may be.
+.TP
+.B Special
+Any special comment about alignment.
+.RE
+'\" <</>>
+.TP
+.B Source
+The reference to the source this item originally came from.
+.TP
+.BI "Size " (object)
+The creature's size, as an object with the following fields:
+'\" <<list>>
+.RS
+.TP
+.B Code
+The size code as documented in the GMA encounter and familiar data.
+.TP
+.B SpaceText
+Any comment about the creature's threatened space.
+.TP
+.B ReachText
+Any comment about the creature's reach distance.
+.RE
+'\" <</>>
+.TP
+.B Type
+Creature type.
+.TP
+.BI "Subtypes " (list)
+List of applicable subtypes.
+.TP
+.BI "Initiative " (object)
+The creature's initiative modifier, as an object with the following fields:
+'\" <<list>>
+.RS
+.TP
+.BI "Mod " (int)
+The total initiative modifier value.
+.TP
+.B Special
+Any special information related to initiative.
+.RE
+'\" <</>>
+.TP
+.B Senses
+A description of the creature's senses.
+.TP
+.B Aura
+A description of the creature's aura effect.
+.TP
+.BI "HP " (object)
+The creature's hit points as an object with the following fields:
+'\" <<list>>
+.RS
+.TP
+.BI "Typical " (int)
+Typical hit point total.
+.TP
+.BI "Current " (int)
+The creature's current hit point total.
+.TP
+.B Special
+Any special comments about the creature's health.
+.TP
+.B HitDice
+The hit dice die-roll specification.
+.RE
+'\" <</>>
+.TP
+.BI "Save " (object)
+The creature's saving throws, as an object with these fields:
+'\" <<list>>
+.RS
+.TP
+.BI "Fort " (object)
+The Fortitude saving throw, as an object with these fields:
+'\" <<list>>
+.RS
+.TP
+.BI "Mod " (int)
+The total saving throw modifier value.
+.TP
+.BI Special
+Any special commentary about this saving throw.
+.TP
+.BI "NoSavingThrow " (bool)
+If true, the creature has no such saving throw at all and the other fields should be ignored.
+.RE
+'\" <</>>
+.TP
+.BI "Refl " (object)
+The creature's Reflex saving throw, in the same format as the Fortitude saving throw.
+.TP
+.BI "Will " (object)
+The creature's Will saving throw, in the same format as the Fortitude saving throw.
+.TP
+.B Special
+Any special comments about the creature's saving throws.
+'\" <</>>
+.RE
+.TP
+.B DefensiveAbilities
+A description of the creature's defensive abilities.
+.TP
+.BI "DR " (object)
+The creature's damage reduction, as an object with the following fields:
+'\" <<list>>
+.RS
+.TP
+.BI "DR " (int)
+The number of hit points resisted.
+.TP
+.B Bypass
+Description of what will bypass the DR.
+'\" <</>>
+.RE
+.TP
+.B Immunities
+A description of the things the creature is immune from.
+.TP
+.B Resists
+A description of the resistances the creature has.
+.TP
+.BI "Speed " (object)
+The creature's movement speed, as an object with the following fields:
+'\" <<list>>
+.RS
+.TP
+.B Code
+The encoded list of speeds.
+.TP
+.B Special
+Additional commentary about movement speed.
+'\" <</>>
+.RE
+.TP
+.B SpecialAttacks
+A description of the various special attacks the creature may make.
+
+.TP
+.B Resists
+A description of the resistances the creature has.
+.TP
+.BI "Speed " (object)
+The creature's movement speed, as an object with the following fields:
+'\" <<list>>
+.RS
+.TP
+.B Code
+The encoded list of speeds.
+.TP
+.B Special
+Additional commentary about movement speed.
+'\" <</>>
+.RE
+.TP
+.B SpecialAttacks
+A description of the various special attacks the creature may make.
+.TP
+.BI "Abilities " (object)
+The creature's ability scores, as an object with the following fields:
+'\" <<list>>
+.RS
+.TP
+.BI "Str " (object)
+The Strength score, as an object with the following fields:
+'\" <<list>>
+.RS
+.TP
+.BI "Base " (int)
+The raw ability score value.
+.TP
+.B Special
+Any special notes about this ability score.
+.TP
+.BI "NullScore " (bool)
+If true, the creature does not have this ability score at all, and the other fields should be ignored.
+'\" <</>>
+.RE
+.TP
+.BI "Dex " (object)
+The Dexterity score, as an object in the same format as Strength.
+.TP
+.BI "Con " (object)
+The Constitution score, as an object in the same format as Strength.
+.TP
+.BI "Int " (object)
+The Intelligence score, as an object in the same format as Strength.
+.TP
+.BI "Wis " (object)
+The Wisdom score, as an object in the same format as Strength.
+.TP
+.BI "Cha " (object)
+The Charisma score, as an object in the same format as Strength.
+'\" <</>>
+.RE
+.TP
+.BI "Combat " (object)
+The combat statistics for the creature, as an object with the following fields:
+'\" <<list>>
+.RS
+.TP
+.BI "BAB " (int)
+The base attack bonus.
+.TP
+.BI "CMB " (int)
+The combat maneuver bonus.
+.TP
+.BI "CMD " (int)
+The combat maneuver defense value.
+.TP
+.B CMBSpecial
+Any special notes on the CMB.
+.TP
+.B CMDSpecial
+Any special notes on the CMD.
+'\" <</>>
+.RE
+.TP
+.B SQ
+A description of the creature's special qualities.
+.TP
+.B Environment
+A description of the environment where this creature commonly appears.
+.TP
+.B Organization
+A description of the groups in which this creature is usually found.
+.TP
+.B Treasure
+The treasure type and amount usually found with this creature.
+.TP
+.B Appearance
+A short description of the creature's physical appearance.
+.TP
+.BI "IsTemplate " (bool)
+If true, this is a template from which other creatures can be built.
+.TP
+.BI "Strategy " (object)
+The creature's strategy in an encounter, as an object with these fields:
+'\" <<list>>
+.RS
+.TP
+.B BeforeCombat
+How the creature will prepare for the encounter.
+.TP
+.B DuringCombat
+How the creature will manage its encounter with the players.
+.TP
+.B Morale
+How resolute the creature is in the face of deadly combat.
+'\" <</>>
+.RE
+.TP
+.BI "IsCharacter " (bool)
+If true, this is a creature that may be a character.
+.TP
+.BI "IsCompanion " (bool)
+If true, this creature may be a companion.
+.TP
+.BI "IsUnique " (bool)
+If true, there is only one of this creature in existence.
+.TP
+.B AgeCagetory
+The age category for the creature.
+.TP
+.B Gender
+The creature's gender
+.TP
+.B Bloodline
+The creature's bloodline.
+.TP
+.B Patron
+The creature's patron deity.
+.TP
+.B AlternateNameForm
+.TP
+.BI "DontUseRacialHD " (bool)
+If true, don't use racial hit dice when creating a character with levels.
+.TP
+.B VariantParent
+.TP
+.BI "Mythic " (object)
+'\" <<list>>
+.RS
+.TP
+.BI "IsMythic " (bool)
+.TP
+.BI "MR " (int)
+.TP
+.BI "MT " (int)
+'\" <</>>
+.RE
+.TP
+.B OffenseNote
+.TP
+.B StatisticsNote
+.TP
+.BI "Gear " (object)
+'\" <<list>>
+.RS
+.TP
+.B Combat
+.TP
+.B Other
+'\" <</>>
+.RE
+.TP
+.BI "Schools " (object)
+'\" <<list>>
+.RS
+.TP
+.B Focused
+.TP
+.B Prohibited
+.TP
+.B Opposition
+'\" <</>>
+.RE
+.TP
+.B ClassArchetypes
+.TP
+.B BaseStatistics
+.TP
+.B RacialMods
+.TP
+.B Mystery
+.TP
+.B Notes
+.TP
+.BI "Domains " (list)
+.TP
+.BI "AC " (object)
+'\" <<list>>
+.RS
+.TP
+.BI "Components " (object)
+.TP
+.BI "Adjustments " (object)
+'\" <</>>
+.RE
+.TP
+.BI "AttackModes " "(list of objects)"
+'\" <<list>>
+.RS
+.TP
+.BI "Tier " (int)
+.TP
+.B BaseWeaponID
+.TP
+.BI "Multiple " (int)
+.TP
+.B Name
+.TP
+.B Attack
+.TP
+.B Damage
+.TP
+.BI "Critical " (object)
+'\" <<list>>
+.RS
+.TP
+.BI "CantCritical " (bool)
+.TP
+.BI "Threat " (int)
+.TP
+.BI "Multiplier " (int)
+'\" <</>>
+.RE
+.TP
+.BI "Ranged " (object)
+'\" <<list>>
+.RS
+.TP
+.BI "IsRanged " (bool)
+.TP
+.BI "Increment " (int)
+.TP
+.BI "MaxIncrements " (int)
+'\" <</>>
+.RE
+.TP
+.BI "IsReach " (bool)
+.TP
+.B Special
+.TP
+.B Mode
+'\" <</>>
+.RE
+.TP
+.BI "Languages " "(list of objects)"
+'\" <<list>>
+.RS
+.TP
+.B Name
+.TP
+.BI "IsMute " (bool)
+.TP
+.B Special
+'\" <</>>
+.RE
+.TP
+.BI "Feats " "(list of objects)"
+'\" <<list>>
+.RS
+.TP
+.B Code
+.TP
+.B Parameters
+.TP
+.BI "IsBonus " (bool)
+'\" <</>>
+.RE
+.TP
+.BI "Skills " "(list of objects)"
+'\" <<list>>
+.RS
+.TP
+.B Code
+.TP
+.BI "Modifier " (int)
+.TP
+.B Notes
+'\" <</>>
+.RE
+.TP
+.BI "Spells " "(list of objects)"
+'\" <<list>>
+.RS
+.TP
+.B ClassName
+.TP
+.BI "CL " (int)
+.TP
+.BI "Concentration " (int)
+.TP
+.BI "NoConcentration " (bool)
+.TP
+.BI "PlusDomain " (int)
+.TP
+.B Description
+.TP
+.B Special
+.TP
+.BI "Spells " "(list of objects)"
+'\" <<list>>
+.RS
+.TP
+.B Name
+.TP
+.B AlternateName
+.TP
+.B Frequency
+.TP
+.B Special
+.TP
+.BI "Slots " "(list of objects)"
+'\" <<list>>
+.RS
+.TP
+.BI "IsCast " (bool)
+.TP
+.BI "IsDomain " (bool)
+.TP
+.BI "MetaMagic " (list)
+'\" <</>>
+.RE
+'\" <</>>
+.RE
+'\" <</>>
+.RE
+.RE
+'\" <</>>
+.TP
+.BR "Data " "fields for" " class " "type items:"
+'\" <<list>>
+.RS
+.TP
+.BI "Spells " (object)
+Describes the spell-casting capability of the class, with the following fields:
+'\" <<list>>
+.RS
+.TP
+.B Type
+The magic type (arcane, etc.)
+.TP
+.B Ability
+The name of the ability score relevant to spells.
+.TP
+.BI "HasBonusSpells " (bool)
+True if the class allows bonus spells (e.g., clerics' domain spells)
+.TP
+.BI "IsSpontaneousCaster " (bool)
+True if the class casts spells without needing to prepare them in advance.
+.TP
+.BI "CastPerDay " (list)
+A list of the number of spells which may be cast per day. Each element is an object which has the following values:
+'\" <<list>>
+.RS
+.TP
+.BI "ClassLevel " (int)
+The class level for which this applies.
+.TP
+.BI "SpellLevel " (int)
+The level of spell for which this applies.
+.TP
+.BI "IsProhibited " (bool)
+If true, this level of spell is not possible at this class level.
+.TP
+.BI "IsUnlimitedUse " (bool)
+If true, this level of spell can be used an unlimited number of times per day at this class level.
+.TP
+.BI "Number " (int)
+The number of spells granted at this spell and class level.
+.RE
+'\" <</>>
+.TP
+.BI "PreparedPerDay " (object)
+The number of spells which may be prepared per day by class level and spell level. Each element has the same
+values as for the 
+.B CastPerDay
+attribute above.
+.TP
+.BI "SpellsKnown " (object)
+The number of spells which may be known by class level and spell level. Each element has the same
+values as for the 
+.B CastPerDay
+attribute above.
+.RE
+'\" <</>>
+.RE
+'\" <</>>
+.TP
+.BR "Data " "fields for" " feat " "type items:"
+'\" <<list>>
+.RS
+.TP
+.B Parameters
+Describes the parameters allowed for the feat, if any.
+.TP
+.B Description
+The text description of the feat.
+.TP
+.B Prerequisites
+The text description of the prerequisites for the feat.
+.TP
+.B Benefit
+Description of the benefit granted by taking this feat.
+.TP
+.B Normal
+Description of the situation if the feat is not taken.
+.TP
+.B Special
+Any special notes or circumstances.
+.TP
+.B Source
+The reference to the source book or other place where this feat origially came from.
+.TP
+.B Race
+.TP
+.B Note
+.TP
+.B Goal
+.TP
+.B CompletionBenefit
+.TP
+.B SuggestedTraits
+.TP
+.BI "Types " (list)
+A list of feat types to which this belongs.
+.TP
+.BI "FlagNames " (list)
+A list of flags which apply to this feat.
+.TP
+.BI "MetaMagic " (object)
+If this is a metamagic feat, the following fields will appear in the
+.B MetaMagic
+attribute:
+'\" <<list>>
+.RS
+.TP
+.BI "IsMetaMagicFeat " (bool)
+If true, this is a metamagic feat and the other fields here will apply.
+.TP
+.B Adjective
+.TP
+.BI "LevelCost " (int)
+The number of levels this feat costs (i.e., the number of spell slots higher than normal this spell will use).
+.TP
+.BI "IsLevelCostVariable " (bool)
+If true, the spell level cost is not fixed.
+.TP
+.B Symbol
+The symbol to use on GMA character record sheets and encounter run sheets for spells which were prepared with this feat.
+.RE
+'\" <</>>
+.RE
+'\" <</>>
+.TP
+.BR "Data " "fields for" " language " "type items:"
+'\" <<list>>
+.RS
+There is no additional data. The language name appears in the
+.B Name
+field.
+.RE
+'\" <</>>
+.TP
+.BR "Data " "fields for" " skill " "type items:"
+'\" <<list>>
+.RS
+.TP
+.BI "ClassSkillFor " (list)
+A list of the class codes for which clases this skill is a class skill.
+.TP
+.B Ability
+Relevant ability score name.
+.TP
+.BI "HasArmorPenalty " (bool)
+If true, this skill is subject to an armor check penalty.
+.TP
+.BI "TrainingRequired " (bool)
+If true, the character must be trained to use this skill.
+.TP
+.B Source
+The reference to the original source for this skill.
+.TP
+.B Description
+The abbreviated text description of the skill.
+.TP
+.B FullText
+The full text description of the skill.
+.TP
+.B ParentSkill
+The name of the parent skill if applicable.
+.TP
+.BI "IsVirtual " (bool)
+If true, this skill cannot be taken; one of its children must be taken specifically.
+.TP
+.BI "IsBackground " (bool)
+If true, this is a background skill.
+.RE
+'\" <</>>
+.TP
+.BR "Data " "fields for" " spell " "type items:"
+'\" <<list>>
+.RS
+.RE
+'\" <</>>
+.TP
+.BR "Data " "fields for" " weapon " "type items:"
+'\" <<list>>
+.RS
+.TP
+.BI "Cost " (int)
+The cost in copper pieces for a standard weapon of this type.
+.TP
+.BI "Damage " (object)
+The damage done by this weapon. The value is an object where the keys are size category codes and the values are the damage
+done by a weapon of that size category.
+.TP
+.BI "Critical " (object)
+The critical hit stats for the weapon. This is an object with the following fields.
+'\" <<list>>
+.RS
+.TP 
+.BI "CantCritical " (bool)
+If true, this weapon cannot score a critical hit at all. The other fields should be ignored.
+.TP
+.BI "Multiplier " (int)
+The number of extra dice to add when a critical hit is scored.
+.TP
+.BI "Threat " (int)
+The minimum die value to threaten a critical hit (e.g., 19 means to threaten on a natural 19\-20).
+.TP
+.RS
+'\" <</>>
+.TP
+.BI "Ranged " (object)
+For ranged weapons, the fields in this attribute describe those parameters.
+'\" <<list>>
+.RS
+.TP
+.BI "Increment " (int)
+The range increment for the weapon.
+.TP
+.BI "MaxIncrements " (int)
+The maximum number of increments before the target is out of range.
+.TP
+.BI "IsRanged " (bool)
+If true, this is a ranged weapon and the other fields are meaningful.
+.RE
+'\" <</>>
+.RE
+'\" <</>>
+.TP
+.BI "Weight " (int)
+The weight in grams of the weapon.
+.TP
+.BI "DamageType " (list)
+The type of damage done. This is a list of strings, with each indicating a damage type such as 
+.B B
+for bludgeoning,
+.B P
+for piercing,
+and
+.B S
+for slashing.
+.TP
+.BI "Qualities " (list)
+A list of weapon qualities. The codes in the list may include:
+.B 1
+(one-handed),
+.B 2
+(two-handed),
+.B b
+(brace),
+.B D
+(disarm),
+.B d
+(double),
+.B E
+(Elven),
+.B f
+(fragile),
+.B G
+(Gnome),
+.B g
+(grapple),
+.B H
+(Halfling),
+.B L
+(light),
+.B M
+(monk),
+.B m
+(martial),
+.B O
+(Orc),
+.B R
+(ranged),
+.B r
+(reach),
+.B S
+(non-lethal),
+.B s
+(simple),
+.B t
+(trip),
+.B U
+(unarmed),
+.B W
+(Dwarven),
+.B X
+(exotic),
+.B x
+(deadly),
+and
+.B Z
+(masterwork).
+.RE
+'\" <</>>
+.RE
+'\" <</>>
+.RE
+'\" <<ital-is-var>>
+'\" <</New>>
 .TP
 .B CS
 Update the client's clock.
@@ -1741,7 +2639,7 @@ elements are replaced by the new ones in
 .BI LS- type
 This set of commands
 load a single map element into the map.
-As opposed to the
+As opposed tothe
 .B L
 command which directs the client to read a file to get one or more objects,
 this just sends an object directly to it. This may be used, for example, when
