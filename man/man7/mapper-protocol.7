@@ -1,5 +1,5 @@
 '\" t
-'\" *** 412 ***
+'\" *** 413 ***
 '\" <<ital-is-var>>
 '\" <<bold-is-fixed>>
 .TH MAPPER-PROTOCOL 7 "GMA-Mapper 4.22.3" 08-Feb-2024 "Protocols" \" @@mp@@
@@ -81,7 +81,7 @@ be implemented to wait synchronously for a server
 response during the authentication negotiation stage.
 .LP
 '\" <</bold-is-fixed>>
-.B "This describes protocol version 412."
+.B "This describes protocol version 413."
 '\" <<bold-is-fixed>>
 These notes are intended to be 
 detailed enough to implement a client from and should be considered
@@ -1081,10 +1081,16 @@ the item
 The
 .B Data
 payload for each type is described in the following sections.
+.B "N.B. The descriptions that follow of the various Data objects are speculative at this point and entirely subject to change."
 .TP
 .BR "Data " "fields for" " bestiary " "type items:"
 '\" <<list>>
 .RS
+.TP
+.B ImageTag
+If the GM maintains a library of creature token images for their local bestiary,
+and one is defined for this creature, then this field will contain the image tag
+name for this creature's token.
 .TP
 .B Species
 The name of the species of the creature.
@@ -4097,9 +4103,19 @@ John Mechalas (elevation and movement modes).
 .SH HISTORY
 '\" <<New>>
 .LP
-This document defines map protocol version 412,
-which added support for sharing die-roll presets.
+This document defines map protocol version 413,
+which added speculative definitions for the
+.BR CORE ,
+.BR CORE/ ,
+and
+.B CORE=
+commands, and extensions to the 
+.B PROGRESS
+command.
 '\" <</New>>
+.TP
+Protocol 412
+added support for sharing die-roll presets.
 .LP
 Protocol 411
 added timestamps to chat messages and die-roll results.
