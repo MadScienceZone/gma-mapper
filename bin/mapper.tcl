@@ -949,7 +949,7 @@ proc root_user_key {} {
 # suitable for use as a widget pathname component
 #
 proc to_window_id {s} {
-	return [string map {+ _ / - = {}} [::base64::encode [::md5::md5 $s]]]
+	return w[string map {+ _ / - = {}} [::base64::encode [::md5::md5 $s]]]
 }
 proc root_user_window_id {base} {
 	return "$base[to_window_id [root_user_key]]"
@@ -1820,6 +1820,11 @@ ttk::style configure TPanedwindow      -background $global_bg_color -foreground 
 ttk::style configure TLabelframe       -background $global_bg_color -foreground $theme_bfg
 ttk::style configure TLabelframe.Label -background $global_bg_color -foreground $theme_fg
 ttk::style configure TLabel            -background $global_bg_color -foreground $theme_bfg
+ttk::style configure Full.Horizontal.TProgressbar -background green
+ttk::style configure Medium.Horizontal.TProgressbar -background yellow
+ttk::style configure Low.Horizontal.TProgressbar -background red
+ttk::style configure Expired.Horizontal.TProgressbar -troughcolor black
+ttk::style configure Expired.TLabel -background black -foreground red
 
 #
 # tile ID
@@ -10101,10 +10106,107 @@ proc DoLS {t d} {
 	update
 }
 
+proc create_timer_widget {id} {
+	global timer_progress_data
+	set wid [to_window_id $id]
+
+	if {[winfo exists .initiative]} {
+		set f [frame .initiative.timers.$wid]
+		pack [ttk::label $f.label -text timer] -side left -fill x -expand 1
+		pack [ttk::progressbar $f.bar -orient horizontal -length 200 -variable timer_progress_data(var:$id)] -side right
+		return $f
+	} else {
+		return {}
+	}
+}
+
+proc populate_timer_widgets {} {
+	global timer_progress_data
+	if {[winfo exists .initiative]} {
+		foreach k [array names timer_progress_data w:*] {
+			set id [string range $k 2 end]
+			if {$timer_progress_data($k) ne {}} {
+				catch {destroy $timer_progress_data($k)}
+			}
+			set timer_progress_data($k) [create_timer_widget $id]
+			update_timer_widget $id
+		}
+	}
+}
+
+proc update_timer_widget {id} {
+	global timer_progress_data
+	if {[winfo exists .initiative] && $timer_progress_data(w:$id) ne {}} {
+		if {$timer_progress_data(max:$id) == 0} {
+			$timer_progress_data(w:$id) configure \
+				-mode indeterminate \
+				-value $timer_progress_data(value:$id)
+		} elseif {$timer_progress_data(value:$id) <= 0} {
+			$timer_progress_data(w:$id) configure -value 0 -style Expired.Horizontal.TProgressbar
+			$timer_progress_data(w:$id).label configure -style Expired.TLabel
+		} else {
+			$timer_progress_data(w:$id).label configure -style TLabel
+
+			if {$timer_progress_data(value:$id) / $timer_progress_data(max:$id) < .25} {
+				$timer_progress_data(w:$id) configure \
+					-value $timer_progress_data(value:$id) \
+					-maximum $timer_progress_data(max:$id) \
+					-style Low.Horizontal.TProgressbar
+			} elseif {$timer_progress_data(value:$id) / $timer_progress_data(max:$id) < .5} {
+				$timer_progress_data(w:$id) configure \
+					-value $timer_progress_data(value:$id) \
+					-maximum $timer_progress_data(max:$id) \
+					-style Medium.Horizontal.TProgressbar
+			} else {
+				$timer_progress_data(w:$id) configure \
+					-value $timer_progress_data(value:$id) \
+					-maximum $timer_progress_data(max:$id) \
+					-style Full.Horizontal.TProgressbar
+			}
+		}
+
+		$timer_progress_data(w:$id).label configure -text $timer_progress_data(title:$id)
+	}
+}
+
+
+
+
 proc DoCommandPROGRESS {d} {
 	global progress_data
+	global timer_progress_data
 
+	# If we're tracking a timer, we handle it differently from the other progress meters.
+	# Those are placed on the initiative timer window but are subject to user filtering
+	# options. We track their status even if the user dismissed them (so we don't just
+	# put them back when we get an update for them). They are fully removed when the server
+	# indicates that they are done.
+	
 	set id [dict get $d OperationID]
+
+	if {[dict get $d IsTimer]} {
+		if {![info exists timer_progress_data(w:$id)]} {
+			# this is a timer we haven't seen yet
+			if {[dict get $d IsDone]} {
+				# but the server's already saying to forget it, so we're good.
+				return
+			}
+			set timer_progress_data(w:$id) [create_timer_widget $id]
+		} elseif {[dict get $d IsDone]} {
+			# forget a timer we were tracking
+			# TODO destroy the widget
+			array unset timer_progress_data(*:$id)
+			return
+		}
+		set timer_progress_data(enabled:$id) true
+		set timer_progress_data(targets:$id) [dict get $d Targets]
+		set timer_progress_data(title:$id) [dict get $d Title]
+		set timer_progress_data(max:$id) [dict get $d MaxValue]
+		set timer_progress_data(value:$id) [dict get $d Value]
+		# TODO update display of timer if enabled
+		return
+	}
+
 	if {[dict get $d IsDone]} {
 		end_progress $id
 		return
@@ -13867,13 +13969,22 @@ proc display_initiative_clock {} {
 		::gmaclock::dest .initiative.clock
 		destroy .initiative
 	}
+	bind .initiative <Destroy> _destroy_initiative_window
 
 	::gmaclock::initiative_display_window .initiative.clock 20 $dark_mode -background $global_bg_color
 	pack .initiative.clock -side top -fill both -expand 1
+	pack [ttk::labelframe .initiative.timers -text Timers] -side top -fill both -expand 1
 	update
 	::gmaclock::draw_face .initiative.clock
 	::gmaclock::update_time .initiative.clock $time_abs $time_rel
 	::gmaclock::combat_mode .initiative.clock $MOB_COMBATMODE
+}
+
+proc _destroy_initiative_window {args} {
+	global timer_progress_data
+	foreach k [array names timer_progress_data w:*] {
+		set timer_progress_data($k) {}
+	}
 }
 
 
