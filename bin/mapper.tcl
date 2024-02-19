@@ -17,9 +17,9 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.22.3}     ;# @@##@@
+set GMAMapperVersion {4.23-alpha}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
-set GMAMapperProtocol {412}         ;# @@##@@
+set GMAMapperProtocol {413}         ;# @@##@@
 set CoreVersionNumber {6.15.1}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
@@ -10111,8 +10111,8 @@ proc create_timer_widget {id} {
 	set wid [to_window_id $id]
 
 	if {[winfo exists .initiative]} {
-		pack [set f [frame .initiative.timers.$wid]] -side top -fill x -expand 1
-		pack [ttk::label $f.label -text timer] -side left -fill x -expand 1
+		pack [set f [frame .initiative.timers.$wid]] -side top -fill x -expand 0
+		pack [ttk::label $f.label -text timer] -side left -fill x -expand 0
 		pack [ttk::progressbar $f.bar -orient horizontal -length 200 -variable timer_progress_data(var:$id)] -side right
 		return $f
 	} else {
@@ -13970,15 +13970,15 @@ proc display_initiative_clock {} {
 
 	::gmaclock::initiative_display_window .initiative.clock 20 $dark_mode -background $global_bg_color
 	pack .initiative.clock -side top -fill both -expand 1
-	pack [ttk::labelframe .initiative.timers -text Timers] -side top -fill both -expand 1
+	pack [ttk::labelframe .initiative.timers -text Timers] -side top -fill x -expand 1
 	update
 	::gmaclock::draw_face .initiative.clock
 	::gmaclock::update_time .initiative.clock $time_abs $time_rel
 	::gmaclock::combat_mode .initiative.clock $MOB_COMBATMODE
+	populate_timer_widgets
 }
 
 proc _destroy_initiative_window {args} {
-	DEBUG 0 "_destroy_initiative_window $args"
 	global timer_progress_data
 	foreach k [array names timer_progress_data w:*] {
 		set timer_progress_data($k) {}
