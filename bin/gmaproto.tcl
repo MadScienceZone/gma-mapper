@@ -139,7 +139,8 @@ namespace eval ::gmaproto {
 		CORE    {Type s Code s Name s RequestID s}
 		CORE=	{NoSuchEntry ? IsHidden ? IsLocal ? Code s Name s Type s RequestID s Data d}
 		CORE/	{Filter s Type s IsHidden ? InvertSelection ?}
-		COREIDX {
+		COREIDX {Type s CodeRegex s NameRegex s Since s RequestID s}
+		COREIDX= {RequestID s Type s IsDone ? N i Of i Name s Code s}
 		CONN    {PeerList {a {Addr s User s Client s LastPolo f IsAuthenticated ? IsMe ?}}}
 		CS      {Absolute f Relative f Running ?}
 		D       {Recipients l ToAll ? ToGM ? RollSpec s RequestID s}
