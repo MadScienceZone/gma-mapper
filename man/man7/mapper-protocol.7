@@ -196,6 +196,8 @@ since all communications are asynchronous.
 '\"  \z{CORE}   &C$\rightarrow$S    &\z{CORE=}  &no &\acronym{JSON}&Query the core game database\\
 '\"  \z{CORE=}  &C$\leftarrow$S     &---        &N/A&\acronym{JSON}&Core game data from the game database\\
 '\"  \z{CORE/}  &C$\rightarrow$S    &---        &yes&\acronym{JSON}&Filter availability of the game database\\
+'\"  \z{COREIDX}&C$\rightarrow$S    &\z{COREIDX=}&no&\acronym{JSON}&Get core database index\\
+'\"  \z{COREIDX=}&C$\leftarrow$S    &---        &N/A&\acronym{JSON}&Update core database index info\\
 '\"  \z{CS}     &C$\leftrightarrow$S&---        &yes&\acronym{JSON}&Change the current time of day\\
 '\"  \z{D}      &C$\rightarrow$S    &\z{ROLL}   &no &\acronym{JSON}&Initiate a die roll\\
 '\"  \z{DD}     &C$\leftarrow$S     &\z{DD=}    &maybe&\acronym{JSON}&Store new presets for user\\
@@ -294,6 +296,7 @@ Polo	POLO	C\[->]S	\fR\(em\fP	no	none	Acknowledge server's ping
 Priv	PRIV	C\[<-]S	\fR\(em\fP	N/A	JSON	Priveleged command denied
 Protocol	PROTOCOL	C\[<-]S	\fR\(em\fP	N/A	int	Signal protocol version in use
 QueryCoreData	CORE	C\[->]S	CORE=	no	JSON	Query the core game database
+QueryCoreIndex	COREIDX	C\[->]S	COREIDX=	no	JSON	Query the core database index
 QueryDicePresets	DR	C\[->]S	DD=	maybe	JSON	Request user's presets
 QueryImage	AI?	C\[<>]S	AI	no	JSON	Ask for definition of image
 QueryPeers	/CONN	C\[->]S	CONN	no	none	Request list of peer clients
@@ -309,6 +312,7 @@ SyncChat	SYNC-CHAT	C\[->]S	CC	no	JSON	Request replay of messages
 Toolbar	TB	C\[<>]S	\fR\(em\fP	yes	JSON	Turn on/off client toolbar
 UpdateClock	CS	C\[<>]S	\fR\(em\fP	yes	JSON	Change the current time of day
 UpdateCoreData	CORE=	C\[<-]S	\fR\(em\fP	N/A	JSON	Update a core data item
+UpdateCoreIndex	COREIDX=	C\[<-]S	\fR\(em\fP	N/A	JSON	Update core data index
 UpdateDicePresets	DD=	C\[<-]S	\fR\(em\fP	N/A	JSON	Receive user's presets
 UpdateInitiative	IL	C\[<>]S	\fR\(em\fP	yes	JSON	Update the initiative list
 UpdateObjAttributes	OA	C\[<>]S	\fR\(em\fP	no	JSON	Update object attributes
@@ -2037,6 +2041,75 @@ match
 are affected.
 .RE
 '\" <</>>
+.TP
+.B COREIDX
+Query the core database to retrieve a list of entries. This gives the information by which the
+actual data behind these entries may be retrieved using the
+.B CORE
+message. The payload includes the following fields:
+'\" <<list>>
+.RS
+.TP
+.B Type
+The type of entry to index, as per the
+.B CORE
+message.
+.TP
+.B CodeRegex
+If present and non-empty, limit the responses to those whose
+.B Code
+field matches this regular expression.
+.TP
+.B NameRegex
+If present and non-empty, limit the responses to those whose
+.B Name
+field matches this regular expression.
+.TP
+.BI "Since " "(RFC 3339-formatted datetime string)"
+If present and non-empty, limit the responses to those which were modified
+since the given date and time.
+.TP
+.B RequestID
+If a string value is provided here, it will be repeated in the server's
+response message.
+'\" <</>>
+.RE
+.TP
+.B COREIDX=
+The server response to a
+.B COREIDX
+message. Since the number of entries in the database may be quite large, the server will
+send a number of these reply messages, one per item from the database.
+It includes the following fields:
+'\" <<list>>
+.RS
+.TP
+.B RequestID
+The
+.B RequestID
+sent to the server in the 
+.B COREIDX
+request that initiated this update, if any.
+.TP
+.B Type
+The database item type
+.TP
+.BI "IsDone " (bool)
+If true, this is the final response in this set.
+.TP
+.BI "N " (int)
+The number of response this is, starting with 1.
+.TP
+.BI "Of " (int)
+The total number of responses that will be given.
+.TP
+.B Name
+The item's name.
+.TP
+.B Code
+The item's code.
+'\" <</>>
+.RE
 '\" <</New>>
 .TP
 .B CS
