@@ -115,6 +115,7 @@ namespace eval ::gmaproto {
 		toolbar                   TB
 		update_clock              CS
 		update_core_data          CORE=
+		update_core_index         COREIDX=
 		update_dice_presets       DD=
 		update_initiative_list    IL
 		update_obj_attributes     OA
@@ -138,6 +139,7 @@ namespace eval ::gmaproto {
 		CORE    {Type s Code s Name s RequestID s}
 		CORE=	{NoSuchEntry ? IsHidden ? IsLocal ? Code s Name s Type s RequestID s Data d}
 		CORE/	{Filter s Type s IsHidden ? InvertSelection ?}
+		COREIDX {
 		CONN    {PeerList {a {Addr s User s Client s LastPolo f IsAuthenticated ? IsMe ?}}}
 		CS      {Absolute f Relative f Running ?}
 		D       {Recipients l ToAll ? ToGM ? RollSpec s RequestID s}
