@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       _______  _______     ______      #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___   )/ ___   )   / ___  \     #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |\/   )  |   \/   \  \    #
-# | |      | || || || (___) | Assistant  / (_) (_        /   )    /   )      ___) /    #
-# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /   _/   /      (___ (     #
-# | | \_  )| |   | || (   ) |                ) (      /   _/   /   _/           ) \    #
-# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\(   (__/\ _ /\___/  /    #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/\_______/(_)\______/     #
+#  _______  _______  _______                ___       _______  ______                  #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___   )/ ___  \                 #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |\/   \  \                #
+# | |      | || || || (___) | Assistant  / (_) (_        /   )   ___) /                #
+# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /   (___ (                 #
+# | | \_  )| |   | || (   ) |                ) (      /   _/        ) \                #
+# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\/\___/  /                #
+# (_______)|/     \||/     \| Client         (_)  (_)\_______/\______/                 #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -17,10 +17,10 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.22.3}     ;# @@##@@
+set GMAMapperVersion {4.23}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
-set GMAMapperProtocol {412}         ;# @@##@@
-set CoreVersionNumber {6.15.1}            ;# @@##@@
+set GMAMapperProtocol {413}         ;# @@##@@
+set CoreVersionNumber {6.16}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -949,7 +949,7 @@ proc root_user_key {} {
 # suitable for use as a widget pathname component
 #
 proc to_window_id {s} {
-	return [string map {+ _ / - = {}} [::base64::encode [::md5::md5 $s]]]
+	return w[string map {+ _ / - = {}} [::base64::encode [::md5::md5 $s]]]
 }
 proc root_user_window_id {base} {
 	return "$base[to_window_id [root_user_key]]"
@@ -965,7 +965,7 @@ if {$tcl_platform(os) eq "Darwin"} {
 
 set ICON_DIR [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end-1 end lib MadScienceZone GMA Mapper icons]]]
 set BIN_DIR [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end end]]]
-foreach module {scrolledframe ustar gmaclock gmacolors gmautil gmaprofile gmaproto gmafile gmazones} {
+foreach module {scrolledframe ustar gmaclock gmacolors gmautil gmaprofile gmaproto gmafile gmazones progressbar} {
 	source [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end end $module.tcl]]]
 }
 
@@ -989,6 +989,7 @@ set GuideLineOffset {0 0}
 set MajorGuideLineOffset {0 0}
 set CombatantScrollEnabled false
 set ForceElementsToTop true
+set TimerScope mine
 set check_menu_color     [::gmaprofile::preferred_color $_preferences check_menu   $colortheme]
 #set iscale 100
 #set rscale 100.0
@@ -997,7 +998,7 @@ frame .toolbar2
 set MAIN_MENU {}
 proc update_main_menu {} {
 	global check_menu_color MAIN_MENU
-	foreach menu {view edit play edit.stipple edit.gridsnap edit.setwidth play.gridsnap} {
+	foreach menu {view edit play edit.stipple edit.gridsnap edit.setwidth play.gridsnap view.timers} {
 		for {set i 0} {$i <= [$MAIN_MENU.$menu index last]} {incr i} {
 			if {[set mtype [$MAIN_MENU.$menu type $i]] eq {radiobutton} || $mtype eq {checkbutton}} {
 				$MAIN_MENU.$menu entryconfigure $i -selectcolor $check_menu_color
@@ -1115,6 +1116,12 @@ proc create_main_menu {use_button} {
 	$mm.view add checkbutton -command {setGridEnable} -label "Show Map Grid" -onvalue 1 -offvalue 0 -selectcolor $check_menu_color -variable ShowMapGrid
 	$mm.view add checkbutton -command {RefreshMOBs} -label "Show Health Stats" -onvalue 1 -offvalue 0 -selectcolor $check_menu_color -variable ShowHealthStats
 	$mm.view add separator
+	menu $mm.view.timers
+	$mm.view add cascade -menu $mm.view.timers -label "Show Timers"
+	$mm.view add separator
+	$mm.view.timers add radiobutton -label "none" -selectcolor $check_menu_color -variable TimerScope -value none -command populate_timer_widgets
+	$mm.view.timers add radiobutton -label "mine" -selectcolor $check_menu_color -variable TimerScope -value mine -command populate_timer_widgets
+	$mm.view.timers add radiobutton -label "all" -selectcolor $check_menu_color -variable TimerScope -value all -command populate_timer_widgets
 	$mm.view add command -command {zoomInBy 2} -label "Zoom In"
 	$mm.view add command -command {zoomInBy 0.5} -label "Zoom Out"
 	$mm.view add command -command {resetZoom} -label "Restore Zoom"
@@ -1820,6 +1827,11 @@ ttk::style configure TPanedwindow      -background $global_bg_color -foreground 
 ttk::style configure TLabelframe       -background $global_bg_color -foreground $theme_bfg
 ttk::style configure TLabelframe.Label -background $global_bg_color -foreground $theme_fg
 ttk::style configure TLabel            -background $global_bg_color -foreground $theme_bfg
+ttk::style configure Full.Horizontal.TProgressbar -troughcolor green
+ttk::style configure Medium.Horizontal.TProgressbar -troughcolor yellow
+ttk::style configure Low.Horizontal.TProgressbar -troughcolor red
+ttk::style configure Expired.Horizontal.TProgressbar -troughcolor black
+ttk::style configure Expired.TLabel -background black -foreground red
 
 #
 # tile ID
@@ -10101,10 +10113,94 @@ proc DoLS {t d} {
 	update
 }
 
+proc create_timer_widget {id} {
+	global timer_progress_data
+	global TimerScope
+	global local_user
+
+	if {$TimerScope eq "none"} {
+		DEBUG 1 "Not showing timer $id because timer display is turned off."
+		return
+	}
+	if {$TimerScope eq "mine" && [lsearch -exact $timer_progress_data(targets:$id) $local_user] < 0} {
+		DEBUG 1 "Not showing timer $id because $local_user is not in $timer_progress_data(targets:$id)"
+		return
+	}
+
+	set wid [to_window_id $id]
+
+	if {[winfo exists .initiative]} {
+		pack [progressbar .initiative.clock.timers.$wid -label timer] -side top -fill x -expand 0
+		return .initiative.clock.timers.$wid
+	} else {
+		return {}
+	}
+}
+
+proc populate_timer_widgets {} {
+	global timer_progress_data
+	if {[winfo exists .initiative]} {
+		foreach k [array names timer_progress_data w:*] {
+			set id [string range $k 2 end]
+			if {$timer_progress_data($k) ne {}} {
+				catch {destroy $timer_progress_data($k)}
+			}
+			set timer_progress_data($k) [create_timer_widget $id]
+			update_timer_widget $id
+		}
+	}
+}
+
+proc update_timer_widget {id} {
+	global timer_progress_data
+	if {[winfo exists .initiative] && $timer_progress_data(w:$id) ne {}} {
+		if {$timer_progress_data(max:$id) == 0} {
+			$timer_progress_data(w:$id) unknown
+		} elseif {$timer_progress_data(value:$id) <= 0} {
+			$timer_progress_data(w:$id) expired
+		} else {
+			$timer_progress_data(w:$id) set [expr int($timer_progress_data(value:$id) * 100.0 / $timer_progress_data(max:$id))] $timer_progress_data(title:$id)
+		}
+	}
+}
+
 proc DoCommandPROGRESS {d} {
 	global progress_data
+	global timer_progress_data
 
+	# If we're tracking a timer, we handle it differently from the other progress meters.
+	# Those are placed on the initiative timer window but are subject to user filtering
+	# options. We track their status even if the user dismissed them (so we don't just
+	# put them back when we get an update for them). They are fully removed when the server
+	# indicates that they are done.
+	
 	set id [dict get $d OperationID]
+
+	if {[dict get $d IsTimer]} {
+		set timer_progress_data(enabled:$id) true
+		set timer_progress_data(targets:$id) [dict get $d Targets]
+		set timer_progress_data(title:$id) [dict get $d Title]
+		set timer_progress_data(max:$id) [dict get $d MaxValue]
+		set timer_progress_data(value:$id) [dict get $d Value]
+		if {![info exists timer_progress_data(w:$id)]} {
+			# this is a timer we haven't seen yet
+			if {[dict get $d IsDone]} {
+				# but the server's already saying to forget it, so we're good.
+				return
+			}
+			set timer_progress_data(w:$id) [create_timer_widget $id]
+		} elseif {[dict get $d IsDone]} {
+			# forget a timer we were tracking
+			if {$timer_progress_data(w:$id) ne {}} {
+				destroy $timer_progress_data(w:$id)
+			}
+			array unset timer_progress_data *:$id
+			return
+		}
+		update_timer_widget $id
+		return
+	}
+
 	if {[dict get $d IsDone]} {
 		end_progress $id
 		return
@@ -13865,15 +13961,25 @@ proc display_initiative_clock {} {
 	wm title .initiative "Game Clock"
 	wm protocol .initiative WM_DELETE_WINDOW {
 		::gmaclock::dest .initiative.clock
+		_destroy_initiative_window
 		destroy .initiative
 	}
 
 	::gmaclock::initiative_display_window .initiative.clock 20 $dark_mode -background $global_bg_color
 	pack .initiative.clock -side top -fill both -expand 1
+	pack [ttk::labelframe .initiative.clock.timers -text Timers] -side top -fill x -expand 1
 	update
 	::gmaclock::draw_face .initiative.clock
 	::gmaclock::update_time .initiative.clock $time_abs $time_rel
 	::gmaclock::combat_mode .initiative.clock $MOB_COMBATMODE
+	populate_timer_widgets
+}
+
+proc _destroy_initiative_window {args} {
+	global timer_progress_data
+	foreach k [array names timer_progress_data w:*] {
+		set timer_progress_data($k) {}
+	}
 }
 
 
@@ -14109,7 +14215,7 @@ proc ConnectToServerByIdx {idx} {
 #
 #*user_key name -> sanitized_name
 #
-# @[00]@| GMA-Mapper 4.22.3
+# @[00]@| GMA-Mapper 4.23
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2024 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

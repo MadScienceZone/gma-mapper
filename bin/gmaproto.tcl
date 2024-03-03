@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___       _______  _______     ______      #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___   )/ ___   )   / ___  \     #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |\/   )  |   \/   \  \    #
-# | |      | || || || (___) | Assistant  / (_) (_        /   )    /   )      ___) /    #
-# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /   _/   /      (___ (     #
-# | | \_  )| |   | || (   ) |                ) (      /   _/   /   _/           ) \    #
-# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\(   (__/\ _ /\___/  /    #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/\_______/(_)\______/     #
+#  _______  _______  _______                ___       _______  ______                  #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___   )/ ___  \                 #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |\/   \  \                #
+# | |      | || || || (___) | Assistant  / (_) (_        /   )   ___) /                #
+# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /   (___ (                 #
+# | | \_  )| |   | || (   ) |                ) (      /   _/        ) \                #
+# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\/\___/  /                #
+# (_______)|/     \||/     \| Client         (_)  (_)\_______/\______/                 #
 #                                                                                      #
 ########################################################################################
 #
@@ -57,9 +57,9 @@ package require base64 2.4.2
 package require uuid 1.0.1
 
 namespace eval ::gmaproto {
-	variable protocol 412
+	variable protocol 413
 	variable min_protocol 333
-	variable max_protocol 412
+	variable max_protocol 413
 	variable max_max_protocol 499
 	variable debug_f {}
 	variable legacy false
@@ -114,6 +114,8 @@ namespace eval ::gmaproto {
 		roll_result               ROLL
 		toolbar                   TB
 		update_clock              CS
+		update_core_data          CORE=
+		update_core_index         COREIDX=
 		update_dice_presets       DD=
 		update_initiative_list    IL
 		update_obj_attributes     OA
@@ -134,6 +136,11 @@ namespace eval ::gmaproto {
 		CLR     {ObjID s}
 		CLR@    {File s IsLocalFile ?}
 		CO      {Enabled ?}
+		CORE    {Type s Code s Name s RequestID s}
+		CORE=	{NoSuchEntry ? IsHidden ? IsLocal ? Code s Name s Type s RequestID s Data d}
+		CORE/	{Filter s Type s IsHidden ? InvertSelection ?}
+		COREIDX {Type s CodeRegex s NameRegex s Since s RequestID s}
+		COREIDX= {RequestID s Type s IsDone ? N i Of i Name s Code s}
 		CONN    {PeerList {a {Addr s User s Client s LastPolo f IsAuthenticated ? IsMe ?}}}
 		CS      {Absolute f Relative f Running ?}
 		D       {Recipients l ToAll ? ToGM ? RollSpec s RequestID s}
@@ -166,7 +173,7 @@ namespace eval ::gmaproto {
 		OK      {Protocol i Challenge b ServerStarted s ServerActive s ServerTime s ServerVersion s}
 		PRIV    {Command s Reason s}
 		POLO    {}
-		PROGRESS {OperationID s Title s Value i MaxValue i IsDone ?}
+		PROGRESS {OperationID s Title s Value i MaxValue i IsDone ? Targets l IsTimer ?}
 		PS      {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l PolyGM ? Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}}}
 		READY   {}
 		REDIRECT {Host s Port i Reason s}
@@ -2299,7 +2306,7 @@ proc ::gmaproto::normalize_dict {cmd d} {
 	return [::gmaproto::new_dict_from_json $cmd [::gmaproto::json_from_dict $cmd $d]]
 }
 
-# @[00]@| GMA-Mapper 4.22.3
+# @[00]@| GMA-Mapper 4.23
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2024 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

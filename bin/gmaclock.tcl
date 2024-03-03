@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___       _______  _______     ______      #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___   )/ ___   )   / ___  \     #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |\/   )  |   \/   \  \    #
-# | |      | || || || (___) | Assistant  / (_) (_        /   )    /   )      ___) /    #
-# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /   _/   /      (___ (     #
-# | | \_  )| |   | || (   ) |                ) (      /   _/   /   _/           ) \    #
-# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\(   (__/\ _ /\___/  /    #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/\_______/(_)\______/     #
+#  _______  _______  _______                ___       _______  ______                  #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___   )/ ___  \                 #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |\/   \  \                #
+# | |      | || || || (___) | Assistant  / (_) (_        /   )   ___) /                #
+# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /   (___ (                 #
+# | | \_  )| |   | || (   ) |                ) (      /   _/        ) \                #
+# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\/\___/  /                #
+# (_______)|/     \||/     \| Client         (_)  (_)\_______/\______/                 #
 #                                                                                      #
 ########################################################################################
 #
@@ -555,7 +555,10 @@ proc _autosize {w} {
 	dict set _window_state($w) _autosize_last_height $cur_height
 	dict set _window_state($w) _autosize_inhibit true
 
-	set height [expr $cur_height - [winfo height $w.timeclock] - [winfo height $w.timedisp] - [winfo height $w.turndisp]]
+	set height [expr $cur_height - [winfo height $w.timeclock] - [winfo height $w.timedisp] - [winfo height $w.turndisp] ]
+	if {[winfo exists $w.timers]} {
+		set height [expr $height - [winfo height $w.timers]]
+	}
 
 	if {[set flist [dict get $_window_state($w) flist]] ne {}} {
 		dict for {k fld} $flist {
@@ -1079,7 +1082,7 @@ proc exists {w} {
 
 }
 #
-# @[00]@| GMA-Mapper 4.22.3
+# @[00]@| GMA-Mapper 4.23
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2024 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
