@@ -3,19 +3,25 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.22.3          <!-- @@##@@ -->
- * Effective Date: 08-Feb-2024               <!-- @@##@@ -->
+ * This Package Version: 4.23          <!-- @@##@@ -->
+ * Effective Date: 03-Mar-2024               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.15.1 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.16 <!-- @@##@@ -->
  * GMA Mapper File Format: 23	     <!-- @@##@@ -->
- * GMA Mapper Protocol: 412        <!-- @@##@@ -->
+ * GMA Mapper Protocol: 413        <!-- @@##@@ -->
  * GMA Mapper Preferences File Format: 7 <!-- @@##@@ -->
 
 ## DEPRECATION NOTICE
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.23
+## Enhancements
+ * Adds display of event timers on the initiative clock window. The user can select whether to display only timers which involve their character (which requires their login name to match their character name), all timers, or none.
+ * Supports protocol 413.
+   * Includes acceptance of protocol commands for retrieving core data from the server, although those remain unused at this time.
 
 # 4.22.3
 ## Fixes
