@@ -965,7 +965,7 @@ if {$tcl_platform(os) eq "Darwin"} {
 
 set ICON_DIR [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end-1 end lib MadScienceZone GMA Mapper icons]]]
 set BIN_DIR [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end end]]]
-foreach module {scrolledframe ustar gmaclock gmacolors gmautil gmaprofile gmaproto gmafile gmazones} {
+foreach module {scrolledframe ustar gmaclock gmacolors gmautil gmaprofile gmaproto gmafile gmazones progressbar} {
 	source [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end end $module.tcl]]]
 }
 
@@ -989,6 +989,7 @@ set GuideLineOffset {0 0}
 set MajorGuideLineOffset {0 0}
 set CombatantScrollEnabled false
 set ForceElementsToTop true
+set TimerScope mine
 set check_menu_color     [::gmaprofile::preferred_color $_preferences check_menu   $colortheme]
 #set iscale 100
 #set rscale 100.0
@@ -997,7 +998,7 @@ frame .toolbar2
 set MAIN_MENU {}
 proc update_main_menu {} {
 	global check_menu_color MAIN_MENU
-	foreach menu {view edit play edit.stipple edit.gridsnap edit.setwidth play.gridsnap} {
+	foreach menu {view edit play edit.stipple edit.gridsnap edit.setwidth play.gridsnap view.timers} {
 		for {set i 0} {$i <= [$MAIN_MENU.$menu index last]} {incr i} {
 			if {[set mtype [$MAIN_MENU.$menu type $i]] eq {radiobutton} || $mtype eq {checkbutton}} {
 				$MAIN_MENU.$menu entryconfigure $i -selectcolor $check_menu_color
@@ -1115,6 +1116,12 @@ proc create_main_menu {use_button} {
 	$mm.view add checkbutton -command {setGridEnable} -label "Show Map Grid" -onvalue 1 -offvalue 0 -selectcolor $check_menu_color -variable ShowMapGrid
 	$mm.view add checkbutton -command {RefreshMOBs} -label "Show Health Stats" -onvalue 1 -offvalue 0 -selectcolor $check_menu_color -variable ShowHealthStats
 	$mm.view add separator
+	menu $mm.view.timers
+	$mm.view add cascade -menu $mm.view.timers -label "Show Timers"
+	$mm.view add separator
+	$mm.view.timers add radiobutton -label "none" -selectcolor $check_menu_color -variable TimerScope -value none -command populate_timer_widgets
+	$mm.view.timers add radiobutton -label "mine" -selectcolor $check_menu_color -variable TimerScope -value mine -command populate_timer_widgets
+	$mm.view.timers add radiobutton -label "all" -selectcolor $check_menu_color -variable TimerScope -value all -command populate_timer_widgets
 	$mm.view add command -command {zoomInBy 2} -label "Zoom In"
 	$mm.view add command -command {zoomInBy 0.5} -label "Zoom Out"
 	$mm.view add command -command {resetZoom} -label "Restore Zoom"
@@ -10108,13 +10115,23 @@ proc DoLS {t d} {
 
 proc create_timer_widget {id} {
 	global timer_progress_data
+	global TimerScope
+	global local_user
+
+	if {$TimerScope eq "none"} {
+		DEBUG 1 "Not showing timer $id because timer display is turned off."
+		return
+	}
+	if {$TimerScope eq "mine" && [lsearch -exact $timer_progress_data(targets:$id) $local_user] < 0} {
+		DEBUG 1 "Not showing timer $id because $local_user is not in $timer_progress_data(targets:$id)"
+		return
+	}
+
 	set wid [to_window_id $id]
 
 	if {[winfo exists .initiative]} {
-		pack [set f [frame .initiative.timers.$wid]] -side top -fill x -expand 0
-		pack [ttk::label $f.label -text timer] -side left -fill x -expand 0
-		pack [ttk::progressbar $f.bar -orient horizontal -length 200 -variable timer_progress_data(var:$id)] -side right
-		return $f
+		pack [progressbar .initiative.clock.timers.$wid -label timer] -side top -fill x -expand 0
+		return .initiative.clock.timers.$wid
 	} else {
 		return {}
 	}
@@ -10138,32 +10155,12 @@ proc update_timer_widget {id} {
 	global timer_progress_data
 	if {[winfo exists .initiative] && $timer_progress_data(w:$id) ne {}} {
 		if {$timer_progress_data(max:$id) == 0} {
-			$timer_progress_data(w:$id).bar configure \
-				-value $timer_progress_data(value:$id)
+			$timer_progress_data(w:$id) unknown
 		} elseif {$timer_progress_data(value:$id) <= 0} {
-			$timer_progress_data(w:$id).bar configure -value 0 -style Expired.Horizontal.TProgressbar
-			$timer_progress_data(w:$id).label configure -style Expired.TLabel
+			$timer_progress_data(w:$id) expired
 		} else {
-			$timer_progress_data(w:$id).label configure -style TLabel
-
-			if {(1.0 * $timer_progress_data(value:$id)) / $timer_progress_data(max:$id) < .25} {
-				$timer_progress_data(w:$id).bar configure \
-					-value $timer_progress_data(value:$id) \
-					-maximum $timer_progress_data(max:$id) \
-					-style Low.Horizontal.TProgressbar
-			} elseif {(1.0 * $timer_progress_data(value:$id)) / $timer_progress_data(max:$id) < .5} {
-				$timer_progress_data(w:$id).bar configure \
-					-value $timer_progress_data(value:$id) \
-					-maximum $timer_progress_data(max:$id) \
-					-style Medium.Horizontal.TProgressbar
-			} else {
-				$timer_progress_data(w:$id).bar configure \
-					-value $timer_progress_data(value:$id) \
-					-maximum $timer_progress_data(max:$id) \
-					-style Full.Horizontal.TProgressbar
-			}
+			$timer_progress_data(w:$id) set [expr int($timer_progress_data(value:$id) * 100.0 / $timer_progress_data(max:$id))] $timer_progress_data(title:$id)
 		}
-		$timer_progress_data(w:$id).label configure -text $timer_progress_data(title:$id)
 	}
 }
 
@@ -10180,6 +10177,11 @@ proc DoCommandPROGRESS {d} {
 	set id [dict get $d OperationID]
 
 	if {[dict get $d IsTimer]} {
+		set timer_progress_data(enabled:$id) true
+		set timer_progress_data(targets:$id) [dict get $d Targets]
+		set timer_progress_data(title:$id) [dict get $d Title]
+		set timer_progress_data(max:$id) [dict get $d MaxValue]
+		set timer_progress_data(value:$id) [dict get $d Value]
 		if {![info exists timer_progress_data(w:$id)]} {
 			# this is a timer we haven't seen yet
 			if {[dict get $d IsDone]} {
@@ -10195,11 +10197,6 @@ proc DoCommandPROGRESS {d} {
 			array unset timer_progress_data *:$id
 			return
 		}
-		set timer_progress_data(enabled:$id) true
-		set timer_progress_data(targets:$id) [dict get $d Targets]
-		set timer_progress_data(title:$id) [dict get $d Title]
-		set timer_progress_data(max:$id) [dict get $d MaxValue]
-		set timer_progress_data(value:$id) [dict get $d Value]
 		update_timer_widget $id
 		return
 	}
@@ -13970,7 +13967,7 @@ proc display_initiative_clock {} {
 
 	::gmaclock::initiative_display_window .initiative.clock 20 $dark_mode -background $global_bg_color
 	pack .initiative.clock -side top -fill both -expand 1
-	pack [ttk::labelframe .initiative.timers -text Timers] -side top -fill x -expand 1
+	pack [ttk::labelframe .initiative.clock.timers -text Timers] -side top -fill x -expand 1
 	update
 	::gmaclock::draw_face .initiative.clock
 	::gmaclock::update_time .initiative.clock $time_abs $time_rel

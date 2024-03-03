@@ -555,7 +555,10 @@ proc _autosize {w} {
 	dict set _window_state($w) _autosize_last_height $cur_height
 	dict set _window_state($w) _autosize_inhibit true
 
-	set height [expr $cur_height - [winfo height $w.timeclock] - [winfo height $w.timedisp] - [winfo height $w.turndisp]]
+	set height [expr $cur_height - [winfo height $w.timeclock] - [winfo height $w.timedisp] - [winfo height $w.turndisp] ]
+	if {[winfo exists $w.timers]} {
+		set height [expr $height - [winfo height $w.timers]]
+	}
 
 	if {[set flist [dict get $_window_state($w) flist]] ne {}} {
 		dict for {k fld} $flist {
