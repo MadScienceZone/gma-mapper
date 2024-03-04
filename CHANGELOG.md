@@ -3,11 +3,11 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.23          <!-- @@##@@ -->
+ * This Package Version: 4.23.1          <!-- @@##@@ -->
  * Effective Date: 03-Mar-2024               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.16 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.16.1 <!-- @@##@@ -->
  * GMA Mapper File Format: 23	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 413        <!-- @@##@@ -->
  * GMA Mapper Preferences File Format: 7 <!-- @@##@@ -->
@@ -16,6 +16,11 @@
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.23.1
+## Fixes
+ * Corrects cosmetic issue with menus.
+ * Removes deprecated "connect to" menu.
 
 # 4.23
 ## Enhancements
