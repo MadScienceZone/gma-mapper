@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       _______  ______                  #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___   )/ ___  \                 #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |\/   \  \                #
-# | |      | || || || (___) | Assistant  / (_) (_        /   )   ___) /                #
-# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /   (___ (                 #
-# | | \_  )| |   | || (   ) |                ) (      /   _/        ) \                #
-# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\/\___/  /                #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/\______/                 #
+#  _______  _______  _______                ___       _______  ______       __         #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___   )/ ___  \     /  \        #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |\/   \  \    \/) )       #
+# | |      | || || || (___) | Assistant  / (_) (_        /   )   ___) /      | |       #
+# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /   (___ (       | |       #
+# | | \_  )| |   | || (   ) |                ) (      /   _/        ) \      | |       #
+# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\/\___/  / _  __) (_      #
+# (_______)|/     \||/     \| Client         (_)  (_)\_______/\______/ (_) \____/      #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -17,10 +17,10 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.23}     ;# @@##@@
+set GMAMapperVersion {4.23.1}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {413}         ;# @@##@@
-set CoreVersionNumber {6.16}            ;# @@##@@
+set CoreVersionNumber {6.16.1}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -1008,7 +1008,7 @@ proc update_main_menu {} {
 }
 
 proc create_main_menu {use_button} {
-	global MAIN_MENU connmenuidx CombatantScrollEnabled check_menu_color
+	global MAIN_MENU CombatantScrollEnabled check_menu_color
 	global ForceElementsToTop NoFill d_OBJ_MODE StipplePattern
 	if {$MAIN_MENU ne {}} {
 		return
@@ -1115,13 +1115,12 @@ proc create_main_menu {use_button} {
 	$mm.view add checkbutton -command {toolBarState -1} -label "Show Toolbar" -onvalue 1 -offvalue 0 -selectcolor $check_menu_color -variable ShowToolBar
 	$mm.view add checkbutton -command {setGridEnable} -label "Show Map Grid" -onvalue 1 -offvalue 0 -selectcolor $check_menu_color -variable ShowMapGrid
 	$mm.view add checkbutton -command {RefreshMOBs} -label "Show Health Stats" -onvalue 1 -offvalue 0 -selectcolor $check_menu_color -variable ShowHealthStats
-	$mm.view add separator
 	menu $mm.view.timers
 	$mm.view add cascade -menu $mm.view.timers -label "Show Timers"
-	$mm.view add separator
 	$mm.view.timers add radiobutton -label "none" -selectcolor $check_menu_color -variable TimerScope -value none -command populate_timer_widgets
 	$mm.view.timers add radiobutton -label "mine" -selectcolor $check_menu_color -variable TimerScope -value mine -command populate_timer_widgets
 	$mm.view.timers add radiobutton -label "all" -selectcolor $check_menu_color -variable TimerScope -value all -command populate_timer_widgets
+	$mm.view add separator
 	$mm.view add command -command {zoomInBy 2} -label "Zoom In"
 	$mm.view add command -command {zoomInBy 0.5} -label "Zoom Out"
 	$mm.view add command -command {resetZoom} -label "Restore Zoom"
@@ -1160,13 +1159,6 @@ proc create_main_menu {use_button} {
 	}
 	$mm.play add separator
 	$mm.play add command -command {ClearSelection} -label "Deselect All"
-	$mm.play add separator
-	if {[::gmautil::version_compare [info patchlevel] 8.7] >= 0} {
-		$mm.play add cascade -menu $mm.play.servers -state disabled -label "\[DEPRECATED\] Connect to"
-	} else {
-		$mm.play add cascade -menu $mm.play.servers -label "\[DEPRECATED\] Connect to"
-	}
-	set connmenuidx 14
 	menu $mm.tools
 	$mm.tools add command -command {checkForUpdates} -label "Check for Updates..."
 	$mm.tools add separator
@@ -1457,26 +1449,6 @@ proc ApplyPreferences {data args} {
 	}
 	applyServerSideConfiguration
 	create_main_menu [dict get $data menu_button]
-	UpdateConnectionMenu [::gmaprofile::list_server_names $data]
-}
-proc UpdateConnectionMenu {names} {
-	global connmenuidx MAIN_MENU
-	set mm ${MAIN_MENU}.play
-	$mm.servers delete 0 end
-	set idx 0
-	foreach name $names {
-		$mm.servers add command -command "ConnectToServerByIdx $idx" -label $name
-		incr idx
-	}
-	if {[llength $names] > 0} {
-		if {[::gmautil::version_compare [info patchlevel] 8.7] >= 0} {
-			$mm entryconfigure $connmenuidx -state normal
-		}
-	} else {
-		if {[::gmautil::version_compare [info patchlevel] 8.7] >= 0} {
-			$mm entryconfigure $connmenuidx -state disabled
-		}
-	}
 }
 
 set PreferencesData {}
@@ -14215,7 +14187,7 @@ proc ConnectToServerByIdx {idx} {
 #
 #*user_key name -> sanitized_name
 #
-# @[00]@| GMA-Mapper 4.23
+# @[00]@| GMA-Mapper 4.23.1
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2024 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
