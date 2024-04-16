@@ -3491,6 +3491,20 @@ Clients SHOULD NOT send these; they are for the server to notify the client
 about progress. If a client does send progress update messages to other
 peers, it should be clear that what is being tracked is a process that the
 other clients are interested in.
+.LP
+'\" <<New>>
+As a special case, the server may send this message with
+.B OperationID=*
+and
+.BR IsDone=true .
+This is a signal to clients that all timers should be cancelled and dismissed from view.
+If a subsequent
+.B PROGRESS
+message is sent with the
+.B OperationID
+of a timer that was dismissed in this way, clients should treat it like a new
+timer being created at that point.
+'\" <</New>>
 .RE
 '\" <<list>>
 .TP
