@@ -10103,11 +10103,11 @@ proc create_timer_widget {id} {
 
 	if {[winfo exists .initiative]} {
 		pack [progressbar .initiative.clock.timers.$wid -label timer] -side top -fill x -expand 0
+		::gmaclock::autosize .initiative.clock
 		return .initiative.clock.timers.$wid
 	} else {
 		return {}
 	}
-	::gmaclock::autosize .initiative.clock
 }
 
 proc populate_timer_widgets {} {
@@ -10121,8 +10121,8 @@ proc populate_timer_widgets {} {
 			set timer_progress_data($k) [create_timer_widget $id]
 			update_timer_widget $id
 		}
+		::gmaclock::autosize .initiative.clock
 	}
-	::gmaclock::autosize .initiative.clock
 }
 
 proc update_timer_widget {id} {
@@ -10157,11 +10157,13 @@ proc DoCommandPROGRESS {d} {
 				# We're cancelling all existing progress timers
 				foreach tw [array names timer_progress_data w:*] {
 					if {$tw ne {}} {
-						destroy $tw
+						destroy $timer_progress_data($tw)
 					}
 					array unset timer_progress_data *:[string range $tw 2 end]
 				}
-				::gmaclock::autosize .initiative.clock
+				if {[winfo exists .initiative]} {
+					::gmaclock::autosize .initiative.clock
+				}
 			} else {
 				# This request doesn't make sense
 				DEBUG 0 "Received progress update $d does not make sense (ignored)"
