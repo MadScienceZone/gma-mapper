@@ -10107,6 +10107,7 @@ proc create_timer_widget {id} {
 	} else {
 		return {}
 	}
+	::gmaclock::autosize .initiative.clock
 }
 
 proc populate_timer_widgets {} {
@@ -10121,6 +10122,7 @@ proc populate_timer_widgets {} {
 			update_timer_widget $id
 		}
 	}
+	::gmaclock::autosize .initiative.clock
 }
 
 proc update_timer_widget {id} {
@@ -10148,7 +10150,25 @@ proc DoCommandPROGRESS {d} {
 	
 	set id [dict get $d OperationID]
 
+
 	if {[dict get $d IsTimer]} {
+		if {$id eq "*"} {
+			if {[dict get $d IsDone]} {
+				# We're cancelling all existing progress timers
+				foreach tw [array names timer_progress_data w:*] {
+					if {$tw ne {}} {
+						destroy $tw
+					}
+					array unset timer_progress_data *:[string range $tw 2 end]
+				}
+				::gmaclock::autosize .initiative.clock
+			} else {
+				# This request doesn't make sense
+				DEBUG 0 "Received progress update $d does not make sense (ignored)"
+			}
+			return
+		}
+			
 		set timer_progress_data(enabled:$id) true
 		set timer_progress_data(targets:$id) [dict get $d Targets]
 		set timer_progress_data(title:$id) [dict get $d Title]
