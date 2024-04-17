@@ -10107,6 +10107,7 @@ proc create_timer_widget {id} {
 	} else {
 		return {}
 	}
+	::gmaclock::autosize .initiative.clock
 }
 
 proc populate_timer_widgets {} {
@@ -10121,6 +10122,7 @@ proc populate_timer_widgets {} {
 			update_timer_widget $id
 		}
 	}
+	::gmaclock::autosize .initiative.clock
 }
 
 proc update_timer_widget {id} {
@@ -10159,6 +10161,7 @@ proc DoCommandPROGRESS {d} {
 					}
 					array unset timer_progress_data *:[string range $tw 2 end]
 				}
+				::gmaclock::autosize .initiative.clock
 			} else {
 				# This request doesn't make sense
 				DEBUG 0 "Received progress update $d does not make sense (ignored)"
