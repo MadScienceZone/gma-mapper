@@ -3,11 +3,11 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.23.1          <!-- @@##@@ -->
- * Effective Date: 03-Mar-2024               <!-- @@##@@ -->
+ * This Package Version: 4.23.2          <!-- @@##@@ -->
+ * Effective Date: 16-Apr-2024               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.16.1 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.17.1 <!-- @@##@@ -->
  * GMA Mapper File Format: 23	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 413        <!-- @@##@@ -->
  * GMA Mapper Preferences File Format: 7 <!-- @@##@@ -->
