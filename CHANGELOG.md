@@ -17,6 +17,11 @@ The support for old server protocols (<400) and map file formats (<20) will be d
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
+# 4.23.2
+## Fixes
+ * Now honors server requests to dismiss all displayed timers.
+ * Fixes cosmetic issues where timers overcrowded the initiative list.
+
 # 4.23.1
 ## Fixes
  * Corrects cosmetic issue with menus.
