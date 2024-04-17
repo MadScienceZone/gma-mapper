@@ -1,14 +1,14 @@
 '\" t
 '\" *** 413 ***
 '\" <<ital-is-var>>
-'\" <<bold-is-fixed>>
-.TH MAPPER-PROTOCOL 7 "GMA-Mapper 4.23.1" 03-Mar-2024 "Protocols" \" @@mp@@
+.TH MAPPER-PROTOCOL 7 "GMA-Mapper 4.23.2" 16-Apr-2024 "Protocols" \" @@mp@@
 .SH NAME
 mapper-protocol \- GMA client/server protocol specification
 '\" <<New>>
 .SH EXPERIMENTAL
 .LP
 .B "This document includes experimental changes to the protocol which have not yet been officially released."
+'\" <<bold-is-fixed>>
 '\" <</New>>
 .SH DESCRIPTION
 .LP
@@ -378,11 +378,9 @@ have a JSON data payload attached to them. The protocol version number is
 simply sent as an ASCII string of digits separated from the 
 .B PROTOCOL
 command word by a space.
-'\" <<New>>
 The reason for this is that this data format is valid in all protocol
 versions, including those before version 400, so it can be used to
 unambiguously identify the server's protocol to all possible clients.
-'\" <</New>>
 .RS
 .LP
 Servers which implement protocol versions 400 and later MUST send this message
@@ -986,7 +984,6 @@ If true, this object describes the client which received this command.
 .RE
 '\" <</>>
 .RE
-'\" <<New>>
 .TP
 .B CORE
 Query the server's core SRD database. The server SHOULD respond with a
@@ -1080,12 +1077,13 @@ value provided by the client when making the request that resulted in this reply
 This value is a JSON-encoded object containing the specific data relating to the item in question. Its format depends on
 the item
 .BR Type .
-'\" <</>>
 .LP
 The
 .B Data
 payload for each type is described in the following sections.
+'\" <</bold-is-fixed>>
 .B "N.B. The descriptions that follow of the various Data objects are speculative at this point and entirely subject to change."
+'\" <<bold-is-fixed>>
 .TP
 .BR "Data " "fields for" " bestiary " "type items:"
 '\" <<list>>
@@ -1716,16 +1714,13 @@ The symbol to use on GMA character record sheets and encounter run sheets for sp
 .RE
 '\" <</>>
 .RE
-'\" <</>>
 .TP
 .BR "Data " "fields for" " language " "type items:"
-'\" <<list>>
 .RS
 There is no additional data. The language name appears in the
 .B Name
 field.
 .RE
-'\" <</>>
 .TP
 .BR "Data " "fields for" " skill " "type items:"
 '\" <<list>>
@@ -1941,7 +1936,6 @@ If true, this is a ranged weapon and the other fields are meaningful.
 .RE
 '\" <</>>
 .RE
-'\" <</>>
 .TP
 .BI "Weight " (int)
 The weight in grams of the weapon.
@@ -2009,8 +2003,9 @@ and
 (masterwork).
 .RE
 '\" <</>>
-.RE
 '\" <</>>
+'\" <</>>
+.RE
 .RE
 '\" <<ital-is-var>>
 .TP
@@ -2110,7 +2105,6 @@ The item's name.
 The item's code.
 '\" <</>>
 .RE
-'\" <</New>>
 .TP
 .B CS
 Update the client's clock.
@@ -2177,22 +2171,18 @@ die-roll presets for it to retrieve for use in subsequent sessions.
 The JSON payload is identical to the one sent by the server in the
 .B DD=
 command, 
-'\" <<New>>
 except that it does not contain
 .B DelegateFor
 or
 .B Delegates
 fields.
-'\" <</New>>
 .RS
 .LP
 The server SHOULD respond by issuing a
 .B DD=
 command to all peer clients logged in with the same username as the
 affected user
-'\" <<New>>
 as well as any authorized delegates. 
-'\" <</New>>
 .RE
 .TP
 .B DD+
@@ -2206,9 +2196,7 @@ The server SHOULD respond by issuing a
 .B DD=
 command to all peer clients logged in with the same username as the
 requesting client 
-'\" <<New>>
 and all authorized delegates.
-'\" <</New>>
 .TP
 .B DD/
 Filter die-roll presets. This removes a set of die-roll presets
@@ -2217,9 +2205,7 @@ The server SHOULD respond by issuing a
 .B DD=
 command to all peer clients logged in with the same username as the
 affected user
-'\" <<New>>
 and all authorized delegates.
-'\" <</New>>
 The JSON payload includes the following fields:
 '\" <<list>>
 .RS
@@ -2234,9 +2220,7 @@ attribute matches this regular expression.
 The name of the user whose presets are being filtered. This is optional;
 if omitted, the presets of the user making this request are affected. Only
 the GM 
-'\" <<New>>
 and authorized delegates
-'\" <</New>>
 may filter other users' presets.
 '\" <</>>
 .RE
@@ -2253,7 +2237,6 @@ in protocol versions prior to 400.
 The JSON payload includes the following fields:
 '\" <<list>>
 .RS
-'\" <<New>>
 .TP
 .B For
 The username of the player for whom these presets were stored. The default, if no
@@ -2266,7 +2249,6 @@ The list of all the other users for whom the target user is a delegate.
 .BI Delegates " (list of strings)"
 The list of delegates who also have visibility and control for the owner's presets.
 If empty or missing, there are no delegates.
-'\" <</New>>
 .TP
 .BI Presets " (list of objects)"
 '\" <<ital-is-var>>
@@ -2301,11 +2283,9 @@ of the bar, e.g.,
 .RB \*(lq 001|damage \*(rq,
 .RB \*(lq "002|fort save" \*(rq,
 etc. The numbers need not be strictly consecutive.
-'\" <<New>>
 Clients SHOULD use dictionary sorting for preset items so that the numeric sort-order sequence value
 is correctly arranged regardless of number of characters; however the recommendation here is also to
 pad them with zeroes to three digits for the benefit of clients which cannot or will not do so.
-'\" <</New>>
 .TP
 2.
 Stored variables MAY be stored as a die-roll preset with a
@@ -2349,7 +2329,6 @@ clients SHOULD interpret this to mean that the preset's value should not be assi
 to a variable name, but should be appended to any die-roll specification made while it
 is enabled.
 .RE
-'\" <<New>>
 .TP
 3.
 It is RECOMMENDED that clients allow for grouping of related presets and/or modifiers
@@ -2380,9 +2359,7 @@ in the die-roll preset list.
 .TP
 4.
 Clients 
-'\" <<New>>
 MUST 
-'\" <</New>>
 gracefully handle the existence of data formats not listed
 above without losing or corrupting any presets or metadata.
 .RS
@@ -2430,7 +2407,6 @@ here represents the Unicode codepoint U+25B6.)
 .RE
 '\" <</TeX>>
 .RE
-'\" <</New>>
 '\" <</>>
 .RE
 .TP
@@ -2443,7 +2419,6 @@ The die-roll specification to send to the server when rolling this preset.
 .RE
 '\" <</>>
 .RE
-'\" <<New>>
 .TP
 .B DDD
 Define Die-roll Delegate.
@@ -2474,7 +2449,6 @@ is empty (or the
 field missing), then all delegates are removed.
 .RE
 '\" <</>>
-'\" <</New>>
 .TP
 .B DENIED
 Access to the server is denied. The server will send this to a client; clients
@@ -2493,7 +2467,6 @@ Retrieve the authenticated user's die roll presets. This SHOULD
 result in the server sending the
 .B DD=
 command back to the requesting client. 
-'\" <<New>>
 The JSON payload may contain the following field:
 .RS
 '\" <<list>>
@@ -2503,7 +2476,6 @@ The name of the user whose presets are being requested.
 Only the GM or an authorized delegate may request other users' presets.
 If this field is empty or missing, the requesting user's presets are requested.
 '\" <</>>
-'\" <</New>>
 .RE
 .TP
 .B DSM
@@ -3479,7 +3451,6 @@ The payload is a JSON object with the following fields:
 .TP
 .B OperationID
 A unique identifier for the operation we're reporting progress for.
-'\" <<New>>
 .TP
 '\" <</ital-is-var>>
 .BI "Targets " (list)
@@ -3494,7 +3465,6 @@ The description of the operation in progress. This is suitable for display to th
 .TP
 .BI Value " (int)"
 The current value of the progress meter. Units are arbitrary.
-'\" <<New>>
 The value may fluctuate up or down over the course of the updates that are received.
 It may also go negative. It is up to the client to display negative values appropriately
 based on the type of progress meter or other context. For example, timers generated by
@@ -3502,7 +3472,6 @@ GMA will run negative for a number of updates to show that the timer has expired
 sending a final update with
 .B IsDone
 true to indicate that the timer should be removed from view.
-'\" <</New>>
 .TP
 .BI MaxValue " (int)"
 The maximum value expected for the progress meter when it is finished.
@@ -3522,7 +3491,22 @@ Clients SHOULD NOT send these; they are for the server to notify the client
 about progress. If a client does send progress update messages to other
 peers, it should be clear that what is being tracked is a process that the
 other clients are interested in.
+.LP
+'\" <<New>>
+As a special case, the server may send this message with
+.B OperationID=*
+and
+.BR IsDone=true .
+This is a signal to clients that all timers should be cancelled and dismissed from view.
+If a subsequent
+.B PROGRESS
+message is sent with the
+.B OperationID
+of a timer that was dismissed in this way, clients should treat it like a new
+timer being created at that point.
+'\" <</New>>
 .RE
+'\" <<list>>
 .TP
 .BI PS
 Place a creature token on the map. This may be used to define a new creature object
@@ -4191,7 +4175,6 @@ and
 Steve Willoughby / steve@madscience.zone;
 John Mechalas (elevation and movement modes).
 .SH HISTORY
-'\" <<New>>
 .LP
 This document defines map protocol version 413,
 which added speculative definitions for the
@@ -4202,8 +4185,7 @@ and
 commands, and extensions to the 
 .B PROGRESS
 command.
-'\" <</New>>
-.TP
+.LP
 Protocol 412
 added support for sharing die-roll presets.
 .LP
