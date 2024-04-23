@@ -9465,6 +9465,15 @@ proc DoCommandCO    {d} { setCombatMode [dict get $d Enabled] }
 proc DoCommandMARCO {d} { ::gmaproto::polo }
 proc DoCommandMARK  {d} { global canvas; start_ping_marker $canvas [dict get $d X] [dict get $d Y] 0 }
 
+proc DoCommandDENIED {d} {
+	tk_messageBox -type ok -icon error -title "Server Closed Connection" \
+		-message "[dict get $d Reason]" \
+		-detail "The server terminated your session due to the reason stated above. Please correct the cause of this problem before reconnecting."
+	exit 1
+}
+
+
+
 proc DoCommandWORLD {d} {
 	global ServerSideConfiguration
 	if {[dict exists $d ClientSettings]} {
