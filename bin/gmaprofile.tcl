@@ -28,7 +28,7 @@ namespace eval ::gmaprofile {
 	variable font_repository
 	variable _default_color_table
 	variable minimum_file_version 1
-	variable maximum_file_version 7
+	variable maximum_file_version 8
 	array set _default_color_table {
 		fg,light           #000000
 		normal_fg,light    #000000
@@ -95,6 +95,7 @@ namespace eval ::gmaprofile {
 		debug_proto ?
 		flash_updates ?
 		scaling f
+		show_timers s
 		guide_lines {o {
 			major {o {
 				interval i
@@ -278,6 +279,9 @@ namespace eval ::gmaprofile {
 		if {![dict exists $p scaling] || [dict get $p scaling] == 0.0} {
 			dict set p scaling 1.0
 		}
+		if {![dict exists $p show_timers]} {
+			dict set p show_timers mine
+		}
 	}
 	proc default_preferences {} {
 		return [dict create \
@@ -304,6 +308,7 @@ namespace eval ::gmaprofile {
 			profiles     [list [empty_server_profile offline]]\
 			fonts        [default_fonts]\
 			scaling      1.0\
+			show_timers  mine\
 			styles       [default_styles]\
 		]
 	}
@@ -512,7 +517,7 @@ namespace eval ::gmaprofile {
 
 		json::write indented true
 		json::write aligned true
-		dict set data GMA_Mapper_preferences_version 7
+		dict set data GMA_Mapper_preferences_version 8
 		set f [open $filename w]
 		puts $f [::gmaproto::_encode_payload $data $_file_format]
 		close $f
@@ -560,6 +565,14 @@ namespace eval ::gmaprofile {
 		set bsizetext [format "Button size: %s" $v]
 		set button_size $v
 	}
+	proc _show_timers {v} {
+		global t_show_timers show_timers
+		switch -exact $v {
+			none { set t_show_timers "Show no timers"; set show_timers none }
+			all { set t_show_timers "Show all timers"; set show_timers all }
+			default { set t_show_timers "Show only my timers"; set show_timers mine }
+		}
+	}
 	proc _imgfmt {v} {
 		global imgtext image_format
 		set imgtext [format "Use %s-format images" [string toupper $v]]
@@ -571,7 +584,7 @@ namespace eval ::gmaprofile {
 		set _profile $_profile_backup
 	}
 	proc _save {} {
-		global animate colorize_die_rolls button_size bsizetext scaling dark image_format keep_tools preload
+		global animate colorize_die_rolls button_size bsizetext show_timers scaling dark image_format keep_tools preload
 		global imgtext debug_level debug_proto curl_path curl_insecure profiles menu_button never_animate
 		global major_interval major_offset_x major_offset_y
 		global minor_interval minor_offset_x minor_offset_y flash_updates
@@ -611,6 +624,7 @@ namespace eval ::gmaprofile {
 			keep_tools $keep_tools \
 			preload $preload \
 			scaling $scaling \
+			show_timers $show_timers \
 		]
 	}
 	proc _save_server {w} {
@@ -756,7 +770,7 @@ namespace eval ::gmaprofile {
 	}
 
 	proc editor {w d} {
-		global animate button_size bsizetext colorize_die_rolls scaling dark image_format keep_tools preload chat_timestamp
+		global animate button_size bsizetext colorize_die_rolls show_timers scaling dark image_format keep_tools preload chat_timestamp
 		global imgtext debug_proto debug_level curl_path curl_insecure profiles menu_button never_animate
 		global major_interval major_offset_x major_offset_y
 		global minor_interval minor_offset_x minor_offset_y flash_updates
@@ -788,7 +802,8 @@ namespace eval ::gmaprofile {
 			preload preload \
 			profiles profiles \
 			current_profile current_profile \
-			scaling scaling
+			scaling scaling \
+			show_timers show_timers
 
 		set animate [::gmaproto::int_bool $animate]
 		set flash_updates [::gmaproto::int_bool $flash_updates]
@@ -1070,6 +1085,11 @@ namespace eval ::gmaprofile {
 		menu $w.n.a.m_imgfmt
 		$w.n.a.m_imgfmt add command -label PNG -command {::gmaprofile::_imgfmt png}
 		$w.n.a.m_imgfmt add command -label GIF -command {::gmaprofile::_imgfmt gif}
+		menu $w.n.a.m_show_timers
+		$w.n.a.m_show_timers add command -label "Show no timers" -command {::gmaprofile::_show_timers none}
+		$w.n.a.m_show_timers add command -label "Show only my timers" -command {::gmaprofile::_show_timers mine}
+		$w.n.a.m_show_timers add command -label "Show all timers" -command {::gmaprofile::_show_timers all}
+		::gmaprofile::_show_timers $show_timers
 
 		grid [ttk::label $w.n.a.title -text "MAPPER APPEARANCE SETTINGS" -anchor center -foreground $sep_fg -background $sep_bg] - - - - - - -sticky we -pady 5
 		grid [ttk::checkbutton $w.n.a.animate -text "Animate updates" -variable animate] - - - - - - -sticky w
@@ -1081,6 +1101,7 @@ namespace eval ::gmaprofile {
 		grid [ttk::checkbutton $w.n.a.menu_button -text "Use menu button instead of menu bar" -variable menu_button] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.never_animate -text "Never play animated images" -variable never_animate] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.keep -text "Keep toolbar visible" -variable keep_tools] - - - - - - -sticky w
+		grid [ttk::menubutton $w.n.a.show_timers -textvariable t_show_timers -menu $w.n.a.m_show_timers] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.preload -text "Pre-load all cached images" -variable preload] - - - - - - -sticky w
 		grid [ttk::menubutton $w.n.a.imgfmt -textvariable imgtext -menu $w.n.a.m_imgfmt] - - - - - - -sticky w
 		grid [ttk::menubutton $w.n.a.bsize -textvariable bsizetext -menu $w.n.a.m_bsize] - - - - - - -sticky w
