@@ -621,6 +621,8 @@ proc DEBUG {level msg args} {
 				set DEBUGbgcolor(2) yellow
 				set DEBUGfgcolor(3) white
 				set DEBUGbgcolor(3) #232323
+				set DEBUGbgsel white
+				set DEBUGfgsel #232323
 				set dialogbg #232323
 			} else {
 				set DEBUGfgcolor(0) red
@@ -631,15 +633,18 @@ proc DEBUG {level msg args} {
 				set DEBUGbgcolor(2) yellow
 				set DEBUGfgcolor(3) blue
 				set DEBUGbgcolor(3) #cccccc
+				set DEBUGbgsel blue
+				set DEBUGfgsel #cccccc
 				set dialogbg #cccccc
 			}
 			toplevel .debugwindow -background $dialogbg
 			wm title .debugwindow "Diagnostic Messages"
-			grid [text .debugwindow.text -yscrollcommand {.debugwindow.sb set}] \
+			grid [text .debugwindow.text -exportselection true -yscrollcommand {.debugwindow.sb set}] \
 				[scrollbar .debugwindow.sb -orient vertical -command {.debugwindow.text yview}] -sticky news
 			foreach l {0 1 2 3} {
 				.debugwindow.text tag configure level$l -foreground $DEBUGfgcolor($l) -background $DEBUGbgcolor($l)
 			}
+			.debugwindow.text configure -selectforeground $DEBUGfgsel -selectbackground $DEBUGbgsel
 		}
 
 		foreach k [array names DEBUGfgcolor] {
@@ -1170,6 +1175,8 @@ proc create_main_menu {use_button} {
 	$mm.tools add command -command {CleanupImageCache -update} -label "Update Cached Images from Server"
 	$mm.tools add separator
 	$mm.tools add command -command ServerPingTest -label "Test server response time..."
+	$mm.tools add separator
+	$mm.tools add command -command SaveDebugText -label "Save diagnostic messages as..."
 
 	menu $mm.tools.rch
 	$mm.tools.rch add command -command {ResetChatHistory 50} -label "...and load 50 messages"
@@ -1180,6 +1187,23 @@ proc create_main_menu {use_button} {
 	menu $mm.help
 	$mm.help add command -command {aboutMapper} -label "About Mapper..."
 }
+
+proc SaveDebugText {} {
+	if {[winfo exists .debugwindow.text]} {
+		if {[set filename [tk_getSaveFile -defaultextension .txt -parent . -title "Save diagnostic messages as..."]] eq {}} return
+		if {[catch {set f [open $filename w]} err]} {
+			tk_messageBox -type ok -icon error -title "Unable to open file" \
+				-message "Unable to write to \"$filename\": $err" -parent .
+			return
+		}
+		puts $f [.debugwindow.text get 1.0 end]
+		close $f
+	} else {
+		tk_messageBox -type ok -icon error -title "No diagnostics to save" \
+			-message "There is no diagnostics window to save to a file." -parent .
+	}
+}
+
 
 #
 # Manage Delegates
