@@ -1,5 +1,5 @@
 '\" t
-'\" *** 413 ***
+'\" *** 414 ***
 '\" <<ital-is-var>>
 .TH MAPPER-PROTOCOL 7 "GMA-Mapper 4.23.2" 16-Apr-2024 "Protocols" \" @@mp@@
 .SH NAME
@@ -81,7 +81,7 @@ be implemented to wait synchronously for a server
 response during the authentication negotiation stage.
 .LP
 '\" <</bold-is-fixed>>
-.B "This describes protocol version 413."
+.B "This describes protocol version 414."
 '\" <<bold-is-fixed>>
 These notes are intended to be 
 detailed enough to implement a client from and should be considered
@@ -135,7 +135,6 @@ The server
 MUST NOT
 send the
 .BR AC ,
-.BR DENIED ,
 .BR GRANTED ,
 .BR OK ,
 .BR READY ,
@@ -150,6 +149,16 @@ Clients MUST NOT send the
 command after receiving the server's
 .B READY
 signal.
+'\" <<New>>
+(Note that prior to protocol 414, servers were not allowed to send
+.B DENIED
+to clients after the
+.B READY
+message. Now they can send a
+.B DENIED
+message at any time to indicate that they wish to terminate the
+client's session immediately.)
+'\" <</New>>
 .SS "Command Summary"
 .LP
 '\"<<TeX>>
@@ -2452,7 +2461,14 @@ field missing), then all delegates are removed.
 .TP
 .B DENIED
 Access to the server is denied. The server will send this to a client; clients
-MAY NOT send it.
+MAY NOT send it. 
+'\" <<New>>
+When a client receives this message, it MUST not continue
+to communicate with the server. In fact, the server SHOULD terminate the
+network connection after sending the
+.B DENIED
+message.
+'\" <</New>>
 The JSON payload sent with this command includes the field:
 '\" <<list>>
 .RS
@@ -4176,8 +4192,14 @@ Steve Willoughby / steve@madscience.zone;
 John Mechalas (elevation and movement modes).
 .SH HISTORY
 .LP
-This document defines map protocol version 413,
-which added speculative definitions for the
+This document defines map protocol version 414,
+which changed the definition of the
+.B DENIED
+message to allow it to be sent at any time during the
+conversation. 
+.LP
+Protocol 413
+added speculative definitions for the
 .BR CORE ,
 .BR CORE/ ,
 and
