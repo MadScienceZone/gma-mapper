@@ -57,9 +57,9 @@ package require base64 2.4.2
 package require uuid 1.0.1
 
 namespace eval ::gmaproto {
-	variable protocol 413
+	variable protocol 414
 	variable min_protocol 333
-	variable max_protocol 413
+	variable max_protocol 414
 	variable max_max_protocol 499
 	variable debug_f {}
 	variable legacy false
