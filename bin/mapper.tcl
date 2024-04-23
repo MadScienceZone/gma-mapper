@@ -1361,7 +1361,7 @@ proc applyServerSideConfiguration {} {
 	}
 }
 proc ApplyPreferences {data args} {
-	global colortheme
+	global colortheme TimerScope
 	global animatePlacement blur_all blur_pct DEBUG_level debug_protocol
 	global dark_mode IThost ImageFormat ITpassword ITport
 	global GuideLineOffset GuideLines MajorGuideLines MajorGuideLineOffset
@@ -1449,6 +1449,7 @@ proc ApplyPreferences {data args} {
 	}
 	applyServerSideConfiguration
 	create_main_menu [dict get $data menu_button]
+	set TimerScope [dict get $data show_timers]
 }
 
 set PreferencesData {}
