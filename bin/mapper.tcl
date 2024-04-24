@@ -1190,7 +1190,15 @@ proc create_main_menu {use_button} {
 
 proc SaveDebugText {} {
 	if {[winfo exists .debugwindow.text]} {
-		if {[set filename [tk_getSaveFile -defaultextension .txt -parent . -title "Save diagnostic messages as..."]] eq {}} return
+		if {[set filename [tk_getSaveFile -defaultextension .txt \
+				-parent .  -title "Save diagnostic messages as..." \
+				-filetypes {
+					{{Text Files} {.txt}}
+					{{All Files}       *}
+				}]] eq {}} {
+			return
+		}
+
 		if {[catch {set f [open $filename w]} err]} {
 			tk_messageBox -type ok -icon error -title "Unable to open file" \
 				-message "Unable to write to \"$filename\": $err" -parent .
