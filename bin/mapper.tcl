@@ -10254,6 +10254,9 @@ proc DoCommandPROGRESS {d} {
 			# forget a timer we were tracking
 			if {$timer_progress_data(w:$id) ne {}} {
 				destroy $timer_progress_data(w:$id)
+				if {[winfo exists .initiative]} {
+					::gmaclock::autosize .initiative.clock
+				}
 			}
 			array unset timer_progress_data *:$id
 			return
