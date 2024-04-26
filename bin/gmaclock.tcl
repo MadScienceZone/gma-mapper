@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___       _______  ______      _______     #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___   )/ ___  \    / ___   )    #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |\/   \  \   \/   )  |    #
-# | |      | || || || (___) | Assistant  / (_) (_        /   )   ___) /       /   )    #
-# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /   (___ (      _/   /     #
-# | | \_  )| |   | || (   ) |                ) (      /   _/        ) \    /   _/      #
-# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\/\___/  / _ (   (__/\    #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/\______/ (_)\_______/    #
+#  _______  _______  _______                ___       _______     ___                  #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___   )   /   )                 #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |  / /) |                 #
+# | |      | || || || (___) | Assistant  / (_) (_        /   ) / (_) (_                #
+# | | ____ | |(_)| ||  ___  |           (____   _)     _/   / (____   _)               #
+# | | \_  )| |   | || (   ) |                ) (      /   _/       ) (                 #
+# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\     | |                 #
+# (_______)|/     \||/     \| Client         (_)  (_)\_______/     (_)                 #
 #                                                                                      #
 ########################################################################################
 #
@@ -42,6 +42,12 @@ proc nameplate_text {full_name} {
 }
 
 # widget w ?-24hr? ?-dark? ?-handscale x? ?-calendar name? ?-- canvasopts ...? -> id
+proc resize_widget {w height width} {
+	$w configure -height $height -width $width
+	_draw_face $w
+	_update_combat $w 1 0
+}
+
 proc widget {w args} {
 	variable _clock_state
 	global ::_preferences
@@ -516,10 +522,11 @@ proc initiative_display_window {w {limit 20} {dark_mode false} args} {
 		flist			{} \
 		ilist			{} \
 		limit			$limit \
+		timer_height            0 \
 	]
 
 	frame $w {*}$args
-	widget $w.timeclock -- -width 200 -height 200
+	widget $w.timeclock -- -width 150 -height 150
 	pack $w.timeclock -side top
 	pack [label $w.timedisp -anchor n -font [::gmaprofile::lookup_font $::_preferences [dict get $::_preferences styles clocks timedisp_font]]] -side top -fill x
 	pack [label $w.turndisp -anchor n -font [::gmaprofile::lookup_font $::_preferences [dict get $::_preferences styles clocks turndisp_font]]] -side top -fill x
@@ -534,22 +541,49 @@ proc autosize {w} {
 	variable _window_state
 
 	if {[dict get $_window_state($w) _autosize_inhibit]} {
+		::DEBUG 1 "autosize inhibited"
 		return
 	}
 
 	if {[set taskID [dict get $_window_state($w) _autosize_task]] ne {}} {
+		::DEBUG 1 "autosize cancelling previous task $taskID"
 		after cancel $taskID
 	}
 	dict set _window_state($w) _autosize_task [after 500 "::gmaclock::_autosize $w"]
+	::DEBUG 1 "autosize scheduled task [dict get $_window_state($w) _autosize_task] for window $w in 500 mS"
 }
 
 proc _autosize {w} {
+#	variable _window_state
+#	set oldlimit [dict get $_window_state($w) limit]
+#	set limit [_autosize_calc $w]
+#
+#	if {$limit != $oldlimit} {
+#		if {$limit < 8} {
+#			resize_widget $w.timeclock 50 50
+#		} else {
+#			resize_widget $w.timeclock 200 200
+#		}
+#	}
+	_autosize_calc $w
+}
+
+proc _autosize_calc {w} {
 	variable _window_state
 
+	::DEBUG 1 "_autosize $w"
 	set cur_height [winfo height $w]
+	if {[winfo exists $w.timers]} {
+		set cur_theight [winfo height $w.timers]
+	} else {
+		set cur_theight 0
+	}
+
 	if {[dict get $_window_state($w) _autosize_last_height] ne {} \
+	&&  [dict get $_window_state($w) timer_height] == $cur_theight \
 	&&  [dict get $_window_state($w) _autosize_last_height] == $cur_height} {
-		return
+		::DEBUG 1 "_autosize exiting (nothing to do)"
+		return [dict get $_window_state($w) limit]
 	}
 
 	dict set _window_state($w) _autosize_last_height $cur_height
@@ -558,6 +592,9 @@ proc _autosize {w} {
 	set height [expr $cur_height - [winfo height $w.timeclock] - [winfo height $w.timedisp] - [winfo height $w.turndisp] ]
 	if {[winfo exists $w.timers]} {
 		set height [expr $height - [winfo height $w.timers]]
+		dict set _window_state($w) timer_height [winfo height $w.timers]
+	} else {
+		dict set _window_state($w) timer_height 0
 	}
 
 	if {[set flist [dict get $_window_state($w) flist]] ne {}} {
@@ -572,7 +609,7 @@ proc _autosize {w} {
 		-highlightthickness 0] -side top -padx 2 -pady 1 -fill x
 	update
 	set f_height [winfo height $w.test]
-	dict set _window_state($w) limit [expr int($height / $f_height)]
+	dict set _window_state($w) limit [set limit [expr int($height / $f_height)]]
 	pack forget $w.test
 	destroy $w.test
 	
@@ -580,6 +617,8 @@ proc _autosize {w} {
 	update
 	dict set _window_state($w) _autosize_task {}
 	dict set _window_state($w) _autosize_inhibit false
+	::DEBUG 1 "_autosize exits with state $_window_state($w)"
+	return $limit
 }
 
 # update_initiative_slots w ?limit={}? ?-force?
@@ -1082,7 +1121,7 @@ proc exists {w} {
 
 }
 #
-# @[00]@| GMA-Mapper 4.23.2
+# @[00]@| GMA-Mapper 4.24
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2024 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

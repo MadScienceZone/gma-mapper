@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___       _______  ______      _______     #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___   )/ ___  \    / ___   )    #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |\/   \  \   \/   )  |    #
-# | |      | || || || (___) | Assistant  / (_) (_        /   )   ___) /       /   )    #
-# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /   (___ (      _/   /     #
-# | | \_  )| |   | || (   ) |                ) (      /   _/        ) \    /   _/      #
-# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\/\___/  / _ (   (__/\    #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/\______/ (_)\_______/    #
+#  _______  _______  _______                ___       _______     ___                  #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___   )   /   )                 #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |  / /) |                 #
+# | |      | || || || (___) | Assistant  / (_) (_        /   ) / (_) (_                #
+# | | ____ | |(_)| ||  ___  |           (____   _)     _/   / (____   _)               #
+# | | \_  )| |   | || (   ) |                ) (      /   _/       ) (                 #
+# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\     | |                 #
+# (_______)|/     \||/     \| Client         (_)  (_)\_______/     (_)                 #
 #                                                                                      #
 ########################################################################################
 #
@@ -57,9 +57,9 @@ package require base64 2.4.2
 package require uuid 1.0.1
 
 namespace eval ::gmaproto {
-	variable protocol 413
+	variable protocol 414
 	variable min_protocol 333
-	variable max_protocol 413
+	variable max_protocol 414
 	variable max_max_protocol 499
 	variable debug_f {}
 	variable legacy false
@@ -2306,7 +2306,7 @@ proc ::gmaproto::normalize_dict {cmd d} {
 	return [::gmaproto::new_dict_from_json $cmd [::gmaproto::json_from_dict $cmd $d]]
 }
 
-# @[00]@| GMA-Mapper 4.23.2
+# @[00]@| GMA-Mapper 4.24
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2024 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
