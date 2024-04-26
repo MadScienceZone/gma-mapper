@@ -3,19 +3,30 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.23.2          <!-- @@##@@ -->
- * Effective Date: 16-Apr-2024               <!-- @@##@@ -->
+ * This Package Version: 4.24          <!-- @@##@@ -->
+ * Effective Date: 26-Apr-2024               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.17.1 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.17.2 <!-- @@##@@ -->
  * GMA Mapper File Format: 23	     <!-- @@##@@ -->
- * GMA Mapper Protocol: 413        <!-- @@##@@ -->
- * GMA Mapper Preferences File Format: 7 <!-- @@##@@ -->
+ * GMA Mapper Protocol: 414        <!-- @@##@@ -->
+ * GMA Mapper Preferences File Format: 8 <!-- @@##@@ -->
 
 ## DEPRECATION NOTICE
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.24
+## Enhancements
+ * Better highlighting for selection in the diagnostic window for when selecting text to copy and paste.
+ * Added menu item `Tools > Save diagnostic messages as...` to save entire contents of the diagnostic window to a text file.
+ * Now supports mapper protocol 414.
+ * Previously, the display of timers defaulted to only show timers specifically targetted at the PC named the same as the login name on the mapper client. This can be changed via the `View > Show timers > ...` menu. Now, the default setting (no timers, my timers, or all timers) appears in the preferences editor, so once set there that becomes the permanent default for that client.
+ * Added support for the new ability for the server to reject client connections after the authentication stage, so the client will gracefully inform the user of why their session has been terminated by the server.
+## Fixes
+ * Corrects the way the initiative tracker window is resized when timers are added or removed.
+ * The analog clock display is slightly smaller. It didn't need to be that big and we needed more room.
 
 # 4.23.2
 ## Fixes

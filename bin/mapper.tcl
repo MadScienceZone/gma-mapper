@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       _______  ______      _______     #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___   )/ ___  \    / ___   )    #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |\/   \  \   \/   )  |    #
-# | |      | || || || (___) | Assistant  / (_) (_        /   )   ___) /       /   )    #
-# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /   (___ (      _/   /     #
-# | | \_  )| |   | || (   ) |                ) (      /   _/        ) \    /   _/      #
-# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\/\___/  / _ (   (__/\    #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/\______/ (_)\_______/    #
+#  _______  _______  _______                ___       _______     ___                  #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___   )   /   )                 #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |  / /) |                 #
+# | |      | || || || (___) | Assistant  / (_) (_        /   ) / (_) (_                #
+# | | ____ | |(_)| ||  ___  |           (____   _)     _/   / (____   _)               #
+# | | \_  )| |   | || (   ) |                ) (      /   _/       ) (                 #
+# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\     | |                 #
+# (_______)|/     \||/     \| Client         (_)  (_)\_______/     (_)                 #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -17,10 +17,10 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.23.2}     ;# @@##@@
+set GMAMapperVersion {4.24}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
-set GMAMapperProtocol {413}         ;# @@##@@
-set CoreVersionNumber {6.17.1}            ;# @@##@@
+set GMAMapperProtocol {414}         ;# @@##@@
+set CoreVersionNumber {6.17.2}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -621,6 +621,8 @@ proc DEBUG {level msg args} {
 				set DEBUGbgcolor(2) yellow
 				set DEBUGfgcolor(3) white
 				set DEBUGbgcolor(3) #232323
+				set DEBUGbgsel white
+				set DEBUGfgsel #232323
 				set dialogbg #232323
 			} else {
 				set DEBUGfgcolor(0) red
@@ -631,15 +633,18 @@ proc DEBUG {level msg args} {
 				set DEBUGbgcolor(2) yellow
 				set DEBUGfgcolor(3) blue
 				set DEBUGbgcolor(3) #cccccc
+				set DEBUGbgsel blue
+				set DEBUGfgsel #cccccc
 				set dialogbg #cccccc
 			}
 			toplevel .debugwindow -background $dialogbg
 			wm title .debugwindow "Diagnostic Messages"
-			grid [text .debugwindow.text -yscrollcommand {.debugwindow.sb set}] \
+			grid [text .debugwindow.text -exportselection true -yscrollcommand {.debugwindow.sb set}] \
 				[scrollbar .debugwindow.sb -orient vertical -command {.debugwindow.text yview}] -sticky news
 			foreach l {0 1 2 3} {
 				.debugwindow.text tag configure level$l -foreground $DEBUGfgcolor($l) -background $DEBUGbgcolor($l)
 			}
+			.debugwindow.text configure -selectforeground $DEBUGfgsel -selectbackground $DEBUGbgsel
 		}
 
 		foreach k [array names DEBUGfgcolor] {
@@ -1170,6 +1175,8 @@ proc create_main_menu {use_button} {
 	$mm.tools add command -command {CleanupImageCache -update} -label "Update Cached Images from Server"
 	$mm.tools add separator
 	$mm.tools add command -command ServerPingTest -label "Test server response time..."
+	$mm.tools add separator
+	$mm.tools add command -command SaveDebugText -label "Save diagnostic messages as..."
 
 	menu $mm.tools.rch
 	$mm.tools.rch add command -command {ResetChatHistory 50} -label "...and load 50 messages"
@@ -1180,6 +1187,56 @@ proc create_main_menu {use_button} {
 	menu $mm.help
 	$mm.help add command -command {aboutMapper} -label "About Mapper..."
 }
+
+proc SaveDebugText {} {
+	if {[winfo exists .debugwindow.text]} {
+		if {[set filename [tk_getSaveFile -defaultextension .txt \
+				-parent .  -title "Save diagnostic messages as..." \
+				-filetypes {
+					{{Text Files} {.txt}}
+					{{All Files}       *}
+				}]] eq {}} {
+			return
+		}
+
+		if {[catch {set f [open $filename w]} err]} {
+			tk_messageBox -type ok -icon error -title "Unable to open file" \
+				-message "Unable to write to \"$filename\": $err" -parent .
+			return
+		}
+#		puts $f [.debugwindow.text get 1.0 end]
+		set level "???"
+		foreach {k v i} [.debugwindow.text dump -text -tag 1.0 end] {
+			switch -exact $k {
+				text     { 
+					foreach line [split $v "\n"] {
+						if {$line ne {}} {
+							puts $f [format "%-8s|%s" $level $line]
+						}
+					}
+				}
+				tagon    { 
+					switch -exact $v {
+						level0          { set level "ERROR" }
+						level1          { set level "DEBUG 1" }
+						level2          { set level "DEBUG 2" }
+						level3          { set level "DEBUG 3" }
+						levelprotocol   { set level "PROTOCOL" }
+						levelinfo       { set level "INFO" }
+						default         { set level $v }
+					}
+				}
+				tagoff   {}
+				default  { puts -nonewline $f "<<??? $v>>" }
+			}
+		}
+		close $f
+	} else {
+		tk_messageBox -type ok -icon error -title "No diagnostics to save" \
+			-message "There is no diagnostics window to save to a file." -parent .
+	}
+}
+
 
 #
 # Manage Delegates
@@ -1361,7 +1418,7 @@ proc applyServerSideConfiguration {} {
 	}
 }
 proc ApplyPreferences {data args} {
-	global colortheme
+	global colortheme TimerScope
 	global animatePlacement blur_all blur_pct DEBUG_level debug_protocol
 	global dark_mode IThost ImageFormat ITpassword ITport
 	global GuideLineOffset GuideLines MajorGuideLines MajorGuideLineOffset
@@ -1449,6 +1506,7 @@ proc ApplyPreferences {data args} {
 	}
 	applyServerSideConfiguration
 	create_main_menu [dict get $data menu_button]
+	set TimerScope [dict get $data show_timers]
 }
 
 set PreferencesData {}
@@ -9440,6 +9498,15 @@ proc DoCommandCO    {d} { setCombatMode [dict get $d Enabled] }
 proc DoCommandMARCO {d} { ::gmaproto::polo }
 proc DoCommandMARK  {d} { global canvas; start_ping_marker $canvas [dict get $d X] [dict get $d Y] 0 }
 
+proc DoCommandDENIED {d} {
+	tk_messageBox -type ok -icon error -title "Server Closed Connection" \
+		-message "[dict get $d Reason]" \
+		-detail "The server terminated your session due to the reason stated above. Please correct the cause of this problem before reconnecting."
+	exit 1
+}
+
+
+
 proc DoCommandWORLD {d} {
 	global ServerSideConfiguration
 	if {[dict exists $d ClientSettings]} {
@@ -10187,6 +10254,9 @@ proc DoCommandPROGRESS {d} {
 			# forget a timer we were tracking
 			if {$timer_progress_data(w:$id) ne {}} {
 				destroy $timer_progress_data(w:$id)
+				if {[winfo exists .initiative]} {
+					::gmaclock::autosize .initiative.clock
+				}
 			}
 			array unset timer_progress_data *:$id
 			return
@@ -14209,7 +14279,7 @@ proc ConnectToServerByIdx {idx} {
 #
 #*user_key name -> sanitized_name
 #
-# @[00]@| GMA-Mapper 4.23.2
+# @[00]@| GMA-Mapper 4.24
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2024 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
