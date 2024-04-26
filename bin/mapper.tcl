@@ -1204,7 +1204,32 @@ proc SaveDebugText {} {
 				-message "Unable to write to \"$filename\": $err" -parent .
 			return
 		}
-		puts $f [.debugwindow.text get 1.0 end]
+#		puts $f [.debugwindow.text get 1.0 end]
+		set level "???"
+		foreach {k v i} [.debugwindow.text dump -text -tag 1.0 end] {
+			switch -exact $k {
+				text     { 
+					foreach line [split $v "\n"] {
+						if {$line ne {}} {
+							puts $f [format "%-8s|%s" $level $line]
+						}
+					}
+				}
+				tagon    { 
+					switch -exact $v {
+						level0          { set level "ERROR" }
+						level1          { set level "DEBUG 1" }
+						level2          { set level "DEBUG 2" }
+						level3          { set level "DEBUG 3" }
+						levelprotocol   { set level "PROTOCOL" }
+						levelinfo       { set level "INFO" }
+						default         { set level $v }
+					}
+				}
+				tagoff   {}
+				default  { puts -nonewline $f "<<??? $v>>" }
+			}
+		}
 		close $f
 	} else {
 		tk_messageBox -type ok -icon error -title "No diagnostics to save" \
@@ -10229,6 +10254,9 @@ proc DoCommandPROGRESS {d} {
 			# forget a timer we were tracking
 			if {$timer_progress_data(w:$id) ne {}} {
 				destroy $timer_progress_data(w:$id)
+				if {[winfo exists .initiative]} {
+					::gmaclock::autosize .initiative.clock
+				}
 			}
 			array unset timer_progress_data *:$id
 			return
