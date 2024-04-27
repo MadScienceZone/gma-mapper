@@ -3,11 +3,11 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.24          <!-- @@##@@ -->
+ * This Package Version: 4.24.1          <!-- @@##@@ -->
  * Effective Date: 26-Apr-2024               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.17.2 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.18 <!-- @@##@@ -->
  * GMA Mapper File Format: 23	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 414        <!-- @@##@@ -->
  * GMA Mapper Preferences File Format: 8 <!-- @@##@@ -->
@@ -16,6 +16,10 @@
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.24.1
+## Fixes
+ * Corrects a bug in resolving the location of files in the mapper's cache on Windows filesystems.
 
 # 4.24
 ## Enhancements
