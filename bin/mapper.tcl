@@ -1932,18 +1932,25 @@ proc cache_map_file_dir {id} {
 #   if the name is in an invalid format, name and zoom are empty strings
 #
 proc cache_info {cache_filename} {
-	global ImageFormat
+	global ImageFormat tcl_platform
 
-	if {[regexp [format "%s%s" {/(:[0-9]+:)?([^/]+)@([0-9.]+)\.} $ImageFormat] $cache_filename _ image_frame image_name image_zoom]} {
+	DEBUG 1 "cache_info($cache_filename) starts"
+	if {$tcl_platform(os) eq "Windows NT"} {
+		set rpath [file normalize $cache_filename]
+	} else {
+		set rpath $cache_filename
+	}
+	if {[regexp [format "%s%s" {/(:[0-9]+:)?([^/]+)@([0-9.]+)\.} $ImageFormat] $rpath _ image_frame image_name image_zoom]} {
 		if {[file exists $cache_filename]} {
 			return [list 1 [expr ([clock seconds] - [file mtime $cache_filename]) / (24*60*60)] $image_name $image_zoom $image_frame]
 		}
 		return [list 0 0 $image_name $image_zoom $image_frame]
 	}
-	if {[regexp {/([^/]+)@([0-9.]+)$} $cache_filename _ image_name image_zoom] && [file isdirectory $cache_filename]} {
+	if {[regexp {/([^/]+)@([0-9.]+)$} $rpath _ image_name image_zoom] && [file isdirectory $cache_filename]} {
+		DEBUG 1 "file $cache_filename is a directory; name=$image_name zoom=$image_zoom"
 		return [list 1 0 $image_name $image_zoom -dir]
 	}
-	if {[regexp {/([^/]+)\.map} $cache_filename x map_name]} {
+	if {[regexp {/([^/]+)\.map} $rpath x map_name]} {
 		if {[file exists $cache_filename]} {
 			return [list 1 [expr ([clock seconds] - [file mtime $cache_filename]) / (24*60*60)] $map_name {} {}]
 		}
