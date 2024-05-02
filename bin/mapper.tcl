@@ -1,13 +1,14 @@
 #!/usr/bin/env wish
+\
 ########################################################################################
-#  _______  _______  _______                ___       _______     ___        __        #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___   )   /   )      /  \       #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |  / /) |      \/) )      #
-# | |      | || || || (___) | Assistant  / (_) (_        /   ) / (_) (_       | |      #
-# | | ____ | |(_)| ||  ___  |           (____   _)     _/   / (____   _)      | |      #
-# | | \_  )| |   | || (   ) |                ) (      /   _/       ) (        | |      #
-# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\     | |   _  __) (_     #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/     (_)  (_) \____/     #
+#  _______  _______  _______                ___       _______     ___       _______    #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___   )   /   )     / ___   )   #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |  / /) |     \/   )  |   #
+# | |      | || || || (___) | Assistant  / (_) (_        /   ) / (_) (_        /   )   #
+# | | ____ | |(_)| ||  ___  |           (____   _)     _/   / (____   _)     _/   /    #
+# | | \_  )| |   | || (   ) |                ) (      /   _/       ) (      /   _/     #
+# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\     | |   _ (   (__/\   #
+# (_______)|/     \||/     \| Client         (_)  (_)\_______/     (_)  (_)\_______/   #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -17,10 +18,10 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.24.1}     ;# @@##@@
+set GMAMapperVersion {4.24.2}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {414}         ;# @@##@@
-set CoreVersionNumber {6.18}            ;# @@##@@
+set CoreVersionNumber {6.19-beta.0}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -5403,16 +5404,21 @@ proc FindImage {image_pfx zoom} {
 			}
 		} else {
 			DEBUG 1 "--No cached copy exists, either. Asking for help..."
+			# We used to throttle by dropping requests so we only send every 10th and then every 50th to the server
+			# but as it turns out we can still get too many sent at once so now we'll make the fallback time-based.
+			# We will ask immediately, then no sooner than 30 seconds, then no sooner than 60 seconds
 			if {![info exists TILE_RETRY($tile_id)]} {
-				# first reference: ask now and wait for 10
-				set TILE_RETRY($tile_id) 10
+				# first reference: ask now and wait for 30 seconds
+				set TILE_RETRY($tile_id) [clock add [clock seconds] 30 seconds]
 				::gmaproto::query_image $image_pfx $zoom
-			} elseif {$TILE_RETRY($tile_id) <= 0} {
-				# subsequent times: ask every 50
+				DEBUG 1 "---first query (sending immediately; try again in 30 seconds)"
+			} elseif {$TILE_RETRY($tile_id) < [clock seconds]} {
+				# subsequent times: ask every 60 seconds
 				::gmaproto::query_image $image_pfx $zoom
-				set TILE_RETRY($tile_id) 50
+				set TILE_RETRY($tile_id) [clock add [clock seconds] 60 seconds]
+				DEBUG 1 "---trying again (60 seconds until next try)"
 			} else {
-				incr TILE_RETRY($tile_id) -1
+				DEBUG 1 "---Too early to try again"
 			}
 		}
 	}
@@ -14286,7 +14292,7 @@ proc ConnectToServerByIdx {idx} {
 #
 #*user_key name -> sanitized_name
 #
-# @[00]@| GMA-Mapper 4.24.1
+# @[00]@| GMA-Mapper 4.24.2
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2024 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
