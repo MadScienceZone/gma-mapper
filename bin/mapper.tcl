@@ -5403,16 +5403,21 @@ proc FindImage {image_pfx zoom} {
 			}
 		} else {
 			DEBUG 1 "--No cached copy exists, either. Asking for help..."
+			# We used to throttle by dropping requests so we only send every 10th and then every 50th to the server
+			# but as it turns out we can still get too many sent at once so now we'll make the fallback time-based.
+			# We will ask immediately, then no sooner than 30 seconds, then no sooner than 60 seconds
 			if {![info exists TILE_RETRY($tile_id)]} {
-				# first reference: ask now and wait for 10
-				set TILE_RETRY($tile_id) 10
+				# first reference: ask now and wait for 30 seconds
+				set TILE_RETRY($tile_id) [clock add [clock seconds] 30 seconds]
 				::gmaproto::query_image $image_pfx $zoom
-			} elseif {$TILE_RETRY($tile_id) <= 0} {
-				# subsequent times: ask every 50
+				DEBUG 1 "---first query (sending immediately; try again in 30 seconds)"
+			} elseif {$TILE_RETRY($tile_id) < [clock seconds]} {
+				# subsequent times: ask every 60 seconds
 				::gmaproto::query_image $image_pfx $zoom
-				set TILE_RETRY($tile_id) 50
+				set TILE_RETRY($tile_id) [clock add [clock seconds] 60 seconds]
+				DEBUG 1 "---trying again (60 seconds until next try)"
 			} else {
-				incr TILE_RETRY($tile_id) -1
+				DEBUG 1 "---Too early to try again"
 			}
 		}
 	}
