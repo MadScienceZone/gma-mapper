@@ -1,14 +1,15 @@
 #!/usr/bin/env wish
 \
+\
 ########################################################################################
-#  _______  _______  _______                ___       _______     ___       _______    #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___   )   /   )     / ___   )   #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |  / /) |     \/   )  |   #
-# | |      | || || || (___) | Assistant  / (_) (_        /   ) / (_) (_        /   )   #
-# | | ____ | |(_)| ||  ___  |           (____   _)     _/   / (____   _)     _/   /    #
-# | | \_  )| |   | || (   ) |                ) (      /   _/       ) (      /   _/     #
-# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\     | |   _ (   (__/\   #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/     (_)  (_)\_______/   #
+#  _______  _______  _______                ___       _______     ___       ______     #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___   )   /   )     / ___  \    #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |  / /) |     \/   \  \   #
+# | |      | || || || (___) | Assistant  / (_) (_        /   ) / (_) (_       ___) /   #
+# | | ____ | |(_)| ||  ___  |           (____   _)     _/   / (____   _)     (___ (    #
+# | | \_  )| |   | || (   ) |                ) (      /   _/       ) (           ) \   #
+# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\     | |   _ /\___/  /   #
+# (_______)|/     \||/     \| Client         (_)  (_)\_______/     (_)  (_)\______/    #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -18,7 +19,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.24.2}     ;# @@##@@
+set GMAMapperVersion {4.24.3}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {414}         ;# @@##@@
 set CoreVersionNumber {6.19-beta.0}            ;# @@##@@
@@ -11512,7 +11513,7 @@ proc ECBT_set {w i components} {
 	if {[llength $components] > 1 && [lindex $components 1] ne {}} {
 		# there is a foreground color
 		set ECBTstate($w,$i,fgen) 1
-		set ECBTstate($w,$i,fg) [lindex $components 1]
+		set ECBTstate($w,$i,fg) [string trim [lindex $components 1]]
 		if {[catch {
 			$w.fg$i configure -state normal -text [::gmacolors::rgb_name [lindex $components 1]] -background [lindex $components 1]
 		}]} {
@@ -11523,7 +11524,7 @@ proc ECBT_set {w i components} {
 		if {[llength $components] > 2 && [lindex $components 2] ne {}} {
 			# there is a background color
 			set ECBTstate($w,$i,bgen) 1
-			set ECBTstate($w,$i,bg) [lindex $components 2]
+			set ECBTstate($w,$i,bg) [string trim [lindex $components 2]]
 			if {[catch {
 				$w.bg$i configure -state normal -text [::gmacolors::rgb_name [lindex $components 2]]
 			}]} {
@@ -11534,7 +11535,7 @@ proc ECBT_set {w i components} {
 			# automatic background color
 			set ECBTstate($w,$i,bgen) 0
 			if {[catch {
-				set ECBTstate($w,$i,bg) [::tk::Darken [lindex $components 1] 40]
+				set ECBTstate($w,$i,bg) [::tk::Darken [string trim [lindex $components 1]] 40]
 				$w.bg$i configure -state disabled -text auto -background $ECBTstate($w,$i,bg)
 			}]} {
 				set ECBTstate($w,$i,bg) [::tk::Darken white 40]
@@ -14292,7 +14293,7 @@ proc ConnectToServerByIdx {idx} {
 #
 #*user_key name -> sanitized_name
 #
-# @[00]@| GMA-Mapper 4.24.2
+# @[00]@| GMA-Mapper 4.24.3
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2024 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
