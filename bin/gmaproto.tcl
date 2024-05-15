@@ -1,14 +1,12 @@
-\
-\
 ########################################################################################
-#  _______  _______  _______                ___       _______     ___       ______     #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___   )   /   )     / ___  \    #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |  / /) |     \/   \  \   #
-# | |      | || || || (___) | Assistant  / (_) (_        /   ) / (_) (_       ___) /   #
-# | | ____ | |(_)| ||  ___  |           (____   _)     _/   / (____   _)     (___ (    #
-# | | \_  )| |   | || (   ) |                ) (      /   _/       ) (           ) \   #
-# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\     | |   _ /\___/  /   #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/     (_)  (_)\______/    #
+#  _______  _______  _______                ___       _______     ___          ___     #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___   )   /   )        /   )    #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |  / /) |       / /) |    #
+# | |      | || || || (___) | Assistant  / (_) (_        /   ) / (_) (_     / (_) (_   #
+# | | ____ | |(_)| ||  ___  |           (____   _)     _/   / (____   _)   (____   _)  #
+# | | \_  )| |   | || (   ) |                ) (      /   _/       ) (          ) (    #
+# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\     | |   _      | |    #
+# (_______)|/     \||/     \| Client         (_)  (_)\_______/     (_)  (_)     (_)    #
 #                                                                                      #
 ########################################################################################
 #
@@ -152,7 +150,7 @@ namespace eval ::gmaproto {
 		DD=     {For s Presets {a {Name s Description s DieRollSpec s}} DelegateFor l Delegates l}
 		DDD	{For s Delegates l}
 		DENIED  {Reason s}
-		DR      {}
+		DR      {For s}
 		DSM     {Condition s Shape s Color s Description s Transparent ?}
 		ECHO    {s s i i o d ReceivedTime s SentTime s}
 		GRANTED {User s}
@@ -2308,7 +2306,7 @@ proc ::gmaproto::normalize_dict {cmd d} {
 	return [::gmaproto::new_dict_from_json $cmd [::gmaproto::json_from_dict $cmd $d]]
 }
 
-# @[00]@| GMA-Mapper 4.24.3
+# @[00]@| GMA-Mapper 4.24.4
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2024 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
