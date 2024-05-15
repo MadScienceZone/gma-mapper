@@ -3,8 +3,8 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.24.3          <!-- @@##@@ -->
- * Effective Date: 12-May-2024               <!-- @@##@@ -->
+ * This Package Version: 4.24.4          <!-- @@##@@ -->
+ * Effective Date: 15-May-2024               <!-- @@##@@ -->
 
 ## Compatibility
  * GMA Core API Library Version: 6.19-beta.0 <!-- @@##@@ -->
