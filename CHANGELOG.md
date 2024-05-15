@@ -17,6 +17,11 @@ The support for old server protocols (<400) and map file formats (<20) will be d
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
+# 4.24.4
+## Fixes
+ * Corrects requests for delegate die-roll presets.
+ * Corrects standard threatened space templates.
+ 
 # 4.24.3
 ## Fixes
  * Corrects color name parsing error in die-roll preset editor.
