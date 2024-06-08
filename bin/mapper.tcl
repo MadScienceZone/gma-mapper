@@ -8459,8 +8459,8 @@ proc AddPlayerMenu {type} {
 	::tooltip::tooltip .apm.ent1 {[<image>=]<name>[ #<n>[-<m>]]}
 	grid [label .apm.lab2 -text {Size Categories:}] 		   -row 1 -column 0 -sticky w
 	grid [entry .apm.ent2 -textvariable MOB_SIZE -width 20] -  -row 1 -column 1 -sticky ew
-	::tooltip::tooltip .apm.lab2 {<category>[<natural reach>][-><extended reach>][=<space>]}
-	::tooltip::tooltip .apm.ent2 {<category>[<natural reach>][-><extended reach>][=<space>]}
+	::tooltip::tooltip .apm.lab2 {<category>[<natural reach>][-><extended reach>][=<space>] [...(if multiple skins)]}
+	::tooltip::tooltip .apm.ent2 {<category>[<natural reach>][-><extended reach>][=<space>] [...(if multiple skins)]}
 	grid [label .apm.lab4 -text {Threat Zone Color:}] 	   -row 2 -column 0 -sticky w
 	grid [entry .apm.ent4 -textvariable MOB_COLOR -width 20] - -row 2 -column 1 -sticky ew
 	grid x [ttk::checkbutton .apm.ent5 -text {Extended Reach Active} -variable MOB_REACH] - -sticky w
