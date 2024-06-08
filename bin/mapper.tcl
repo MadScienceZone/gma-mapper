@@ -9359,7 +9359,9 @@ proc fetch_image {name zoom id} {
 		set i [dict get $options -errorcode]
 		if {[llength $i] >= 3 && [lindex $i 0] eq {CHILDSTATUS} && [lindex $i 2] == 22} {
 			DEBUG 0 "Requested image file ID $id was not found on the server. We will not ask for it again."
+			DEBUG 1 "forbidding [format %s:%.2f $name $zoom]"
 			set forbidden_url($url) 1
+			set forbidden_url([format %s:%.2f $name $zoom]) 1
 		} else {
 			DEBUG 0 "Error running $CURLpath to get $url into $cache_filename: $err"
 		}
