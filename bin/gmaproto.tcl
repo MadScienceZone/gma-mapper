@@ -1426,6 +1426,11 @@ proc ::gmaproto::add_image {name sizes {frames 0} {speed 0} {loops 0}} {
 }
 
 proc ::gmaproto::query_image {name size} {
+	global ::forbidden_url
+	if {[info exists ::forbidden_url([format %s:%.2f $name $size])]} {
+		::DEBUG 1 "Not asking again about $name at $size"
+		return
+	}
 	::gmaproto::_protocol_send AI? Name $name Sizes [list [dict create Zoom $size]]
 }
 
