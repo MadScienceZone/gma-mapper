@@ -451,7 +451,7 @@ proc TkFontToGMAFont {tkfont} {
 		if {[lsearch -exact $tkfont bold] >= 0} {dict set d Weight 1}
 		return $d
 	}
-	DEBUG 0 "unable to read tk font value $tkfont; assuming it's the family name only"
+	DEBUG 1 "unable to read tk font value $tkfont; assuming it's the family name only"
 	return [dict create Family $tkfont Size 10 Slant 0 Weight 0]
 }
 
@@ -1173,6 +1173,7 @@ proc create_main_menu {use_button} {
 	$mm.tools add command -command {CleanupImageCache 0} -label "Clear Image Cache"
 	$mm.tools add command -command {CleanupImageCache 60} -label "Clear Image Cache (over 60 days)"
 	$mm.tools add command -command {CleanupImageCache -update} -label "Update Cached Images from Server"
+	$mm.tools add command -command {array unset forbidden_url} -label "Retry failed image retrievals"
 	$mm.tools add separator
 	$mm.tools add command -command ServerPingTest -label "Test server response time..."
 	$mm.tools add separator
@@ -1968,7 +1969,7 @@ proc create_image_from_file {tile_id filename} {
 	global ImageFormat
 
 	if {[catch {set image_file [open $filename r]} err]} {
-		DEBUG 0 "Can't open image file $filename ($tile_id): $err"
+		DEBUG 1 "Can't open image file $filename ($tile_id): $err"
 		return
 	}
 	fconfigure $image_file -encoding binary -translation binary
@@ -1994,7 +1995,7 @@ proc create_animated_frame_from_file {tile_id frameno filename} {
 	global ImageFormat
 
 	if {[catch {set image_file [open $filename r]} err]} {
-		DEBUG 0 "Can't open image file $filename ($tile_id, frame $frameno): $err"
+		DEBUG 1 "Can't open image file $filename ($tile_id, frame $frameno): $err"
 		return
 	}
 	fconfigure $image_file -encoding binary -translation binary
@@ -2095,7 +2096,7 @@ DEBUG 1 "Loading cached images"
 				flush stdout
 			}
 			if {![lindex $cache_stats 0]} {
-				DEBUG 0 "Cache file $cache_filename disappeared!"
+				DEBUG 1 "Cache file $cache_filename disappeared!"
 				continue
 			}
 			if {[lindex $cache_stats 4] eq "-dir"} {
@@ -2104,7 +2105,7 @@ DEBUG 1 "Loading cached images"
 				set frame0_path [file join $cache_filename ":0:[lindex $frame_path_parts end].$ImageFormat"]
 				set frame0_stats [cache_info $frame0_path]
 				if {[lindex $frame0_stats 2] eq {} || [lindex $frame0_stats 3] eq {}} {
-					DEBUG 0 "Cache frame 0 of $cache_filename not recognized (ignoring, but it shouldn't be there.)"
+					DEBUG 1 "Cache frame 0 of $cache_filename not recognized (ignoring, but it shouldn't be there.)"
 					continue
 				}
 				if {[lindex $frame0_stats 1] >= $cache_too_old_days} {
@@ -2121,12 +2122,12 @@ DEBUG 1 "Loading cached images"
 						[dict get $animation_meta Animation FrameSpeed]\
 						[dict get $animation_meta Animation Loops]
 				} err]} {
-					DEBUG 0 "Cached animated file $cache_filename could not be loaded: $err"
+					DEBUG 1 "Cached animated file $cache_filename could not be loaded: $err"
 				}
 				continue
 			}
 			if {[lindex $cache_stats 2] eq {} || [lindex $cache_stats 3] eq {}} {
-				DEBUG 0 "Cache file $cache_filename not recognized (ignoring, but it shouldn't be there.)"
+				DEBUG 1 "Cache file $cache_filename not recognized (ignoring, but it shouldn't be there.)"
 				continue
 			}
 			if {[lindex $cache_stats 1] >= $cache_too_old_days} {
@@ -2656,7 +2657,7 @@ proc blur_hp {maxhp lethal} {
 			set mf [expr $maxhp * ($blur_pct / 100.0)]
 			set res [expr max(1, int(int(($maxhp - $lethal) / $mf) * $mf))]
 		} err]} {
-			DEBUG 0 "Error calculating blurred HP total: $err; falling back on true value"
+			DEBUG 1 "Error calculating blurred HP total: $err; falling back on true value"
 			return [expr $maxhp - $lethal]
 		}
 		return $res
@@ -3103,12 +3104,12 @@ proc loadfile {file args} {
 									_load_local_animated_file $image_filename $image_id \
 										$image_zoom $aframes $aspeed $aloops
 								} err]} {
-									DEBUG 0 "Can't open $image_filename: $err"
+									DEBUG 1 "Can't open $image_filename: $err"
 									continue
 								}
 							} else {
 								if {[catch {set image_file [open $image_filename r]} err]} {
-									DEBUG 0 "Can't open image file $image_filename for $image_id at zoom $image_zoom: $err"
+									DEBUG 1 "Can't open image file $image_filename for $image_id at zoom $image_zoom: $err"
 									continue
 								}
 								fconfigure $image_file -encoding binary -translation binary
@@ -4529,7 +4530,7 @@ proc StartObj {w x y} {
 				]
 				set CURRENT_TEXT_WIDGET $OBJ_CURRENT
 			} else {
-				DEBUG 0 "Removing text object $OBJ_CURRENT"
+				DEBUG 1 "Removing text object $OBJ_CURRENT"
 				catch {unset OBJdata($OBJ_CURRENT)}
 				catch {unset OBJtype($OBJ_CURRENT)}
 			}
@@ -4583,7 +4584,7 @@ proc StartObj {w x y} {
 				}
 				dict set OBJdata($OBJ_CURRENT) Image [lindex $CurrentStampTile 1]
 			} else {
-				DEBUG 0 "Removing image object$OBJ_CURRENT"
+				DEBUG 1 "Removing image object$OBJ_CURRENT"
 				catch {unset OBJdata($OBJ_CURRENT)}
 				catch {unset OBJtype($OBJ_CURRENT)}
 			}
@@ -5406,16 +5407,20 @@ proc FindImage {image_pfx zoom} {
 			# We used to throttle by dropping requests so we only send every 10th and then every 50th to the server
 			# but as it turns out we can still get too many sent at once so now we'll make the fallback time-based.
 			# We will ask immediately, then no sooner than 30 seconds, then no sooner than 60 seconds
+			#
+			# After we added code to stop even asking if we get a 404 (or other 400+ failure) from the server,
+			# we don't need to be quite so conservative about backoff times. Now we'll wait 5 seconds after the first
+			# one and 10 after that.
 			if {![info exists TILE_RETRY($tile_id)]} {
-				# first reference: ask now and wait for 30 seconds
-				set TILE_RETRY($tile_id) [clock add [clock seconds] 30 seconds]
+				# first reference: ask now and wait for 5 seconds
+				set TILE_RETRY($tile_id) [clock add [clock seconds] 5 seconds]
 				::gmaproto::query_image $image_pfx $zoom
-				DEBUG 1 "---first query (sending immediately; try again in 30 seconds)"
+				DEBUG 1 "---first query (sending immediately; try again in 5 seconds)"
 			} elseif {$TILE_RETRY($tile_id) < [clock seconds]} {
-				# subsequent times: ask every 60 seconds
+				# subsequent times: ask every 10 seconds
 				::gmaproto::query_image $image_pfx $zoom
-				set TILE_RETRY($tile_id) [clock add [clock seconds] 60 seconds]
-				DEBUG 1 "---trying again (60 seconds until next try)"
+				set TILE_RETRY($tile_id) [clock add [clock seconds] 10 seconds]
+				DEBUG 1 "---trying again (10 seconds until next try)"
 			} else {
 				DEBUG 1 "---Too early to try again"
 			}
@@ -6799,7 +6804,7 @@ proc GetSelectionList {} {
 	set result {}
 	foreach id [array names MOB_SELECTED] {
 		if {![info exists MOBdata($id)] && $MOB_SELECTED($id)} {
-			DEBUG 0 "Removed nonexistent id $id from selection list"
+			DEBUG 1 "Removed nonexistent id $id from selection list"
 			set MOB_SELECTED($id) false
 		}
 		if {$MOB_SELECTED($id)} {
@@ -9109,8 +9114,6 @@ proc cache_map_id {filename} {
 	return [string map {+ _ / - = {}} [::base64::encode [::md5::md5 [concat $ModuleID [file rootname [file tail $filename]]]]]]
 }
 	
-
-
 proc fetch_map_file {id} {
 	global ClockDisplay
 	global CURLproxy CURLpath CURLserver CURLinsecure
@@ -9300,6 +9303,7 @@ proc fetch_image {name zoom id} {
 	global CURLproxy CURLpath CURLserver CURLinsecure
 	global cache_too_old_days
 	global my_stdout
+	global forbidden_url
 
 	set age $cache_too_old_days
 	set oldcd $ClockDisplay
@@ -9332,7 +9336,7 @@ proc fetch_image {name zoom id} {
 	}
 	global tcl_platform
 	if {$tcl_platform(os) eq "Windows NT"} {
-	set CreateOpt -s
+		set CreateOpt -s
 	} else {
 		set CreateOpt --create-dirs
 	}
@@ -9344,7 +9348,9 @@ proc fetch_image {name zoom id} {
 	if {$CURLinsecure} {
 		lappend opts -k
 	}
-	if {[catch {
+	if {[info exists forbidden_url($url)]} {
+		DEBUG 1 "Not asking server for $url because we already got a 404 for that URL."
+	} elseif {[catch {
 		DEBUG 1 "Running $CURLpath $CreateOpt $opts --output [file nativename $cache_filename] -f -z [clock format $cache_newer_than] $url"
 		exec $CURLpath $CreateOpt {*}$opts --output [file nativename $cache_filename] -f -z [clock format $cache_newer_than] $url >&@$my_stdout
 		DEBUG 3 "Updating cache file time"
@@ -9352,7 +9358,8 @@ proc fetch_image {name zoom id} {
 	} err options]} {
 		set i [dict get $options -errorcode]
 		if {[llength $i] >= 3 && [lindex $i 0] eq {CHILDSTATUS} && [lindex $i 2] == 22} {
-			DEBUG 0 "Requested image file ID $id was not found on the server."
+			DEBUG 0 "Requested image file ID $id was not found on the server. We will not ask for it again."
+			set forbidden_url($url) 1
 		} else {
 			DEBUG 0 "Error running $CURLpath to get $url into $cache_filename: $err"
 		}
@@ -10107,7 +10114,7 @@ proc DoCommandL {d} {
 	if {[dict get $d CacheOnly]} {
 		# just make sure we have a copy on hand (M?)
 		if {[dict get $d IsLocalFile]} {
-			DEBUG 0 "Server asked us to cache [dict get $d File], but it's a local file (request ignored)"
+			DEBUG 1 "Server asked us to cache [dict get $d File], but it's a local file (request ignored)"
 			return
 		}
 		if {[catch {fetch_map_file [dict get $d File]} err]} {
@@ -11195,7 +11202,7 @@ proc EditDieRollPresets {for_user tkey} {
 	set w .edrp[to_window_id $tkey]
 
 	if {[winfo exists $w]} {
-		DEBUG 0 "There is already a die roll preset editor window open for user $for_user; not making another."
+		DEBUG 1 "There is already a die roll preset editor window open for user $for_user; not making another."
 		return
 	}
 
@@ -11898,7 +11905,7 @@ proc EditDRPGroup {l title} {
 
 	set w .edrpgrp[set lid [to_window_id $l]]
 	if {[winfo exists $w]} {
-		DEBUG 0 "There is already a dialog open to edit $title; not making another."
+		DEBUG 1 "There is already a dialog open to edit $title; not making another."
 		return
 	}
 	toplevel $w
