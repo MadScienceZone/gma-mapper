@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___       _______     ___          ___     #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___   )   /   )        /   )    #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |  / /) |       / /) |    #
-# | |      | || || || (___) | Assistant  / (_) (_        /   ) / (_) (_     / (_) (_   #
-# | | ____ | |(_)| ||  ___  |           (____   _)     _/   / (____   _)   (____   _)  #
-# | | \_  )| |   | || (   ) |                ) (      /   _/       ) (          ) (    #
-# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\     | |   _      | |    #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/     (_)  (_)     (_)    #
+#  _______  _______  _______                ___       _______     ___       _______    #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___   )   /   )     (  ____ \   #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |  / /) |     | (    \/   #
+# | |      | || || || (___) | Assistant  / (_) (_        /   ) / (_) (_    | (____     #
+# | | ____ | |(_)| ||  ___  |           (____   _)     _/   / (____   _)   (_____ \    #
+# | | \_  )| |   | || (   ) |                ) (      /   _/       ) (           ) )   #
+# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\     | |   _ /\____) )   #
+# (_______)|/     \||/     \| Client         (_)  (_)\_______/     (_)  (_)\______/    #
 #                                                                                      #
 ########################################################################################
 #
@@ -1426,6 +1426,11 @@ proc ::gmaproto::add_image {name sizes {frames 0} {speed 0} {loops 0}} {
 }
 
 proc ::gmaproto::query_image {name size} {
+	global ::forbidden_url
+	if {[info exists ::forbidden_url([format %s:%.2f $name $size])]} {
+		::DEBUG 1 "Not asking again about $name at $size"
+		return
+	}
 	::gmaproto::_protocol_send AI? Name $name Sizes [list [dict create Zoom $size]]
 }
 
@@ -2306,7 +2311,7 @@ proc ::gmaproto::normalize_dict {cmd d} {
 	return [::gmaproto::new_dict_from_json $cmd [::gmaproto::json_from_dict $cmd $d]]
 }
 
-# @[00]@| GMA-Mapper 4.24.4
+# @[00]@| GMA-Mapper 4.24.5
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2024 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       _______     ___          ___     #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___   )   /   )        /   )    #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |  / /) |       / /) |    #
-# | |      | || || || (___) | Assistant  / (_) (_        /   ) / (_) (_     / (_) (_   #
-# | | ____ | |(_)| ||  ___  |           (____   _)     _/   / (____   _)   (____   _)  #
-# | | \_  )| |   | || (   ) |                ) (      /   _/       ) (          ) (    #
-# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\     | |   _      | |    #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/     (_)  (_)     (_)    #
+#  _______  _______  _______                ___       _______     ___       _______    #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___   )   /   )     (  ____ \   #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |  / /) |     | (    \/   #
+# | |      | || || || (___) | Assistant  / (_) (_        /   ) / (_) (_    | (____     #
+# | | ____ | |(_)| ||  ___  |           (____   _)     _/   / (____   _)   (_____ \    #
+# | | \_  )| |   | || (   ) |                ) (      /   _/       ) (           ) )   #
+# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\     | |   _ /\____) )   #
+# (_______)|/     \||/     \| Client         (_)  (_)\_______/     (_)  (_)\______/    #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -17,10 +17,10 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.24.4}     ;# @@##@@
+set GMAMapperVersion {4.24.5}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {414}         ;# @@##@@
-set CoreVersionNumber {6.19-beta.0}            ;# @@##@@
+set CoreVersionNumber {6.19.3}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -280,7 +280,7 @@ proc update_progress { id value newmax args } {
 		}
 		# if we already were in that mode, do nothing.
 	    } else {
-		    if {$progress_data($id:max) eq "*"} {
+		    if {[info exists progress_data($id:max)] && $progress_data($id:max) eq "*"} {
 			    # switching to determinate mode
 			    .toolbar2.progbar stop
 			    .toolbar2.progbar configure -mode determinate
@@ -289,7 +289,7 @@ proc update_progress { id value newmax args } {
                     .toolbar2.progbar configure -maximum $newmax
             }
             
-            if {$progress_data($id:max) eq "*"} {
+            if {[info exists progress_data($id:max)] && $progress_data($id:max) eq "*"} {
                 set progress_data($id:value) [expr $progress_data($id:value) + $value]
             } else {
                 set progress_data($id:value) $value
@@ -313,7 +313,7 @@ proc end_progress {id args} {
         if {$args eq {-send}} {
 			::gmaproto::update_progress $id {} {} {} true
         }
-        if {$progress_data($id:max) eq "*"} {
+        if {[info exists progress_data($id:max)] && $progress_data($id:max) eq "*"} {
             .toolbar2.progbar stop
         }
         unset progress_data($id:title)
@@ -451,7 +451,7 @@ proc TkFontToGMAFont {tkfont} {
 		if {[lsearch -exact $tkfont bold] >= 0} {dict set d Weight 1}
 		return $d
 	}
-	DEBUG 0 "unable to read tk font value $tkfont; assuming it's the family name only"
+	DEBUG 1 "unable to read tk font value $tkfont; assuming it's the family name only"
 	return [dict create Family $tkfont Size 10 Slant 0 Weight 0]
 }
 
@@ -1173,6 +1173,7 @@ proc create_main_menu {use_button} {
 	$mm.tools add command -command {CleanupImageCache 0} -label "Clear Image Cache"
 	$mm.tools add command -command {CleanupImageCache 60} -label "Clear Image Cache (over 60 days)"
 	$mm.tools add command -command {CleanupImageCache -update} -label "Update Cached Images from Server"
+	$mm.tools add command -command {array unset forbidden_url} -label "Retry failed image retrievals"
 	$mm.tools add separator
 	$mm.tools add command -command ServerPingTest -label "Test server response time..."
 	$mm.tools add separator
@@ -1968,7 +1969,7 @@ proc create_image_from_file {tile_id filename} {
 	global ImageFormat
 
 	if {[catch {set image_file [open $filename r]} err]} {
-		DEBUG 0 "Can't open image file $filename ($tile_id): $err"
+		DEBUG 1 "Can't open image file $filename ($tile_id): $err"
 		return
 	}
 	fconfigure $image_file -encoding binary -translation binary
@@ -1994,7 +1995,7 @@ proc create_animated_frame_from_file {tile_id frameno filename} {
 	global ImageFormat
 
 	if {[catch {set image_file [open $filename r]} err]} {
-		DEBUG 0 "Can't open image file $filename ($tile_id, frame $frameno): $err"
+		DEBUG 1 "Can't open image file $filename ($tile_id, frame $frameno): $err"
 		return
 	}
 	fconfigure $image_file -encoding binary -translation binary
@@ -2095,7 +2096,7 @@ DEBUG 1 "Loading cached images"
 				flush stdout
 			}
 			if {![lindex $cache_stats 0]} {
-				DEBUG 0 "Cache file $cache_filename disappeared!"
+				DEBUG 1 "Cache file $cache_filename disappeared!"
 				continue
 			}
 			if {[lindex $cache_stats 4] eq "-dir"} {
@@ -2104,7 +2105,7 @@ DEBUG 1 "Loading cached images"
 				set frame0_path [file join $cache_filename ":0:[lindex $frame_path_parts end].$ImageFormat"]
 				set frame0_stats [cache_info $frame0_path]
 				if {[lindex $frame0_stats 2] eq {} || [lindex $frame0_stats 3] eq {}} {
-					DEBUG 0 "Cache frame 0 of $cache_filename not recognized (ignoring, but it shouldn't be there.)"
+					DEBUG 1 "Cache frame 0 of $cache_filename not recognized (ignoring, but it shouldn't be there.)"
 					continue
 				}
 				if {[lindex $frame0_stats 1] >= $cache_too_old_days} {
@@ -2121,12 +2122,12 @@ DEBUG 1 "Loading cached images"
 						[dict get $animation_meta Animation FrameSpeed]\
 						[dict get $animation_meta Animation Loops]
 				} err]} {
-					DEBUG 0 "Cached animated file $cache_filename could not be loaded: $err"
+					DEBUG 1 "Cached animated file $cache_filename could not be loaded: $err"
 				}
 				continue
 			}
 			if {[lindex $cache_stats 2] eq {} || [lindex $cache_stats 3] eq {}} {
-				DEBUG 0 "Cache file $cache_filename not recognized (ignoring, but it shouldn't be there.)"
+				DEBUG 1 "Cache file $cache_filename not recognized (ignoring, but it shouldn't be there.)"
 				continue
 			}
 			if {[lindex $cache_stats 1] >= $cache_too_old_days} {
@@ -2656,7 +2657,7 @@ proc blur_hp {maxhp lethal} {
 			set mf [expr $maxhp * ($blur_pct / 100.0)]
 			set res [expr max(1, int(int(($maxhp - $lethal) / $mf) * $mf))]
 		} err]} {
-			DEBUG 0 "Error calculating blurred HP total: $err; falling back on true value"
+			DEBUG 1 "Error calculating blurred HP total: $err; falling back on true value"
 			return [expr $maxhp - $lethal]
 		}
 		return $res
@@ -3103,12 +3104,12 @@ proc loadfile {file args} {
 									_load_local_animated_file $image_filename $image_id \
 										$image_zoom $aframes $aspeed $aloops
 								} err]} {
-									DEBUG 0 "Can't open $image_filename: $err"
+									DEBUG 1 "Can't open $image_filename: $err"
 									continue
 								}
 							} else {
 								if {[catch {set image_file [open $image_filename r]} err]} {
-									DEBUG 0 "Can't open image file $image_filename for $image_id at zoom $image_zoom: $err"
+									DEBUG 1 "Can't open image file $image_filename for $image_id at zoom $image_zoom: $err"
 									continue
 								}
 								fconfigure $image_file -encoding binary -translation binary
@@ -4529,7 +4530,7 @@ proc StartObj {w x y} {
 				]
 				set CURRENT_TEXT_WIDGET $OBJ_CURRENT
 			} else {
-				DEBUG 0 "Removing text object $OBJ_CURRENT"
+				DEBUG 1 "Removing text object $OBJ_CURRENT"
 				catch {unset OBJdata($OBJ_CURRENT)}
 				catch {unset OBJtype($OBJ_CURRENT)}
 			}
@@ -4583,7 +4584,7 @@ proc StartObj {w x y} {
 				}
 				dict set OBJdata($OBJ_CURRENT) Image [lindex $CurrentStampTile 1]
 			} else {
-				DEBUG 0 "Removing image object$OBJ_CURRENT"
+				DEBUG 1 "Removing image object$OBJ_CURRENT"
 				catch {unset OBJdata($OBJ_CURRENT)}
 				catch {unset OBJtype($OBJ_CURRENT)}
 			}
@@ -5406,16 +5407,20 @@ proc FindImage {image_pfx zoom} {
 			# We used to throttle by dropping requests so we only send every 10th and then every 50th to the server
 			# but as it turns out we can still get too many sent at once so now we'll make the fallback time-based.
 			# We will ask immediately, then no sooner than 30 seconds, then no sooner than 60 seconds
+			#
+			# After we added code to stop even asking if we get a 404 (or other 400+ failure) from the server,
+			# we don't need to be quite so conservative about backoff times. Now we'll wait 5 seconds after the first
+			# one and 10 after that.
 			if {![info exists TILE_RETRY($tile_id)]} {
-				# first reference: ask now and wait for 30 seconds
-				set TILE_RETRY($tile_id) [clock add [clock seconds] 30 seconds]
+				# first reference: ask now and wait for 5 seconds
+				set TILE_RETRY($tile_id) [clock add [clock seconds] 5 seconds]
 				::gmaproto::query_image $image_pfx $zoom
-				DEBUG 1 "---first query (sending immediately; try again in 30 seconds)"
+				DEBUG 1 "---first query (sending immediately; try again in 5 seconds)"
 			} elseif {$TILE_RETRY($tile_id) < [clock seconds]} {
-				# subsequent times: ask every 60 seconds
+				# subsequent times: ask every 10 seconds
 				::gmaproto::query_image $image_pfx $zoom
-				set TILE_RETRY($tile_id) [clock add [clock seconds] 60 seconds]
-				DEBUG 1 "---trying again (60 seconds until next try)"
+				set TILE_RETRY($tile_id) [clock add [clock seconds] 10 seconds]
+				DEBUG 1 "---trying again (10 seconds until next try)"
 			} else {
 				DEBUG 1 "---Too early to try again"
 			}
@@ -6799,7 +6804,7 @@ proc GetSelectionList {} {
 	set result {}
 	foreach id [array names MOB_SELECTED] {
 		if {![info exists MOBdata($id)] && $MOB_SELECTED($id)} {
-			DEBUG 0 "Removed nonexistent id $id from selection list"
+			DEBUG 1 "Removed nonexistent id $id from selection list"
 			set MOB_SELECTED($id) false
 		}
 		if {$MOB_SELECTED($id)} {
@@ -6888,6 +6893,9 @@ proc ScreenXYToGridXY {x y args} {
 		}
 		DEBUG 3 "--size $mob_size"
 		if {$mob_size < 1} {
+			if {$mob_size == 0} {
+				set mob_size .5 
+			}
 			DEBUG 3 "-- calc as [list [expr int([$canvas canvasx $x]/($iscale*$mob_size))*$mob_size] [expr int([$canvas canvasy $y]/($iscale*$mob_size))*$mob_size]]"
 			return [list [expr int([$canvas canvasx $x]/($iscale*$mob_size))*$mob_size] [expr int([$canvas canvasy $y]/($iscale*$mob_size))*$mob_size]]
 		}
@@ -8454,10 +8462,10 @@ proc AddPlayerMenu {type} {
 	grid [entry .apm.ent1 -textvariable MOB_Name -width 20] -  -row 0 -column 1 -sticky ew
 	::tooltip::tooltip .apm.lab1 {[<image>=]<name>[ #<n>[-<m>]]}
 	::tooltip::tooltip .apm.ent1 {[<image>=]<name>[ #<n>[-<m>]]}
-	grid [label .apm.lab2 -text {Size Category:}] 		   -row 1 -column 0 -sticky w
+	grid [label .apm.lab2 -text {Size Categories:}] 		   -row 1 -column 0 -sticky w
 	grid [entry .apm.ent2 -textvariable MOB_SIZE -width 20] -  -row 1 -column 1 -sticky ew
-	::tooltip::tooltip .apm.lab2 {<category>[<natural reach>][-><extended reach>][=<space>]}
-	::tooltip::tooltip .apm.ent2 {<category>[<natural reach>][-><extended reach>][=<space>]}
+	::tooltip::tooltip .apm.lab2 {<category>[<natural reach>][-><extended reach>][=<space>] [...(if multiple skins)]}
+	::tooltip::tooltip .apm.ent2 {<category>[<natural reach>][-><extended reach>][=<space>] [...(if multiple skins)]}
 	grid [label .apm.lab4 -text {Threat Zone Color:}] 	   -row 2 -column 0 -sticky w
 	grid [entry .apm.ent4 -textvariable MOB_COLOR -width 20] - -row 2 -column 1 -sticky ew
 	grid x [ttk::checkbutton .apm.ent5 -text {Extended Reach Active} -variable MOB_REACH] - -sticky w
@@ -8474,13 +8482,16 @@ proc ValidateSizeCode {code} {
 	return true
 }
 
-proc AddMobFromMenu {baseX baseY color name _ size type reach} {
+proc AddMobFromMenu {baseX baseY color name _ sizesstr type reach} {
 	global canvas
 	global PC_IDs
 
-	if {![ValidateSizeCode $size]} {
-		say "Size value $size is not valid.  Specify number of squares or type code (upper-case for tall)."
-		return
+	set sizes [split $sizesstr]
+	foreach size $sizes {
+		if {![ValidateSizeCode $size]} {
+			say "Size value $size is not valid.  Specify number of squares or type code (upper-case for tall)."
+			return
+		}
 	}
 
 	#
@@ -8497,7 +8508,7 @@ proc AddMobFromMenu {baseX baseY color name _ size type reach} {
 			}
 			set apm_id [new_id]
 			DEBUG 3 "Multi-add $i of $multistart-$multiend: ${basename}#$i"
-			set d [::gmaproto::new_dict PS Gx [expr $baseX+$XX] Gy $baseY Color $color Name [AcceptCreatureImageName "${basename}#$i"] SkinSize [list $size] Skin 0 PolyGM false Size $size CreatureType [::gmaproto::to_enum CreatureType $type] ID $apm_id Reach $reach]
+			set d [::gmaproto::new_dict PS Gx [expr $baseX+$XX] Gy $baseY Color $color Name [AcceptCreatureImageName "${basename}#$i"] SkinSize $sizes Skin 0 PolyGM false Size $size CreatureType [::gmaproto::to_enum CreatureType $type] ID $apm_id Reach $reach]
 			PlaceSomeone $canvas $d
 			::gmaproto::place_someone_d [InsertCreatureImageName $d]
 		}
@@ -8513,7 +8524,7 @@ proc AddMobFromMenu {baseX baseY color name _ size type reach} {
 		} else {
 			set apm_id [new_id]
 		}
-		set d [::gmaproto::new_dict PS Gx $baseX Gy $baseY Color $color Name $basename Size $size SkinSize [list $size] Skin 0 PolyGM false CreatureType [::gmaproto::to_enum CreatureType $type] ID $apm_id Reach $reach]
+		set d [::gmaproto::new_dict PS Gx $baseX Gy $baseY Color $color Name $basename Size $size SkinSize $sizes Skin 0 PolyGM false CreatureType [::gmaproto::to_enum CreatureType $type] ID $apm_id Reach $reach]
 		PlaceSomeone $canvas $d
 		::gmaproto::place_someone_d [InsertCreatureImageName $d]
 	}
@@ -9109,8 +9120,6 @@ proc cache_map_id {filename} {
 	return [string map {+ _ / - = {}} [::base64::encode [::md5::md5 [concat $ModuleID [file rootname [file tail $filename]]]]]]
 }
 	
-
-
 proc fetch_map_file {id} {
 	global ClockDisplay
 	global CURLproxy CURLpath CURLserver CURLinsecure
@@ -9300,6 +9309,7 @@ proc fetch_image {name zoom id} {
 	global CURLproxy CURLpath CURLserver CURLinsecure
 	global cache_too_old_days
 	global my_stdout
+	global forbidden_url
 
 	set age $cache_too_old_days
 	set oldcd $ClockDisplay
@@ -9332,7 +9342,7 @@ proc fetch_image {name zoom id} {
 	}
 	global tcl_platform
 	if {$tcl_platform(os) eq "Windows NT"} {
-	set CreateOpt -s
+		set CreateOpt -s
 	} else {
 		set CreateOpt --create-dirs
 	}
@@ -9344,7 +9354,9 @@ proc fetch_image {name zoom id} {
 	if {$CURLinsecure} {
 		lappend opts -k
 	}
-	if {[catch {
+	if {[info exists forbidden_url($url)]} {
+		DEBUG 1 "Not asking server for $url because we already got a 404 for that URL."
+	} elseif {[catch {
 		DEBUG 1 "Running $CURLpath $CreateOpt $opts --output [file nativename $cache_filename] -f -z [clock format $cache_newer_than] $url"
 		exec $CURLpath $CreateOpt {*}$opts --output [file nativename $cache_filename] -f -z [clock format $cache_newer_than] $url >&@$my_stdout
 		DEBUG 3 "Updating cache file time"
@@ -9352,7 +9364,10 @@ proc fetch_image {name zoom id} {
 	} err options]} {
 		set i [dict get $options -errorcode]
 		if {[llength $i] >= 3 && [lindex $i 0] eq {CHILDSTATUS} && [lindex $i 2] == 22} {
-			DEBUG 0 "Requested image file ID $id was not found on the server."
+			DEBUG 0 "Requested image file ID $id was not found on the server. We will not ask for it again."
+			DEBUG 1 "forbidding [format %s:%.2f $name $zoom]"
+			set forbidden_url($url) 1
+			set forbidden_url([format %s:%.2f $name $zoom]) 1
 		} else {
 			DEBUG 0 "Error running $CURLpath to get $url into $cache_filename: $err"
 		}
@@ -10107,7 +10122,7 @@ proc DoCommandL {d} {
 	if {[dict get $d CacheOnly]} {
 		# just make sure we have a copy on hand (M?)
 		if {[dict get $d IsLocalFile]} {
-			DEBUG 0 "Server asked us to cache [dict get $d File], but it's a local file (request ignored)"
+			DEBUG 1 "Server asked us to cache [dict get $d File], but it's a local file (request ignored)"
 			return
 		}
 		if {[catch {fetch_map_file [dict get $d File]} err]} {
@@ -10194,7 +10209,7 @@ proc populate_timer_widgets {} {
 	if {[winfo exists .initiative]} {
 		foreach k [array names timer_progress_data w:*] {
 			set id [string range $k 2 end]
-			if {$timer_progress_data($k) ne {}} {
+			if {[info exists timer_progress_data($k)] && $timer_progress_data($k) ne {}} {
 				catch {destroy $timer_progress_data($k)}
 			}
 			set timer_progress_data($k) [create_timer_widget $id]
@@ -10206,10 +10221,10 @@ proc populate_timer_widgets {} {
 
 proc update_timer_widget {id} {
 	global timer_progress_data
-	if {[winfo exists .initiative] && $timer_progress_data(w:$id) ne {}} {
-		if {$timer_progress_data(max:$id) == 0} {
+	if {[winfo exists .initiative] && [info exists timer_progress_data(w:$id)] && $timer_progress_data(w:$id) ne {}} {
+		if {![info exists timer_progress_data(max:$id)] || $timer_progress_data(max:$id) == 0} {
 			$timer_progress_data(w:$id) unknown
-		} elseif {$timer_progress_data(value:$id) <= 0} {
+		} elseif {![info exists timer_progress_data(value:$id)] || $timer_progress_data(value:$id) <= 0} {
 			$timer_progress_data(w:$id) expired
 		} else {
 			$timer_progress_data(w:$id) set [expr int($timer_progress_data(value:$id) * 100.0 / $timer_progress_data(max:$id))] $timer_progress_data(title:$id)
@@ -11195,7 +11210,7 @@ proc EditDieRollPresets {for_user tkey} {
 	set w .edrp[to_window_id $tkey]
 
 	if {[winfo exists $w]} {
-		DEBUG 0 "There is already a die roll preset editor window open for user $for_user; not making another."
+		DEBUG 1 "There is already a die roll preset editor window open for user $for_user; not making another."
 		return
 	}
 
@@ -11898,7 +11913,7 @@ proc EditDRPGroup {l title} {
 
 	set w .edrpgrp[set lid [to_window_id $l]]
 	if {[winfo exists $w]} {
-		DEBUG 0 "There is already a dialog open to edit $title; not making another."
+		DEBUG 1 "There is already a dialog open to edit $title; not making another."
 		return
 	}
 	toplevel $w
@@ -14291,7 +14306,7 @@ proc ConnectToServerByIdx {idx} {
 #
 #*user_key name -> sanitized_name
 #
-# @[00]@| GMA-Mapper 4.24.4
+# @[00]@| GMA-Mapper 4.24.5
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2024 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

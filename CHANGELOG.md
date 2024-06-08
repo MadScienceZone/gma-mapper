@@ -3,11 +3,11 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.24.4          <!-- @@##@@ -->
- * Effective Date: 15-May-2024               <!-- @@##@@ -->
+ * This Package Version: 4.24.5          <!-- @@##@@ -->
+ * Effective Date: 08-Jun-2024               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.19-beta.0 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.19.3 <!-- @@##@@ -->
  * GMA Mapper File Format: 23	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 414        <!-- @@##@@ -->
  * GMA Mapper Preferences File Format: 8 <!-- @@##@@ -->
@@ -16,6 +16,14 @@
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.24.5
+## Fixes
+ * Corrects problem with add player/monster dialog so that it now allows you to add a token that has multiple skins, possibly at different sizes.
+ * Improves image retrieval from server. Now it will stop asking entirely about images that the server indicated were available but we got a 404 error trying to fetch them. Menu option available to clear that status so another attempt can be made for any such images.
+ * Protection added around updating progress meters.
+ * Moved some diagnostic messages from level 0 to level 1, so they only show in the diagnostic window if debugging information was requested.
+ * Fixes [Issue #212](https://github.com/MadScienceZone/gma-mapper/issues/212) and [Issue #220](https://github.com/MadScienceZone/gma-mapper/issues/220).
 
 # 4.24.4
 ## Fixes
