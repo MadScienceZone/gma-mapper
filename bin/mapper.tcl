@@ -6893,6 +6893,9 @@ proc ScreenXYToGridXY {x y args} {
 		}
 		DEBUG 3 "--size $mob_size"
 		if {$mob_size < 1} {
+			if {$mob_size == 0} {
+				set mob_size .5 
+			}
 			DEBUG 3 "-- calc as [list [expr int([$canvas canvasx $x]/($iscale*$mob_size))*$mob_size] [expr int([$canvas canvasy $y]/($iscale*$mob_size))*$mob_size]]"
 			return [list [expr int([$canvas canvasx $x]/($iscale*$mob_size))*$mob_size] [expr int([$canvas canvasy $y]/($iscale*$mob_size))*$mob_size]]
 		}
@@ -8459,10 +8462,10 @@ proc AddPlayerMenu {type} {
 	grid [entry .apm.ent1 -textvariable MOB_Name -width 20] -  -row 0 -column 1 -sticky ew
 	::tooltip::tooltip .apm.lab1 {[<image>=]<name>[ #<n>[-<m>]]}
 	::tooltip::tooltip .apm.ent1 {[<image>=]<name>[ #<n>[-<m>]]}
-	grid [label .apm.lab2 -text {Size Category:}] 		   -row 1 -column 0 -sticky w
+	grid [label .apm.lab2 -text {Size Categories:}] 		   -row 1 -column 0 -sticky w
 	grid [entry .apm.ent2 -textvariable MOB_SIZE -width 20] -  -row 1 -column 1 -sticky ew
-	::tooltip::tooltip .apm.lab2 {<category>[<natural reach>][-><extended reach>][=<space>]}
-	::tooltip::tooltip .apm.ent2 {<category>[<natural reach>][-><extended reach>][=<space>]}
+	::tooltip::tooltip .apm.lab2 {<category>[<natural reach>][-><extended reach>][=<space>] [...(if multiple skins)]}
+	::tooltip::tooltip .apm.ent2 {<category>[<natural reach>][-><extended reach>][=<space>] [...(if multiple skins)]}
 	grid [label .apm.lab4 -text {Threat Zone Color:}] 	   -row 2 -column 0 -sticky w
 	grid [entry .apm.ent4 -textvariable MOB_COLOR -width 20] - -row 2 -column 1 -sticky ew
 	grid x [ttk::checkbutton .apm.ent5 -text {Extended Reach Active} -variable MOB_REACH] - -sticky w
@@ -8479,13 +8482,16 @@ proc ValidateSizeCode {code} {
 	return true
 }
 
-proc AddMobFromMenu {baseX baseY color name _ size type reach} {
+proc AddMobFromMenu {baseX baseY color name _ sizesstr type reach} {
 	global canvas
 	global PC_IDs
 
-	if {![ValidateSizeCode $size]} {
-		say "Size value $size is not valid.  Specify number of squares or type code (upper-case for tall)."
-		return
+	set sizes [split $sizesstr]
+	foreach size $sizes {
+		if {![ValidateSizeCode $size]} {
+			say "Size value $size is not valid.  Specify number of squares or type code (upper-case for tall)."
+			return
+		}
 	}
 
 	#
@@ -8502,7 +8508,7 @@ proc AddMobFromMenu {baseX baseY color name _ size type reach} {
 			}
 			set apm_id [new_id]
 			DEBUG 3 "Multi-add $i of $multistart-$multiend: ${basename}#$i"
-			set d [::gmaproto::new_dict PS Gx [expr $baseX+$XX] Gy $baseY Color $color Name [AcceptCreatureImageName "${basename}#$i"] SkinSize [list $size] Skin 0 PolyGM false Size $size CreatureType [::gmaproto::to_enum CreatureType $type] ID $apm_id Reach $reach]
+			set d [::gmaproto::new_dict PS Gx [expr $baseX+$XX] Gy $baseY Color $color Name [AcceptCreatureImageName "${basename}#$i"] SkinSize $sizes Skin 0 PolyGM false Size $size CreatureType [::gmaproto::to_enum CreatureType $type] ID $apm_id Reach $reach]
 			PlaceSomeone $canvas $d
 			::gmaproto::place_someone_d [InsertCreatureImageName $d]
 		}
@@ -8518,7 +8524,7 @@ proc AddMobFromMenu {baseX baseY color name _ size type reach} {
 		} else {
 			set apm_id [new_id]
 		}
-		set d [::gmaproto::new_dict PS Gx $baseX Gy $baseY Color $color Name $basename Size $size SkinSize [list $size] Skin 0 PolyGM false CreatureType [::gmaproto::to_enum CreatureType $type] ID $apm_id Reach $reach]
+		set d [::gmaproto::new_dict PS Gx $baseX Gy $baseY Color $color Name $basename Size $size SkinSize $sizes Skin 0 PolyGM false CreatureType [::gmaproto::to_enum CreatureType $type] ID $apm_id Reach $reach]
 		PlaceSomeone $canvas $d
 		::gmaproto::place_someone_d [InsertCreatureImageName $d]
 	}
