@@ -280,7 +280,7 @@ proc update_progress { id value newmax args } {
 		}
 		# if we already were in that mode, do nothing.
 	    } else {
-		    if {$progress_data($id:max) eq "*"} {
+		    if {[info exists progress_data($id:max)] && $progress_data($id:max) eq "*"} {
 			    # switching to determinate mode
 			    .toolbar2.progbar stop
 			    .toolbar2.progbar configure -mode determinate
@@ -289,7 +289,7 @@ proc update_progress { id value newmax args } {
                     .toolbar2.progbar configure -maximum $newmax
             }
             
-            if {$progress_data($id:max) eq "*"} {
+            if {[info exists progress_data($id:max)] && $progress_data($id:max) eq "*"} {
                 set progress_data($id:value) [expr $progress_data($id:value) + $value]
             } else {
                 set progress_data($id:value) $value
@@ -313,7 +313,7 @@ proc end_progress {id args} {
         if {$args eq {-send}} {
 			::gmaproto::update_progress $id {} {} {} true
         }
-        if {$progress_data($id:max) eq "*"} {
+        if {[info exists progress_data($id:max)] && $progress_data($id:max) eq "*"} {
             .toolbar2.progbar stop
         }
         unset progress_data($id:title)
@@ -10194,7 +10194,7 @@ proc populate_timer_widgets {} {
 	if {[winfo exists .initiative]} {
 		foreach k [array names timer_progress_data w:*] {
 			set id [string range $k 2 end]
-			if {$timer_progress_data($k) ne {}} {
+			if {[info exists timer_progress_data($k)] && $timer_progress_data($k) ne {}} {
 				catch {destroy $timer_progress_data($k)}
 			}
 			set timer_progress_data($k) [create_timer_widget $id]
@@ -10206,10 +10206,10 @@ proc populate_timer_widgets {} {
 
 proc update_timer_widget {id} {
 	global timer_progress_data
-	if {[winfo exists .initiative] && $timer_progress_data(w:$id) ne {}} {
-		if {$timer_progress_data(max:$id) == 0} {
+	if {[winfo exists .initiative] && [info exists timer_progress_data(w:$id)] && $timer_progress_data(w:$id) ne {}} {
+		if {![info exists timer_progress_data(max:$id)] || $timer_progress_data(max:$id) == 0} {
 			$timer_progress_data(w:$id) unknown
-		} elseif {$timer_progress_data(value:$id) <= 0} {
+		} elseif {![info exists timer_progress_data(value:$id)] || $timer_progress_data(value:$id) <= 0} {
 			$timer_progress_data(w:$id) expired
 		} else {
 			$timer_progress_data(w:$id) set [expr int($timer_progress_data(value:$id) * 100.0 / $timer_progress_data(max:$id))] $timer_progress_data(title:$id)
