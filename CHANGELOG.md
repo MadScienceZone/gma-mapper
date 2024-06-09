@@ -17,6 +17,10 @@ The support for old server protocols (<400) and map file formats (<20) will be d
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
+# 4.24.6 (Unreleased)
+## Fixes
+ * Repositions some dialog boxes to be on top of the main window instead of random locations possibly on other displays.
+
 # 4.24.5
 ## Fixes
  * Corrects problem with add player/monster dialog so that it now allows you to add a token that has multiple skins, possibly at different sizes.
