@@ -247,7 +247,7 @@ proc IsScreenXYVisible {x y {ltmargin 0} {rbmargin 0}} {
 
 proc GoToGridCoords {} {
 	global GoToGrid__label
-	if {[::getstring::tk_getString .goToGridPrompt GoToGrid__label {Map Coordinates:}]} {
+	if {[::getstring::tk_getString .goToGridPrompt GoToGrid__label {Map Coordinates:} -geometry [parent_geometry_ctr]]} {
 		ScrollToGridLabel $GoToGrid__label
 	}
 }
@@ -1288,7 +1288,7 @@ proc SelectDelegateByIdx {w idx} {
 
 proc AddDelegate {w} {
 	global AddDelegateName
-	if {[::getstring::tk_getString .delegates_entry AddDelegateName {User name of delegate:} -title {Add Delegate}]} {
+	if {[::getstring::tk_getString .delegates_entry AddDelegateName {User name of delegate:} -title {Add Delegate} -geometry [parent_geometry_ctr]]} {
 		foreach existing [$w.lb get 0 end] {
 			if {$AddDelegateName eq $existing} {
 				return
@@ -3282,6 +3282,16 @@ proc unloadfile {file args} {
 	RefreshGrid false
 }
 
+proc parent_geometry_ctr {{w .}} {
+	if {![regexp {^(\d+)x(\d+)([+-]\d+)([+-]\d+)$} [winfo geometry $w] _ g_w g_h g_x g_y]} {
+		set g_x 0
+		set g_y 0
+		set g_w 0
+		set g_h 0
+	}
+	return [format %+d%+d [expr $g_x + ($g_w/2)] [expr $g_y + ($g_h/2)]]
+}
+
 proc savefile {} {
 	global OBJdata OBJtype MOBdata MOBid OBJ_FILE LastFileComment LastFileLocation MOB_IMAGE
 
@@ -3299,8 +3309,8 @@ proc savefile {} {
 
 	set lock_objects [tk_messageBox -type yesno -icon question -title {Lock objects?} -message {Do you wish to lock all map objects in this file?} -detail {When locked, map objects cannot be further modified by clients. This helps avoid accidentally disturbing the map background while people are interacting with the map during a game.} -default yes]
 
-	::getstring::tk_getString .meta_comment LastFileComment {Map Name/Comment:}
-	::getstring::tk_getString .meta_location LastFileLocation {Map Location:}
+	::getstring::tk_getString .meta_comment LastFileComment {Map Name/Comment:} -geometry [parent_geometry_ctr]
+	::getstring::tk_getString .meta_location LastFileLocation {Map Location:} -geometry [parent_geometry_ctr]
 
 	if {[catch {
 		::gmafile::save_arrays_to_file $f [dict create\
@@ -3672,7 +3682,7 @@ proc SelectText {x y} {
 	global ClockDisplay CurrentTextString 
 	global _newtextstring
 	set _newtextstring {}
-	if {[::getstring::tk_getString .textstring _newtextstring {Text string to place:}]} {
+	if {[::getstring::tk_getString .textstring _newtextstring {Text string to place:} -geometry [parent_geometry_ctr]]} {
 		set CurrentTextString $_newtextstring
 		set ClockDisplay $CurrentTextString
 	}
@@ -3729,7 +3739,7 @@ proc SelectTile {x y} {
 	global ClockDisplay CurrentStampTile zoom
 	global TILE_SET _newtilename
 	set _newtilename {}
-	if {[::getstring::tk_getString .tilename _newtilename {Tile base name:}]} {
+	if {[::getstring::tk_getString .tilename _newtilename {Tile base name:} -geometry [parent_geometry_ctr]]} {
 		set CurrentStampTile [list [FindImage $_newtilename $zoom] $_newtilename $zoom]
 		set ClockDisplay $CurrentStampTile
 	}
@@ -8398,7 +8408,7 @@ set MOB_REACH 0
 proc AddElevationMenu {mob_id} {
 	global NewElevationText
 	set NewElevationText {}
-	if {[::getstring::tk_getString .atm NewElevationText {Elevation:}]} {
+	if {[::getstring::tk_getString .atm NewElevationText {Elevation:} -geometry [parent_geometry_ctr]]} {
 		ElevatePerson $mob_id $NewElevationText
 	}
 }
@@ -8406,7 +8416,7 @@ proc AddElevationMenu {mob_id} {
 proc AddElevationMenuAll {mob_list} {
 	global NewElevationText
 	set NewElevationText {}
-	if {[::getstring::tk_getString .atm NewElevationText {Elevation:}]} {
+	if {[::getstring::tk_getString .atm NewElevationText {Elevation:} -geometry [parent_geometry_ctr]]} {
 		foreach person $mob_list {
 			ElevatePerson $person $NewElevationText
 		}
@@ -8416,7 +8426,7 @@ proc AddElevationMenuAll {mob_list} {
 proc AddTagMenu {mob_id} {
 	global NewTagText
 	set NewTagText {}
-	if {[::getstring::tk_getString .atm NewTagText {Tag:}]} {
+	if {[::getstring::tk_getString .atm NewTagText {Tag:} -geometry [parent_geometry_ctr]]} {
 		TagPerson $mob_id $NewTagText
 	}
 }
@@ -8424,7 +8434,7 @@ proc AddTagMenu {mob_id} {
 proc AddTagMenuAll {mob_list} {
 	global NewTagText
 	set NewTagText {}
-	if {[::getstring::tk_getString .atm NewTagText {Tag:}]} {
+	if {[::getstring::tk_getString .atm NewTagText {Tag:} -geometry [parent_geometry_ctr]]} {
 		foreach person $mob_list {
 			TagPerson $person $NewTagText
 		}
