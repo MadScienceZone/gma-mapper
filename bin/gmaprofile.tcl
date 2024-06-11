@@ -319,7 +319,7 @@ namespace eval ::gmaprofile {
 		# Add and select new default font
 		#
 		variable _profile
-		if {[::getstring::tk_getString $w.new_font_name newname {Name of new font}] && $newname ne {}} {
+		if {[::getstring::tk_getString $w.new_font_name newname {Name of new font} -geometry [::parent_geometry_ctr $w]] && $newname ne {}} {
 			if {[dict exists $_profile fonts $newname]} {
 				tk_messageBox -type ok -icon error -title "Duplicate name" -message "You tried to add a font called \"$newname\" but that name already exists in the font set." -parent $w
 				return
@@ -353,7 +353,7 @@ namespace eval ::gmaprofile {
 			return
 		}
 		set srcdata [dict get $_profile fonts $srcfont]
-		if {[::getstring::tk_getString $w.new_font_name newname "Name of new font (copy of $srcfont)"] && $newname ne {}} {
+		if {[::getstring::tk_getString $w.new_font_name newname "Name of new font (copy of $srcfont)" -geometry [::parent_geometry_ctr $w]] && $newname ne {}} {
 			if {[dict exists $_profile fonts $newname]} {
 				tk_messageBox -type ok -icon error -title "Duplicate name" -message "You tried to add a font called \"$newname\" but that name already exists in the font set." -parent $w
 				return
@@ -458,7 +458,7 @@ namespace eval ::gmaprofile {
 	}
 	proc _add_new {w} {
 		variable _profile
-		if {[::getstring::tk_getString $w.new_profile_name newname {Name of new server profile}] && $newname ne {}} {
+		if {[::getstring::tk_getString $w.new_profile_name newname {Name of new server profile} -geometry [::parent_geometry_ctr $w]] && $newname ne {}} {
 			if {[find_server_index $_profile $newname] >= 0} {
 				tk_messageBox -type ok -icon error -title "Duplicate name" -message "You tried to add a server called \"$newname\" but that name already exists in the profile set." -parent $w
 				return
@@ -480,7 +480,7 @@ namespace eval ::gmaprofile {
 		}
 		set serverdata [lindex [dict get $_profile profiles] $currently_editing_index]
 		set servername [dict get $serverdata name]
-		if {[::getstring::tk_getString $w.new_profile_name newname "Name of new server profile (copy of $servername)"] && $newname ne {}} {
+		if {[::getstring::tk_getString $w.new_profile_name newname "Name of new server profile (copy of $servername)" -geometry [::parent_geometry_ctr $w]] && $newname ne {}} {
 			if {[find_server_index $_profile $newname] >= 0} {
 				tk_messageBox -type ok -icon error -title "Duplicate name" -message "You tried to add a server called \"$newname\" but that name already exists in the profile set." -parent $w
 				return
