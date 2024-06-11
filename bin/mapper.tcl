@@ -402,7 +402,11 @@ set ChatTranscript 	{}
 
 proc say {msg} {
 	puts "-> $msg"
-	tk_messageBox -type ok -icon warning -title "Warning" -message $msg -parent .
+	if {[catch {
+		tk_messageBox -type ok -icon warning -title "Warning" -message $msg -parent .
+	}] {
+		tk_messageBox -type ok -icon warning -title "Warning" -message $msg
+	}
 }
 
 #
