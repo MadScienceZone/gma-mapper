@@ -402,7 +402,11 @@ set ChatTranscript 	{}
 
 proc say {msg} {
 	puts "-> $msg"
-	tk_messageBox -type ok -icon warning -title "Warning" -message $msg
+	if {[catch {
+		tk_messageBox -type ok -icon warning -title "Warning" -message $msg -parent .
+	}] {
+		tk_messageBox -type ok -icon warning -title "Warning" -message $msg
+	}
 }
 
 #
@@ -1517,7 +1521,7 @@ proc editPreferences {} {
 	set PreferencesData [::gmaprofile::editor .preferences $PreferencesData]
 	::gmaprofile::save $preferences_path $PreferencesData
 	ApplyPreferences $PreferencesData
-	if {[tk_messageBox -type yesno -default no -icon warning -title "Restart Mapper?"\
+	if {[tk_messageBox -type yesno -default no -icon warning -title "Restart Mapper?" -parent . \
 		-message "Some preferences will only take effect when the mapper is restarted. Do you wish to go ahead and restart the mapper now? (If you do, it will be started with the same command-line arguments as were used to start this instance.)"\
 	]} {
 		restartMapper
@@ -1560,7 +1564,7 @@ proc restartMapper {} {
 		}
 	}
 	
-	tk_messageBox -type ok -icon error -title "Unable to restart" -message "Sorry, we were unable to relaunch the mapper. If you want to restart it, you need to manually exit and restart the mapper." -detail "$err\n\nWe tried:\n[join $tries \n]"
+	tk_messageBox -parent . -type ok -icon error -title "Unable to restart" -message "Sorry, we were unable to relaunch the mapper. If you want to restart it, you need to manually exit and restart the mapper." -detail "$err\n\nWe tried:\n[join $tries \n]"
 	return
 }
 
@@ -1584,7 +1588,7 @@ if {[file exists $preferences_path]} {
 		::gmaprofile::fix_missing PreferencesData
 		ApplyPreferences $PreferencesData
 	} err]} {
-		tk_messageBox -type ok -icon error -title "Unable to load preferences" -message "The preferences settings could not be loaded from \"$preferences_path\"." -detail $err
+		tk_messageBox -type ok -icon error -title "Unable to load preferences" -message "The preferences settings could not be loaded from \"$preferences_path\"." -detail $err -parent .
 		set PreferencesData [::gmaprofile::default_preferences]
 		set CurrentProfileName {}
 		ApplyPreferences $PreferencesData
@@ -2539,7 +2543,7 @@ proc exitchk {} {
 	global OBJ_MODIFIED OBJ_FILE
 
 	if {$OBJ_MODIFIED 
-	&& [tk_messageBox -type yesno -default no -icon warning -title "Abandon changes to $OBJ_FILE?"\
+	&& [tk_messageBox -parent . -type yesno -default no -icon warning -title "Abandon changes to $OBJ_FILE?"\
 		-message "You have unsaved changes to this map.  Do you want to abandon them and exit anyway?"]\
 		ne "yes"} {
 		return
@@ -2946,7 +2950,7 @@ proc saf_loadfile {file oldcd args} {
 
 		if {$cache_mtime <= 0} {
 			tk_messageBox -type ok -icon warning -title "Can't see file metadata"\
-				-message "Can't get server-side file's timestamp from metadata; sending new copy over to be safe."
+				-message "Can't get server-side file's timestamp from metadata; sending new copy over to be safe." -parent .
 		}
 	} else {
 		set cache_mtime 0	; # force send if we're unconditionally sending anyway
@@ -3002,6 +3006,7 @@ proc loadfile {file args} {
 		-type yesno -default no -icon warning \
 		-title "Abandon changes to $OBJ_FILE?"\
 		-message "You have unsaved changes to this map. Do you want to abandon them and load a new map anyway?"\
+		-parent .\
 	] ne "yes"} {
 		return
 	}
@@ -3223,7 +3228,7 @@ proc unloadfile {file args} {
     # If we're being told remotely to do this, don't prompt the user
     # 
     if {!$forcep} {
-        if {[tk_messageBox -type yesno -default no -icon warning -title "Remove Elements?"\
+        if {[tk_messageBox -type yesno -default no -icon warning -title "Remove Elements?" -parent .\
             -message "Do you really want to DELETE all elements from file $file?"] ne "yes"} {
             return
         }
@@ -3307,7 +3312,7 @@ proc savefile {} {
 		}
 	}
 
-	set lock_objects [tk_messageBox -type yesno -icon question -title {Lock objects?} -message {Do you wish to lock all map objects in this file?} -detail {When locked, map objects cannot be further modified by clients. This helps avoid accidentally disturbing the map background while people are interacting with the map during a game.} -default yes]
+	set lock_objects [tk_messageBox -parent . -type yesno -icon question -title {Lock objects?} -message {Do you wish to lock all map objects in this file?} -detail {When locked, map objects cannot be further modified by clients. This helps avoid accidentally disturbing the map background while people are interacting with the map during a game.} -default yes]
 
 	::getstring::tk_getString .meta_comment LastFileComment {Map Name/Comment:} -geometry [parent_geometry_ctr]
 	::getstring::tk_getString .meta_location LastFileLocation {Map Location:} -geometry [parent_geometry_ctr]
@@ -9214,7 +9219,7 @@ proc fetch_url {localdir local url} {
 
 	if {![file isdirectory $localdir]} {
 		if {[file exists $localdir]} {
-			tk_messageBox -type ok -icon error -title "Conflicting File Exists" \
+			tk_messageBox -parent . -type ok -icon error -title "Conflicting File Exists" \
 				-message "We cannot complete the operation you requested becuase of a conflicting file."\
 				-detail "We need to access the directory [file nativename $localdir], but it appears there is already a file with that name, so we can't make the directory we need."
 			return {}
@@ -9222,7 +9227,7 @@ proc fetch_url {localdir local url} {
 			if {[catch {
 				file mkdir $localdir
 			} err]} {
-				tk_messageBox -type ok -icon error -title "Unable to Create Directory" \
+				tk_messageBox -parent . -type ok -icon error -title "Unable to Create Directory" \
 					-message "We cannot complete the operation you requested because we could not create a directory called [file nativename $localdir]."\
 					-detail $err
 				return {}
@@ -9244,12 +9249,12 @@ proc fetch_url {localdir local url} {
 		set i [dict get $options -errorcode]
 		if {[llength $i] >= 3 && [lindex $i 0] eq {CHILDSTATUS} && [lindex $i 2] == 22} {
 			DEBUG 0 "Requested map file ID $id was not found on the server."
-			tk_messageBox -type ok -icon error -title "Error Accessing Remote File" \
+			tk_messageBox -parent . -type ok -icon error -title "Error Accessing Remote File" \
 				-message "We cannot complete the operation you requested because we could not retrieve a remote file."\
 				-detail "File not found."
 			return {}
 		} else {
-			tk_messageBox -type ok -icon error -title "Error Accessing Remote File" \
+			tk_messageBox -parent . -type ok -icon error -title "Error Accessing Remote File" \
 				-message "We cannot complete the operation you requested because we could not retrieve a remote file."\
 				-detail $err
 			return {}
@@ -9260,7 +9265,7 @@ proc fetch_url {localdir local url} {
 		set d [read $f]
 		close $f
 	} err]} {
-		tk_messageBox -type ok -icon error -title "Error Accessing Remote File" \
+		tk_messageBox -parent . -type ok -icon error -title "Error Accessing Remote File" \
 			-message "We cannot complete the operation you requested because we could not read the data we retrieved from the remote site."\
 			-detail $err
 		return {}
@@ -9536,7 +9541,7 @@ proc DoCommandMARCO {d} { ::gmaproto::polo }
 proc DoCommandMARK  {d} { global canvas; start_ping_marker $canvas [dict get $d X] [dict get $d Y] 0 }
 
 proc DoCommandDENIED {d} {
-	tk_messageBox -type ok -icon error -title "Server Closed Connection" \
+	tk_messageBox -parent . -type ok -icon error -title "Server Closed Connection" \
 		-message "[dict get $d Reason]" \
 		-detail "The server terminated your session due to the reason stated above. Please correct the cause of this problem before reconnecting."
 	exit 1
@@ -9579,7 +9584,7 @@ proc DoCommandAV {d} {
 }
 
 proc DoCommandPRIV {d} {
-	tk_messageBox -type ok -icon error -title "Permission Denied" \
+	tk_messageBox -parent . -type ok -icon error -title "Permission Denied" \
 		-message "[dict get $d Reason]" \
 		-detail "The operation you attempted to carry out which sent the command shown here is only allowed for privileged users, and in the words of Chevy Chase, \"you're not.\"\n\nAttempted command:\n[dict get $d Command]"
 }
@@ -10469,18 +10474,18 @@ proc UpgradeAvailable {args} {
 
 	if {$comp < 0} {
 		if {[::gmautil::is_git $BIN_DIR]} {
-			tk_messageBox -type ok -icon info \
+			tk_messageBox -parent . -type ok -icon info \
 				-title "Mapper version $new_version is available"\
 				-message "There is a new mapper version, $new_version, available for use. Update your Git repository." \
 				-detail "$recommendation\nHowever, since you are running this client from $BIN_DIR, which is inside a Git repository working tree, you should upgrade it by running \"git pull\" rather than using the built-in upgrade feature."
 		} else {
 			if {$_UpdateURL eq {}} {
-				tk_messageBox -type ok -icon info \
+				tk_messageBox -parent . -type ok -icon info \
 					-title "Mapper version $new_version is available"\
 					-message "There is a new mapper version, $new_version, available for use." \
 					-detail "$recommendation\nIf you add an update-url value to your mapper configuration file or include an --update-url option when running mapper, this update may be installed automatically for you. Ask your GM for the correct value for that setting."
 			} else {
-				set answer [tk_messageBox -type yesno -icon question \
+				set answer [tk_messageBox -parent . -type yesno -icon question \
 					-title "Mapper version $new_version is available"\
 					-message "There is a new mapper version, $new_version, available for use. Do you wish to upgrade now?" \
 					-detail "$recommendation\n\nIf you click YES, the new mapper will be downloaded and installed on your computer, and then launched. You will then be using the version $new_version client."]
@@ -10505,7 +10510,7 @@ proc UpgradeAvailable {args} {
 						}
 					}
 
-					set answer [tk_messageBox -type yesnocancel -icon question \
+					set answer [tk_messageBox -parent . -type yesnocancel -icon question \
 						-title "Installation Target" \
 						-message "This client is running from $BIN_DIR. Should I install the new one in [file join {*}$target_dirs]?"\
 						-detail "If you click YES, the new client will be installed in the recommended location to make it easier to maintain all the versions of the mapper you have on your system.\nIf you click NO, you will be prompted to choose the installation directory of your choice.\nIt you click CANCEL, we won't install the new version at this time at all."]
@@ -10519,7 +10524,7 @@ proc UpgradeAvailable {args} {
 						if {$chosen_dir eq {}} {
 							say "No directory selected; upgrade cancelled."
 						} else {
-							if {[tk_messageBox -type yesno -icon question \
+							if {[tk_messageBox -parent . -type yesno -icon question \
 								-title "Confirm Installation Directory" \
 								-message "Are you sure you wish to install into $chosen_dir?"\
 								-detail "If you click YES, we will install the new mapper client into $chosen_dir."] eq {yes}} {
@@ -12194,7 +12199,7 @@ proc DisplayChatMessage {d for_user args} {
 
 	if {$SuppressChat} return
 	if {![::gmaproto::is_connected]} {
-		tk_messageBox -type ok -icon error -title "No Connection to Server" \
+		tk_messageBox -parent . -type ok -icon error -title "No Connection to Server" \
 			-message "Your client must be connected to the map server to use this function."
 		return
 	}
@@ -12849,7 +12854,7 @@ proc SaveDieRollPresets {w for_user tkey} {
 	} -parent $w -title "Save current die-roll presets for $for_user as..."]] eq {}} return
 
 	while {[catch {set f [open $file w]} err]} {
-		if {[tk_messageBox -type retrycancel -icon error -default cancel -title "Error opening file"\
+		if {[tk_messageBox -parent . -type retrycancel -icon error -default cancel -title "Error opening file"\
 			-message "Unable to open $file: $err" -parent $w] eq "cancel"} {
 			return
 		}
@@ -12890,7 +12895,7 @@ proc LoadDieRollPresets {w for_user tkey} {
 		} -parent $w -title "Load die roll presets for $for_user from..."]] eq {}} return
 
 	while {[catch {set f [open $file r]} err]} {
-		if {[tk_messageBox -type retrycancel -icon error -default cancel -title "Error opening file"\
+		if {[tk_messageBox -parent . -type retrycancel -icon error -default cancel -title "Error opening file"\
 			-message "Unable to open $file: $err" -parent $w] eq "cancel"} {
 				return
 		}
@@ -12928,17 +12933,17 @@ proc CommitNewPreset {for_user tkey} {
 	set def  [string trim [$w.re get]]
 
 	if {$name eq {}} {
-		tk_messageBox -type ok -icon error -title "Preset Name Required" \
+		tk_messageBox -parent . -type ok -icon error -title "Preset Name Required" \
 			-message "The preset name must be provided. If it matches the name of an existing preset, it will replace the old one."
 		return
 	}
 	if {$def eq {}} {
-		tk_messageBox -type ok -icon error -title "Preset Definition Required" \
+		tk_messageBox -parent . -type ok -icon error -title "Preset Definition Required" \
 			-message "You didn't specify a die roll expression to store."
 		return
 	}
 	if {[info exists dice_preset_data(preset,$tkey,$name)]} {
-		if {! [tk_messageBox -type yesno -icon question -title "Overwrite previous preset?" \
+		if {! [tk_messageBox -parent . -type yesno -icon question -title "Overwrite previous preset?" \
 			-message "There is already a preset for $for_user called \"$name\". Do you want to replace it with this one?" \
 			-default no]} {
 			return
@@ -13245,7 +13250,7 @@ proc aboutMapper {} {
 	}
 
 
-	tk_messageBox -type ok -icon info -title "About Mapper" \
+	tk_messageBox -parent . -type ok -icon info -title "About Mapper" \
 		-message "GMA Mapper Client, Version $GMAMapperVersion, for GMA $CoreVersionNumber.\n\nCopyright \u00A9 Steve Willoughby, Aloha, Oregon, USA. All Rights Reserved. Distributed under the terms and conditions of the 3-Clause BSD License.\n\nThis client supports file format $GMAMapperFileFormat and server protocol $GMAMapperProtocol." -detail $connection_info
 }
 
@@ -13253,7 +13258,7 @@ proc SyncAllClientsToMe {} {
 	global SafMode GMAMapperFileFormat OBJdata OBJtype MOBdata ClockDisplay MOB_IMAGE
 
 	set oldcd $ClockDisplay
-	if {[tk_messageBox -type yesno -icon question -title "Push map data to other clients?" \
+	if {[tk_messageBox -parent . -type yesno -icon question -title "Push map data to other clients?" \
 			-message "This will push your map data to all other peers, replacing their map contents.  Are you sure?" \
 			-default no]} {
 		if {$SafMode} {
@@ -14051,7 +14056,7 @@ proc display_initiative_clock {} {
 	global IThost
 
 	if {![::gmaproto::is_connected]} {
-		tk_messageBox -type ok -icon error -title "No Connection to Server" \
+		tk_messageBox -parent . -type ok -icon error -title "No Connection to Server" \
 			-message "Your client must be connected to the map server to use this function."
 		return
 	}
@@ -14127,11 +14132,11 @@ proc ConnectToServerByIdx {idx} {
 	if {[catch {
 		set newdata [::gmaprofile::set_current_profile $PreferencesData $idx]
 	}]} {
-		tk_messageBox -type ok -icon error -title "Unable to Connect" -message "Unable to find the requested server profile."
+		tk_messageBox -parent . -type ok -icon error -title "Unable to Connect" -message "Unable to find the requested server profile."
 		return
 	}
 	set profilename [dict get $newdata current_profile]
-	tk_messageBox -type ok -icon warning -title "Not Recommended" -message "We will attempt to reconnect you now to your \"$profilename\" server profile; however, this is not guaranteed to work 100% due to some known issues with the implementation of this feature.\n\nInstead, we recommend either of these methods which will work perfectly:\n(1) On the command line, add a --select '$profilename' switch to the mapper command;\n(2) Select Edit -> Preferences from the menu, click the Servers tab, click on $profilename, save, and click Yes to have the mapper restart with those settings.\nTo see a list of available profiles, run the mapper with the --list-profiles option."
+	tk_messageBox -parent . -type ok -icon warning -title "Not Recommended" -message "We will attempt to reconnect you now to your \"$profilename\" server profile; however, this is not guaranteed to work 100% due to some known issues with the implementation of this feature.\n\nInstead, we recommend either of these methods which will work perfectly:\n(1) On the command line, add a --select '$profilename' switch to the mapper command;\n(2) Select Edit -> Preferences from the menu, click the Servers tab, click on $profilename, save, and click Yes to have the mapper restart with those settings.\nTo see a list of available profiles, run the mapper with the --list-profiles option."
 	set PreferencesData $newdata
 	#::gmaprofile::save $preferences_path $newdata
 	ApplyPreferences $newdata
