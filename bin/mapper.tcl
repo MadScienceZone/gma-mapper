@@ -404,7 +404,7 @@ proc say {msg} {
 	puts "-> $msg"
 	if {[catch {
 		tk_messageBox -type ok -icon warning -title "Warning" -message $msg -parent .
-	}] {
+	}]} {
 		tk_messageBox -type ok -icon warning -title "Warning" -message $msg
 	}
 }
