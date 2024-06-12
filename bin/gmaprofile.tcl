@@ -199,6 +199,7 @@ namespace eval ::gmaprofile {
 		constant   {A constant value in the die roll expression, such as a bonus or penalty.}
 		critlabel  {An indicator that this roll is to confirm a critical hit.}
 		critspec   {An indicator that this roll may be subject to confirmation as a critical hit.}
+		cumulative {The accumulated total of all die rolls (when using the |total option).}
 		dc         {An indicator of the target DC for this roll.}
 		diebonus   {A bonus or penalty applied to every die rolled for a particular diespec value (but not others in a multiple-die-roll request).}
 		diespec    {A die-roll specification such as "3d12" which indicates a random component of the overall expression.}
@@ -227,6 +228,7 @@ namespace eval ::gmaprofile {
 		separator  {Any punctuation that is used as a separator in the die-roll expression.}
 		sf         {An indicator that the "|sf" option was used to check for natural min and max rolls as automatic failure or success, along with custom labels, if any, for the success and failure outcomes.}
 		short      {When making a roll with a DC target, or using "|until", this indicates the amount by which this roll fell short of the target.}
+		total      {An indicator that you want to repeat the roll until the total of all rolls meets a target value.}
 		subtotal   {This shows a subtotal at various places in a complex, multi-dice roll expression.}
 		success    {If the roll includes clear success/fail criteria, this indicates why the roll succeeded.}
 		system     {This gives the style to display system messages in the chat window.}
@@ -1475,6 +1477,7 @@ namespace eval ::gmaprofile {
 					constant  [dict create fg [dict create dark {} light {}] bg [dict create dark {} light {}] font Normal format {} overstrike false underline false offset 0]\
 					critlabel [dict create fg [dict create dark #fffb00 light #f05b00] bg [dict create dark {} light {}] font Special format {Confirm: } overstrike false underline false offset 0]\
 					critspec  [dict create fg [dict create dark #fffb00 light #f05b00] bg [dict create dark {} light {}] font Special format {} overstrike false underline false offset 0]\
+					cumulative [dict create fg [dict create dark #aaaaaa light #888888] bg [dict create dark {} light {}] font Special format { (now %s)} overstrike false underline false offset 0]\
 					dc        [dict create fg [dict create dark #aaaaaa light #888888] bg [dict create dark {} light {}] font Special format {DC %s: } overstrike false underline false offset 0]\
 					diebonus  [dict create fg [dict create dark red light red] bg [dict create dark {} light {}] font Special format {(%s per die)} overstrike false underline false offset 0]\
 					diespec   [dict create fg [dict create dark {} light {}] bg [dict create dark {} light {}] font Normal format {} overstrike false underline false offset 0]\
@@ -1509,6 +1512,7 @@ namespace eval ::gmaprofile {
 					timestamp [dict create fg [dict create dark #888888 light #888888] bg [dict create dark {} light {}] font Tiny format {} overstrike false underline false offset 0]\
 					title     [dict create fg [dict create dark #aaaaaa light #ffffff] bg [dict create dark #000044 light #c7c0ae] font Normal format {} overstrike false underline false offset 0]\
 					to        [dict create fg [dict create dark red light red] bg [dict create dark {} light {}] font Special format {} overstrike false underline false offset 0]\
+					total     [dict create fg [dict create dark #aaaaaa light #888888] bg [dict create dark {} light {}] font Special format {total %s} overstrike false underline false offset 0]\
 					until     [dict create fg [dict create dark #aaaaaa light #888888] bg [dict create dark {} light {}] font Special format {until %s} overstrike false underline false offset 0]\
 					worst     [dict create fg [dict create dark #aaaaaa light #888888] bg [dict create dark {} light {}] font Special format { worst of %s} overstrike false underline false offset 0]\
 				]\
@@ -1897,6 +1901,19 @@ namespace eval ::gmaprofile {
 				until      18
 				iteration  1
 				short      4
+				- -
+				timestamp {12:34 }
+				fullresult 14 {} { }
+				from {Alice: }
+				result 14
+				separator =
+				diespec 2d10
+				subtotal 14
+				roll 8,6
+				moddelim |
+				total 27
+				cumulative 14
+				iteration 1
 				- -
 				timestamp {12:34 }
 				fullresult 7 {} { }
