@@ -6649,6 +6649,7 @@ proc RenderSomeone {w id {norecurse false}} {
 		foreach threatening_mob_id [array names MOBdata] {
 			DEBUG 1 "Checking who $threatening_mob_id is threatening"
 			if {[dict get $MOBdata($threatening_mob_id) Killed]} continue
+			if {[dict get $MOBdata($threatening_mob_id) Hidden] && !$is_GM} continue
 			if {[set fullinfo [FullCreatureAreaInfo $threatening_mob_id]] eq {}} {
 				DEBUG 0 "can't get full area info for threatening creature $threatening_mob_id"
 				continue
