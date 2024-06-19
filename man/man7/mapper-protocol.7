@@ -2165,11 +2165,39 @@ sent to all clients.
 If true, this die-roll will be sent \*(lqblind\*(rq to the GM only.
 Not even the requester will see the result of the roll, only the GM will.
 .TP
-.BI RollSpec
+.B RollSpec
 '\" <<ital-is-var>>
 The die-roll specification, like \*(lqd20+12\*(rq or \*(lq6d6 fire\*(rq.
 If this field is empty, the previous die-roll from this client is repeated,
 or \*(lq1d20\*(rq if there was no previous one.
+'\" <<New>>
+.TP
+.BI Seed " (int64)"
+Specify a seed value for the random-number generator to use. By default, a random seed is used.
+'\" <</bold-is-fixed>>
+.RS
+.LP
+.B N.B.
+'\" <<bold-is-fixed>>
+Only use this parameter for testing or under specific circumstances where the seed value
+is chosen for valid reasons. While the numbers are still random, any set of die rolls with the
+same
+.B RollSpec
+and the same
+.B Seed
+will always yield the same results. Thus, using this for normal in-game dice rolling would
+be, in a word, cheating.
+The value for the seed is a 64-bit integer expressed as decimal digits.
+A zero value for this field is the same as leaving it out, i.e., a random seed will be used.
+.LP
+If a
+.B Seed
+value is given, the die-roll results will report that such was the case. Clients SHOULD
+flag this result as potentially cheating (and MUST display something to indicate that a custom
+seed was used if the seed came from the user or any other source not known to the client to
+have been fairly chosen) when displaying the results to the players.
+.RE
+'\" <</New>>
 '\" <</>>
 .RE
 .TP
@@ -3843,6 +3871,16 @@ The
 .B RequestID
 string passed by the client when requesting this die roll, or the empty string
 if they didn't.
+'\" <<New>>
+.TP
+.BI Seed " (int64)"
+If nonzero, this indicates that the request which generated these results
+supplied this value as the seed to use for the random number generation behind
+the die-roll results. Clients MUST either be in complete control of the seed
+value and ensure it was fairly chosen, or report this die-roll to the player
+as potentially unfair. This field is not sent (or is zero) in the case
+where the server chose its own random seed to use (which is the typical case).
+'\" <</New>>
 .TP
 .BI Sent " (RFC 3339-formatted datetime string)"
 The date and time the message was sent.

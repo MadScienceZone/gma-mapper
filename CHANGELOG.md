@@ -20,6 +20,7 @@ versions.
 # 4.24.6 (Unreleased)
 ## Fixes
  * Repositions some dialog boxes to be on top of the main window instead of random locations possibly on other displays.
+ * Corrects bug which showed threat arrows from hidden creatures.
 
 # 4.24.5
 ## Fixes
