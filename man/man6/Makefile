@@ -1,4 +1,4 @@
-all: mapper.6.pdf
+all: gma-mapper.6.pdf
 
-mapper.6.pdf: mapper.6
+gma-mapper.6.pdf: gma-mapper.6
 	gma fmtman < $< | tbl | groff -man | ps2pdf - $@

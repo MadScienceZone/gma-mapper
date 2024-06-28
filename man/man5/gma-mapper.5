@@ -1,13 +1,13 @@
 '\" t
 '\" <<ital-is-var>>
 '\" <<bold-is-fixed>>
-.TH MAPPER 5 "GMA-Mapper 4.25" 27-Jun-2024 "File Formats" \" @@mp@@
+.TH GMA-MAPPER 5 "GMA-Mapper 4.25" 27-Jun-2024 "File Formats" \" @@mp@@
 .SH NAME
 mapper \- battle grid save file format
 .SH DESCRIPTION
 .LP
 The version 23 file format for the
-.BR mapper (6)
+.BR gma-mapper (6)
 battle grid program is described in this document.
 .LP
 The file is UTF-8-encoded Unicode, of which 7-bit ASCII is a subset.
@@ -85,7 +85,7 @@ It is ignored if present when writing a map file.
 .BI \[Fo] element_type \[Fc]
 Defines a map element using a JSON structure identical to the JSON
 data defined in the mapper protocol in
-.BR mapper (6)
+.BR gma-mapper (6)
 for the
 .BI LS- element_type
 command.
@@ -239,8 +239,8 @@ at zoom factor 1.0, or with server ID \*(lqSJy9rpbTDElsCfklYHMvsgre5_e2@100\*(rq
 at zoom factor 2.0.
 .SH "SEE ALSO"
 .LP
-.BR mapper (6),
-.BR rendersizes (6).
+.BR gma-mapper (6),
+.BR gma-rendersizes (6).
 .SH FILES
 The exact location of cache files may vary depending on the
 operating system platform. For example, on macOS the
@@ -440,7 +440,7 @@ key/value line sequence.
 .SS "Changes as of File Format 21"
 .LP
 The fields for creatures have been changed as documented in
-.BR mapper-protocol (7).
+.BR gma-mapper-protocol (7).
 .SS "Changes as of File Format 22"
 .LP
 Animation support introduced in protocol 407 alters the format

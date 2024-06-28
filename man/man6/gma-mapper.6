@@ -1,9 +1,9 @@
 '\" t
 '\" <<ital-is-var>>
 '\" <<bold-is-fixed>>
-.TH MAPPER 6 "GMA-Mapper 4.25" 27-Jun-2024 "Games" \" @@mp@@
+.TH GMA-MAPPER 6 "GMA-Mapper 4.25" 27-Jun-2024 "Games" \" @@mp@@
 .SH NAME
-mapper \- GMA battle grid map
+gma mapper \- GMA battle grid map
 .SH SYNOPSIS
 '\" <<usage>>
 .LP
@@ -1004,7 +1004,7 @@ on the map with the upper-left corner at the point the mouse was clicked.
 If no such tile was chosen, you will be prompted for its name. Right-clicking
 will force the selection of a new tile image rather than re-stamping the
 current one. See
-.BR rendersizes (6)
+.BR gma-rendersizes (6)
 for more information about the format of these tile files. They should be
 rendered and (if using a map server) uploaded ahead of time so they are
 visible in the map.
@@ -1256,7 +1256,7 @@ The bottom entry line is for making die rolls. Into the entry box you may type a
 string such as would be accepted to the
 .B DieRoller.do_roll()
 method as documented in
-.BR dice (3).
+.BR gma-dice-syntax (7).
 When the Return key is pressed, this die roll is sent to the server, which will roll the
 dice and transmit the results just like a chat message (which includes the currently-selected
 chat recipient list). The \*(lq(i)\*(rq button to the right of the entry box will bring up
@@ -1289,7 +1289,7 @@ sort the presets in the window. This allows arbitrary sort ordering without clut
 .LP
 The file load and save buttons at the bottom of the pane are used to load and save the preset
 list to local disk files which have the format documented in
-.BR dice (5).
+.BR gma-dice (5).
 .RE
 .RE
 '\" <</>>
@@ -1635,11 +1635,12 @@ are configured correctly for your needs as well.
 .BR curl (1),
 .BR scp (1),
 .BR ssh (1),
-.BR dice (3),
-.BR dice (5),
-.BR mapper (5),
+.BR gma-dice (3),
+.BR gma-dice (5),
+.BR gma-mapper (5),
 .BR gma (6),
-.BR mapper-protocol (7).
+.BR gma-dice-syntax (7),
+.BR gma-mapper-protocol (7).
 .SH AUTHORS
 .LP
 Steve Willoughby / steve@madscience.zone;
