@@ -3,11 +3,11 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.24.5          <!-- @@##@@ -->
- * Effective Date: 08-Jun-2024               <!-- @@##@@ -->
+ * This Package Version: 4.25          <!-- @@##@@ -->
+ * Effective Date: 27-Jun-2024               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.19.3 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.21 <!-- @@##@@ -->
  * GMA Mapper File Format: 23	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 414        <!-- @@##@@ -->
  * GMA Mapper Preferences File Format: 8 <!-- @@##@@ -->
@@ -16,6 +16,12 @@
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.25
+## Adds
+ * Supports die-roll option `|total` and displays the results accordingly.
+## Fixes
+ * Repositions some dialog boxes to be on top of the main window instead of random locations possibly on other displays.
 
 # 4.24.5
 ## Fixes
