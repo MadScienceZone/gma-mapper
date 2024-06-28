@@ -17,6 +17,10 @@ The support for old server protocols (<400) and map file formats (<20) will be d
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
+# 4.25.1 or 4.26 (unreleased)
+## Fixes
+ * Moves manual page entries to have names starting with `gma` as part of the overall GMA-project-wide effort to clean up the footprint of GMA tools that might clash with names of other packages installed on a system.
+
 # 4.25
 ## Adds
  * Supports die-roll option `|total` and displays the results accordingly.
