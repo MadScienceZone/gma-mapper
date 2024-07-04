@@ -4316,6 +4316,7 @@ proc ShowDiceSyntax {} {
 		 b {!} p .)}
 		{b {| repeat } i N p "\tRoll the expression " i N p { times, reporting that many separate results.}}
 		{b {| until } i N p "\tRoll the expression repeatedly (reporting each result) until the result is at least " i N p .}
+		{b {| total } i N p "\tRoll the expression repeatedly (reporting each result) until the cumulative total of the rolls is at least " i N p .}
 		{b {| dc } i N p "\tThis is a check against a difficulty class (DC) of " i N 
 		 p {. This does not affect the roll, but will report back whether the roll satisfied the DC and by what margin.}}
 		{b {| sf } p \[ i success p \[ b / i fail p "\]\]\tThis roll (which must involve but a single die) indicates automatic success or failure on a natural 20 or 1 respectively (or whatever the maximum value of the die is, if not a d20). The optional " i success p " or " i fail p " labels are used in the report (or suitable defaults are used if these are not given)."}
