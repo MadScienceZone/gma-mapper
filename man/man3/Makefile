@@ -1,6 +1,6 @@
-all: gmafile.3.pdf gmaproto.3.pdf gmautil.3.pdf ustar.3.pdf gmacolors.3.pdf mapper.3.pdf
+all: gmafile.3.pdf gmaproto.3.pdf gmautil.3.pdf gma-ustar.3.pdf gmacolors.3.pdf gma-mapper.3.pdf
 
-mapper.3.pdf: mapper.3
+gma-mapper.3.pdf: gma-mapper.3
 	gma fmtman < $< | groff -man | ps2pdf - $@
 
 gmacolors.3.pdf: gmacolors.3
@@ -15,5 +15,5 @@ gmaproto.3.pdf: gmaproto.3
 gmautil.3.pdf: gmautil.3
 	gma fmtman < $< | tbl | groff -man | ps2pdf - $@
 
-ustar.3.pdf: ustar.3
+gma-ustar.3.pdf: gma-ustar.3
 	gma fmtman < $< | groff -man | ps2pdf - $@

@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___       _______  _______                 #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___   )(  ____ \                #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  || (    \/                #
+#  _______  _______  _______                ___       _______   ______                 #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___   ) / ____ \                #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |( (    \/                #
 # | |      | || || || (___) | Assistant  / (_) (_        /   )| (____                  #
-# | | ____ | |(_)| ||  ___  |           (____   _)     _/   / (_____ \                 #
-# | | \_  )| |   | || (   ) |                ) (      /   _/        ) )                #
-# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\/\____) )                #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/\______/                 #
+# | | ____ | |(_)| ||  ___  |           (____   _)     _/   / |  ___ \                 #
+# | | \_  )| |   | || (   ) |                ) (      /   _/  | (   ) )                #
+# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\( (___) )                #
+# (_______)|/     \||/     \| Client         (_)  (_)\_______/ \_____/                 #
 #                                                                                      #
 ########################################################################################
 #
@@ -57,9 +57,9 @@ package require base64 2.4.2
 package require uuid 1.0.1
 
 namespace eval ::gmaproto {
-	variable protocol 414
+	variable protocol 415
 	variable min_protocol 333
-	variable max_protocol 414
+	variable max_protocol 415
 	variable max_max_protocol 499
 	variable debug_f {}
 	variable legacy false
@@ -170,7 +170,7 @@ namespace eval ::gmaproto {
 		OA      {ObjID s NewAttrs d}
 		OA+     {ObjID s AttrName s Values l}
 		OA-     {ObjID s AttrName s Values l}
-		OK      {Protocol i Challenge b ServerStarted s ServerActive s ServerTime s ServerVersion s}
+		OK      {Protocol i Challenge b ServerStarted s ServerActive s ServerTime s ServerVersion s Iterations i}
 		PRIV    {Command s Reason s}
 		POLO    {}
 		PROGRESS {OperationID s Title s Value i MaxValue i IsDone ? Targets l IsTimer ?}
@@ -2020,6 +2020,7 @@ proc ::gmaproto::_login {} {
 					error "This does not appear to be a server which speaks any protocol we understand."
 				}
 				set challenge [dict get $params Challenge]
+				set iterations [dict get $params Iterations]
 				if {$::gmaproto::protocol < $::gmaproto::min_protocol} {
 					error "The server speaks a protocol too old for me to understand ($::gmaproto::protocol)"
 				}
@@ -2046,7 +2047,7 @@ proc ::gmaproto::_login {} {
 					}
 					::gmaproto::DEBUG "Server requests authentication (challenge=[binary encode hex $challenge])"
 					::report_progress "Authenticating..."
-					set response [::gmaproto::auth_response $challenge]
+					set response [::gmaproto::auth_response $challenge $iterations]
 					::gmaproto::_protocol_send AUTH Response $response User $::gmaproto::username Client $::gmaproto::client
 					::report_progress "Authenticating... (awaiting server response)"
 					::gmaproto::DEBUG "Waiting for server's response"
@@ -2148,11 +2149,13 @@ proc ::gmaproto::end_stream {dictname endcmd} {
 	return [dict get $d StreamData]
 }
 
-proc ::gmaproto::auth_response {challenge} {
+proc ::gmaproto::auth_response {challenge {passes 0}} {
 	global ::tcl_platform
 	if {[catch {
-		binary scan $challenge S passes
-		set passes [expr $passes & 0xffff]
+		if {$passes <= 0} {
+			binary scan $challenge S passes
+			set passes [expr $passes & 0xffff]
+		} 
 		::gmaproto::DEBUG "-- $passes passes"
 		set H [::sha2::SHA256Init]
 		::sha2::SHA256Update $H $challenge
@@ -2311,7 +2314,7 @@ proc ::gmaproto::normalize_dict {cmd d} {
 	return [::gmaproto::new_dict_from_json $cmd [::gmaproto::json_from_dict $cmd $d]]
 }
 
-# @[00]@| GMA-Mapper 4.25
+# @[00]@| GMA-Mapper 4.26
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2024 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

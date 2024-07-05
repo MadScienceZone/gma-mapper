@@ -1,7 +1,7 @@
 '\" t
 '\" *** 414 ***
 '\" <<ital-is-var>>
-.TH MAPPER-PROTOCOL 7 "GMA-Mapper 4.25" 27-Jun-2024 "Protocols" \" @@mp@@
+.TH MAPPER-PROTOCOL 7 "GMA-Mapper 4.26" 05-Jul-2024 "Protocols" \" @@mp@@
 .SH NAME
 mapper-protocol \- GMA client/server protocol specification
 '\" <<New>>
@@ -736,13 +736,14 @@ Given:
 '\" \begin{align*}
 '\"  C & \text{ is the server's challenge as a binary string of bytes }\\
 '\"    & \text{ (after decoding from the base-64 string sent by the server),} \\
+'\"  i & \text{ is the number of hash rounds to apply,} \\
 '\"  H(x) & \text{ is the binary SHA-256 hash digest of \(x\),} \\
 '\"  P & \text{ is the password needed to connect to the server, and the notation} \\
 '\"  x || y& \text{ means to concatenate the strings \(x\) and \(y\),}
 '\" \end{align*}
 '\" then the procedure to calculate the \z{Response} string is:
 '\" \begin{enumerate}
-'\"  \item Obtain $i$ by extracting the first two bytes from $C$ as an unsigned, big-endian,
+'\"  \item If $i=0$ or was not provided by the server, obtain $i$ by extracting the first two bytes from $C$ as an unsigned, big-endian,
 '\" 16-bit integer value.
 '\"  \item Calculate $D=H(C||P)$.
 '\"  \item Repeat $i$ times:
@@ -755,6 +756,9 @@ Given:
 .TP 5
 .I C
 is the server's challenge as a binary string of bytes (after decoding from the base-64 string actually sent by the server),
+.TP
+.I i
+is the number of rounds of hash function to apply,
 .TP
 .RI H( x )
 is the binary SHA-256 hash digest of 
@@ -776,9 +780,13 @@ string, the client must do the following:
 .\" <<enum>>
 .TP 4
 (1)
-Obtain
+'\" <<New>>
+If no value for
+.I i
+was provided by the server, obtain
 .I i
 by extracting the first two bytes from
+'\" <</New>>
 .I C
 as an unsigned, big-endian, 16-bit integer value.
 .TP
@@ -3415,6 +3423,12 @@ respond with a valid
 .B AUTH
 command before any of its commands to the server will be accepted. The server will also
 refuse to send the client any map updates until it has successfully authenticated.
+'\" <<New>>
+.TP
+.BI Iterations " (int)"
+The number of rounds of hashing to apply to generate the challenge response. This
+value SHOULD be in the range [64,4095].
+'\" <</New>>
 .TP
 .BI ServerStarted " (RFC 3339-formatted datetime string)"
 The absolute wall-clock time that the server was started.

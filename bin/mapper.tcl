@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       _______  _______                 #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___   )(  ____ \                #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  || (    \/                #
+#  _______  _______  _______                ___       _______   ______                 #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___   ) / ____ \                #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |( (    \/                #
 # | |      | || || || (___) | Assistant  / (_) (_        /   )| (____                  #
-# | | ____ | |(_)| ||  ___  |           (____   _)     _/   / (_____ \                 #
-# | | \_  )| |   | || (   ) |                ) (      /   _/        ) )                #
-# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\/\____) )                #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/\______/                 #
+# | | ____ | |(_)| ||  ___  |           (____   _)     _/   / |  ___ \                 #
+# | | \_  )| |   | || (   ) |                ) (      /   _/  | (   ) )                #
+# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\( (___) )                #
+# (_______)|/     \||/     \| Client         (_)  (_)\_______/ \_____/                 #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -17,10 +17,10 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.25}     ;# @@##@@
+set GMAMapperVersion {4.26}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
-set GMAMapperProtocol {414}         ;# @@##@@
-set CoreVersionNumber {6.21}            ;# @@##@@
+set GMAMapperProtocol {415}         ;# @@##@@
+set CoreVersionNumber {6.22}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -4316,6 +4316,7 @@ proc ShowDiceSyntax {} {
 		 b {!} p .)}
 		{b {| repeat } i N p "\tRoll the expression " i N p { times, reporting that many separate results.}}
 		{b {| until } i N p "\tRoll the expression repeatedly (reporting each result) until the result is at least " i N p .}
+		{b {| total } i N p "\tRoll the expression repeatedly (reporting each result) until the cumulative total of the rolls is at least " i N p .}
 		{b {| dc } i N p "\tThis is a check against a difficulty class (DC) of " i N 
 		 p {. This does not affect the roll, but will report back whether the roll satisfied the DC and by what margin.}}
 		{b {| sf } p \[ i success p \[ b / i fail p "\]\]\tThis roll (which must involve but a single die) indicates automatic success or failure on a natural 20 or 1 respectively (or whatever the maximum value of the die is, if not a d20). The optional " i success p " or " i fail p " labels are used in the report (or suitable defaults are used if these are not given)."}
@@ -14322,7 +14323,7 @@ proc ConnectToServerByIdx {idx} {
 #
 #*user_key name -> sanitized_name
 #
-# @[00]@| GMA-Mapper 4.25
+# @[00]@| GMA-Mapper 4.26
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2024 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
