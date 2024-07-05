@@ -3,19 +3,25 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.25          <!-- @@##@@ -->
- * Effective Date: 27-Jun-2024               <!-- @@##@@ -->
+ * This Package Version: 4.26          <!-- @@##@@ -->
+ * Effective Date: 05-Jul-2024               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.21 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.22 <!-- @@##@@ -->
  * GMA Mapper File Format: 23	     <!-- @@##@@ -->
- * GMA Mapper Protocol: 414        <!-- @@##@@ -->
+ * GMA Mapper Protocol: 415        <!-- @@##@@ -->
  * GMA Mapper Preferences File Format: 8 <!-- @@##@@ -->
 
 ## DEPRECATION NOTICE
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.26
+## Enhancements
+ * Implements protocol 415, which provides a slightly more secure challenge/response exchange (backward compatible with previous versions).
+## Fixes
+ * Moves manual page entries to have names starting with `gma` as part of the overall GMA-project-wide effort to clean up the footprint of GMA tools that might clash with names of other packages installed on a system.
 
 # 4.25
 ## Adds
