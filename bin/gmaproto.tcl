@@ -170,7 +170,7 @@ namespace eval ::gmaproto {
 		OA      {ObjID s NewAttrs d}
 		OA+     {ObjID s AttrName s Values l}
 		OA-     {ObjID s AttrName s Values l}
-		OK      {Protocol i Challenge b ServerStarted s ServerActive s ServerTime s ServerVersion s}
+		OK      {Protocol i Challenge b ServerStarted s ServerActive s ServerTime s ServerVersion s Iterations i}
 		PRIV    {Command s Reason s}
 		POLO    {}
 		PROGRESS {OperationID s Title s Value i MaxValue i IsDone ? Targets l IsTimer ?}
@@ -2020,6 +2020,7 @@ proc ::gmaproto::_login {} {
 					error "This does not appear to be a server which speaks any protocol we understand."
 				}
 				set challenge [dict get $params Challenge]
+				set iterations [dict get $params Iterations]
 				if {$::gmaproto::protocol < $::gmaproto::min_protocol} {
 					error "The server speaks a protocol too old for me to understand ($::gmaproto::protocol)"
 				}
@@ -2046,7 +2047,7 @@ proc ::gmaproto::_login {} {
 					}
 					::gmaproto::DEBUG "Server requests authentication (challenge=[binary encode hex $challenge])"
 					::report_progress "Authenticating..."
-					set response [::gmaproto::auth_response $challenge]
+					set response [::gmaproto::auth_response $challenge $iterations]
 					::gmaproto::_protocol_send AUTH Response $response User $::gmaproto::username Client $::gmaproto::client
 					::report_progress "Authenticating... (awaiting server response)"
 					::gmaproto::DEBUG "Waiting for server's response"
@@ -2148,11 +2149,13 @@ proc ::gmaproto::end_stream {dictname endcmd} {
 	return [dict get $d StreamData]
 }
 
-proc ::gmaproto::auth_response {challenge} {
+proc ::gmaproto::auth_response {challenge {passes 0}} {
 	global ::tcl_platform
 	if {[catch {
-		binary scan $challenge S passes
-		set passes [expr $passes & 0xffff]
+		if {$passes <= 0} {
+			binary scan $challenge S passes
+			set passes [expr $passes & 0xffff]
+		} 
 		::gmaproto::DEBUG "-- $passes passes"
 		set H [::sha2::SHA256Init]
 		::sha2::SHA256Update $H $challenge
