@@ -1,9 +1,9 @@
 '\" t
 '\" *** 415 ***
 '\" <<ital-is-var>>
-.TH MAPPER-PROTOCOL 7 "GMA-Mapper 4.26" 05-Jul-2024 "Protocols" \" @@mp@@
+.TH GMA-MAPPER-PROTOCOL 7 "GMA-Mapper 4.26" 05-Jul-2024 "Protocols" \" @@mp@@
 .SH NAME
-mapper-protocol \- GMA client/server protocol specification
+gma-mapper-protocol \- GMA client/server protocol specification
 '\" <<New>>
 .SH EXPERIMENTAL
 .LP
@@ -780,13 +780,11 @@ string, the client must do the following:
 .\" <<enum>>
 .TP 4
 (1)
-'\" <<New>>
 If no value for
 .I i
 was provided by the server, obtain
 .I i
 by extracting the first two bytes from
-'\" <</New>>
 .I C
 as an unsigned, big-endian, 16-bit integer value.
 .TP
@@ -2040,6 +2038,7 @@ value of all the entries to be affected by this command.
 .B Type
 The type of core data entry to target.
 .TP
+'\" <</ital-is-var>>
 .BI "IsHidden " (bool)
 If true, set the entries matching the
 .B Filter
@@ -2051,6 +2050,7 @@ If true, all entries which do
 match
 .B Filter
 are affected.
+'\" <<ital-is-var>>
 .RE
 '\" <</>>
 .TP
@@ -2077,7 +2077,9 @@ If present and non-empty, limit the responses to those whose
 .B Name
 field matches this regular expression.
 .TP
+'\" <</ital-is-var>>
 .BI "Since " "(RFC 3339-formatted datetime string)"
+'\" <<ital-is-var>>
 If present and non-empty, limit the responses to those which were modified
 since the given date and time.
 .TP
@@ -2106,6 +2108,7 @@ request that initiated this update, if any.
 .B Type
 The database item type
 .TP
+'\" <</ital-is-var>>
 .BI "IsDone " (bool)
 If true, this is the final response in this set.
 .TP
@@ -2114,6 +2117,7 @@ The number of response this is, starting with 1.
 .TP
 .BI "Of " (int)
 The total number of responses that will be given.
+'\" <<ital-is-var>>
 .TP
 .B Name
 The item's name.
@@ -3656,7 +3660,7 @@ This has the general form
 .IR category [ natural ][\fB->\fP extended ][\fB=\fP space ][\fB:\fP[\fB*\fP] comment ]
 .RE
 '\" <<TeX>>
-'\" \label{mapper-protocol:PS:Size}
+'\" \label{gma-mapper-protocol:PS:Size}
 '\" <</TeX>>
 .LP
 where
@@ -4102,11 +4106,11 @@ which yields the client's version number to be compared against the
 field described above.
 '\" <</ital-is-var>>
 .I "This field should be used only in server init files. Clients SHOULD NOT use this field, nor expect it to be sent by the server."
-'\" <<ital-is-var>>
 .TP
 .BI Instances " (list of objects)"
 A list of all available instances of the named package. Each is a JSON object
 with the following fields:
+'\" <<ital-is-var>>
 '\" <<list>>
 .RS
 .TP
