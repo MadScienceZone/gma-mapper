@@ -1,5 +1,5 @@
 '\" t
-'\" *** 414 ***
+'\" *** 415 ***
 '\" <<ital-is-var>>
 .TH MAPPER-PROTOCOL 7 "GMA-Mapper 4.26" 05-Jul-2024 "Protocols" \" @@mp@@
 .SH NAME
@@ -81,7 +81,7 @@ be implemented to wait synchronously for a server
 response during the authentication negotiation stage.
 .LP
 '\" <</bold-is-fixed>>
-.B "This describes protocol version 414."
+.B "This describes protocol version 415."
 '\" <<bold-is-fixed>>
 These notes are intended to be 
 detailed enough to implement a client from and should be considered
@@ -4208,9 +4208,18 @@ and
 Steve Willoughby / steve@madscience.zone;
 John Mechalas (elevation and movement modes).
 .SH HISTORY
+'\" <<New>>
 .LP
-This document defines map protocol version 414,
-which changed the definition of the
+This document defines map protocol version 415,
+which added the 
+.B Iterations
+parameter to the 
+.B OK
+message.
+.LP
+Version 414 changed 
+'\" <</New>>
+the definition of the
 .B DENIED
 message to allow it to be sent at any time during the
 conversation. 
