@@ -1458,8 +1458,8 @@ proc ::gmaproto::polo {} {
 	::gmaproto::_protocol_send POLO
 }
 
-proc ::gmaproto::roll_dice {spec recipients to_all blind_to_gm} {
-	::gmaproto::_protocol_send D Recipients $recipients ToAll $to_all ToGM $blind_to_gm RollSpec $spec
+proc ::gmaproto::roll_dice {spec recipients to_all blind_to_gm {rid {}}} {
+	::gmaproto::_protocol_send D Recipients $recipients ToAll $to_all ToGM $blind_to_gm RollSpec $spec RequestID $rid
 }
 
 proc ::gmaproto::sync_chat {target} {

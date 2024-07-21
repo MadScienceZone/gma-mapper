@@ -17,6 +17,11 @@ The support for old server protocols (<400) and map file formats (<20) will be d
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
+# 4.27
+## Enhancements
+ * Die rolls are now sent with `RequestID` fields to identify which results that come back from the server relate to which rolls.
+ * When a die roll is made which has 3 or more results (such as with the `|repeat` option), the mapper will print a line after the results which include the basic statistics from that result set (population size, population mean, standard deviation, median, mode, and sum).
+ * Adds a new die roller style `stats` for printing the stats of a die roll set.
 # 4.26
 ## Enhancements
  * Implements protocol 415, which provides a slightly more secure challenge/response exchange (backward compatible with previous versions).

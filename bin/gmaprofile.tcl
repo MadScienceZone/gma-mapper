@@ -228,6 +228,7 @@ namespace eval ::gmaprofile {
 		separator  {Any punctuation that is used as a separator in the die-roll expression.}
 		sf         {An indicator that the "|sf" option was used to check for natural min and max rolls as automatic failure or success, along with custom labels, if any, for the success and failure outcomes.}
 		short      {When making a roll with a DC target, or using "|until", this indicates the amount by which this roll fell short of the target.}
+		stats      {When reporting statistics about multi-die roll sets such as those generated with "|repeat" options.}
 		total      {An indicator that you want to repeat the roll until the total of all rolls meets a target value.}
 		subtotal   {This shows a subtotal at various places in a complex, multi-dice roll expression.}
 		success    {If the roll includes clear success/fail criteria, this indicates why the roll succeeded.}
@@ -1506,6 +1507,7 @@ namespace eval ::gmaprofile {
 					separator [dict create fg [dict create dark {} light {}] bg [dict create dark {} light {}] font Normal format {=} overstrike false underline false offset 0]\
 					sf        [dict create fg [dict create dark #aaaaaa light #888888] bg [dict create dark {} light {}] font Special format {} overstrike false underline false offset 0]\
 					short     [dict create fg [dict create dark red light red] bg [dict create dark {} light {}] font Special format { missed DC by %s} overstrike false underline false offset 0]\
+					stats     [dict create fg [dict create dark #aaaaaa light #888888] bg [dict create dark {} light {}] font Tiny format {} overstrike false underline false offset 0]\
 					subtotal  [dict create fg [dict create dark #00fa92 light green] bg [dict create dark {} light {}] font Normal format {(%s)} overstrike false underline false offset 0]\
 					success   [dict create fg [dict create dark #00fa92 light green] bg [dict create dark {} light {}] font Important format {(%s) } overstrike false underline false offset 0]\
 					system    [dict create fg [dict create dark cyan light blue] bg [dict create dark {} light {}] font System format {} overstrike false underline false offset 0]\
