@@ -4634,8 +4634,13 @@ proc ZoomVector { args } {
 proc ObjAoeDrag {w x y} {
 	global OBJdata OBJ_CURRENT OBJ_SNAP canvas zoom DistanceLabelText AOE_START
 
-	set xx  [SnapCoordAlways [$canvas canvasx $x]]
-	set yy  [SnapCoordAlways [$canvas canvasy $y]]
+	if {$OBJ_CURRENT != 0 && [::gmaproto::from_enum AoEShape [dict get $OBJdata($OBJ_CURRENT) AoEShape]] eq {cone}} {
+		set xx [$canvas canvasx $x]
+		set yy [$canvas canvasy $y]
+	} else {
+		set xx  [SnapCoordAlways [$canvas canvasx $x]]
+		set yy  [SnapCoordAlways [$canvas canvasy $y]]
+	}
 	set gx  [CanvasToGrid $xx]
 	set gy  [CanvasToGrid $yy]
 
@@ -4686,10 +4691,17 @@ proc DrawAoeZone {w id coords} {
 		return
 	}
 	lassign $coords x0 y0 xx yy
-	set gx0 [CanvasToGrid $x0]
-	set gy0 [CanvasToGrid $y0]
-	set gxx [CanvasToGrid $xx]
-	set gyy [CanvasToGrid $yy]
+	if {[dict get $OBJdata($id) AoEShape] eq {cone}} {
+		set gx0 [expr [CanvasToGrid $x0*4] / 4.0]
+		set gy0 [expr [CanvasToGrid $y0*4] / 4.0]
+		set gxx [expr [CanvasToGrid $xx*4] / 4.0]
+		set gyy [expr [CanvasToGrid $yy*4] / 4.0]
+	} else {
+		set gx0 [CanvasToGrid $x0]
+		set gy0 [CanvasToGrid $y0]
+		set gxx [CanvasToGrid $xx]
+		set gyy [CanvasToGrid $yy]
+	}
 	set radius_grids [GridDistance $gx0 $gy0 $gxx $gyy]
 	set r [expr $radius_grids * $iscale]
 
