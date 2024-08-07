@@ -4741,7 +4741,9 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags} {
 						set js [expr $iscale * $j]
 						set is1 [expr $iscale + $is]
 						set js1 [expr $js - $iscale]
-						if {sqrt($is**2 + $js**2) <= $r} {
+						# special case for r=iscale (5'rad is too tight for the other tolerances to work)
+						# otherwise the top 2 corners need to be within 25% of the corner of the last square
+						if {$r == $iscale || (sqrt($is**2 + $js**2) <= $r+($iscale*.25) && sqrt($is1**2 + $js**2) <= $r+($iscale*.25))} {
 							# I
 							DrawAoeGrid $w [expr $x0 + $is] [expr $y0 - $js] \
 							               [expr $x0 + $is1] [expr $y0 - $js1] \
@@ -4783,18 +4785,48 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags} {
 				$w create line $x0 $y0 $xx $yy -tags [list REF$id] -width 1 -fill red
 				if {$deltax > 0 && $deltay > 0} {
 					# quadrant I
-					for {set x $x0} {$x < $xx} {set x [expr $x+$iscale]} {
-						for {set y [expr $y0 - $iscale]} {$y >= $yy} {set y [expr $y-$iscale]} {
+					if {$deltax >= $deltay } {
+						# 0-45 degrees
+						set y [expr $y0 - $iscale]
+						set by [expr $y + $iscale]
+						for {set x $x0; set i 0} {$x < $xx} {set x [expr $x+$iscale]; incr i} {
 							set bx [expr $x + $iscale]
-							set by [expr $y + $iscale]
-							foreach wid [$w find overlapping [expr $x+1] [expr $y+1] [expr $bx-1] [expr $by-1]] {
-								if {[lsearch -exact [$w gettags $wid] REF$id] >= 0} {
-									DrawAoeGrid $w $x $y $bx $by $color $id $tags
-									break
-								}
+							if {$i*$iscale >= round($deltax/$deltay)*$iscale} {
+								puts "bump $i*$iscale >= round($deltax/$deltay*$iscale) => [expr $i*$iscale] >= [expr round($deltax/$deltay*$iscale)]"
+								set i 0
+								set y [expr $y-$iscale]
+								set by [expr $y + $iscale]
 							}
+							puts "i=$i x=$x y=$y bx=$bx by=$by deltax=$deltax deltay=$deltay id=$id"
+							DrawAoeGrid $w $x $y $bx $by $color $id $tags
+						}
+					} else {
+						# 46-90 degrees
+						set x $x0
+						set bx [expr $x + $iscale]
+						for {set y [expr $y0-$iscale]; set i 0} {$y >= $yy} {set y [expr $y-$iscale]; incr i} {
+							set by [expr $y + $iscale]
+							if {$i*$iscale >= $deltay} {
+								set i 0
+								set x [expr $x+$iscale]
+								set bx [expr $x + $iscale]
+							}
+							DrawAoeGrid $w $x $y $bx $by $color $id $tags
 						}
 					}
+
+#########					for {set x $x0} {$x < $xx} {set x [expr $x+$iscale]} {
+	#########					for {set y [expr $y0 - $iscale]} {$y >= $yy} {set y [expr $y-$iscale]} {
+		#########					set bx [expr $x + $iscale]
+			#########				set by [expr $y + $iscale]
+				#########			foreach wid [$w find overlapping [expr $x+1] [expr $y+1] [expr $bx-1] [expr $by-1]] {
+					#########			if {[lsearch -exact [$w gettags $wid] REF$id] >= 0} {
+						#########			DrawAoeGrid $w $x $y $bx $by $color $id $tags
+							#########		break
+								#########}
+							#########}
+						#########}
+					#########}
 				}
 				if {$deltax < 0 && $deltay > 0} {
 					# quadrant II
