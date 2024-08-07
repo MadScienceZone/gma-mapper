@@ -4785,28 +4785,43 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags} {
 				$w create line $x0 $y0 $xx $yy -tags [list REF$id] -width 1 -fill red
 				if {$deltax > 0 && $deltay > 0} {
 					# quadrant I
+					#         (xx,yy)  xx,yy,x0,y0 in canvas coords with (0,0) at upper left
+					#        /         deltax, deltay in canvas units but with y increasing up
+					# (x0,y0)
+					# to achieve the specific pattern of the RAW line templates,
+					# step x from x0->xx, incrementing y in steps over (y0-iscale)->yy every time we 
+					# draw the number of squares horizontally that we need to achieve the line's slope.
+					#   |<-iscale->|
+					#   x,y_________ ... (xx,yy)
+					#   |          |
+					#   |          |
+					#   |          |
+					#   |______bx,by
+					# x0,y0
+					#
 					if {$deltax >= $deltay } {
 						# 0-45 degrees
+						#puts "id=$id 0-45deg dx=$deltax dy=$deltay steps=[expr round(1.0*$deltax/$deltay)]"
+						set steps [expr round(1.0*$deltax/$deltay)]
 						set y [expr $y0 - $iscale]
 						set by [expr $y + $iscale]
 						for {set x $x0; set i 0} {$x < $xx} {set x [expr $x+$iscale]; incr i} {
 							set bx [expr $x + $iscale]
-							if {$i*$iscale >= round($deltax/$deltay)*$iscale} {
-								puts "bump $i*$iscale >= round($deltax/$deltay*$iscale) => [expr $i*$iscale] >= [expr round($deltax/$deltay*$iscale)]"
+							if {$i >= $steps} {
 								set i 0
 								set y [expr $y-$iscale]
 								set by [expr $y + $iscale]
 							}
-							puts "i=$i x=$x y=$y bx=$bx by=$by deltax=$deltax deltay=$deltay id=$id"
 							DrawAoeGrid $w $x $y $bx $by $color $id $tags
 						}
 					} else {
 						# 46-90 degrees
 						set x $x0
 						set bx [expr $x + $iscale]
+						set steps [expr round(1.0*$deltay/$deltax)]
 						for {set y [expr $y0-$iscale]; set i 0} {$y >= $yy} {set y [expr $y-$iscale]; incr i} {
 							set by [expr $y + $iscale]
-							if {$i*$iscale >= $deltay} {
+							if {$i >= $steps} {
 								set i 0
 								set x [expr $x+$iscale]
 								set bx [expr $x + $iscale]
@@ -4814,33 +4829,37 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags} {
 							DrawAoeGrid $w $x $y $bx $by $color $id $tags
 						}
 					}
-
-#########					for {set x $x0} {$x < $xx} {set x [expr $x+$iscale]} {
-	#########					for {set y [expr $y0 - $iscale]} {$y >= $yy} {set y [expr $y-$iscale]} {
-		#########					set bx [expr $x + $iscale]
-			#########				set by [expr $y + $iscale]
-				#########			foreach wid [$w find overlapping [expr $x+1] [expr $y+1] [expr $bx-1] [expr $by-1]] {
-					#########			if {[lsearch -exact [$w gettags $wid] REF$id] >= 0} {
-						#########			DrawAoeGrid $w $x $y $bx $by $color $id $tags
-							#########		break
-								#########}
-							#########}
-						#########}
-					#########}
 				}
 				if {$deltax < 0 && $deltay > 0} {
 					# quadrant II
-					$w create line $x0 $y0 $xx $yy -tags [list REF$id] -width 1 -fill red
-					for {set x $xx} {$x < $x0} {set x [expr $x+$iscale]} {
-						for {set y [expr $y0 - $iscale]} {$y >= $yy} {set y [expr $y-$iscale]} {
+					# (xx,yy)          xx,yy,x0,y0 in canvas coords with (0,0) at upper left
+					#        \         deltax, deltay in canvas units but with y increasing up
+					#         (x0,y0)
+					# to achieve the specific pattern of the RAW line templates,
+					# step x from x0->xx, incrementing y in steps over (y0-iscale)->yy every time we 
+					# draw the number of squares horizontally that we need to achieve the line's slope.
+					# (xx,yy)...
+					#      |<-iscale->|
+					#      x,y_________ 
+					#      |          |
+					#      |          |
+					#      |          |
+					#      |______bx,by
+					#               x0,y0
+					if {abs($deltax) >= $deltay} {
+						# 91-135 degrees
+						set steps [expr abs(round(1.0*$deltax/$deltay))]
+						set y [expr $yy - $iscale]
+						set by [expr $y + $iscale]
+						for {set x $x0-$iscale; set i 0} {$x > $xx} {set x [expr $x-$iscale]; incr i} {
 							set bx [expr $x + $iscale]
-							set by [expr $y + $iscale]
-							foreach wid [$w find overlapping [expr $x+1] [expr $y+1] [expr $bx-1] [expr $by-1]] {
-								if {[lsearch -exact [$w gettags $wid] REF$id] >= 0} {
-									DrawAoeGrid $w $x $y $bx $by $color $id $tags
-									break
-								}
+							if {$i >= $steps} {
+								set i 0
+								set y [expr $y+$iscale]
+								set by [expr $y + $iscale]
 							}
+
+							DrawAoeGrid $w $x $y $bx $by $color $id $tags
 						}
 					}
 				}
