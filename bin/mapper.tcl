@@ -4782,7 +4782,7 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags} {
 		}
 		ray {
 			if {$r > 0} {
-				$w create line $x0 $y0 $xx $yy -tags [list REF$id] -width 1 -fill red
+				#$w create line $x0 $y0 $xx $yy -tags [list REF$id] -width 1 -fill red
 				if {$deltax > 0 && $deltay > 0} {
 					# quadrant I
 					#         (xx,yy)  xx,yy,x0,y0 in canvas coords with (0,0) at upper left
@@ -4835,9 +4835,6 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags} {
 					# (xx,yy)          xx,yy,x0,y0 in canvas coords with (0,0) at upper left
 					#        \         deltax, deltay in canvas units but with y increasing up
 					#         (x0,y0)
-					# to achieve the specific pattern of the RAW line templates,
-					# step x from x0->xx, incrementing y in steps over (y0-iscale)->yy every time we 
-					# draw the number of squares horizontally that we need to achieve the line's slope.
 					# (xx,yy)...
 					#      |<-iscale->|
 					#      x,y_________ 
@@ -4846,53 +4843,120 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags} {
 					#      |          |
 					#      |______bx,by
 					#               x0,y0
-					if {abs($deltax) >= $deltay} {
-						# 91-135 degrees
-						set steps [expr abs(round(1.0*$deltax/$deltay))]
-						set y [expr $yy - $iscale]
-						set by [expr $y + $iscale]
-						for {set x $x0-$iscale; set i 0} {$x > $xx} {set x [expr $x-$iscale]; incr i} {
+					if {-$deltax >= $deltay} {
+						# 135-180 degrees (more horizontal than vertical)
+						set steps [expr round(1.0*(-$deltax)/$deltay)]
+						set y [expr $y0-$iscale]
+						set by [expr $y+$iscale]
+						for {set x [expr $x0-$iscale]; set i 0} {$x >= $xx} {set x [expr $x-$iscale]; incr i} {
 							set bx [expr $x + $iscale]
 							if {$i >= $steps} {
 								set i 0
-								set y [expr $y+$iscale]
-								set by [expr $y + $iscale]
+								set y [expr $y-$iscale]
+								set by [expr $y+$iscale]
 							}
-
+							DrawAoeGrid $w $x $y $bx $by $color $id $tags
+						}
+					} else {
+						# 91-134 degrees (more vertical than horizontal)
+						set steps [expr round(1.0*$deltay/(-$deltax))]
+						set x [expr $x0 - $iscale]
+						set bx [expr $x + $iscale]
+						for {set y [expr $y0-$iscale]; set i 0} {$y >= $yy} {set y [expr $y-$iscale]; incr i} {
+							set by [expr $y+$iscale]
+							if {$i >= $steps} {
+								set i 0
+								set x [expr $x-$iscale]
+								set bx [expr $x+$iscale]
+							}
 							DrawAoeGrid $w $x $y $bx $by $color $id $tags
 						}
 					}
 				}
 				if {$deltax < 0 && $deltay < 0} {
 					# quadrant III
-					$w create line $x0 $y0 $xx $yy -tags [list REF$id] -width 1 -fill red
-					for {set x $xx} {$x < $x0} {set x [expr $x+$iscale]} {
-						#for {set y [expr $y0 - $iscale]} {$y >= $yy} {set y [expr $y-$iscale]} {}
-						for {set y [expr $yy-$iscale]} {$y >= $y0} {set y [expr $y-$iscale]} {
-							set bx [expr $x + $iscale]
-							set by [expr $y + $iscale]
-							foreach wid [$w find overlapping [expr $x+1] [expr $y+1] [expr $bx-1] [expr $by-1]] {
-								if {[lsearch -exact [$w gettags $wid] REF$id] >= 0} {
-									DrawAoeGrid $w $x $y $bx $by $color $id $tags
-									break
-								}
+					#         (x0,y0)  xx,yy,x0,y0 in canvas coords with (0,0) at upper left
+					#        /         deltax, deltay in canvas units but with y increasing up
+					# (xx,yy)
+					#
+					#      |<-iscale->|
+					#      x,y_________(x0,y0)
+					#      |          |
+					#      |          |
+					#      |          |
+					#      |______bx,by
+					# (xx,yy)...    x0,y0
+					#$w create line $x0 $y0 $xx $yy -tags [list REF$id] -width 1 -fill red
+					if {-$deltax >= -$deltay} {
+						# 181-225 degrees (more horizontal)
+						set steps [expr round(1.0*$deltax/$deltay)]
+						set y $y0
+						set by [expr $y+$iscale]
+						for {set x [expr $x0-$iscale]; set i 0} {$x >= $xx} {set x [expr $x-$iscale]; incr i} {
+							set bx [expr $x+$iscale]
+							if {$i >= $steps} {
+								set i 0
+								set y [expr $y+$iscale]
+								set by [expr $y+$iscale]
 							}
+							DrawAoeGrid $w $x $y $bx $by $color $id $tags
+						}
+					} else {
+						# 226-270 degrees (more vertical)
+						set steps [expr round(1.0*$deltay/$deltax)]
+						set x [expr $x0-$iscale]
+						set bx [expr $x+$iscale]
+						for {set y $y0; set i 0} {$y < $yy} {set y [expr $y+$iscale]; incr i} {
+							set by [expr $y+$iscale]
+							if {$i >= $steps} {
+								set i 0
+								set x [expr $x-$iscale]
+								set bx [expr $x+$iscale]
+							}
+							DrawAoeGrid $w $x $y $bx $by $color $id $tags
 						}
 					}
 				}
 				if {$deltax > 0 && $deltay < 0} {
 					# quadrant IV
-					$w create line $x0 $y0 $xx $yy -tags [list REF$id] -width 1 -fill red
-					for {set x $x0} {$x < $xx} {set x [expr $x+$iscale]} {
-						for {set y [expr $yy-$iscale]} {$y >= $y0} {set y [expr $y-$iscale]} {
+					# (x0,y0)          xx,yy,x0,y0 in canvas coords with (0,0) at upper left
+					#        \         deltax, deltay in canvas units but with y increasing up
+					#         (xx,yy)
+					# (x0,y0)
+					#      |<-iscale->|
+					#      x,y_________ 
+					#      |          |
+					#      |          |
+					#      |          |
+					#      |______bx,by
+					#                 ...xx,yy
+					if {$deltax >= -$deltay} {
+						# 315-359 degrees (more horizontal than vertical)
+						set steps [expr round(1.0*$deltax/(-$deltay))]
+						set y $y0
+						set by [expr $y+$iscale]
+						for {set x $x0; set i 0} {$x < $xx} {set x [expr $x+$iscale]; incr i} {
 							set bx [expr $x + $iscale]
-							set by [expr $y + $iscale]
-							foreach wid [$w find overlapping [expr $x+1] [expr $y+1] [expr $bx-1] [expr $by-1]] {
-								if {[lsearch -exact [$w gettags $wid] REF$id] >= 0} {
-									DrawAoeGrid $w $x $y $bx $by $color $id $tags
-									break
-								}
+							if {$i >= $steps} {
+								set i 0
+								set y [expr $y+$iscale]
+								set by [expr $y+$iscale]
 							}
+							DrawAoeGrid $w $x $y $bx $by $color $id $tags
+						}
+					} else {
+						# 271-314 degrees (more vertical than horizontal)
+						set steps [expr round(1.0*(-$deltay)/$deltax)]
+						set x $x0
+						set bx [expr $x + $iscale]
+						for {set y $y0; set i 0} {$y < $yy} {set y [expr $y+$iscale]; incr i} {
+							set by [expr $y+$iscale]
+							if {$i >= $steps} {
+								set i 0
+								set x [expr $x+$iscale]
+								set bx [expr $x+$iscale]
+							}
+							DrawAoeGrid $w $x $y $bx $by $color $id $tags
 						}
 					}
 				}
