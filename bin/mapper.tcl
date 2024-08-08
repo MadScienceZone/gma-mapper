@@ -4430,7 +4430,7 @@ proc StartObj {w x y} {
 
 			set OBJtype($OBJ_CURRENT) aoe
 			set OBJdata($OBJ_CURRENT) [::gmaproto::new_dict LS-SAOE ID $OBJ_CURRENT \
-				X [expr $a_x / $zoom] Y [expr $a_y / $zoom] Z 99999999 \
+				X [expr $a_x / $zoom] Y [expr $a_y / $zoom] Z [expr 99999999+$z] \
 				Fill $fill_color Line $OBJ_COLOR(line) Width $OBJ_WIDTH Dash $dash Layer $layer \
 				AoEShape [::gmaproto::to_enum AoEShape $AOE_SHAPE] \
 			]
@@ -4453,10 +4453,11 @@ proc StartObj {w x y} {
 					# A cone is defined by a line from the cone's origin at (X,Y) to the cone's range extent, bisecting the 90-degree cone.
 
 					set DistanceLabelText "cone 0\u00b0, 15'"
-					$canvas coords obj_locator$OBJ_CURRENT $a_x $a_y [expr $a_x+3*$zoom*$iscale] $a_y
+					set a_x2 [expr $a_x+3*$zoom*$iscale]
 					set r 3*$zoom*$iscale
-					$canvas create polygon $a_x $a_y [expr $r*cos($PI/4.0)] [expr $r*sin($PI/4.0)] [expr $a_x+2*$r] $a_y [expr $r*cos(-$PI/4.0)] [expr $r*sin(-$PI/4.0)] \
-						-outline $OBJ_COLOR(line) -width 3 -dash - \
+					$canvas coords obj_locator$OBJ_CURRENT $a_x $a_y $a_x2 $a_y
+					$canvas create polygon $a_x $a_y [expr $a_x+2*$r*cos($PI/4.0)] [expr $a_y+2*$r*sin($PI/4.0)] [expr $a_x+2*$r*cos(-$PI/4.0)] [expr $a_y+2*$r*sin(-$PI/4.0)] \
+						-outline $OBJ_COLOR(fill) -fill {} -width 3 -dash - \
 						-tags [list obj$OBJ_CURRENT obj_locator_radius$OBJ_CURRENT allOBJ]
 				}
 			}
@@ -4649,22 +4650,28 @@ proc ObjAoeDrag {w x y} {
 
 	if {$AOE_SHAPE == "cone"} {
 		lassign [AllPointsFromObj $OBJdata($OBJ_CURRENT)] x0 y0
+		set x [$canvas canvasx $x]
+		set y [$canvas canvasy $y]
 		# radius is horizontal distance from (X,Y), i.e., move mouse left/right to adjust AoE range
-		set r_px [expr floor(abs($x - $x0)/$zoom/$iscale)*$zoom*$iscale]
+		set r_grids [expr abs(floor(($x - $x0) / ($zoom * $iscale)) + 3)]
+		set r_px [expr int($r_grids * $zoom * $iscale)]
+		set r_ft [expr int($r_grids * 5)]
+
 		# rotation angle is vertical distance from (X,Y), i.e., move mouse up/down to adjust AoE rotation in units of grids/15 degrees
-		set theta_deg [expr floor(($y - $y0)/$zoom/$iscale) * 15]
+		set theta_deg [expr min(180, max(-180, floor(($y0- $y) / ($zoom*$iscale/4)) * 15))]
 		set theta [expr $theta_deg*$PI/180.0]
-		set DistanceLabelText [format "%d\u00b0, %d'" [expr int($theta_deg)] [expr int(5*$r_px/$zoom/$iscale)]]
-		set Ax [expr $r_px*cos($theta+($PI/4.0))] 
-		set Ay [expr $r_px*sin($theta+($PI/4.0))]
-		set Bx [expr 2*$r_px*cos($theta)] 
-		set By [expr 2*$r_px*sin($theta)]
-		set Cx [expr $r_px*cos($theta-($PI/4.0))] 
-		set Cy [expr $r_px*sin($theta-($PI/4.0))]
-		set x1 [expr $r_px*cos($theta)]
-		set y1 [expr $r_px*sin($theta)]
-		$w coords obj_locator_radius$OBJ_CURRENT $x0 $y0 $Ax $Ay $Bx $By $Cx $Cy
-		$w coords obj_locator$OBJ_CURRENT $x0 $y0 $x1 $y1
+
+		set DistanceLabelText [format "%d\u00b0 (%f), %d' x0=%g y0=%g x=%g y=%g" [expr int($theta_deg)] $theta $r_ft $x0 $y0 $x $y]
+		set Ax [expr $x0+2*$r_px*cos($theta+($PI/4.0))] 
+		set Ay [expr $y0+2*$r_px*sin($theta+($PI/4.0))]
+#		set Bx [expr $x0+2*$r_px*cos($theta)] 
+#		set By [expr $y0+2*$r_px*sin($theta)]
+		set Cx [expr $x0+2*$r_px*cos($theta-($PI/4.0))] 
+		set Cy [expr $y0+2*$r_px*sin($theta-($PI/4.0))]
+		set x1 [expr $x0+$r_px*cos($theta)]
+		set y1 [expr $y0+$r_px*sin($theta)]
+		$w coords obj_locator_radius$OBJ_CURRENT $x0 $y0 $Ax $Ay $Cx $Cy
+		$w coords obj_locator$OBJ_CURRENT $x0 $y0 [expr $x0+$r_px] $y0
 		set new_coords [list $x0 $y0 $x1 $y1]
 	} else {
 		set xx  [SnapCoordAlways [$canvas canvasx $x]]
@@ -4686,6 +4693,7 @@ proc ObjAoeDrag {w x y} {
 			radius {
 				$w coords obj_locator_radius$OBJ_CURRENT "[expr $x0-$r] [expr $y0-$r] [expr $x0+$r] [expr $y0+$r]"
 			}
+		}
 #			cone {
 #				if {$r > 0} {
 #					set theta0  [expr atan2($y0 - $yy, $xx - $x0)]
@@ -4701,7 +4709,6 @@ proc ObjAoeDrag {w x y} {
 #					$w itemconfigure obj_locator_cone3_$OBJ_CURRENT -start [expr ($theta2 / $PI) * 180.0]
 #				}
 #			}
-		}
 		DrawAoeZone $w $OBJ_CURRENT "$x0 $y0 $xx $yy"
 		update
 	}
@@ -5001,97 +5008,56 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags} {
 			}
 		}
 		cone {
+			global OBJdata iscale zoom PI
+			# Cones are special. We will have already set the correct (and snapped) point
+			# of origin at (x0,y0), and the vector caused by the line (x0,y0)-(x1,y1) is orthagonal
+			# to the 90-degree cone that shoots out from that point.
+			gmautil::dassign [lindex [dict get $OBJdata($id) Points] 0] X x1 Y y1
+			set x0 [expr [dict get $OBJdata($id) X] * $zoom]
+			set y0 [expr [dict get $OBJdata($id) Y] * $zoom]
+			set x1 [expr $x1*$zoom]
+			set y1 [expr $y1*$zoom]
+			set r [expr hypot($x1-$x0, $y1-$y0)]
+			set theta [expr atan2($y0-$y1, $x1-$x0)]
+			puts "($x0,$y0)-($x1,$y1) r=$r theta=$theta"
 
+			# draw a reference zone that bounds the 90-degree cone from (x0,y0)
+			set tolerance 4.0
+			set ref [$w create polygon $x0 $y0 [expr $x0+2*$r*cos($theta+($PI/$tolerance))] [expr $y0-2*$r*sin($theta+($PI/$tolerance))] \
+						  [expr $x0+2*$r*cos($theta-($PI/$tolerance))] [expr $y0-2*$r*sin($theta-($PI/$tolerance))] \
+						  -tags [list REF$id] -width 1 -fill {} -outline red]
 
+			# go through the area inside the polygon and mark each square that is within the range of the origin.
+			lassign [$w bbox $ref] bx1 by1 bx2 by2
+			puts "bbox of $ref = $bx1 $by1 $bx2 $by2 ; [$w bbox $ref]"
+			set bx1 [SnapCoordAlways $bx1]
+			set by1 [SnapCoordAlways $by1]
+			set bx2 [SnapCoordAlways $bx2]
+			set by2 [SnapCoordAlways $by2]
+			puts "snapped bbox $bx1 $by1 $bx2 $by2"
 
-
-
-#			# draw a reference pie slice and see what's inside it
-#			set theta0 [expr atan2($y0 - $yy, $xx - $x0)]
-#			set theta2 [expr $theta0 - ($PI / 4)]
-#			set theta2_deg [expr ($theta2/$PI)*180.0]
-#			if {$theta2_deg < -180} {
-#				set theta2_deg [expr $theta2_deg + 360]
-#			}
-#			set offset [expr $iscale / 2.0]
-#			$w create arc [expr $x0-$r] [expr $y0-$r] [expr $x0+$r] [expr $y0+$r] -width 1 -fill red -outline red -start $theta2_deg -extent 90 -tags [list REF$id]
-#			#
-#			# Note that for corner grid squares, we'll test two of these.
-#			#
-#			#
-#			# if the cone's right edge is in [0,π/2], check that the top edge of the grid square overlaps the cone
-#			#
-#			set fuzz 3
-#			#if {$theta2_deg >= 0 && $theta2_deg <= 90} {
-#				for {set x [expr -$r]} {$x < $r} {set x [expr $x+$iscale]} {
-#					for {set y [expr -$r]} {$y < 0} {set y [expr $y+$iscale]} {
-#						if {($x < 0 && $x >= $y) || ($x >=0 && $x < -$y)} {
-#							foreach wid [$w find overlapping [expr $x0+$x+$fuzz] [expr $y0+$y] [expr $x0+$x+$iscale-$fuzz] [expr $y0+$y]] {
-#								if {[lsearch -exact [$w gettags $wid] REF$id] >= 0} {
-#									DrawAoeGrid $w [expr $x0+$x] [expr $y0+$y] [expr $x0+$x+$iscale] [expr $y0+$y+$iscale] $color $id $tags
-#									break
-#								}
-#							}
-#						}
-#					}
-#				}
-#			#}
-#			#
-#			# if the cone's right edge is in [π/2,π], check that the left edge of the grid square overlaps the cone
-#			#
-#			#if {$theta2_deg >= 90 && $theta2_deg <= 180} {
-#				for {set x [expr -$r]} {$x < 0} {set x [expr $x+$iscale]} {
-#					for {set y [expr -$r]} {$y < $r} {set y [expr $y+$iscale]} {
-#						if {($y < 0 && $y >= $x) || ($y >= 0 && $y < -$x)} {
-#							foreach wid [$w find overlapping [expr $x0+$x] [expr $y0+$y+$fuzz] [expr $x0+$x] [expr $y0+$y+$iscale-$fuzz]] {
-#								if {[lsearch -exact [$w gettags $wid] REF$id] >= 0} {
-#									DrawAoeGrid $w [expr $x0+$x] [expr $y0+$y] [expr $x0+$x+$iscale] [expr $y0+$y+$iscale] $color $id $tags
-#									break
-#								}
-#							}
-#						}
-#					}
-#				}
-#			#}
-#			#
-#			# if the cone's right edge is in [-π,-π/2], check that the bottom edge of the grid square overlaps the cone
-#			#
-#			#if {$theta2_deg >= -180 && $theta2_deg <= -90} {
-#				for {set x [expr -$r]} {$x < $r} {set x [expr $x+$iscale]} {
-#					for {set y 0} {$y < $r} {set y [expr $y+$iscale]} {
-#						if {($x < 0 && -$x-$iscale <= $y) || ($x >= 0 && $x <= $y)} {
-#							foreach wid [$w find overlapping [expr $x0+$x+$fuzz] [expr $y0+$y+$iscale] [expr $x0+$x+$iscale-$fuzz] [expr $y0+$y+$iscale]] {
-#
-#								if {[lsearch -exact [$w gettags $wid] REF$id] >= 0} {
-#									DrawAoeGrid $w [expr $x0+$x] [expr $y0+$y] [expr $x0+$x+$iscale] [expr $y0+$y+$iscale] $color $id $tags
-#									break
-#								}
-#							}
-#						}
-#					}
-#				}
-#			#}
-#			#
-#			# if the cone's right edge is in [-π/2,0], check that the right edge of the grid square overlaps the cone
-#			#
-#			#if {$theta2_deg >= -90 && $theta2_deg <= 0} {
-#				for {set x 0} {$x < $r} {set x [expr $x+$iscale]} {
-#					for {set y [expr -$r]} {$y < $r} {set y [expr $y+$iscale]} {
-#						if {($y < 0 && $x >= -$y-$iscale) || ($y >= 0 && $x >= $y)} {
-#							foreach wid [$w find overlapping [expr $x0+$x+$iscale] [expr $y0+$y+$fuzz] [expr $x0+$x+$iscale] [expr $y0+$y+$iscale-$fuzz]] {
-#
-#								if {[lsearch -exact [$w gettags $wid] REF$id] >= 0} {
-#									DrawAoeGrid $w [expr $x0+$x] [expr $y0+$y] [expr $x0+$x+$iscale] [expr $y0+$y+$iscale] $color $id $tags
-#									break
-#								}
-#							}
-#						}
-#					}
-#				}
-#			#}
+			for {set x $bx1} {$x < $bx2} {set x $xx} {
+				set xx [expr $x+$iscale*$zoom]
+				for {set y $by1} {$y < $by2} {set y $yy} {
+					set yy [expr $y+$iscale*$zoom]
+					set in false
+					foreach wid [$w find overlapping $x $y $xx $yy] {
+						if {[lsearch -exact [$w gettags $wid] REF$id] >= 0} {
+							set in true
+							break
+						}
+					}
+					if {$in} {
+						$w create rect $x $y [expr $x+$iscale*$zoom] [expr $y+$iscale*$zoom] -outline green -fill {} -width 9 -tag x
+					} else {
+						$w create rect $x $y [expr $x+$iscale*$zoom] [expr $y+$iscale*$zoom] -outline red -fill {} -width 1 -tag x
+					}
+					update
+				}	
+			}
 		}
 	}
-	$w delete REF$id
+	#$w delete REF$id
 }
 
 #
@@ -5313,12 +5279,23 @@ proc LastPoint {w x y} {
 }
 
 proc LastAoePoint {w x y} {
-	global OBJdata OBJ_CURRENT OBJ_SNAP canvas zoom
+	global OBJdata OBJ_CURRENT OBJ_SNAP canvas zoom AOE_SHAPE iscale PI
 	set x [$canvas canvasx $x]
 	set y [$canvas canvasy $y]
-	set xx [SnapCoordAlways $x]
-	set yy [SnapCoordAlways $y]
-	dict lappend OBJdata($OBJ_CURRENT) Points [dict create X [expr $xx / $zoom] Y [expr $yy / $zoom]]
+	if {$AOE_SHAPE eq "cone"} {
+		# last x0,y0 - xx,yy line defines the angle and magnitude of the cone
+		lassign [AllPointsFromObj $OBJdata($OBJ_CURRENT)] x0 y0 
+		set r_grids [expr abs(floor(($x-$x0) / ($zoom*$iscale)) + 3)]
+		set r_px [expr $r_grids*$zoom*$iscale]
+		set theta [expr min($PI, max(-$PI, floor(($y0 - $y) / ($zoom*$iscale/4)) * ($PI/12.0)))]
+		set xx [expr $x0 + $r_px*cos($theta)]
+		set yy [expr $y0 + $r_px*sin($theta)]
+		dict lappend OBJdata($OBJ_CURRENT) Points [dict create X [expr $xx / $zoom] Y [expr $yy / $zoom]]
+	} else {
+		set xx [SnapCoordAlways $x]
+		set yy [SnapCoordAlways $y]
+		dict lappend OBJdata($OBJ_CURRENT) Points [dict create X [expr $xx / $zoom] Y [expr $yy / $zoom]]
+	}
 	$w delete obj_distance$OBJ_CURRENT
 	$w delete obj_locator$OBJ_CURRENT
 	$w delete obj_locator_radius$OBJ_CURRENT
@@ -5370,6 +5347,7 @@ proc EndObj w {
 		$w delete obj$OBJ_CURRENT
 		RemoveObject $OBJ_CURRENT
 		$w delete obj_distance$OBJ_CURRENT
+		$w delete obj_distance_radius$OBJ_CURRENT
 	} elseif {$t == "ruler"} {
 		# Rulers are only temporary. I suppose we could plant a flag at the endpoint or something
 		# but right now we don't need to.
