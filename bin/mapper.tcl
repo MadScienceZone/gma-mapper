@@ -5052,20 +5052,28 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags} {
 						}
 					}
 					if {$in} {
-						$w create rect $x $y [expr $x+$iscale*$zoom] [expr $y+$iscale*$zoom] -outline green -fill {} -width 1 -tag x
-						$w create line $x $y [expr $x+$iscale*$zoom] [expr $y+$iscale*$zoom] -fill green -width 1 -tag x -dash -
-						if {hypot($x0-$x, $y0-$y) <= $r} {
+#						$w create rect $x $y [expr $x+$iscale*$zoom] [expr $y+$iscale*$zoom] -outline green -fill {} -width 1 -tag x
+#						$w create line $x $y [expr $x+$iscale*$zoom] [expr $y+$iscale*$zoom] -fill green -width 1 -tag x -dash -
+#						$w create oval \
+#							[expr ($x+.5*$iscale*$zoom)-2] [expr ($y+.5*$iscale*$zoom)+2] \
+#							[expr ($x+.5*$iscale*$zoom)+2] [expr ($y+.5*$iscale*$zoom)-2] \
+#							-fill blue
+#						$w create line $x0 $y0 [expr $x+.5*$iscale*$zoom] [expr $y+.5*$iscale*$zoom] -fill blue
+#						if {hypot($x0-($x+.5*$iscale*$zoom), $y0-($y+.5*$iscale*$zoom)) <= $r-.25*$iscale*$zoom} {
+#							DrawAoeGrid $w $x $y [expr $x+$iscale*$zoom] [expr $y+$iscale*$zoom] $color $id $tags
+#						}
+						set rs [lsort -real -decreasing [list [expr hypot($x0-$x, $y0-$y)] [expr hypot($x0-($x+$iscale*$zoom), $y0-$y)] [expr hypot($x0-($x+$iscale*$zoom), $y0-($y+$iscale*$zoom))] [expr hypot($x0-$x, $y0-($y+$iscale*$zoom))]]]
+						if {[lindex $rs 0] <= $r+(.30*$iscale*$zoom) && [lindex $rs 1] <= $r+(.30*$iscale*$zoom)} {
 							DrawAoeGrid $w $x $y [expr $x+$iscale*$zoom] [expr $y+$iscale*$zoom] $color $id $tags
 						}
-					} else {
-						$w create rect $x $y [expr $x+$iscale*$zoom] [expr $y+$iscale*$zoom] -outline red -fill {} -width 1 -tag x
+#(else)						$w create rect $x $y [expr $x+$iscale*$zoom] [expr $y+$iscale*$zoom] -outline red -fill {} -width 1 -tag x
 					}
 					#update
 				}	
 			}
 		}
 	}
-	#$w delete REF$id
+	$w delete REF$id
 }
 
 #
