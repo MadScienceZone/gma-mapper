@@ -5023,8 +5023,12 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags} {
 
 			# draw a reference zone that bounds the 90-degree cone from (x0,y0)
 			set tolerance 4.0
-			set ref [$w create polygon $x0 $y0 [expr $x0+2*$r*cos($theta+($PI/$tolerance))] [expr $y0-2*$r*sin($theta+($PI/$tolerance))] \
-						  [expr $x0+2*$r*cos($theta-($PI/$tolerance))] [expr $y0-2*$r*sin($theta-($PI/$tolerance))] \
+			# (rx0,ry0) are centered on the border grids for the reference line
+			set r_offset [expr $iscale*$zoom*.5]
+			set rx0 [expr $x0+$r_offset*cos($theta)]
+			set ry0 [expr $y0-$r_offset*sin($theta)]
+			set ref [$w create polygon $rx0 $ry0 [expr $rx0+2*$r*cos($theta+($PI/$tolerance))] [expr $ry0-2*$r*sin($theta+($PI/$tolerance))] \
+						  [expr $rx0+2*$r*cos($theta-($PI/$tolerance))] [expr $ry0-2*$r*sin($theta-($PI/$tolerance))] \
 						  -tags [list REF$id] -width 1 -fill {} -outline red]
 
 			# go through the area inside the polygon and mark each square that is within the range of the origin.
@@ -5048,11 +5052,15 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags} {
 						}
 					}
 					if {$in} {
-						$w create rect $x $y [expr $x+$iscale*$zoom] [expr $y+$iscale*$zoom] -outline green -fill {} -width 9 -tag x
+						$w create rect $x $y [expr $x+$iscale*$zoom] [expr $y+$iscale*$zoom] -outline green -fill {} -width 1 -tag x
+						$w create line $x $y [expr $x+$iscale*$zoom] [expr $y+$iscale*$zoom] -fill green -width 1 -tag x -dash -
+						if {hypot($x0-$x, $y0-$y) <= $r} {
+							DrawAoeGrid $w $x $y [expr $x+$iscale*$zoom] [expr $y+$iscale*$zoom] $color $id $tags
+						}
 					} else {
 						$w create rect $x $y [expr $x+$iscale*$zoom] [expr $y+$iscale*$zoom] -outline red -fill {} -width 1 -tag x
 					}
-					update
+					#update
 				}	
 			}
 		}
