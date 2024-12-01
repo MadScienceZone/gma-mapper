@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       _______   ______                 #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___   ) / ____ \                #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |( (    \/                #
-# | |      | || || || (___) | Assistant  / (_) (_        /   )| (____                  #
-# | | ____ | |(_)| ||  ___  |           (____   _)     _/   / |  ___ \                 #
-# | | \_  )| |   | || (   ) |                ) (      /   _/  | (   ) )                #
-# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\( (___) )                #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/ \_____/                 #
+#  _______  _______  _______                ___       _______  ______                  #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___   )/ ___  \                 #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |\/   )  )                #
+# | |      | || || || (___) | Assistant  / (_) (_        /   )    /  /                 #
+# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /    /  /                  #
+# | | \_  )| |   | || (   ) |                ) (      /   _/    /  /                   #
+# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\ /  /                    #
+# (_______)|/     \||/     \| Client         (_)  (_)\_______/ \_/                     #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -17,10 +17,10 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.26}     ;# @@##@@
+set GMAMapperVersion {4.27}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {415}         ;# @@##@@
-set CoreVersionNumber {6.22}            ;# @@##@@
+set CoreVersionNumber {6.26}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -10351,9 +10351,15 @@ proc DoCommandLoginSuccessful {} {
 		set is_GM true
 	}
 	refresh_title
+	set feature_set {}
+
 	if {[dict get $_preferences colorize_die_rolls]} {
-		::gmaproto::allow DICE-COLOR-BOXES
+		lappend feature_set DICE-COLOR-BOXES
 	}
+	if {[dict get $_preferences colorize_die_labels]} {
+		lappend feature_set DICE-COLOR-LABELS
+	}
+	::gmaproto::allow $feature_set
 }
 
 #
@@ -10596,7 +10602,103 @@ proc format_with_style {value format} {
 	return $value
 }
 
+#
+# We collect and report stats for die roll sets of 3 or more results.
+# Since we see each result separately, we group them by RequestID (which
+# means we by necessity ignore any without an ID), until we see the last
+# roll in the set and then report it. Once we report, we remove the
+# tracked data.
+#
+proc CollectRollStats {d} {
+	global RollStatCollection
+	if {[catch {
+		::gmautil::dassign $d RequestID rID {Result Result} x
+	} err]} {
+		DEBUG 1 "Unable to collect stats: $err"
+		return
+	}
+
+	if {$rID eq {}} {
+		return
+	}
+	lappend RollStatCollection($rID) $x
+	DEBUG 1 "collect $rID -> $RollStatCollection($rID)"
+}
+proc ReportRollStats {d} {
+	global RollStatCollection
+	if {[catch {
+		::gmautil::dassign $d MoreResults is_more RequestID rID
+	} err]} {
+		DEBUG 1 "Unable to report stats: $err"
+		return {}
+	}
+
+	if {$rID eq {} || $is_more} {
+		DEBUG 1 "no report for $rID ($is_more)"
+		return {}
+	}
+
+	if {[set N [llength $RollStatCollection($rID)]] < 3} {
+		array unset RollStatCollection $rID
+		DEBUG 1 "no report for $rID (not enough data)"
+		return {}
+	}
+
+	set sum 0
+	foreach x $RollStatCollection($rID) {
+		incr sum $x
+	}
+	set mean [expr ($sum * 1.0) / $N]
+	set v 0
+	set cur {}
+	set count 0
+	set largest_count 0
+	set mode {}
+	set sorted [lsort -integer $RollStatCollection($rID)]
+	array unset RollStatCollection $rID
+
+	foreach x $sorted {
+		set v [expr $v + (($x - $mean) ** 2)]
+		if {$cur eq {}} {
+			set cur $x
+			set count 1
+		} elseif {$cur != $x} {
+			if {$count == $largest_count} {
+				lappend mode $cur
+			} elseif {$count > $largest_count} {
+				set mode [list $cur]
+				set largest_count $count
+			}
+			set cur $x
+			set count 1
+		} else {
+			incr count
+		}
+	}
+	if {$cur ne {}} {
+		if {$count == $largest_count} {
+			lappend mode $cur
+		} elseif {$count > $largest_count} {
+			set mode [list $cur]
+		}
+	}
+	set sd [expr sqrt($v / ($N-1))]
+	if {$N % 2 == 0} {
+		set med [expr ([lindex $sorted [expr $N/2]] + [lindex $sorted [expr $N/2 - 1]]) / 2.0]
+	} else {
+		set med [lindex $sorted [expr $N/2]]
+	}
+
+	set mode "[list $mode]"
+	DEBUG 1 "report for $rID [list $N $mean $sd $med $mode $sum]"
+	return [list $N $mean $sd $med $mode $sum]
+}
+
+
 set drd_id 0
+proc toIDName {n} {
+	return [regsub -all {\W} $n {}]
+}
 proc DisplayDieRoll {d} {
 	global icon_dieb16 icon_die16 icon_die16c SuppressChat drd_id LastDisplayedChatDate dice_preset_data
 
@@ -10614,6 +10716,7 @@ proc DisplayDieRoll {d} {
 		{Result ResultSuppressed} is_blind \
 		Sent             date_sent
 
+	CollectRollStats $d
 	global local_user dice_preset_data
 	if {![info exists dice_preset_data(cw,[root_user_key])]} {
 		DisplayChatMessage {} {}
@@ -10695,12 +10798,47 @@ proc DisplayDieRoll {d} {
 #				critspec  {$w.1.text insert end "  [lindex $tuple 1]" [lindex $tuple 0]}
 	if {[catch {
 		foreach dd $details {
-			$w.1.text insert end [format_with_style [dict get $dd Value] [dict get $dd Type]] [dict get $dd Type]
-			DEBUG 3 "DisplayDieRoll: $dd"
+			set parts [split [dict get $dd Value] "\u2261"]
+			switch [llength $parts] {
+				0 {
+					$w.1.text insert end [format_with_style [dict get $dd Value] [dict get $dd Type]] [dict get $dd Type]
+					DEBUG 3 "DisplayDieRoll: empty value $dd"
+				}
+				1 {
+					$w.1.text insert end [format_with_style [lindex $parts 0] [dict get $dd Type]] [dict get $dd Type]
+					DEBUG 3 "DisplayDieRoll: normal value $dd"
+				}
+				2 {
+					$w.1.text tag configure [set tag _custom_fg_[toIDName [lindex $parts 1]]] \
+						-foreground [lindex $parts 1] \
+						-background [::tk::Darken [lindex $parts 1] 40] \
+						-font [$w.1.text tag cget [dict get $dd Type] -font]
+					$w.1.text insert end [lindex $parts 0] $tag
+					DEBUG 3 "DisplayDieRoll: custom $tag $dd"
+				}
+				default {
+					$w.1.text tag configure \
+						[set tag _custom_fg_[toIDName [lindex $parts 1]]_bg_[toIDName [lindex $parts 2]]] \
+							-foreground [lindex $parts 1] \
+							-background [lindex $parts 2] \
+							-font [$w.1.text tag cget [dict get $dd Type] -font]
+					$w.1.text insert end [lindex $parts 0] $tag
+					DEBUG 3 "DisplayDieRoll: custom $tag $dd"
+				}
+			}
 		}
 	} err]} {
 		DEBUG 0 $err
 	}
+	if {[catch {
+		if {[llength [set stats [ReportRollStats $d]]] > 0} {
+			$w.1.text insert end "\n"
+			$w.1.text insert end [format "N=%d μ=%g σ=%g Md=%g Mo=%s Σ=%g" {*}$stats] stats
+		}
+	} err]} {
+		DEBUG 1 "Error reporting stats: $err"
+	}
+
 	$w.1.text insert end "\n"
 	$w.1.text see end
 #	if {![info exists dice_preset_data(chat_lock)] || $dice_preset_data(chat_lock)} {
@@ -12370,7 +12508,7 @@ proc DisplayChatMessage {d for_user args} {
 				begingroup best bonus constant critlabel critspec dc diebonus diespec discarded
 				endgroup exceeded fail from fullmax fullresult iteration label max maximized maxroll 
 				met min moddelim normal operator repeat result roll separator short sf success 
-				title to until worst system subtotal error notice timestamp
+				title to until worst system subtotal error notice timestamp stats
 			} {
 				if {![dict exists $_preferences styles dierolls components $tag]} {
 					DEBUG 0 "Preferences profile is missing a definition for $tag; using default"
@@ -13013,7 +13151,7 @@ proc UpdatePeerList {for_user tkey} {
 
 proc SendDieRoll {recipients dice blind_p} {
 	set d [ParseRecipientList $recipients TO ToGM $blind_p]
-	::gmaproto::roll_dice $dice [dict get $d Recipients] [dict get $d ToAll] [dict get $d ToGM]
+	::gmaproto::roll_dice $dice [dict get $d Recipients] [dict get $d ToAll] [dict get $d ToGM] [new_id]
 }
 proc UpdateDicePresets {deflist for_user} {::gmaproto::define_dice_presets $deflist false $for_user}
 proc RequestDicePresets {for_user} {::gmaproto::query_dice_presets $for_user}
@@ -14323,7 +14461,7 @@ proc ConnectToServerByIdx {idx} {
 #
 #*user_key name -> sanitized_name
 #
-# @[00]@| GMA-Mapper 4.26
+# @[00]@| GMA-Mapper 4.27
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2024 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
