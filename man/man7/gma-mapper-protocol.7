@@ -665,7 +665,7 @@ Every time an
 .B ALLOW
 command is given, it resets the entire set of features, rather than 
 adding to them.
-Currently, only one feature is recognized:
+Currently, the following one features are recognized:
 .RS
 '\" <<list>>
 .TP
@@ -688,6 +688,11 @@ color code, indicating the foreground color for that part of the title. A second
 such suffix may be added to indicate the background color. If this feature is
 not enabled, these formatting codes are stripped out by the server before sending
 die roll results to a client which isn't prepared to interpret them.
+.TP
+.B DICE-COLOR-LABELS
+The client supports formatting controls in die-roll label fields in the roll details
+in a format as described above for sub-titles. This allows custom colors to be used
+for special die-roll modifiers that need to stand out visually from all the rest.
 '\" <</>>
 '\" <</>>
 .RE
