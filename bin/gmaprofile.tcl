@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___       _______   ______                 #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___   ) / ____ \                #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |( (    \/                #
-# | |      | || || || (___) | Assistant  / (_) (_        /   )| (____                  #
-# | | ____ | |(_)| ||  ___  |           (____   _)     _/   / |  ___ \                 #
-# | | \_  )| |   | || (   ) |                ) (      /   _/  | (   ) )                #
-# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\( (___) )                #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/ \_____/                 #
+#  _______  _______  _______                ___       _______  ______                  #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___   )/ ___  \                 #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |\/   )  )                #
+# | |      | || || || (___) | Assistant  / (_) (_        /   )    /  /                 #
+# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /    /  /                  #
+# | | \_  )| |   | || (   ) |                ) (      /   _/    /  /                   #
+# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\ /  /                    #
+# (_______)|/     \||/     \| Client         (_)  (_)\_______/ \_/                     #
 #                                                                                      #
 ########################################################################################
 # Profile editor
@@ -87,6 +87,7 @@ namespace eval ::gmaprofile {
 		button_size s
 		chat_timestamp ?
 		colorize_die_rolls ?
+		colorize_die_labels ?
 		curl_path s
 		curl_insecure ?
 		current_profile s
@@ -292,6 +293,7 @@ namespace eval ::gmaprofile {
 			button_size     small\
 			chat_timestamp  true\
 			colorize_die_rolls true\
+			colorize_die_labels true\
 			curl_path       [::gmautil::searchInPath curl]\
 			curl_insecure   false\
 			current_profile offline\
@@ -587,7 +589,7 @@ namespace eval ::gmaprofile {
 		set _profile $_profile_backup
 	}
 	proc _save {} {
-		global animate colorize_die_rolls button_size bsizetext show_timers scaling dark image_format keep_tools preload
+		global animate colorize_die_rolls colorize_die_labels button_size bsizetext show_timers scaling dark image_format keep_tools preload
 		global imgtext debug_level debug_proto curl_path curl_insecure profiles menu_button never_animate
 		global major_interval major_offset_x major_offset_y
 		global minor_interval minor_offset_x minor_offset_y flash_updates
@@ -599,6 +601,7 @@ namespace eval ::gmaprofile {
 			button_size $button_size \
 			chat_timestamp $chat_timestamp \
 			colorize_die_rolls $colorize_die_rolls \
+			colorize_die_labels $colorize_die_labels \
 			curl_path $curl_path \
 			curl_insecure $curl_insecure \
 			dark $dark \
@@ -773,7 +776,7 @@ namespace eval ::gmaprofile {
 	}
 
 	proc editor {w d} {
-		global animate button_size bsizetext colorize_die_rolls show_timers scaling dark image_format keep_tools preload chat_timestamp
+		global animate button_size bsizetext colorize_die_rolls colorize_die_labels show_timers scaling dark image_format keep_tools preload chat_timestamp
 		global imgtext debug_proto debug_level curl_path curl_insecure profiles menu_button never_animate
 		global major_interval major_offset_x major_offset_y
 		global minor_interval minor_offset_x minor_offset_y flash_updates
@@ -791,6 +794,7 @@ namespace eval ::gmaprofile {
 			button_size button_size \
 			chat_timestamp chat_timestamp \
 			colorize_die_rolls colorize_die_rolls \
+			colorize_die_labels colorize_die_labels \
 			curl_path curl_path \
 			curl_insecure curl_insecure \
 			dark dark \
@@ -811,6 +815,7 @@ namespace eval ::gmaprofile {
 		set animate [::gmaproto::int_bool $animate]
 		set flash_updates [::gmaproto::int_bool $flash_updates]
 		set colorize_die_rolls [::gmaproto::int_bool $colorize_die_rolls]
+		set colorize_die_labels [::gmaproto::int_bool $colorize_die_labels]
 		set chat_timestamp [::gmaproto::int_bool $chat_timestamp]
 		set dark [::gmaproto::int_bool $dark]
 		set menu_button [::gmaproto::int_bool $menu_button]
@@ -1099,6 +1104,7 @@ namespace eval ::gmaprofile {
 		grid [ttk::checkbutton $w.n.a.flash -text "Flash objects when they are updated" -variable flash_updates] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.chat_timestamp -text "Show timestamp in chat messages" -variable chat_timestamp] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.cdr -text "Enable colors in die-roll titles" -variable colorize_die_rolls] - - - - - - -sticky w
+		grid [ttk::checkbutton $w.n.a.cdl -text "Enable colors in die-roll labels" -variable colorize_die_labels] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.dark -text "Dark theme" -variable dark] - - - - - - -sticky w
 		grid [ttk::label $w.n.a.scalingl -text "Visual scaling factor:"] [ttk::spinbox $w.n.a.scaling -textvariable scaling -from 1.0 -to 100.0 -increment 1.0 -format "%.1f" -width 5] -sticky we
 		grid [ttk::checkbutton $w.n.a.menu_button -text "Use menu button instead of menu bar" -variable menu_button] - - - - - - -sticky w

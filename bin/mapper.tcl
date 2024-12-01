@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       _______   ______                 #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___   ) / ____ \                #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |( (    \/                #
-# | |      | || || || (___) | Assistant  / (_) (_        /   )| (____                  #
-# | | ____ | |(_)| ||  ___  |           (____   _)     _/   / |  ___ \                 #
-# | | \_  )| |   | || (   ) |                ) (      /   _/  | (   ) )                #
-# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\( (___) )                #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/ \_____/                 #
+#  _______  _______  _______                ___       _______  ______                  #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___   )/ ___  \                 #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |\/   )  )                #
+# | |      | || || || (___) | Assistant  / (_) (_        /   )    /  /                 #
+# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /    /  /                  #
+# | | \_  )| |   | || (   ) |                ) (      /   _/    /  /                   #
+# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\ /  /                    #
+# (_______)|/     \||/     \| Client         (_)  (_)\_______/ \_/                     #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -17,10 +17,10 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.27-beta}     ;# @@##@@
+set GMAMapperVersion {4.27}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {415}         ;# @@##@@
-set CoreVersionNumber {6.22}            ;# @@##@@
+set CoreVersionNumber {6.26}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -10504,9 +10504,15 @@ proc DoCommandLoginSuccessful {} {
 		set is_GM true
 	}
 	refresh_title
+	set feature_set {}
+
 	if {[dict get $_preferences colorize_die_rolls]} {
-		::gmaproto::allow DICE-COLOR-BOXES
+		lappend feature_set DICE-COLOR-BOXES
 	}
+	if {[dict get $_preferences colorize_die_labels]} {
+		lappend feature_set DICE-COLOR-LABELS
+	}
+	::gmaproto::allow $feature_set
 }
 
 #
@@ -10843,6 +10849,9 @@ proc ReportRollStats {d} {
 
 
 set drd_id 0
+proc toIDName {n} {
+	return [regsub -all {\W} $n {}]
+}
 proc DisplayDieRoll {d} {
 	global icon_dieb16 icon_die16 icon_die16c SuppressChat drd_id LastDisplayedChatDate dice_preset_data
 
@@ -10942,8 +10951,34 @@ proc DisplayDieRoll {d} {
 #				critspec  {$w.1.text insert end "  [lindex $tuple 1]" [lindex $tuple 0]}
 	if {[catch {
 		foreach dd $details {
-			$w.1.text insert end [format_with_style [dict get $dd Value] [dict get $dd Type]] [dict get $dd Type]
-			DEBUG 3 "DisplayDieRoll: $dd"
+			set parts [split [dict get $dd Value] "\u2261"]
+			switch [llength $parts] {
+				0 {
+					$w.1.text insert end [format_with_style [dict get $dd Value] [dict get $dd Type]] [dict get $dd Type]
+					DEBUG 3 "DisplayDieRoll: empty value $dd"
+				}
+				1 {
+					$w.1.text insert end [format_with_style [lindex $parts 0] [dict get $dd Type]] [dict get $dd Type]
+					DEBUG 3 "DisplayDieRoll: normal value $dd"
+				}
+				2 {
+					$w.1.text tag configure [set tag _custom_fg_[toIDName [lindex $parts 1]]] \
+						-foreground [lindex $parts 1] \
+						-background [::tk::Darken [lindex $parts 1] 40] \
+						-font [$w.1.text tag cget [dict get $dd Type] -font]
+					$w.1.text insert end [lindex $parts 0] $tag
+					DEBUG 3 "DisplayDieRoll: custom $tag $dd"
+				}
+				default {
+					$w.1.text tag configure \
+						[set tag _custom_fg_[toIDName [lindex $parts 1]]_bg_[toIDName [lindex $parts 2]]] \
+							-foreground [lindex $parts 1] \
+							-background [lindex $parts 2] \
+							-font [$w.1.text tag cget [dict get $dd Type] -font]
+					$w.1.text insert end [lindex $parts 0] $tag
+					DEBUG 3 "DisplayDieRoll: custom $tag $dd"
+				}
+			}
 		}
 	} err]} {
 		DEBUG 0 $err
@@ -14579,7 +14614,7 @@ proc ConnectToServerByIdx {idx} {
 #
 #*user_key name -> sanitized_name
 #
-# @[00]@| GMA-Mapper 4.26
+# @[00]@| GMA-Mapper 4.27
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2024 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
