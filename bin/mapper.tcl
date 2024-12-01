@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       _______   ______                 #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___   ) / ____ \                #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |( (    \/                #
-# | |      | || || || (___) | Assistant  / (_) (_        /   )| (____                  #
-# | | ____ | |(_)| ||  ___  |           (____   _)     _/   / |  ___ \                 #
-# | | \_  )| |   | || (   ) |                ) (      /   _/  | (   ) )                #
-# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\( (___) )                #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/ \_____/                 #
+#  _______  _______  _______                ___       _______  ______                  #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___   )/ ___  \                 #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |\/   )  )                #
+# | |      | || || || (___) | Assistant  / (_) (_        /   )    /  /                 #
+# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /    /  /                  #
+# | | \_  )| |   | || (   ) |                ) (      /   _/    /  /                   #
+# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\ /  /                    #
+# (_______)|/     \||/     \| Client         (_)  (_)\_______/ \_/                     #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -17,10 +17,10 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.27-beta}     ;# @@##@@
+set GMAMapperVersion {4.27}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {415}         ;# @@##@@
-set CoreVersionNumber {6.22}            ;# @@##@@
+set CoreVersionNumber {6.26}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -14461,7 +14461,7 @@ proc ConnectToServerByIdx {idx} {
 #
 #*user_key name -> sanitized_name
 #
-# @[00]@| GMA-Mapper 4.26
+# @[00]@| GMA-Mapper 4.27
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2024 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
