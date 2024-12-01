@@ -3,11 +3,11 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.26          <!-- @@##@@ -->
- * Effective Date: 05-Jul-2024               <!-- @@##@@ -->
+ * This Package Version: 4.27          <!-- @@##@@ -->
+ * Effective Date: 30-Nov-2024               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.22 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.26 <!-- @@##@@ -->
  * GMA Mapper File Format: 23	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 415        <!-- @@##@@ -->
  * GMA Mapper Preferences File Format: 8 <!-- @@##@@ -->
@@ -16,6 +16,13 @@
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.27 
+## Enhancements
+ * Die rolls are now sent with `RequestID` fields to identify which results that come back from the server relate to which rolls.
+ * When a die roll is made which has 3 or more results (such as with the `|repeat` option), the mapper will print a line after the results which include the basic statistics from that result set (population size, population mean, standard deviation, median, mode, and sum).
+ * Adds a new die roller style `stats` for printing the stats of a die roll set.
+ * Die roll labels may now include custom colors using the same syntax as the up-front die-roll title string does. This allows a foreground or foreground and background color to be specified by name or RGB hex value. We recommend using these sparingly as an ad-hoc addition to the style definitions to make certain special modifiers stand out in large multi-roll sets, saving time hunting for them by making them visually stand out from the others.
 
 # 4.26
 ## Enhancements

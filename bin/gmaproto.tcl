@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___       _______   ______                 #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___   ) / ____ \                #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |( (    \/                #
-# | |      | || || || (___) | Assistant  / (_) (_        /   )| (____                  #
-# | | ____ | |(_)| ||  ___  |           (____   _)     _/   / |  ___ \                 #
-# | | \_  )| |   | || (   ) |                ) (      /   _/  | (   ) )                #
-# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\( (___) )                #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/ \_____/                 #
+#  _______  _______  _______                ___       _______  ______                  #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___   )/ ___  \                 #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |\/   )  )                #
+# | |      | || || || (___) | Assistant  / (_) (_        /   )    /  /                 #
+# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /    /  /                  #
+# | | \_  )| |   | || (   ) |                ) (      /   _/    /  /                   #
+# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\ /  /                    #
+# (_______)|/     \||/     \| Client         (_)  (_)\_______/ \_/                     #
 #                                                                                      #
 ########################################################################################
 #
@@ -1458,8 +1458,8 @@ proc ::gmaproto::polo {} {
 	::gmaproto::_protocol_send POLO
 }
 
-proc ::gmaproto::roll_dice {spec recipients to_all blind_to_gm} {
-	::gmaproto::_protocol_send D Recipients $recipients ToAll $to_all ToGM $blind_to_gm RollSpec $spec
+proc ::gmaproto::roll_dice {spec recipients to_all blind_to_gm {rid {}}} {
+	::gmaproto::_protocol_send D Recipients $recipients ToAll $to_all ToGM $blind_to_gm RollSpec $spec RequestID $rid
 }
 
 proc ::gmaproto::sync_chat {target} {
@@ -2314,7 +2314,7 @@ proc ::gmaproto::normalize_dict {cmd d} {
 	return [::gmaproto::new_dict_from_json $cmd [::gmaproto::json_from_dict $cmd $d]]
 }
 
-# @[00]@| GMA-Mapper 4.26
+# @[00]@| GMA-Mapper 4.27
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2024 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
