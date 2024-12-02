@@ -1104,7 +1104,7 @@ namespace eval ::gmaprofile {
 		grid [ttk::checkbutton $w.n.a.flash -text "Flash objects when they are updated" -variable flash_updates] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.chat_timestamp -text "Show timestamp in chat messages" -variable chat_timestamp] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.cdr -text "Enable colors in die-roll titles" -variable colorize_die_rolls] - - - - - - -sticky w
-		grid [ttk::checkbutton $w.n.a.cdl -text "Enable colors in die-roll labels" -variable colorize_die_labels] - - - - - - -sticky w
+		grid [ttk::checkbutton $w.n.a.cdl -text "Enable colors in die-roll modifier labels" -variable colorize_die_labels] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.dark -text "Dark theme" -variable dark] - - - - - - -sticky w
 		grid [ttk::label $w.n.a.scalingl -text "Visual scaling factor:"] [ttk::spinbox $w.n.a.scaling -textvariable scaling -from 1.0 -to 100.0 -increment 1.0 -format "%.1f" -width 5] -sticky we
 		grid [ttk::checkbutton $w.n.a.menu_button -text "Use menu button instead of menu bar" -variable menu_button] - - - - - - -sticky w
