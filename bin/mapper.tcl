@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       _______  ______                  #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___   )/ ___  \                 #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |\/   )  )                #
-# | |      | || || || (___) | Assistant  / (_) (_        /   )    /  /                 #
-# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /    /  /                  #
-# | | \_  )| |   | || (   ) |                ) (      /   _/    /  /                   #
-# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\ /  /                    #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/ \_/                     #
+#  _______  _______  _______                ___       _______  ______      _______     #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___   )/ ___  \    / ___   )    #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |\/   )  )   \/   )  |    #
+# | |      | || || || (___) | Assistant  / (_) (_        /   )    /  /        /   )    #
+# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /    /  /       _/   /     #
+# | | \_  )| |   | || (   ) |                ) (      /   _/    /  /       /   _/      #
+# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\ /  /     _ (   (__/\    #
+# (_______)|/     \||/     \| Client         (_)  (_)\_______/ \_/     (_)\_______/    #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -17,7 +17,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.27}     ;# @@##@@
+set GMAMapperVersion {4.27.2}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {415}         ;# @@##@@
 set CoreVersionNumber {6.26}            ;# @@##@@
@@ -4357,12 +4357,15 @@ proc ShowDiceSyntax {} {
 		{p {}}
 		{p {If part of a die roll needs to be constrained within a given minimum or maximum value (as opposed to applying a global minimum or maximum on the } i entire p { result via the } b |min p { and } b |max p { options, you can use the } b <= p { and } b >= p { operators. In an expression, } i x b <= i y p { means to take the value of } i x p { but that it must be less than or equal to } i y p {, and likewise for } i x b >= i y p {. You may also use the characters ≤ and ≥ for these operators.}}
 		{p {}}
+		{p "You can color the die-roll title (everything before the = sign) or any individual modifier label by adding the special character \u2261 (U+2261) followed by a hex RGB color code like #334455 or a color name at the end of the label. Add two of these to specify both a foreground and background color. Separate titles or labels into multiple, separately colored parts by dividing them with \u2016 (U+2016) characters."}
+		{p {}}
 		{h1 {Presets}}
 		{p {}}
 		{p {Saving preset rolls to the server allows them to be available any time your client connects to it. Each preset is given a unique name. If another preset is added with the same name, it will replace the previous one.}}
 		{p {Clicking on the [Edit Presets...] button will allow you to add, remove, modify, and reorder the list of presets you have on file. You can also define modifiers and variables. These are fragments of die-roll expressions (such as "+2 inspiration") which you can turn on or off as you need them. When turned on, they are added to all of your die rolls (in the order they appear). You may also give them a variable name, in which case they will not be added to every die roll but will instead be substituted in place of the notation } b $ i name p { or } b $\{ i name b \} p {, where } i name p { is the name of the variable.}}
 		{p {}}
-		{p {The export file for presets is a structured, record-based text file documented in dice(5).}}
+		{p {The export file for presets is a structured, record-based text file documented in gma-dice(5).}}
+		{p {See gma-dice-syntax(6) for more.}}
 	} {
 		foreach {f t} $line {
 			$w.text insert end $t $f
@@ -10798,32 +10801,34 @@ proc DisplayDieRoll {d} {
 #				critspec  {$w.1.text insert end "  [lindex $tuple 1]" [lindex $tuple 0]}
 	if {[catch {
 		foreach dd $details {
-			set parts [split [dict get $dd Value] "\u2261"]
-			switch [llength $parts] {
-				0 {
-					$w.1.text insert end [format_with_style [dict get $dd Value] [dict get $dd Type]] [dict get $dd Type]
-					DEBUG 3 "DisplayDieRoll: empty value $dd"
-				}
-				1 {
-					$w.1.text insert end [format_with_style [lindex $parts 0] [dict get $dd Type]] [dict get $dd Type]
-					DEBUG 3 "DisplayDieRoll: normal value $dd"
-				}
-				2 {
-					$w.1.text tag configure [set tag _custom_fg_[toIDName [lindex $parts 1]]] \
-						-foreground [lindex $parts 1] \
-						-background [::tk::Darken [lindex $parts 1] 40] \
-						-font [$w.1.text tag cget [dict get $dd Type] -font]
-					$w.1.text insert end [lindex $parts 0] $tag
-					DEBUG 3 "DisplayDieRoll: custom $tag $dd"
-				}
-				default {
-					$w.1.text tag configure \
-						[set tag _custom_fg_[toIDName [lindex $parts 1]]_bg_[toIDName [lindex $parts 2]]] \
+			foreach detailparts [split [dict get $dd Value] "\u2016"] {
+				set parts [split $detailparts "\u2261"]
+				switch [llength $parts] {
+					0 {
+						$w.1.text insert end [format_with_style [dict get $dd Value] [dict get $dd Type]] [dict get $dd Type]
+						DEBUG 3 "DisplayDieRoll: empty value $dd"
+					}
+					1 {
+						$w.1.text insert end [format_with_style [lindex $parts 0] [dict get $dd Type]] [dict get $dd Type]
+						DEBUG 3 "DisplayDieRoll: normal value $dd"
+					}
+					2 {
+						$w.1.text tag configure [set tag _custom_fg_[toIDName [lindex $parts 1]]] \
 							-foreground [lindex $parts 1] \
-							-background [lindex $parts 2] \
+							-background [::tk::Darken [lindex $parts 1] 40] \
 							-font [$w.1.text tag cget [dict get $dd Type] -font]
-					$w.1.text insert end [lindex $parts 0] $tag
-					DEBUG 3 "DisplayDieRoll: custom $tag $dd"
+						$w.1.text insert end [lindex $parts 0] $tag
+						DEBUG 3 "DisplayDieRoll: custom $tag $dd"
+					}
+					default {
+						$w.1.text tag configure \
+							[set tag _custom_fg_[toIDName [lindex $parts 1]]_bg_[toIDName [lindex $parts 2]]] \
+								-foreground [lindex $parts 1] \
+								-background [lindex $parts 2] \
+								-font [$w.1.text tag cget [dict get $dd Type] -font]
+						$w.1.text insert end [lindex $parts 0] $tag
+						DEBUG 3 "DisplayDieRoll: custom $tag $dd"
+					}
 				}
 			}
 		}
@@ -14461,7 +14466,7 @@ proc ConnectToServerByIdx {idx} {
 #
 #*user_key name -> sanitized_name
 #
-# @[00]@| GMA-Mapper 4.27
+# @[00]@| GMA-Mapper 4.27.2
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2024 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

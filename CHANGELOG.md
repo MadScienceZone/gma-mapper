@@ -3,8 +3,8 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.27          <!-- @@##@@ -->
- * Effective Date: 30-Nov-2024               <!-- @@##@@ -->
+ * This Package Version: 4.27.2          <!-- @@##@@ -->
+ * Effective Date: 01-Dec-2024               <!-- @@##@@ -->
 
 ## Compatibility
  * GMA Core API Library Version: 6.26 <!-- @@##@@ -->
@@ -16,6 +16,14 @@
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.27.2
+## Fixes
+ * Bug fixes to colorization of die-roll modifier labels.
+
+# 4.27.1
+## Fixes
+ * Bug fixes to colorization of die-roll modifier labels.
 
 # 4.27 
 ## Enhancements
