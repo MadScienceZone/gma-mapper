@@ -10702,8 +10702,9 @@ set drd_id 0
 proc toIDName {n} {
 	return [regsub -all {\W} $n {}]
 }
+set die_roll_group false
 proc DisplayDieRoll {d} {
-	global icon_dieb16 icon_die16 icon_die16c SuppressChat drd_id LastDisplayedChatDate dice_preset_data
+	global icon_dieb16 icon_die16 icon_die16c SuppressChat drd_id LastDisplayedChatDate dice_preset_data die_roll_group
 
 	if {$SuppressChat} {
 		return
@@ -10713,11 +10714,29 @@ proc DisplayDieRoll {d} {
 		Sender           from \
 		Recipients       recipientlist \
 		Title            title \
+		RequestID        request_id \
+		MoreResults      more_results_coming \
 		{Result Result}  result \
 		{Result Details} details \
 		{Result InvalidRequest} is_invalid \
 		{Result ResultSuppressed} is_blind \
 		Sent             date_sent
+
+	# Notation to show grouping of multiple result sets
+	if {$die_roll_group} {
+		# continuing the set we previously started
+		if {$more_results_coming} {
+			set group_marker "\u2503"
+		} else {
+			set group_marker "\u2517"
+			set die_roll_group false
+		}
+	} elseif {$more_results_coming} {
+		set die_roll_group true
+		set group_marker "\u250f"
+	} else {
+		set group_marker ""
+	}
 
 	CollectRollStats $d
 	global local_user dice_preset_data
@@ -10760,6 +10779,7 @@ proc DisplayDieRoll {d} {
 		}
 	}
 	$w.1.text image create end -align baseline -image $icon -padx 2
+	$w.1.text insert end $group_marker separator
 	if {!$is_blind && !$is_invalid} {
 		$w.1.text insert end [format_with_style $result fullresult] fullresult
 		$w.1.text insert end " "
