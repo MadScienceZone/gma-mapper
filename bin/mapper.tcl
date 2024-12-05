@@ -2256,9 +2256,10 @@ foreach icon_name {
 	shape_square_go dash0 dash24 dash44 dash64 dash6424 dash642424 
 	arrow_both arrow_first arrow_none arrow_last arrow_refresh heart
 	saf saf_open saf_merge saf_unload saf_group_go die16 die16c information info20 die20 die20c
+	dbracket_t dbracket_m dbracket_b dbracket__
 	delete add clock dieb16 -- *hourglass *hourglass_go *arrow_right *cross *bullet_go menu
 	stipple_100 stipple_75 stipple_50 stipple_25 stipple_12 stipple_88 lock unlock bullet_arrow_down bullet_arrow_right
-	bullet_arrow_down16 bullet_arrow_right16
+	bullet_arrow_down16 bullet_arrow_right16 
 } {
 	if {$icon_name eq {--}} {
 		if {$ImageFormat eq {png}} {
@@ -10705,6 +10706,7 @@ proc toIDName {n} {
 set die_roll_group false
 proc DisplayDieRoll {d} {
 	global icon_dieb16 icon_die16 icon_die16c SuppressChat drd_id LastDisplayedChatDate dice_preset_data die_roll_group
+	global icon_dbracket_b icon_dbracket_t icon_dbracket_m icon_dbracket__
 
 	if {$SuppressChat} {
 		return
@@ -10726,16 +10728,16 @@ proc DisplayDieRoll {d} {
 	if {$die_roll_group} {
 		# continuing the set we previously started
 		if {$more_results_coming} {
-			set group_marker "\u2503"
+			set group_marker $icon_dbracket_m
 		} else {
-			set group_marker "\u2517"
+			set group_marker $icon_dbracket_b
 			set die_roll_group false
 		}
 	} elseif {$more_results_coming} {
 		set die_roll_group true
-		set group_marker "\u250f"
+		set group_marker $icon_dbracket_t
 	} else {
-		set group_marker ""
+		set group_marker $icon_dbracket__
 	}
 
 	CollectRollStats $d
@@ -10779,7 +10781,7 @@ proc DisplayDieRoll {d} {
 		}
 	}
 	$w.1.text image create end -align baseline -image $icon -padx 2
-	$w.1.text insert end $group_marker separator
+	$w.1.text image create end -align baseline -image $group_marker -padx 1
 	if {!$is_blind && !$is_invalid} {
 		$w.1.text insert end [format_with_style $result fullresult] fullresult
 		$w.1.text insert end " "
