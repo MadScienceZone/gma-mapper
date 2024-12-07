@@ -6,7 +6,7 @@
 # | | ____ | |(_)| ||  ___  |           (____   _)     _/   /    /  /       _/   /     #
 # | | \_  )| |   | || (   ) |                ) (      /   _/    /  /       /   _/      #
 # | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\ /  /     _ (   (__/\    #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/ \_/     (_)\_______/    #
+# (_______)|/     \||/     \| Client         (_)  (_)\_______/ \_/     (_)\_______/ __ #
 #                                                                                      #
 ########################################################################################
 #
@@ -2314,7 +2314,7 @@ proc ::gmaproto::normalize_dict {cmd d} {
 	return [::gmaproto::new_dict_from_json $cmd [::gmaproto::json_from_dict $cmd $d]]
 }
 
-# @[00]@| GMA-Mapper 4.27.2
+# @[00]@| GMA-Mapper 4.27.2_alpha.0
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2024 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
