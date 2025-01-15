@@ -27,7 +27,7 @@ This includes a multi-user interactive tactical battle map where players
 can move their tokens around the map, initiative is managed automatically,
 etc.
 
-While we intend to open source GMA **later in ~~2023~~ 2024**, it's not quite ready for
+While we intend to open source GMA **later in ~~2023 2024~~ 2025**, it's not quite ready for
 general use (mostly because it needs to be generalized more to be playable
 on multiple game systems and less tied to the author's game group).
 The manual describing the full GMA product may be downloaded 
