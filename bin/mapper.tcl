@@ -1155,6 +1155,7 @@ proc create_main_menu {use_button} {
 	$mm.play add command -command {RefreshDelegates .delegates} -label "Refresh Die-Roll and Delegate Data from Server"
 	$mm.play add separator
 	$mm.play add command -command {display_initiative_clock} -label "Show Initiative Clock"
+	$mm.play add command -command {initiate_timer_request} -label "Request a New Timer"
 	# gridsnap nil .25 .5 1
 	menu $mm.play.gridsnap
 	$mm.play add cascade -menu $mm.play.gridsnap -label "Creature token grid snap"
@@ -2259,7 +2260,7 @@ foreach icon_name {
 	dbracket_t dbracket_m dbracket_b dbracket__
 	delete add clock dieb16 -- *hourglass *hourglass_go *arrow_right *cross *bullet_go menu
 	stipple_100 stipple_75 stipple_50 stipple_25 stipple_12 stipple_88 lock unlock bullet_arrow_down bullet_arrow_right
-	bullet_arrow_down16 bullet_arrow_right16 
+	bullet_arrow_down16 bullet_arrow_right16 tmrq
 } {
 	if {$icon_name eq {--}} {
 		if {$ImageFormat eq {png}} {
@@ -2415,6 +2416,7 @@ grid \
 	 [button .toolbar.griden -image $icon_snap_1 -command toggleGridEnable] \
 	 [button .toolbar.chat -image $icon_die20 -command {DisplayChatMessage {} {}}] \
 	 [button .toolbar.iniclock -image $icon_clock -command {display_initiative_clock}] \
+	 [button .toolbar.tmrq -image $icon_tmrq -command {initiate_timer_request}] \
 	 [label  .toolbar.sp4  -text "   "] \
 	 [button .toolbar.zi   -image $icon_zoom_in -command {zoomInBy 2}] \
 	 [button .toolbar.zo   -image $icon_zoom_out -command {zoomInBy 0.5}] \
@@ -2503,6 +2505,7 @@ foreach {btn tip} {
 	mode2	{}
 	nil		{Mode Select: Normal Play Mode}
 	iniclock {Display Initiative Clock Window}
+	tmrq    {Request a New Timer}
 	kill	{Mode Select: Delete Objects}
 	move	{Mode Select: Move Objects}
 	stamp	{Mode Select: Stamp Images/Textures}
@@ -9595,6 +9598,27 @@ proc DoCommandPRIV {d} {
 		-detail "The operation you attempted to carry out which sent the command shown here is only allowed for privileged users, and in the words of Chevy Chase, \"you're not.\"\n\nAttempted command:\n[dict get $d Command]"
 }
 
+proc DoCommandTMRQ {d} {
+	# clients ignore these upon receipt
+}
+
+proc DoCommandTMACK {d} {
+	# Acknowledge our timer request. If we're still showing a request dialog, update/dismiss it
+	# based on RequestID field
+	itr_accepted [dict get $d RequestID]
+}
+
+proc DoCommandFAILED {d} {
+	# Indicate general failure. If we're still showing a timer request dialog, update it based on
+	# IsError, IsDiscretionary, Reason, ReqeustID
+	# also: Command
+	if {[string range [dict get $d Command] 0 3] eq "TMRQ"} {
+		itr_failed [dict get $d RequestID] [dict get $d Reason]
+	} else {
+		tk_messageBox -parent . -type ok -icon error -title "Operation Failed" \
+			-message "[dict get $d Reason]"
+	}
+}
 
 proc DoCommandCS {d} {
 	global time_abs
@@ -14214,6 +14238,129 @@ proc start_ping_marker {w x y seq} {
 #  |                    Name password [edit] [-]
 #  |                    [+]
 #
+
+
+proc initiate_timer_request {} {
+	# put up a new dialog to make a request for a timer. We leave this up until dismissed or accepted by the GM.
+	global global_bg_color
+
+	set this_request [new_id]
+	set w .tmrq_$this_request
+	toplevel $w -background $global_bg_color
+	wm title $w "New Timer Request"
+	grid [label $w.dl -text "Description:"]  -row 0 -column 0 -sticky w
+	grid [entry $w.de -width 64]           - -row 0 -column 1 -sticky we
+	grid [label $w.el -text "Expires:"]      -row 1 -column 0 -sticky w
+	grid [entry $w.ee -width 64]           - -row 1 -column 1 -sticky we
+	grid [label $w.tl -text "Targets:"]      -row 2 -column 0 -sticky w
+	grid [entry $w.te -width 64]             -row 2 -column 1 -sticky we
+	grid [button $w.tb -command "itr_build_target_list $w" -text "..."] -row 2 -column 2
+	grid x [ttk::checkbutton $w.rb -text "Running Now"] x -sticky w
+	grid x [ttk::checkbutton $w.sb -text "Show to players"] x -sticky w
+	grid x [label $w.ml -text {} -foreground red] -sticky we
+	grid [button $w.cancel -command "destroy $w" -text Cancel] -row 6 -column 0 -sticky w
+	grid [button $w.ok -command "itr_commit $w $this_request" -text Request] -row 6 -column 2 -sticky e
+	$w.rb state {selected !alternate}
+	$w.sb state {selected !alternate}
+	::tooltip::tooltip $w.dl {Describe the new timer's purpose.}
+	::tooltip::tooltip $w.de {Describe the new timer's purpose.}
+	::tooltip::tooltip $w.el {Timer expiration as "@[[[y-]m-]d] h:m[:s[.t]]", "[+-][d:]h:m[:s[.t]]", or "[+-]n units"}
+	::tooltip::tooltip $w.ee {Timer expiration as "@[[[y-]m-]d] h:m[:s[.t]]", "[+-][d:]h:m[:s[.t]]", or "[+-]n units"}
+	::tooltip::tooltip $w.tl {Players timer is visible to (space-separated, default is visible to all)}
+	::tooltip::tooltip $w.te {Players timer is visible to (space-separated, default is visible to all)}
+	::tooltip::tooltip $w.tb {Build list of targets interactively}
+	::tooltip::tooltip $w.rb {Should the timer start off running immediately? Or let the GM start it later?}
+	::tooltip::tooltip $w.sb {Should the timer be visible to the players? Or just the GM?}
+	puts [$w.rb state]
+}
+
+proc itr_build_target_list {parent} {
+	global global_bg_color PeerList
+
+	set w ${parent}_t
+	catch {destroy $w}
+	toplevel $w -background $global_bg_color
+	wm title $w "Target List for [$parent.de get]"
+	grid columnconfigure $w 1 -weight 2
+	grid [ttk::checkbutton $w._all -text "Toggle All" -command "itr_toggle $w"] - - -sticky w
+	$w._all state {!selected !alternate}
+	foreach name [lsort -dictionary -unique $PeerList] {
+		set n [to_window_id $name]
+		grid [ttk::checkbutton $w.p$n -text $name] - - -sticky w
+		$w.p$n state {!selected !alternate}
+	}
+	grid [button $w._cancel -command "destroy $w" -text "Cancel"] x [button $w._ok -command "itr_commit_t $parent" -text "Set Targets"]
+}
+
+# this is a little janky but we just base our operations on the current peer list
+# to keep the timer targets to who is logged in. But that makes the dialog box behave
+# oddly if the peer list changes while we are editing the list.
+proc itr_toggle {w} {
+	global PeerList
+	set toggle [$w._all instate selected]
+	foreach name $PeerList {
+		catch {
+			if {$toggle} {
+				$w.p[to_window_id $name] state selected
+			} else {
+				$w.p[to_window_id $name] state !selected
+			}
+		}
+	}
+}
+
+proc itr_commit_t {parent} {
+	global PeerList
+	set target_list {}
+	foreach name $PeerList {
+		catch {
+			if {[${parent}_t.p[to_window_id $name] instate selected]} {
+				lappend target_list $name
+			}
+		}
+	}
+	$parent.te delete 0 end
+	$parent.te insert end $target_list
+	destroy ${parent}_t
+}
+
+proc itr_commit {w request_id} {
+	::gmaproto::timer_request $request_id [$w.de get] [$w.ee get] [$w.rb instate selected] [$w.te get] [$w.sb instate selected]
+	$w.cancel configure -text Dismiss
+	$w.ok configure -text Pending... -state disabled
+	foreach ww {de ee te tb} {
+		$w.$ww configure -state disabled
+	}
+	$w.sb state disabled
+	$w.rb state disabled
+}
+
+proc itr_failed {request_id reason} {
+	if {[catch {
+		set w .tmrq_$request_id
+		foreach ww {de ee te tb} {
+			$w.$ww configure -state normal
+		}
+		$w.sb state !disabled
+		$w.rb state !disabled
+		$w.ok configure -state normal -text Request
+		$w.cancel configure -text Cancel
+		$w.ml configure -text $reason
+	}]} {
+		tk_messageBox -parent . -type ok -icon error -title "Timer Request Failed" \
+			-message $reason
+	}
+}
+
+proc itr_accepted {request_id} {
+	set w .tmrq_$request_id
+	catch {
+		$w.ml configure -text "Timer request accepted." -foreground "#008800"
+		$w.ok configure -command "destroy $w" -text "Ok" -state normal
+	}
+	after 5000 "destroy $w"
+}
+
 proc display_initiative_clock {} {
 	global dark_mode
 	global global_bg_color
