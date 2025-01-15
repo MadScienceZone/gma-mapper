@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       _______  ______      _______     #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___   )/ ___  \    / ___   )    #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |\/   )  )   \/   )  |    #
-# | |      | || || || (___) | Assistant  / (_) (_        /   )    /  /        /   )    #
-# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /    /  /       _/   /     #
-# | | \_  )| |   | || (   ) |                ) (      /   _/    /  /       /   _/      #
-# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\ /  /     _ (   (__/\    #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/ \_/     (_)\_______/    #
+#  _______  _______  _______                ___       _______   _____                  #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___   ) / ___ \                 #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |( (___) )                #
+# | |      | || || || (___) | Assistant  / (_) (_        /   ) \     /                 #
+# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /  / ___ \                 #
+# | | \_  )| |   | || (   ) |                ) (      /   _/  ( (   ) )                #
+# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\( (___) )                #
+# (_______)|/     \||/     \| Client         (_)  (_)\_______/ \_____/                 #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -17,10 +17,10 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.27.2}     ;# @@##@@
+set GMAMapperVersion {4.28}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
-set GMAMapperProtocol {415}         ;# @@##@@
-set CoreVersionNumber {6.26}            ;# @@##@@
+set GMAMapperProtocol {416}         ;# @@##@@
+set CoreVersionNumber {6.28}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -1155,6 +1155,7 @@ proc create_main_menu {use_button} {
 	$mm.play add command -command {RefreshDelegates .delegates} -label "Refresh Die-Roll and Delegate Data from Server"
 	$mm.play add separator
 	$mm.play add command -command {display_initiative_clock} -label "Show Initiative Clock"
+	$mm.play add command -command {initiate_timer_request} -label "Request a New Timer"
 	# gridsnap nil .25 .5 1
 	menu $mm.play.gridsnap
 	$mm.play add cascade -menu $mm.play.gridsnap -label "Creature token grid snap"
@@ -2256,9 +2257,10 @@ foreach icon_name {
 	shape_square_go dash0 dash24 dash44 dash64 dash6424 dash642424 
 	arrow_both arrow_first arrow_none arrow_last arrow_refresh heart
 	saf saf_open saf_merge saf_unload saf_group_go die16 die16c information info20 die20 die20c
+	dbracket_t dbracket_m dbracket_b dbracket__
 	delete add clock dieb16 -- *hourglass *hourglass_go *arrow_right *cross *bullet_go menu
 	stipple_100 stipple_75 stipple_50 stipple_25 stipple_12 stipple_88 lock unlock bullet_arrow_down bullet_arrow_right
-	bullet_arrow_down16 bullet_arrow_right16
+	bullet_arrow_down16 bullet_arrow_right16 tmrq
 } {
 	if {$icon_name eq {--}} {
 		if {$ImageFormat eq {png}} {
@@ -2414,6 +2416,7 @@ grid \
 	 [button .toolbar.griden -image $icon_snap_1 -command toggleGridEnable] \
 	 [button .toolbar.chat -image $icon_die20 -command {DisplayChatMessage {} {}}] \
 	 [button .toolbar.iniclock -image $icon_clock -command {display_initiative_clock}] \
+	 [button .toolbar.tmrq -image $icon_tmrq -command {initiate_timer_request}] \
 	 [label  .toolbar.sp4  -text "   "] \
 	 [button .toolbar.zi   -image $icon_zoom_in -command {zoomInBy 2}] \
 	 [button .toolbar.zo   -image $icon_zoom_out -command {zoomInBy 0.5}] \
@@ -2502,6 +2505,7 @@ foreach {btn tip} {
 	mode2	{}
 	nil		{Mode Select: Normal Play Mode}
 	iniclock {Display Initiative Clock Window}
+	tmrq    {Request a New Timer}
 	kill	{Mode Select: Delete Objects}
 	move	{Mode Select: Move Objects}
 	stamp	{Mode Select: Stamp Images/Textures}
@@ -9594,6 +9598,27 @@ proc DoCommandPRIV {d} {
 		-detail "The operation you attempted to carry out which sent the command shown here is only allowed for privileged users, and in the words of Chevy Chase, \"you're not.\"\n\nAttempted command:\n[dict get $d Command]"
 }
 
+proc DoCommandTMRQ {d} {
+	# clients ignore these upon receipt
+}
+
+proc DoCommandTMACK {d} {
+	# Acknowledge our timer request. If we're still showing a request dialog, update/dismiss it
+	# based on RequestID field
+	itr_accepted [dict get $d RequestID]
+}
+
+proc DoCommandFAILED {d} {
+	# Indicate general failure. If we're still showing a timer request dialog, update it based on
+	# IsError, IsDiscretionary, Reason, ReqeustID
+	# also: Command
+	if {[string range [dict get $d Command] 0 3] eq "TMRQ"} {
+		itr_failed [dict get $d RequestID] [dict get $d Reason]
+	} else {
+		tk_messageBox -parent . -type ok -icon error -title "Operation Failed" \
+			-message "[dict get $d Reason]"
+	}
+}
 
 proc DoCommandCS {d} {
 	global time_abs
@@ -10702,8 +10727,10 @@ set drd_id 0
 proc toIDName {n} {
 	return [regsub -all {\W} $n {}]
 }
+set die_roll_group false
 proc DisplayDieRoll {d} {
-	global icon_dieb16 icon_die16 icon_die16c SuppressChat drd_id LastDisplayedChatDate dice_preset_data
+	global icon_dieb16 icon_die16 icon_die16c SuppressChat drd_id LastDisplayedChatDate dice_preset_data die_roll_group
+	global icon_dbracket_b icon_dbracket_t icon_dbracket_m icon_dbracket__
 
 	if {$SuppressChat} {
 		return
@@ -10713,11 +10740,29 @@ proc DisplayDieRoll {d} {
 		Sender           from \
 		Recipients       recipientlist \
 		Title            title \
+		RequestID        request_id \
+		MoreResults      more_results_coming \
 		{Result Result}  result \
 		{Result Details} details \
 		{Result InvalidRequest} is_invalid \
 		{Result ResultSuppressed} is_blind \
 		Sent             date_sent
+
+	# Notation to show grouping of multiple result sets
+	if {$die_roll_group} {
+		# continuing the set we previously started
+		if {$more_results_coming} {
+			set group_marker $icon_dbracket_m
+		} else {
+			set group_marker $icon_dbracket_b
+			set die_roll_group false
+		}
+	} elseif {$more_results_coming} {
+		set die_roll_group true
+		set group_marker $icon_dbracket_t
+	} else {
+		set group_marker $icon_dbracket__
+	}
 
 	CollectRollStats $d
 	global local_user dice_preset_data
@@ -10760,6 +10805,7 @@ proc DisplayDieRoll {d} {
 		}
 	}
 	$w.1.text image create end -align baseline -image $icon -padx 2
+	$w.1.text image create end -align baseline -image $group_marker -padx 1
 	if {!$is_blind && !$is_invalid} {
 		$w.1.text insert end [format_with_style $result fullresult] fullresult
 		$w.1.text insert end " "
@@ -14192,6 +14238,245 @@ proc start_ping_marker {w x y seq} {
 #  |                    Name password [edit] [-]
 #  |                    [+]
 #
+
+
+proc initiate_timer_request {} {
+	# put up a new dialog to make a request for a timer. We leave this up until dismissed or accepted by the GM.
+	global global_bg_color icon_info20
+
+	set this_request [new_id]
+	set w .tmrq_$this_request
+	toplevel $w -background $global_bg_color
+	wm title $w "New Timer Request"
+	grid [label $w.dl -text "Description:"]  -row 0 -column 0 -sticky w
+	grid [entry $w.de -width 64]         - - -row 0 -column 1 -sticky we
+	grid [label $w.el -text "Expires:"]      -row 1 -column 0 -sticky w
+	grid [entry $w.ee -width 64]         - - -row 1 -column 1 -sticky we
+	grid [label $w.tl -text "Targets:"]      -row 2 -column 0 -sticky w
+	grid [entry $w.te -width 64]             -row 2 -column 1 -sticky we
+	grid [button $w.tm -command "itr_personal_target $w" -text "ME"] -row 2 -column 2
+	grid [button $w.tb -command "itr_build_target_list $w" -text "..."] -row 2 -column 3
+	grid x [ttk::checkbutton $w.rb -text "Running Now"] - - -sticky w
+	grid x [ttk::checkbutton $w.sb -text "Show to Players"] - - -sticky w
+	grid x [label $w.ml -text {}] - - -sticky we
+	grid [button $w.cancel -command "destroy $w" -text Cancel] -row 6 -column 0 -sticky w
+	grid [button $w.info -command "itr_info" -image $icon_info20] - -row 6 -column 1
+	grid [button $w.ok -command "itr_commit $w $this_request" -text Request] -row 6 -column 3 -sticky e
+	$w.rb state {selected !alternate}
+	$w.sb state {selected !alternate}
+	::tooltip::tooltip $w.dl {Describe the new timer's purpose.}
+	::tooltip::tooltip $w.de {Describe the new timer's purpose.}
+	::tooltip::tooltip $w.el {Timer expiration as "@[[[y-]m-]d] h:m[:s[.t]]", "[+-][d:]h:m[:s[.t]]", or "[+-]n units"}
+	::tooltip::tooltip $w.ee {Timer expiration as "@[[[y-]m-]d] h:m[:s[.t]]", "[+-][d:]h:m[:s[.t]]", or "[+-]n units"}
+	::tooltip::tooltip $w.tl {Players timer is visible to (space-separated, default is visible to all)}
+	::tooltip::tooltip $w.te {Players timer is visible to (space-separated, default is visible to all)}
+	::tooltip::tooltip $w.tb {Build list of targets interactively}
+	::tooltip::tooltip $w.tm {This timer's target is me}
+	::tooltip::tooltip $w.rb {Should the timer start off running immediately? Or let the GM start it later?}
+	::tooltip::tooltip $w.sb {Should the timer be visible to the players? Or just the GM?}
+	puts [$w.rb state]
+}
+
+proc itr_info {} {
+	set w .timer_request_help
+	create_dialog $w
+	wm title $w "How to Request a Timer"
+	grid [text $w.text -yscrollcommand "$w.sb set"] \
+	     [scrollbar $w.sb -orient vertical -command "$w.text yview"]\
+		 	-sticky news
+	grid columnconfigure $w 0 -weight 1
+	grid rowconfigure $w 0 -weight 1
+	$w.text tag configure h1 -justify center -font Tf14
+	$w.text tag configure p -font Nf12 -wrap word
+	$w.text tag configure i -font If12 -wrap word
+	$w.text tag configure b -font Tf12 -wrap word
+
+	foreach line {
+		{h1 {Requesting Timers}}
+		{p {}}
+		{p  {The GM tracks a number of timed events for the game. You can request timers of your own (e.g., for actions your character is doing) to be added to that set of events. When you do this, you will create a request that will be sent to the GM's client in real time. They can then make any necessary adjustments and add it to the system. They may also decide not to add it to the system.}
+		 i { Note that the GM must be logged in at the same time in order to receive and act on your request.}}
+		{p {}}
+		{p {To initiate a request, click on the "Request a New Timer" toolbar button (alarm clock with "+" sign) or choose the same option from the Play menu. Fill in the timer's description and expiration time (see below) in the fields provided.}}
+		{p {}}
+		{p {By default, timers will be visible to all players. If a timer only applies to some people, you can put their login names in the "Targets" field separated by spaces. For example: "} b {Alice Bob Charlie} p {" (although this is } i {not recommended,} p { if someone had spaces in their name, their entire name needs to be enclosed in braces like this: "} b {Alice Bob {This is me}} p {"). To make this easier, you can click on the "} b {ME} p {" button to put your own name in the target list to make the timer personal to you alone, or click the "} b {...} p {" button to bring up a dialog to select from among the logged-in players.}}
+		{p {(Note that this doesn't } i {hide} p { your timer, just allows people to ignore it. If they set their maps to show all timers, they'll still see yours too.)}}
+		{p {}}
+		{p {Check the "Running Now" box if you want the timer to start off running as soon as it's created. Otherwise the GM will have to manually start it later.}}
+		{p {Check the "Show to Players" box if you want the timer to be visible on the player map displays. Otherwise it will be added to the GM's time tracker but will only be visible to the GM.}}
+		{p {}}
+		{p {When ready, click the } b {Request} p { button. If you leave the dialog box up and there is a problem with the request you'll be informed and given the chance to correct the issue and resubmit it, or once the GM accepts the timer the dialog will go away on its own.}}
+		{p {}}
+		{h1 {Absolute Timers}}
+		{p {An absolute timer expires at a specific date and time on the game clock. To create a timer such as this, the expiration time must begin with an }
+		 b {@}
+		 p { sign.}}
+		{p {The full form accepted is }
+		 b @ p {[[[} i year b - p {]} i month b - p {]} i day p {] } i hour b : i minute p {[} b : i second p {[} b . i tenths p {]]}}
+		{p {Examples:}}
+		{b {@12:00} p { (noon today)}}
+		{b {@17:30:45} p { (half-past 5 PM plus 45 seconds)}}
+		{b {@3-15 8:00} p { (8 AM on the 15th of the 3rd month)}}
+		{b {@Absalom-20 10:15} p { (10:15 AM on the 20th of a month called Absalom)}}
+		{b {@ABS-20 10:15} p { (as above, using abbreviated month name)}}
+		{b {@4722-GOZ-1 00:00} p { (midnight, 1st of Gozran, 4722)}}
+		{p {}}
+		{h1 {Relative Timers}}
+		{p {Relative timers count down until a certain duration of time has elapsed. These }
+	     	 i {may}
+		 p { begin with an initial }
+		 b {+}
+		 p { or }
+		 b {-}
+		 p { to indicate that they expire in the future or already did in the past, respectively (the default is to assume it is in the future). Following this is a time duration in one of the following forms:}}
+		{p {[} i {n} p {] [} i {units} p {]}}
+		{p {[[} i days b : p {]} i hours b : p {]} i minutes b : i seconds p {[} b . i tenths p {]}}
+		{p {Examples:}}
+		{b {+5 rounds}}
+		{b {10 minutes}}
+		{b {1:2:3:4.5} p { (one day, two hours, three minutes, 4.5 seconds)}}
+		{b {10} p { (10 initiative counts, i.e. 1.0 seconds)}}
+		{b {round} p { (1 round, i.e. defaults to 1 of the given unit)}}
+		{b {3 days}}
+		{b {1.5 hours}}
+		{b {4 weeks}}
+		{p {}}
+		{p {Defined units include seconds (second, secs, sec, s), rounds (round, rnds, rnd, r), minutes (minute, mins, min, m), hours (hour, hrs, hr, h), weeks (week, wks, wk, w), and days (day, dys, dy, d).}}
+	} {
+		foreach {f t} $line {
+			$w.text insert end $t $f
+		}
+		$w.text insert end "\n"
+	}
+}
+
+proc itr_personal_target {w} {
+	global local_user
+	$w.te delete 0 end
+	$w.te insert end [list $local_user]
+}
+
+proc itr_build_target_list {parent} {
+	global global_bg_color PeerList local_user
+
+	set users $PeerList
+	lappend users $local_user
+
+	set w ${parent}_t
+	catch {destroy $w}
+	toplevel $w -background $global_bg_color
+	wm title $w "Target List for [$parent.de get]"
+	grid columnconfigure $w 1 -weight 2
+	grid [ttk::checkbutton $w._all -text "Toggle All" -command "itr_toggle $w"] - - -sticky w
+	$w._all state {!selected !alternate}
+	foreach name [lsort -dictionary -unique $users] {
+		set n [to_window_id $name]
+		grid [ttk::checkbutton $w.p$n -text $name] - - -sticky w
+		$w.p$n state {!selected !alternate}
+	}
+	grid [button $w._cancel -command "destroy $w" -text "Cancel"] x [button $w._ok -command "itr_commit_t $parent" -text "Set Targets"]
+}
+
+# this is a little janky but we just base our operations on the current peer list
+# to keep the timer targets to who is logged in. But that makes the dialog box behave
+# oddly if the peer list changes while we are editing the list.
+proc itr_toggle {w} {
+	global PeerList local_user
+
+	set users $PeerList
+	lappend users $local_user
+
+	set toggle [$w._all instate selected]
+	foreach name $users {
+		catch {
+			if {$toggle} {
+				$w.p[to_window_id $name] state selected
+			} else {
+				$w.p[to_window_id $name] state !selected
+			}
+		}
+	}
+}
+
+proc itr_commit_t {parent} {
+	global PeerList local_user
+
+	set users $PeerList
+	lappend users $local_user
+
+	set target_list {}
+	foreach name $users {
+		catch {
+			if {[${parent}_t.p[to_window_id $name] instate selected]} {
+				lappend target_list $name
+			}
+		}
+	}
+	$parent.te delete 0 end
+	$parent.te insert end $target_list
+	destroy ${parent}_t
+}
+
+proc itr_commit {w request_id} {
+	set targets [string trim [$w.te get]]
+	set desc [string trim [$w.de get]]
+	set exp [string trim [$w.ee get]]
+	if {![string is list $targets]} {
+		$w.ml configure -foreground red -text "Target list has invalid format (unbalanced braces, maybe?)"
+		return
+	}
+	if {$desc eq {} || $exp eq {}} {
+		$w.ml configure -foreground red -text "Description and expiration time are required."
+		return
+	}
+	::gmaproto::timer_request $request_id $desc $exp [$w.rb instate selected] $targets [$w.sb instate selected]
+	$w.cancel configure -text Dismiss
+	$w.ok configure -text Pending... -state disabled
+	$w.ml configure -text "Waiting for GM to accept timer into system..."
+	foreach ww {de ee te tb} {
+		$w.$ww configure -state disabled
+	}
+	$w.sb state disabled
+	$w.rb state disabled
+}
+
+proc itr_failed {request_id reason} {
+	if {[catch {
+		set w .tmrq_$request_id
+		foreach ww {de ee te tb} {
+			$w.$ww configure -state normal
+		}
+		$w.sb state !disabled
+		$w.rb state !disabled
+		$w.ok configure -state normal -text Request
+		$w.cancel configure -text Cancel
+		$w.ml configure -text $reason -foreground red
+	}]} {
+		tk_messageBox -parent . -type ok -icon error -title "Timer Request Failed" \
+			-message $reason
+	}
+}
+
+proc itr_accepted {request_id} {
+	set w .tmrq_$request_id
+	catch {
+		$w.ml configure -text "Timer request accepted." -foreground "#008800"
+		$w.ok configure -command "destroy $w" -text "Ok 5" -state normal
+		after 1000 "itr_destroy $w 4"
+	}
+}
+
+proc itr_destroy {w t} {
+	catch {
+		if {$t == 0} {
+			destroy $w
+		} else {
+			$w.ok configure -text "OK $t"
+			after 1000 "itr_destroy $w [expr $t - 1]"
+		}
+	}
+}
+
 proc display_initiative_clock {} {
 	global dark_mode
 	global global_bg_color
@@ -14466,7 +14751,7 @@ proc ConnectToServerByIdx {idx} {
 #
 #*user_key name -> sanitized_name
 #
-# @[00]@| GMA-Mapper 4.27.2
+# @[00]@| GMA-Mapper 4.28
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2024 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

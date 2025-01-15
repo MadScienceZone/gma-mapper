@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___       _______  ______      _______     #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___   )/ ___  \    / ___   )    #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |\/   )  )   \/   )  |    #
-# | |      | || || || (___) | Assistant  / (_) (_        /   )    /  /        /   )    #
-# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /    /  /       _/   /     #
-# | | \_  )| |   | || (   ) |                ) (      /   _/    /  /       /   _/      #
-# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\ /  /     _ (   (__/\    #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/ \_/     (_)\_______/    #
+#  _______  _______  _______                ___       _______   _____                  #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___   ) / ___ \                 #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |( (___) )                #
+# | |      | || || || (___) | Assistant  / (_) (_        /   ) \     /                 #
+# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /  / ___ \                 #
+# | | \_  )| |   | || (   ) |                ) (      /   _/  ( (   ) )                #
+# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\( (___) )                #
+# (_______)|/     \||/     \| Client         (_)  (_)\_______/ \_____/                 #
 #                                                                                      #
 ########################################################################################
 #
@@ -57,9 +57,9 @@ package require base64 2.4.2
 package require uuid 1.0.1
 
 namespace eval ::gmaproto {
-	variable protocol 415
+	variable protocol 416
 	variable min_protocol 333
-	variable max_protocol 415
+	variable max_protocol 416
 	variable max_max_protocol 499
 	variable debug_f {}
 	variable legacy false
@@ -153,6 +153,7 @@ namespace eval ::gmaproto {
 		DR      {For s}
 		DSM     {Condition s Shape s Color s Description s Transparent ?}
 		ECHO    {s s i i o d ReceivedTime s SentTime s}
+		FAILED	{IsError ? IsDiscretionary ? Command s Reason s RequestID s RequestedBy s RequestingClient s}
 		GRANTED {User s}
 		I       {ActorID s Hours i Minutes i Seconds i Rounds i Count i}
 		IL      {InitiativeList {a {Slot i CurrentHP i Name s IsHolding ? HasReadiedAction ? IsFlatFooted ?}}}
@@ -181,6 +182,8 @@ namespace eval ::gmaproto {
 		SYNC    {}
 		SYNC-CHAT {Target i}
 		TB      {Enabled ?}
+		TMACK	{RequestID s RequestingClient s RequestedBy s}
+		TMRQ	{Description s Expires s Targets l ShowToAll ? IsRunning ? RequestedBy s RequestingClient s RequestID s}
 		TO      {Sender s Recipients l MessageID i ToAll ? ToGM ? Text s Sent s}
 		UPDATES {Packages {a {Name s Instances {a {OS s Arch s Version s Token s}}}}}
 		WORLD   {Calendar s ClientSettings {o {MkdirPath s ImageBaseURL s ModuleCode s SCPDestination s ServerHostname s}}}
@@ -1377,6 +1380,9 @@ proc ::gmaproto::adjust_view {x y grid_label} {
 proc ::gmaproto::chat_message {message sender recipients to_all to_gm} {
 	::gmaproto::_protocol_send TO Recipients $recipients ToAll $to_all ToGM $to_gm Text $message
 }
+proc ::gmaproto::timer_request {id description expires {is_running true} {targets {}} {to_all true}} {
+	::gmaproto::_protocol_send TMRQ RequestID $id Description $description Expires $expires Targets $targets IsRunning $is_running ShowToAll $to_all
+}
 proc ::gmaproto::clear {obj_id} {
 	::gmaproto::_protocol_send CLR ObjID $obj_id
 }
@@ -2314,7 +2320,7 @@ proc ::gmaproto::normalize_dict {cmd d} {
 	return [::gmaproto::new_dict_from_json $cmd [::gmaproto::json_from_dict $cmd $d]]
 }
 
-# @[00]@| GMA-Mapper 4.27.2
+# @[00]@| GMA-Mapper 4.28
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2024 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
