@@ -1,5 +1,5 @@
 '\" t
-'\" *** 415 ***
+'\" *** 416 ***
 '\" <<ital-is-var>>
 .TH GMA-MAPPER-PROTOCOL 7 "GMA-Mapper 4.28.0-alpha.0" 06-Dec-2024 "Protocols" \" @@mp@@
 .SH NAME
@@ -81,7 +81,7 @@ be implemented to wait synchronously for a server
 response during the authentication negotiation stage.
 .LP
 '\" <</bold-is-fixed>>
-.B "This describes protocol version 415."
+.B "This describes protocol version 416."
 '\" <<bold-is-fixed>>
 These notes are intended to be 
 detailed enough to implement a client from and should be considered
@@ -149,7 +149,6 @@ Clients MUST NOT send the
 command after receiving the server's
 .B READY
 signal.
-'\" <<New>>
 (Note that prior to protocol 414, servers were not allowed to send
 .B DENIED
 to clients after the
@@ -158,7 +157,6 @@ message. Now they can send a
 .B DENIED
 message at any time to indicate that they wish to terminate the
 client's session immediately.)
-'\" <</New>>
 .SS "Command Summary"
 .LP
 '\"<<TeX>>
@@ -218,6 +216,7 @@ since all communications are asynchronous.
 '\"  \z{DR}     &C$\rightarrow$S    &\z{DD=}    &maybe&\acronym{JSON}&Request user's presets\\
 '\"  \z{DSM}    &C$\leftrightarrow$S&---        &yes&\acronym{JSON}&Define creature status marker\\
 '\"  \z{ECHO}   &C$\leftrightarrow$S&\z{ECHO}   &no &\acronym{JSON}&Send data for server to echo back\\
+'\"  \z{FAILED} &C$\leftrightarrow$S&---        &yes&\acronym{JSON}&Request failed or denied by GM\\
 '\"  \z{GRANTED}&C$\leftarrow$S     &---        &N/A&\acronym{JSON}&Server grants access\\
 '\"  \z{I}      &C$\leftrightarrow$S&---        &yes&\acronym{JSON}&Indicate turn in combat\\
 '\"  \z{IL}     &C$\leftrightarrow$S&---        &yes&\acronym{JSON}&Update the initiative list\\
@@ -231,13 +230,13 @@ since all communications are asynchronous.
 '\"  \z{LS-TEXT}&C$\leftrightarrow$S&---        &no &\acronym{JSON}&Add some text to the map\\
 '\"  \z{LS-TILE}&C$\leftrightarrow$S&---        &no &\acronym{JSON}&Add a graphic tile to the map\\
 '\"  \z{MARCO}  &C$\leftarrow$S     &\z{POLO}   &N/A&none          &Check if client is alive\\
-'\"  \z{MARK}   &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Visually mark a spot\\\bottomrule
 '\" \end{tabular}
 '\" \caption{Summary of Client/Server Messages}\label{tbl:mapper:6:messages}
 '\"\end{table}
 '\"\begin{table}
 '\" \begin{tabular}{lcllll}\toprule
 '\"  {\bfseries Command}&{\bfseries C$\leftrightarrow$S}&{\bfseries Reply}&{\bfseries Priv}&{\bfseries Data}&{\bfseries Description}\\\midrule
+'\"  \z{MARK}   &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Visually mark a spot\\\bottomrule
 '\"  \z{POLO}   &C$\rightarrow$S    &---        &no &none          &Acknowledge server's ping\\
 '\"  \z{PRIV}   &C$\leftarrow$S     &---        &N/A&\acronym{JSON}&Privileged command denied\\
 '\"  \z{PROGRESS}&C$\leftrightarrow$S&---       &no &\acronym{JSON}&Indicate progress on task\\
@@ -253,6 +252,8 @@ since all communications are asynchronous.
 '\"  \z{SYNC}   &C$\rightarrow$S    &any        &no &none          &Request replay of commands\\
 '\"  \z{SYNC-CHAT}&C$\rightarrow$S  &\z{CC}/\z{ROLL}/\z{TO}&no&\acronym{JSON}&Request replay of messages\\
 '\"  \z{TB}     &C$\leftrightarrow$S&---        &yes&\acronym{JSON}&Turn on/off client toolbar\\
+'\"  \z{TMACK}  &C$\leftrightarrow$S&---        &yes&\acronym{JSON}&Acknowledge a timer request\\
+'\"  \z{TMRQ}   &C$\leftrightarrow$S&\z{TMACK}/\z{FAILED}&no&\acronym{JSON}&Request a timer\\
 '\"  \z{TO}     &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Send chat message\\
 '\"  \z{UPDATES}&C$\leftarrow$S     &---        &N/A&\acronym{JSON}&Advertise software updates\\
 '\"  \z{WORLD}  &C$\leftarrow$S     &---        &N/A&\acronym{JSON}&Campaign world info\\\bottomrule
@@ -284,6 +285,7 @@ DefineDicePresets	DD	C\[->]S	DD=	maybe	JSON	Store new presets for user
 DefineDiceDelegates	DDD	C\[->]S	DD=	maybe	JSON	Assign die-roll delegates
 Denied	DENIED	C\[<-]S	\fR\(em\fP	N/A	JSON	Server denies access
 Echo	ECHO	C\[<>]S	ECHO	no	JSON	Send data for server to echo back to client
+Failed	FAILED	C\[<>]S	\fR\(em\fP	yes	JSON	Request failed or denied by GM
 FilterCoreData	CORE/	C\[->]S	\fR\(em\fP	yes	JSON	Filter availability of the game database
 FilterDicePresets	DD/	C\[->]S	DD=	maybe	JSON	Remove some presets for user
 FilterImages	AI/	C\[->]S	\fR\(em\fP	yes	JSON	Filter saved image definitions
@@ -318,6 +320,10 @@ Sync	SYNC	C\[->]S	\fRany\fP	no	none	Request replay of commands
 SyncChat	SYNC-CHAT	C\[->]S	CC	no	JSON	Request replay of messages
 \^	\^	\^	ROLL	\^	\^	\^
 \^	\^	\^	TO	\^	\^	\^
+TimerAcknowledge	TMACK	C\[<>]S	\fR\(em\fP	yes	JSON	Acknowledge timer request
+TimerRequest	TMRQ	C\[<>]S	FAILED	no	JSON	Request a new timer
+\^	\^	\^	TMACK	\^	\^	\^
+\^	\^	\^	PROGRESS	\^	\^	\^
 Toolbar	TB	C\[<>]S	\fR\(em\fP	yes	JSON	Turn on/off client toolbar
 UpdateClock	CS	C\[<>]S	\fR\(em\fP	yes	JSON	Change the current time of day
 UpdateCoreData	CORE=	C\[<-]S	\fR\(em\fP	N/A	JSON	Update a core data item
@@ -2479,13 +2485,11 @@ field missing), then all delegates are removed.
 .B DENIED
 Access to the server is denied. The server will send this to a client; clients
 MAY NOT send it. 
-'\" <<New>>
 When a client receives this message, it MUST not continue
 to communicate with the server. In fact, the server SHOULD terminate the
 network connection after sending the
 .B DENIED
 message.
-'\" <</New>>
 The JSON payload sent with this command includes the field:
 '\" <<list>>
 .RS
@@ -2753,6 +2757,45 @@ The time when the server sent the response packet to the client.
 .RE
 
 '\" <</>>
+'\" <<New>>
+.TP
+.B FAILED
+Gives notice that a client request was not accepted. This may be issued by the server
+for reasons such as an error in the request itself that the server is able to detect
+before processing it further, or it may originate from a GM client in response to a player
+request such as
+.B TMRQ
+where the request contains an error or the GM decides to decline the request.
+If this message is sent by a client, it MUST be a privileged client, and will be relayed
+to the indicated requesting client.
+The JSON payload includes the following fields:
+.RS
+.TP
+.BI "IsError " (bool)
+If true, this notice indicates that the request failed because it contains an error that prevents it from being
+carried out.
+.TP
+.BI "IsDiscretionary " (bool)
+If true, this notice is the result of a decision by the GM to decline the player's request.
+.TP
+.B Command
+The original command being referenced.
+.TP
+.B Reason
+Freeform text describing why the request failed or was declined. This should be all that needs to be shown to the end user to explain the issue.
+.TP
+.B RequestID
+The uniquie identifier sent along with the original request.
+.TP
+.B RequestedBy
+The user name of the original requester.
+.TP
+.B RequestingClient
+The client ID of the original requester. When the
+.B FAILED
+message is sent by a GM client, the server will relay it to this client session.
+.RE
+'\" <</New>>
 .TP
 .B GRANTED
 Access to the server is granted. The server will send this to a client; no client should send it. The JSON payload contains the field:
@@ -3462,7 +3505,7 @@ The server's version number.
 .B PRIV
 Notice from the server that a command sent by the client is denied due to
 insufficient privilege. Clients MUST NOT send this command. The JSON
-payload includes the following field:
+payload includes the following fields:
 '\" <<list>>
 .RS
 .TP
@@ -4000,6 +4043,136 @@ If true, the client SHOULD display its toolbar. If false, the client SHOULD NOT
 display it. The client may override this request based on the user's preferences.
 '\" <</>>
 .RE
+'\" <<New>>
+.TP
+.B TMACK
+Acknowledges a timer request. If a client receives this, it means the GM has accepted their
+timer request into the set of tracked timers, and subsequent
+.B PROGRESS
+messages MAY appear as that timer's value is updated over time.
+The JSON payload for this message includes the following fields:
+.RS
+.TP
+.B RequestID
+The ID of the original request, as sent by the client when making it.
+.TP
+.B RequestingClient
+The client connection ID as it appeared in the original request.
+.TP
+.B RequestedBy
+The user name of the original requester. If the server is unable to locate the original requesting client connection
+as specified by the
+.B RequestingClient
+field, it MAY send
+.B TMACK
+messages to clients logged in by the user named in this field instead.
+.RE
+.TP
+.B TMRQ
+Request a new timer. This sends a request the the GM's GMA client. If the GM approves, the timer
+will be added to the collection of timers being tracked for the game. This MAY result in subsequent
+.B PROGRESS
+messages being received by clients as the timer's value is updated over time. If no GMA process hears
+the message, nothing may happen. Clients which receive this message MUST ignore it. If the GM declines
+to accept the incoming timer request, or if the request contains an error, a
+.B FAILED
+message SHOULD be sent back to the requesting client with the same
+.B RequestID
+value as the original request.
+If the GM accepts the timer into the tracking system, their client SHOULD send a
+.B TMACK
+message with matching
+.B RequestID
+field to the original requester to notify them of that fact. Clients MUST cope with the possibility
+of not receiving those acknowledgement messages or there being long delays between the request and acknowledgement.
+.RS
+.LP
+The JSON payload for this message includes the following fields:
+.TP
+.B Description
+A one-line text description giving the purpose of the timer.
+.TP
+.B Expires
+The time at which the timer should expire. This may be given as an absolute or relative time. If the string begins with
+an
+.B @
+character, it will be an abolute timer and the field MUST have the form
+.RS
+.LP
+.RI \fB@\fP[[[ year \fB-\fP] month \fB-\fP] date "] " hour \fB:\fP minute [\fB:\fP second [\fB.\fP tenths ]]
+.LP
+where the
+.IR year ,
+.IR month ,
+.IR date ,
+.IR hour ,
+.IR minute ,
+and
+.IR second
+values are numeric and conform to the campaign world calendar currently in play, and
+.I tenths
+is a single digit representing tenths of seconds. For example,
+.RB \*(lq @15:32 \*(rq
+represents a timer which expires at 32 minutes past 3 P.M., and
+.RB \*(lq "@10-15 12:00:05" \*(rq
+expires at five seconds past noon on the fifteenth day of the tenth month of the current year. Text
+names or abbreviations may be used for
+.I name
+if defined for the calendar in effect at the time, so on the Golarion calendar that last example
+could also have been
+.RB \*(lq "@LAM-15 12:00:05" \*(rq
+since the tenth month is Lamashan.
+.LP
+Otherwise, the value indicates a relative amount of time from the time and date on the clock at the moment
+the timer is accepted into the system by the GM.
+This expiration MAY begin with a
+.B +
+or
+.B -
+sign. Following this is a number and a unit name, such as
+.RB \*(lq "5 rounds" \*(rq
+or
+.RB \*(lq "3 hours" \*(rq,
+or an expression in the form
+.LP
+.RI [[ days \fB:\fP] hours \fB:\fP] minutes \fB:\fP seconds \fB.\fP tenths
+.LP
+so
+.RB \*(lq "3 hours" \*(rq,
+.RB \*(lq "+3 hours" \*(rq,
+.RB \*(lq "3:00" \*(rq,
+and
+.RB \*(lq "+3:00" \*(rq
+all set a timer for three hours into the future, while
+.RB \*(lq "-2 rounds" \*(rq
+sets one that expires two rounds in the past (which may not be as useless as it sounds depending
+on the circumstances in the game, but probably is).
+.RE
+.TP
+.BI "Targets " "(list of strings)"
+If this is empty, the timer is assumed to apply to everyone. Otherwise, it applies to the individuals named in the
+list. If these are the names of players, they should match their login names exactly.
+.TP
+.BI "ShowToAll " (bool)
+If true, the timer should be visible to the players. Otherwise, only the GM sees it on their time tracker.
+.TP
+.BI "IsRunning " (bool)
+If true, the timer should start running immediately. Otherwise, the GM will need to manually start it at a future point in time.
+.TP
+.BI "RequestedBy"
+The user name of the user who initiated this request. Clients NEED NOT supply this field; it will be supplied
+by the server as it relays the request on to the GM.
+.TP
+.B RequestingClient
+The client connection ID of the user who initiated this request. Clients MUST NOT supply this field; it will be supplied
+by the server as it relays the request on to the GM. The meaning of this value is opaque and is only used by the server.
+.TP
+.B RequestID
+A unique identifier for this request. Replies sent back to the requesting client in regard to this request will reference
+this same ID. A UUID string is suggested for this value.
+.RE
+.RE
+'\" <</New>>
 .TP
 .B TO
 Send chat message to a set of recipients. 
@@ -4219,8 +4392,16 @@ John Mechalas (elevation and movement modes).
 .SH HISTORY
 '\" <<New>>
 .LP
-This document defines map protocol version 415,
-which added the 
+This document defines map protocol version 416,
+which added the
+.B TMRQ
+message and the
+.B IsDiscretionary
+parameter to the
+.B PRIV
+message.
+.LP
+Version 415 added the 
 .B Iterations
 parameter to the 
 .B OK
