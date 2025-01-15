@@ -14338,10 +14338,10 @@ proc itr_info {} {
 		{b {10} p { (10 initiative counts, i.e. 1.0 seconds)}}
 		{b {round} p { (1 round, i.e. defaults to 1 of the given unit)}}
 		{b {3 days}}
-		{b {1 hour}}
+		{b {1.5 hours}}
 		{b {4 weeks}}
 		{p {}}
-		{p {Defined units include seconds (second, secs, sec, s), rounds (round, rnds, rnd, r), minutes (minute, mins, min, m), hours (hour, hrs, hr, h), weeks (week, wks, wk, w), and days (day, dys, dy, d). You can't give fractional values like } b {1.5 minutes} p {, however; for that you would need to use the longer form and specify the timer as } b {1:30} p {.}}
+		{p {Defined units include seconds (second, secs, sec, s), rounds (round, rnds, rnd, r), minutes (minute, mins, min, m), hours (hour, hrs, hr, h), weeks (week, wks, wk, w), and days (day, dys, dy, d).}}
 	} {
 		foreach {f t} $line {
 			$w.text insert end $t $f
@@ -14448,9 +14448,9 @@ proc itr_failed {request_id reason} {
 		}
 		$w.sb state !disabled
 		$w.rb state !disabled
-		$w.ok configure -state normal -text Request -foreground red
+		$w.ok configure -state normal -text Request
 		$w.cancel configure -text Cancel
-		$w.ml configure -text $reason
+		$w.ml configure -text $reason -foreground red
 	}]} {
 		tk_messageBox -parent . -type ok -icon error -title "Timer Request Failed" \
 			-message $reason
