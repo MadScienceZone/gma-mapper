@@ -3,19 +3,25 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.28.0-alpha.0_alpha.0          <!-- @@##@@ -->
- * Effective Date: 06-Dec-2024               <!-- @@##@@ -->
+ * This Package Version: 4.28          <!-- @@##@@ -->
+ * Effective Date: 15-Jan-2025               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.27 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.28 <!-- @@##@@ -->
  * GMA Mapper File Format: 23	     <!-- @@##@@ -->
- * GMA Mapper Protocol: 415        <!-- @@##@@ -->
+ * GMA Mapper Protocol: 416        <!-- @@##@@ -->
  * GMA Mapper Preferences File Format: 8 <!-- @@##@@ -->
 
 ## DEPRECATION NOTICE
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.28
+## Enhancements
+ * Players may now request new timers to be added to the set of events that are being tracked on the game calendar by the GM.
+ * Die rolls which result in multiple results are now visually grouped together in the die-roll output display.
+ * Implements server protocol 416.
 
 # 4.27.2
 ## Fixes
