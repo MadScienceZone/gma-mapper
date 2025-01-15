@@ -14242,24 +14242,26 @@ proc start_ping_marker {w x y seq} {
 
 proc initiate_timer_request {} {
 	# put up a new dialog to make a request for a timer. We leave this up until dismissed or accepted by the GM.
-	global global_bg_color
+	global global_bg_color icon_info20
 
 	set this_request [new_id]
 	set w .tmrq_$this_request
 	toplevel $w -background $global_bg_color
 	wm title $w "New Timer Request"
 	grid [label $w.dl -text "Description:"]  -row 0 -column 0 -sticky w
-	grid [entry $w.de -width 64]           - -row 0 -column 1 -sticky we
+	grid [entry $w.de -width 64]         - - -row 0 -column 1 -sticky we
 	grid [label $w.el -text "Expires:"]      -row 1 -column 0 -sticky w
-	grid [entry $w.ee -width 64]           - -row 1 -column 1 -sticky we
+	grid [entry $w.ee -width 64]         - - -row 1 -column 1 -sticky we
 	grid [label $w.tl -text "Targets:"]      -row 2 -column 0 -sticky w
 	grid [entry $w.te -width 64]             -row 2 -column 1 -sticky we
-	grid [button $w.tb -command "itr_build_target_list $w" -text "..."] -row 2 -column 2
-	grid x [ttk::checkbutton $w.rb -text "Running Now"] x -sticky w
-	grid x [ttk::checkbutton $w.sb -text "Show to players"] x -sticky w
-	grid x [label $w.ml -text {} -foreground red] -sticky we
+	grid [button $w.tm -command "itr_personal_target $w" -text "ME"] -row 2 -column 2
+	grid [button $w.tb -command "itr_build_target_list $w" -text "..."] -row 2 -column 3
+	grid x [ttk::checkbutton $w.rb -text "Running Now"] - - -sticky w
+	grid x [ttk::checkbutton $w.sb -text "Show to Players"] - - -sticky w
+	grid x [label $w.ml -text {}] - - -sticky we
 	grid [button $w.cancel -command "destroy $w" -text Cancel] -row 6 -column 0 -sticky w
-	grid [button $w.ok -command "itr_commit $w $this_request" -text Request] -row 6 -column 2 -sticky e
+	grid [button $w.info -command "itr_info" -image $icon_info20] - -row 6 -column 1
+	grid [button $w.ok -command "itr_commit $w $this_request" -text Request] -row 6 -column 3 -sticky e
 	$w.rb state {selected !alternate}
 	$w.sb state {selected !alternate}
 	::tooltip::tooltip $w.dl {Describe the new timer's purpose.}
@@ -14269,13 +14271,96 @@ proc initiate_timer_request {} {
 	::tooltip::tooltip $w.tl {Players timer is visible to (space-separated, default is visible to all)}
 	::tooltip::tooltip $w.te {Players timer is visible to (space-separated, default is visible to all)}
 	::tooltip::tooltip $w.tb {Build list of targets interactively}
+	::tooltip::tooltip $w.tm {This timer's target is me}
 	::tooltip::tooltip $w.rb {Should the timer start off running immediately? Or let the GM start it later?}
 	::tooltip::tooltip $w.sb {Should the timer be visible to the players? Or just the GM?}
 	puts [$w.rb state]
 }
 
+proc itr_info {} {
+	set w .timer_request_help
+	create_dialog $w
+	wm title $w "How to Request a Timer"
+	grid [text $w.text -yscrollcommand "$w.sb set"] \
+	     [scrollbar $w.sb -orient vertical -command "$w.text yview"]\
+		 	-sticky news
+	grid columnconfigure $w 0 -weight 1
+	grid rowconfigure $w 0 -weight 1
+	$w.text tag configure h1 -justify center -font Tf14
+	$w.text tag configure p -font Nf12 -wrap word
+	$w.text tag configure i -font If12 -wrap word
+	$w.text tag configure b -font Tf12 -wrap word
+
+	foreach line {
+		{h1 {Requesting Timers}}
+		{p {}}
+		{p  {The GM tracks a number of timed events for the game. You can request timers of your own (e.g., for actions your character is doing) to be added to that set of events. When you do this, you will create a request that will be sent to the GM's client in real time. They can then make any necessary adjustments and add it to the system. They may also decide not to add it to the system.}
+		 i { Note that the GM must be logged in at the same time in order to receive and act on your request.}}
+		{p {}}
+		{p {To initiate a request, click on the "Request a New Timer" toolbar button (alarm clock with "+" sign) or choose the same option from the Play menu. Fill in the timer's description and expiration time (see below) in the fields provided.}}
+		{p {}}
+		{p {By default, timers will be visible to all players. If a timer only applies to some people, you can put their login names in the "Targets" field separated by spaces. For example: "} b {Alice Bob Charlie} p {" (although this is } i {not recommended,} p { if someone had spaces in their name, their entire name needs to be enclosed in braces like this: "} b {Alice Bob {This is me}} p {"). To make this easier, you can click on the "} b {ME} p {" button to put your own name in the target list to make the timer personal to you alone, or click the "} b {...} p {" button to bring up a dialog to select from among the logged-in players.}}
+		{p {(Note that this doesn't } i {hide} p { your timer, just allows people to ignore it. If they set their maps to show all timers, they'll still see yours too.)}}
+		{p {}}
+		{p {Check the "Running Now" box if you want the timer to start off running as soon as it's created. Otherwise the GM will have to manually start it later.}}
+		{p {Check the "Show to Players" box if you want the timer to be visible on the player map displays. Otherwise it will be added to the GM's time tracker but will only be visible to the GM.}}
+		{p {}}
+		{p {When ready, click the } b {Request} p { button. If you leave the dialog box up and there is a problem with the request you'll be informed and given the chance to correct the issue and resubmit it, or once the GM accepts the timer the dialog will go away on its own.}}
+		{p {}}
+		{h1 {Absolute Timers}}
+		{p {An absolute timer expires at a specific date and time on the game clock. To create a timer such as this, the expiration time must begin with an }
+		 b {@}
+		 p { sign.}}
+		{p {The full form accepted is }
+		 b @ p {[[[} i year b - p {]} i month b - p {]} i day p {] } i hour b : i minute p {[} b : i second p {[} b . i tenths p {]]}}
+		{p {Examples:}}
+		{b {@12:00} p { (noon today)}}
+		{b {@17:30:45} p { (half-past 5 PM plus 45 seconds)}}
+		{b {@3-15 8:00} p { (8 AM on the 15th of the 3rd month)}}
+		{b {@Absalom-20 10:15} p { (10:15 AM on the 20th of a month called Absalom)}}
+		{b {@ABS-20 10:15} p { (as above, using abbreviated month name)}}
+		{b {@4722-GOZ-1 00:00} p { (midnight, 1st of Gozran, 4722)}}
+		{p {}}
+		{h1 {Relative Timers}}
+		{p {Relative timers count down until a certain duration of time has elapsed. These }
+	     	 i {may}
+		 p { begin with an initial }
+		 b {+}
+		 p { or }
+		 b {-}
+		 p { to indicate that they expire in the future or already did in the past, respectively (the default is to assume it is in the future). Following this is a time duration in one of the following forms:}}
+		{p {[} i {n} p {] [} i {units} p {]}}
+		{p {[[} i days b : p {]} i hours b : p {]} i minutes b : i seconds p {[} b . i tenths p {]}}
+		{p {Examples:}}
+		{b {+5 rounds}}
+		{b {10 minutes}}
+		{b {1:2:3:4.5} p { (one day, two hours, three minutes, 4.5 seconds)}}
+		{b {10} p { (10 initiative counts, i.e. 1.0 seconds)}}
+		{b {round} p { (1 round, i.e. defaults to 1 of the given unit)}}
+		{b {3 days}}
+		{b {1 hour}}
+		{b {4 weeks}}
+		{p {}}
+		{p {Defined units include seconds (second, secs, sec, s), rounds (round, rnds, rnd, r), minutes (minute, mins, min, m), hours (hour, hrs, hr, h), weeks (week, wks, wk, w), and days (day, dys, dy, d). You can't give fractional values like } b {1.5 minutes} p {, however; for that you would need to use the longer form and specify the timer as } b {1:30} p {.}}
+	} {
+		foreach {f t} $line {
+			$w.text insert end $t $f
+		}
+		$w.text insert end "\n"
+	}
+}
+
+proc itr_personal_target {w} {
+	global local_user
+	$w.te delete 0 end
+	$w.te insert end [list $local_user]
+}
+
 proc itr_build_target_list {parent} {
-	global global_bg_color PeerList
+	global global_bg_color PeerList local_user
+
+	set users $PeerList
+	lappend users $local_user
 
 	set w ${parent}_t
 	catch {destroy $w}
@@ -14284,7 +14369,7 @@ proc itr_build_target_list {parent} {
 	grid columnconfigure $w 1 -weight 2
 	grid [ttk::checkbutton $w._all -text "Toggle All" -command "itr_toggle $w"] - - -sticky w
 	$w._all state {!selected !alternate}
-	foreach name [lsort -dictionary -unique $PeerList] {
+	foreach name [lsort -dictionary -unique $users] {
 		set n [to_window_id $name]
 		grid [ttk::checkbutton $w.p$n -text $name] - - -sticky w
 		$w.p$n state {!selected !alternate}
@@ -14296,9 +14381,13 @@ proc itr_build_target_list {parent} {
 # to keep the timer targets to who is logged in. But that makes the dialog box behave
 # oddly if the peer list changes while we are editing the list.
 proc itr_toggle {w} {
-	global PeerList
+	global PeerList local_user
+
+	set users $PeerList
+	lappend users $local_user
+
 	set toggle [$w._all instate selected]
-	foreach name $PeerList {
+	foreach name $users {
 		catch {
 			if {$toggle} {
 				$w.p[to_window_id $name] state selected
@@ -14310,9 +14399,13 @@ proc itr_toggle {w} {
 }
 
 proc itr_commit_t {parent} {
-	global PeerList
+	global PeerList local_user
+
+	set users $PeerList
+	lappend users $local_user
+
 	set target_list {}
-	foreach name $PeerList {
+	foreach name $users {
 		catch {
 			if {[${parent}_t.p[to_window_id $name] instate selected]} {
 				lappend target_list $name
@@ -14325,9 +14418,21 @@ proc itr_commit_t {parent} {
 }
 
 proc itr_commit {w request_id} {
-	::gmaproto::timer_request $request_id [$w.de get] [$w.ee get] [$w.rb instate selected] [$w.te get] [$w.sb instate selected]
+	set targets [string trim [$w.te get]]
+	set desc [string trim [$w.de get]]
+	set exp [string trim [$w.ee get]]
+	if {![string is list $targets]} {
+		$w.ml configure -foreground red -text "Target list has invalid format (unbalanced braces, maybe?)"
+		return
+	}
+	if {$desc eq {} || $exp eq {}} {
+		$w.ml configure -foreground red -text "Description and expiration time are required."
+		return
+	}
+	::gmaproto::timer_request $request_id $desc $exp [$w.rb instate selected] $targets [$w.sb instate selected]
 	$w.cancel configure -text Dismiss
 	$w.ok configure -text Pending... -state disabled
+	$w.ml configure -text "Waiting for GM to accept timer into system..."
 	foreach ww {de ee te tb} {
 		$w.$ww configure -state disabled
 	}
@@ -14343,7 +14448,7 @@ proc itr_failed {request_id reason} {
 		}
 		$w.sb state !disabled
 		$w.rb state !disabled
-		$w.ok configure -state normal -text Request
+		$w.ok configure -state normal -text Request -foreground red
 		$w.cancel configure -text Cancel
 		$w.ml configure -text $reason
 	}]} {
@@ -14356,9 +14461,20 @@ proc itr_accepted {request_id} {
 	set w .tmrq_$request_id
 	catch {
 		$w.ml configure -text "Timer request accepted." -foreground "#008800"
-		$w.ok configure -command "destroy $w" -text "Ok" -state normal
+		$w.ok configure -command "destroy $w" -text "Ok 5" -state normal
+		after 1000 "itr_destroy $w 4"
 	}
-	after 5000 "destroy $w"
+}
+
+proc itr_destroy {w t} {
+	catch {
+		if {$t == 0} {
+			destroy $w
+		} else {
+			$w.ok configure -text "OK $t"
+			after 1000 "itr_destroy $w [expr $t - 1]"
+		}
+	}
 }
 
 proc display_initiative_clock {} {
