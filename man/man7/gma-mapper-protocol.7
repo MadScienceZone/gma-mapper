@@ -2771,12 +2771,14 @@ to the indicated requesting client.
 The JSON payload includes the following fields:
 .RS
 .TP
+'\" <</ital-is-var>>
 .BI "IsError " (bool)
 If true, this notice indicates that the request failed because it contains an error that prevents it from being
 carried out.
 .TP
 .BI "IsDiscretionary " (bool)
 If true, this notice is the result of a decision by the GM to decline the player's request.
+'\" <</ital-is-var>>
 .TP
 .B Command
 The original command being referenced.
@@ -4149,6 +4151,7 @@ sets one that expires two rounds in the past (which may not be as useless as it 
 on the circumstances in the game, but probably is).
 .RE
 .TP
+'\" <</ital-is-var>>
 .BI "Targets " "(list of strings)"
 If this is empty, the timer is assumed to apply to everyone. Otherwise, it applies to the individuals named in the
 list. If these are the names of players, they should match their login names exactly.
@@ -4159,7 +4162,8 @@ If true, the timer should be visible to the players. Otherwise, only the GM sees
 .BI "IsRunning " (bool)
 If true, the timer should start running immediately. Otherwise, the GM will need to manually start it at a future point in time.
 .TP
-.BI "RequestedBy"
+'\" <<ital-is-var>>
+.B "RequestedBy"
 The user name of the user who initiated this request. Clients NEED NOT supply this field; it will be supplied
 by the server as it relays the request on to the GM.
 .TP
@@ -4394,12 +4398,12 @@ John Mechalas (elevation and movement modes).
 .LP
 This document defines map protocol version 416,
 which added the
-.B TMRQ
-message and the
-.B IsDiscretionary
-parameter to the
-.B PRIV
-message.
+.BR FAILED ,
+.BR TMRQ ,
+and
+.B TMACK
+messages.
+'\" <</New>>
 .LP
 Version 415 added the 
 .B Iterations
@@ -4408,7 +4412,6 @@ parameter to the
 message.
 .LP
 Version 414 changed 
-'\" <</New>>
 the definition of the
 .B DENIED
 message to allow it to be sent at any time during the
