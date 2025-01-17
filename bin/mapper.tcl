@@ -14274,6 +14274,9 @@ proc initiate_timer_request {} {
 	::tooltip::tooltip $w.tm {This timer's target is me}
 	::tooltip::tooltip $w.rb {Should the timer start off running immediately? Or let the GM start it later?}
 	::tooltip::tooltip $w.sb {Should the timer be visible to the players? Or just the GM?}
+	::tooltip::tooltip $w.cancel {Dismiss this dialog box without taking further action.}
+	::tooltip::tooltip $w.info {Display help information about requesting timers.}
+	::tooltip::tooltip $w.ok {Submit this timer request to the GM.}
 }
 
 proc itr_info {} {
