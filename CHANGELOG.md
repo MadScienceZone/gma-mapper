@@ -4,7 +4,7 @@
 
 ## Current Version Information
  * This Package Version: 4.28          <!-- @@##@@ -->
- * Effective Date: 15-Jan-2025               <!-- @@##@@ -->
+ * Effective Date: 17-Jan-2025               <!-- @@##@@ -->
 
 ## Compatibility
  * GMA Core API Library Version: 6.28 <!-- @@##@@ -->
