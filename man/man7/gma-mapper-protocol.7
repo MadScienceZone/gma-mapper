@@ -1,5 +1,5 @@
 '\" t
-'\" *** 416 ***
+'\" *** 417 ***
 '\" <<ital-is-var>>
 .TH GMA-MAPPER-PROTOCOL 7 "GMA-Mapper 4.28" 17-Jan-2025 "Protocols" \" @@mp@@
 .SH NAME
@@ -81,7 +81,7 @@ be implemented to wait synchronously for a server
 response during the authentication negotiation stage.
 .LP
 '\" <</bold-is-fixed>>
-.B "This describes protocol version 416."
+.B "This describes protocol version 417."
 '\" <<bold-is-fixed>>
 These notes are intended to be 
 detailed enough to implement a client from and should be considered
@@ -2275,6 +2275,33 @@ The username of the player for whom these presets were stored. The default, if n
 name is given or if it is empty, is the currently logged-in user.
 .TP
 '\" <</ital-is-var>>
+'\" <<New>>
+.BI Global " (bool)"
+If present and true, these presets are the system-wide set that apply to all users rather than those of the target user.
+For the
+.B DD
+command, this means the operation is redefining the entire set of system-wide presets. For
+.BR DD+ ,
+the operation is adding to the system-wide presets without changing the other existing ones.
+For
+.BR DD/ ,
+the operation is filtering out items from the system-wide set, and for
+.BR DR ,
+the operation is requesting to see only the system-wide set of presets without including those of any individual user.
+.RS
+.LP
+Note that when any of these commands are sent with this parameter set to true,
+they become privileged commands.
+.LP
+For the 
+.B DD=
+response from the server, the presence of this parameter with a true value indicates that it is the response from the latter command
+and as such contains only the system-wide presets. Otherwise, this is a \*(lqnormal\*(rq response from a
+.B DR
+command which will contain all of the system-wide presets plus the target user's own set. 
+.RE
+'\" <</New>>
+.TP
 .BI DelegateFor " (list of strings)"
 The list of all the other users for whom the target user is a delegate.
 .TP
@@ -2283,11 +2310,19 @@ The list of delegates who also have visibility and control for the owner's prese
 If empty or missing, there are no delegates.
 .TP
 .BI Presets " (list of objects)"
-'\" <<ital-is-var>>
 Each element in this list describes a single preset. It has the following
 fields:
 '\" <<list>>
 .RS
+'\" <<New>>
+.TP
+.BI Global " (bool)"
+If this parameter is present and true, it indicates that this preset was defined at a system-wide level and may
+not be changed or deleted by the user. The client MUST track it separately and MUST NOT confuse it with a non-global preset
+with the same name. This parameter is only set by the server. Clients MAY NOT set this when defining or modifying presets and sending them
+to the server.
+'\" <</New>>
+'\" <<ital-is-var>>
 .TP
 .BI Name
 The name by which this preset is identified to the user. This MUST
@@ -2388,8 +2423,51 @@ is a modifier in the \*(lqmonster\*(rq group.
 '\" <</TeX>>
 Clients SHOULD allow users to collapse all of the die rolls with the same group name(s) appearing consecutively
 in the die-roll preset list.
+'\" <<New>>
 .TP
 4.
+Stored tables MAY be stored as a die-roll preset with a
+.B Name
+field in the format
+.RS
+.LP
+.BI #; tblname ; flags ; dieexpr ; n0 ; t0 ;\fR...\fP; nN-1 ; tN-1 ;*; tN ;
+.LP
+The field delimeter 
+.RB (\*(lq ; \*(rq
+in this example) is arbitrary but must be consistent; it is whatever character appears after the
+.RB \*(lq # \*(rq
+character that declares this preset as a table definition.
+This declares a lookup table named
+.I tblname
+(which MUST be unique within the preset list). The set of
+.I flags
+is up to the client to manage. At this time, no flags are defined.
+The
+.I dieexpr
+gives a standard die-roll expression which the client should send to the server whenever a roll on this
+table is requested. Following this are a set of cases represented by numeric values
+.I n
+in increasing order along with corresponding text strings
+.I t
+which may contain GMA markup formatting codes.
+The last case, which is taken if the result of the die roll exceeded any of the values of
+.I n
+found up to that point, is represented by
+.RB \*(lq * \*(rq.
+.LP
+When the user wishes to invoke a random roll using the lookup table, the client will send a die-roll request
+to the server with
+.I dieexpr
+(along with, perhaps, additional modifiers and options) to get a random result back, which is then compared to
+the values in the lookup table until a value is found that is greater than or equal to the result, or the final
+.RB \*(lq * \*(rq
+value is reached, whereupon the corresponding text string is displayed by the client to the user in some
+appropriate fashion.
+'\" <</New>>
+.RE
+.TP
+5.
 Clients 
 MUST 
 gracefully handle the existence of data formats not listed
@@ -4396,14 +4474,17 @@ John Mechalas (elevation and movement modes).
 .SH HISTORY
 '\" <<New>>
 .LP
-This document defines map protocol version 416,
-which added the
+This document defines map protocol version 417,
+which added support for system-wide die-roll presets and
+table definitions.
+'\" <</New>>
+.LP
+Version 416 added the
 .BR FAILED ,
 .BR TMRQ ,
 and
 .B TMACK
 messages.
-'\" <</New>>
 .LP
 Version 415 added the 
 .B Iterations
