@@ -2296,9 +2296,10 @@ they become privileged commands.
 For the 
 .B DD=
 response from the server, the presence of this parameter with a true value indicates that it is the response from the latter command
-and as such contains only the system-wide presets. Otherwise, this is a \*(lqnormal\*(rq response from a
-.B DR
-command which will contain all of the system-wide presets plus the target user's own set. 
+and as such contains only the system-wide presets. In this case, clients MUST NOT conclude that the absense of the user's personal
+presets in the payload of this message means it can delete its copy of them. Without the
+.B Global
+parameter, this message contains all presets the client should know about, including the user's set plus the system-wide globals.
 .RE
 '\" <</New>>
 .TP
@@ -2585,6 +2586,13 @@ command back to the requesting client.
 The JSON payload may contain the following field:
 .RS
 '\" <<list>>
+'\" <<New>>
+.TP
+'\" <</ital-is-var>>
+.BI Global " (bool)"
+If present and true, this requests a list of only the global, system-wide set of presets rather than all of the presets the client should 
+know about.
+'\" <<ital-is-var>>
 .TP
 .B For
 The name of the user whose presets are being requested.
