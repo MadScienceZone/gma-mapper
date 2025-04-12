@@ -57,9 +57,9 @@ package require base64 2.4.2
 package require uuid 1.0.1
 
 namespace eval ::gmaproto {
-	variable protocol 416
+	variable protocol 417
 	variable min_protocol 333
-	variable max_protocol 416
+	variable max_protocol 417
 	variable max_max_protocol 499
 	variable debug_f {}
 	variable legacy false
@@ -144,10 +144,10 @@ namespace eval ::gmaproto {
 		CONN    {PeerList {a {Addr s User s Client s LastPolo f IsAuthenticated ? IsMe ?}}}
 		CS      {Absolute f Relative f Running ?}
 		D       {Recipients l ToAll ? ToGM ? RollSpec s RequestID s}
-		DD      {For s Presets {a {Name s Description s DieRollSpec s}}}
-		DD+     {For s Presets {a {Name s Description s DieRollSpec s}}}
-		DD/     {For s Filter s}
-		DD=     {For s Presets {a {Name s Description s DieRollSpec s}} DelegateFor l Delegates l}
+		DD      {Global ? For s Presets {a {Name s Description s DieRollSpec s}}}
+		DD+     {Global ? For s Presets {a {Name s Description s DieRollSpec s}}}
+		DD/     {Global ? For s Filter s}
+		DD=     {Global ? For s Presets {a {Global ? Name s Description s DieRollSpec s}} DelegateFor l Delegates l}
 		DDD	{For s Delegates l}
 		DENIED  {Reason s}
 		DR      {For s}
@@ -1399,16 +1399,22 @@ proc ::gmaproto::comment {text} {
 	::gmaproto::_protocol_send_raw "// $text"
 }
 
-proc ::gmaproto::define_dice_presets {plist app {for_user {}}} {
-	if {$app} {
-		::gmaproto::_protocol_send DD+ Presets $plist For $for_user
+proc ::gmaproto::define_dice_presets {plist app {for_user {}} {globals_only false}} {
+	if {$globals_only} {
+		set target {Globals true}
 	} else {
-		::gmaproto::_protocol_send DD Presets $plist For $for_user
+		set target [list For $for_user]
+	}
+
+	if {$app} {
+		::gmaproto::_protocol_send DD+ Presets $plist {*}$target
+	} else {
+		::gmaproto::_protocol_send DD Presets $plist {*}$target
 	}
 }
 
-proc ::gmaproto::filter_dice_presets {regex} {
-	::gmaproto::_protocol_send DD/ Filter $regex
+proc ::gmaproto::filter_dice_presets {regex {globals_only false}} {
+	::gmaproto::_protocol_send DD/ Filter $regex Global $globals_only
 }
 
 proc ::gmaproto::load_from {server_id cache_only merge} {
@@ -1419,8 +1425,8 @@ proc ::gmaproto::mark {x y} {
 	::gmaproto::_protocol_send MARK X $x Y $y
 }
 
-proc ::gmaproto::query_dice_presets {for_user} {
-	::gmaproto::_protocol_send DR For $for_user
+proc ::gmaproto::query_dice_presets {{for_user {}} {globals_only false}} {
+	::gmaproto::_protocol_send DR For $for_user Global $globals_only
 }
 
 proc ::gmaproto::define_dice_delegates {for_user delegate_list} {

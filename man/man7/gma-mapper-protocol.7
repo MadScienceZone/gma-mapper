@@ -2247,6 +2247,14 @@ The value is a regular expression. The server will delete all die-roll
 presets whose
 .B Name
 attribute matches this regular expression.
+'\" <<New>>
+'\" <</ital-is-var>>
+.TP
+.BI Global " (bool)"
+If present and true, this operation filters items out of the system-wide global set of presets
+instead of a user's set. This makes this a privileged command.
+'\" <<ital-is-var>>
+'\" <</New>>
 .TP
 .B For
 The name of the user whose presets are being filtered. This is optional;
@@ -2283,21 +2291,16 @@ For the
 command, this means the operation is redefining the entire set of system-wide presets. For
 .BR DD+ ,
 the operation is adding to the system-wide presets without changing the other existing ones.
-For
-.BR DD/ ,
-the operation is filtering out items from the system-wide set, and for
-.BR DR ,
-the operation is requesting to see only the system-wide set of presets without including those of any individual user.
 .RS
 .LP
 Note that when any of these commands are sent with this parameter set to true,
 they become privileged commands.
 .LP
-For the 
+In the 
 .B DD=
-response from the server, the presence of this parameter with a true value indicates that it is the response from the latter command
-and as such contains only the system-wide presets. In this case, clients MUST NOT conclude that the absense of the user's personal
-presets in the payload of this message means it can delete its copy of them. Without the
+response from the server, the presence of this parameter with a true value indicates that this 
+contains only the system-wide presets. In this case, clients MUST NOT conclude that the absence of the user's personal
+presets in the payload means it can delete its copy of the user's presets. Without the
 .B Global
 parameter, this message contains all presets the client should know about, including the user's set plus the system-wide globals.
 .RE
@@ -2322,6 +2325,12 @@ If this parameter is present and true, it indicates that this preset was defined
 not be changed or deleted by the user. The client MUST track it separately and MUST NOT confuse it with a non-global preset
 with the same name. This parameter is only set by the server. Clients MAY NOT set this when defining or modifying presets and sending them
 to the server.
+.RS
+.LP
+Clients MAY locally present the name of global presets, variables, and modifiers in a way that distinguishes them from user presets
+(e.g., by prefixing them with a symbol) to ensure that they can't be confused even if the user accidentally creates a local preset with
+the same name).
+.RE
 '\" <</New>>
 '\" <<ital-is-var>>
 .TP
@@ -2464,7 +2473,7 @@ to the server with
 the values in the lookup table until a value is found that is greater than or equal to the result, or the final
 .RB \*(lq * \*(rq
 value is reached, whereupon the corresponding text string is displayed by the client to the user in some
-appropriate fashion.
+appropriate fashion. Clients SHOULD transmit this result to other clients via a CHAT message.
 '\" <</New>>
 .RE
 .TP

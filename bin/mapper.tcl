@@ -10054,6 +10054,11 @@ proc DoCommandDD= {d} {
 		set target $local_user
 	}
 
+	# w,userid,presetname		widgetid
+	# preset,userid,presetname	user preset
+	# sys,preset,presetname		globals
+	# delegates,userid
+	# delegate_for,userid
 	if {! $SuppressChat} {
 		if {[catch {
 			DisplayChatMessage {} $target
@@ -10063,8 +10068,15 @@ proc DoCommandDD= {d} {
 				DEBUG 1 "destroy $w preset widget"
 				destroy $w
 			}
-			array unset dice_preset_data "preset,$tkey,*"
+			array unset dice_preset_data "sys,preset,*"
 			array unset dice_preset_data "w,$tkey,*"
+			if {[dict exists $d Global] && [dict get $d Global]} {
+				set global_only true
+			} else {
+				set global_only false
+				# if we're not just receiving the global list, remove our locals since we're reloading them too
+				array unset dice_preset_data "preset,$tkey,*"
+			}
 			# NO, don't do this every time or you'll keep getting enabled presets
 			# setting themselves on anytime the presets are refreshed.
 			# --- array unset dice_preset_data "en,$tkey,*"
@@ -10073,7 +10085,11 @@ proc DoCommandDD= {d} {
 			# TODO array unset dice_preset_data "recent_die_rolls,$tkey" ??
 			# TODO array unset DieRollPresetState $tkey,* ??
 			foreach preset [dict get $d Presets] {
-				set dice_preset_data(preset,$tkey,[dict get $preset Name]) $preset
+				if {$global_only || ([dict exists $preset Global] && [dict get $preset Global])} {
+					set dice_preset_data(sys,preset,[dict get $preset Name]) $preset
+				} else {
+					set dice_preset_data(preset,$tkey,[dict get $preset Name]) $preset
+				}
 			}
 			set dice_preset_data(delegates,$tkey) [dict get $d Delegates]
 			set dice_preset_data(delegate_for,$tkey) [dict get $d DelegateFor]
@@ -11351,12 +11367,19 @@ proc _render_die_roller {w width height type for_user tkey args} {
 			if {[dict get $_preferences styles dierolls compact_recents]} {
 				update
 				set i 0
-				foreach preset_name [lsort -dictionary [array names dice_preset_data "preset,$tkey,*"]] {
-					set needed_width [expr [winfo width $w.preset$i.name] + \
+				set name_list [lsort -dictionary [array names dice_preset_data "sys,preset,*"]]
+				lappend name_list {*}[lsort -dictionary [array names dice_preset_data "preset,$tkey,*"]]
+				foreach preset_name $name_list {
+					if {[catch {
+						set needed_width [expr [winfo width $w.preset$i.name] + \
 								   [winfo width $w.preset$i.def] + \
 								   [winfo width $w.preset$i.roll] + \
 								   [winfo width $w.preset$i.extra] + \
 								   [winfo width $w.preset$i.plus]]
+					} err]} {
+						DEBUG 1 "preset width calculation failed; $err"
+						set needed_width 0
+					}
 					if {$width > 0 && $needed_width >= $width} {
 						# move to 2-row format
 						pack forget $w.preset$i.def $w.preset$i.del $w.preset$i.name $w.preset$i.roll $w.preset$i.extra $w.preset$i.plus
@@ -11366,7 +11389,11 @@ proc _render_die_roller {w width height type for_user tkey args} {
 						pack $w.preset$i.name -side left -expand 1 -padx 2
 						#pack $w.preset$i.del -side right
 					} else {
-						pack configure $w.preset$i.def -expand 1 -fill x
+						if {[catch {
+							pack configure $w.preset$i.def -expand 1 -fill x
+						} err]} {
+							DEBUG 1 "preset widget repack error $err"
+						}
 					}
 					incr i
 				}
