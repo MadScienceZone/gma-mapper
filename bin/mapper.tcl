@@ -17,7 +17,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.28}     ;# @@##@@
+set GMAMapperVersion {4.29-alpha.0}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {416}         ;# @@##@@
 set CoreVersionNumber {6.28}            ;# @@##@@
@@ -11135,12 +11135,13 @@ proc _render_die_roller {w width height type for_user tkey args} {
 			global DieRollPresetState
 			set prev_grplist {}
 			set prev_collapse {}
-			foreach preset [dict get $preset_data Modifiers] {
+			foreach {scope preset_set} {g GlobalModifiers u Modifiers} {
+			    foreach preset [dict get $preset_data $preset_set] {
 				set wpi $w.preset$i
 				DEBUG 4 "create frame $wpi"
 				set dname [dict get $preset DisplayName]
 				set pname [dict get $preset Name]
-				set piname [to_window_id $pname]
+				set piname [to_window_id $scope$pname]
 
 				set grplist [split [dict get $preset Group] "\u25B6"]
 				if {![info exists dice_preset_data(collapse,$tkey,$piname)] || \
@@ -11237,14 +11238,27 @@ proc _render_die_roller {w width height type for_user tkey args} {
 					} else {
 						set t "$dname: [dict get $preset DieRollSpec]"
 					}
-					pack [ttk::checkbutton $wpi.enabled -variable dice_preset_data(en,$tkey,$piname) \
-						-command [list DRPScheckVarEn "en,$tkey,$piname" $id $for_user $tkey]\
-						-text $t] -side left
+					if {$scope eq "g"} {
+						pack [ttk::checkbutton $wpi.enabled -variable dice_preset_data(en,$tkey,$piname) \
+							-command [list DRPScheckVarEn "en,$tkey,$piname" $id $for_user $tkey $scope]\
+							-text "\[g\] $t"] -side left
+					} {
+						pack [ttk::checkbutton $wpi.enabled -variable dice_preset_data(en,$tkey,$piname) \
+							-command [list DRPScheckVarEn "en,$tkey,$piname" $id $for_user $tkey $scope]\
+							-text $t] -side left
+					}
 				} else {
-					pack [ttk::checkbutton $wpi.enabled -variable dice_preset_data(en,$tkey,$piname) \
-						-command [list DRPScheckVarEn "en,$tkey,$piname" $id $for_user $tkey]\
-						-text "[dict get $preset DisplayName] (as \$\{$id\}): [dict get $preset DieRollSpec]"\
-					] -side left
+					if {$scope eq "g"} {
+						pack [ttk::checkbutton $wpi.enabled -variable dice_preset_data(en,$tkey,$piname) \
+							-command [list DRPScheckVarEn "en,$tkey,$piname" $id $for_user $tkey $scope]\
+							-text "\[g\] [dict get $preset DisplayName] (as \$\$\{$id\}): [dict get $preset DieRollSpec]"\
+						] -side left
+					} {
+						pack [ttk::checkbutton $wpi.enabled -variable dice_preset_data(en,$tkey,$piname) \
+							-command [list DRPScheckVarEn "en,$tkey,$piname" $id $for_user $tkey $scope]\
+							-text "[dict get $preset DisplayName] (as \$\{$id\}): [dict get $preset DieRollSpec]"\
+						] -side left
+					}
 				}
 				if {![info exists dice_preset_data(en,$tkey,$piname)]} {
 #					trace add variable dice_preset_data(en,$tkey,$piname) {array read write unset} TRACEvar
@@ -11254,6 +11268,7 @@ proc _render_die_roller {w width height type for_user tkey args} {
 				}
 				::tooltip::tooltip $wpi.enabled "* [dict get $preset Description]"
 				incr i
+			   }
 			}
 
 			#
@@ -11406,10 +11421,15 @@ proc _render_die_roller {w width height type for_user tkey args} {
 	}
 }
 
-proc DRPScheckVarEn {key id for_user tkey} {
+proc DRPScheckVarEn {key id for_user tkey {scope u}} {
 	global DieRollPresetState
 	global dice_preset_data
-	set DieRollPresetState($tkey,on,$id) [::gmaproto::json_bool $dice_preset_data($key)]
+
+	if {$scope eq "g"} {
+		set DieRollPresetState(sys,gvar_on,$id) [::gmaproto::json_bool $dice_preset_data($key)]
+	} else {
+		set DieRollPresetState($tkey,on,$id) [::gmaproto::json_bool $dice_preset_data($key)]
+	}
 }
 
 proc _resize_die_roller {w width height type for_user tkey} {
@@ -12271,6 +12291,11 @@ proc PresetLists {arrayname for_user tkey args} {
 	set mods {}
 	set rolls {}
 	set custom {}
+
+	set gmods {}
+	set grolls {}
+	set gcustom {}
+
 	set seq 0
 	if {$export} {
 		array unset DieRollPresetState "$tkey,*"
@@ -12380,7 +12405,113 @@ proc PresetLists {arrayname for_user tkey args} {
 			}
 		}
 	}
-	return [dict create Modifiers $mods Rolls $rolls CustomRolls $custom]
+
+	# process the global set
+	set pkeylen [string length "sys,preset,"]
+	foreach pkey [lsort [array names presets "sys,preset,*"]] {
+		set pname [string range $pkey $pkeylen end]
+		if {[regexp {^§(.*?);(.*?);(.*?)(?:;([^|]*))?(?:\|(.*))?$} $pname _ sequence varname flags client dname]} {
+			set d $presets($pkey)
+			if {$dname eq {}} {
+				dict set d DisplayName {unnamed modifier}
+			} else {
+				dict set d DisplayName $dname
+			}
+			dict set d ClientData $client
+			dict set d Variable $varname
+			foreach {flagcode flagname} {
+				e Enabled
+				g Global
+			} {
+				if {[string first $flagcode $flags] >= 0} {
+					dict set d $flagname true
+				} else {
+					dict set d $flagname false
+				}
+			}
+
+			set sdata [split $sequence "\u25B6"]
+			if {[llength $sdata] > 1} {
+				dict set d Group [join [lrange $sdata 1 end] "\u25B6"]
+				set sdata [lindex $sdata 0]
+			} else {
+				dict set d Group {}
+			}
+			if {[scan $sdata %d%s n _] == 1} {
+				if {$n <= $seq} {
+					set n [incr seq]
+				} else {
+					set seq $n
+				}
+				dict set d DisplaySeq $n
+			} else {
+				dict set d DisplaySeq [incr seq]
+			}
+
+			lappend gmods $d
+			if {$export} {
+				if {[set varname [string trim [dict get $d Variable]]] ne {}} {
+					if {[string is alpha -strict [string range $varname 0 0]] &&
+					([string length $varname] == 1 ||
+					[string is alnum -strict [string range $varname 1 end]])} {
+						set DieRollPresetState(sys,gvar,$varname) [dict get $d DieRollSpec]
+						set DieRollPresetState(sys,gvar_on,$varname) [dict get $d Enabled]
+					} else {
+						DEBUG 0 "Invalid modifier variable name <$varname>. This variable will be ignored."
+						DEBUG 0 "Variables must begin with a letter and include only letters and numbers."
+					}
+				} else {
+					# TODO
+					#set id [dict get $d DisplaySeq]
+					#set DieRollPresetState($tkey,global,$id) [dict get $d DieRollSpec]
+					#set DieRollPresetState($tkey,on,$id) [dict get $d Enabled]
+					#set DieRollPresetState($tkey,g,$id) [dict get $d Global]
+					#lappend DieRollPresetState($tkey,apply_order) $id
+				}
+			}
+		} else {
+			set pieces [split $pname |]
+			set d $presets($pkey)
+
+			if {[llength $pieces] < 2} {
+				# no |, so this is just a simple name with no other fancy stuff.
+				# give it a seqence here, which we'll write out for it later.
+				dict set d DisplayName $pname 
+				dict set d DisplaySeq [incr seq]
+				lappend grolls $d
+			} else {
+				# content before the | can be $[<area>]<sequence><groups>
+				set nstr [lindex $pieces 0]
+				if {[regexp {^(\$\[.*?\])(.*)$} $nstr _ areatag rest]} {
+					set nstr $rest
+					dict set d AreaTag $areatag
+				} else {
+					dict set d AreaTag {}
+				}
+				if {[llength [set seqparts [split $nstr "\u25B6"]]] > 1} {
+					dict set d Group [join [lrange $seqparts 1 end] "\u25B6"]
+					set nstr [lindex $seqparts 0]
+				} else {
+					dict set d Group {}
+				}
+
+				if {[scan $nstr %d%s n _] == 1} {
+					if {$n <= $seq} {
+						set n [incr seq]
+					} else {
+						set seq $n
+					}
+					dict set d DisplayName [join [lrange $pieces 1 end] |] 
+					dict set d DisplaySeq $n
+					lappend grolls $d
+				} else {
+					dict set d DisplayName [join [lrange $pieces 1 end] |]
+					lappend gcustom $d
+				}
+			}
+		}
+	}
+	return [dict create Modifiers $mods Rolls $rolls CustomRolls $custom GlobalModifiers $gmods GlobalRolls $grolls GlobalCustomRolls $gcustom]
 }
 
 proc EDRPcheckVar {w for_user tkey i} {
@@ -13322,28 +13453,39 @@ proc _apply_die_roll_mods {spec extra label {g false}} {
 proc _apply_die_roll_variables {rollspec for_user tkey} {
 	global DieRollPresetState
 	set it 0
-	foreach varform {
-		{\$\{([a-zA-Z][a-zA-Z0-9]*)\}}
-		{\$([a-zA-Z][a-zA-Z0-9]*)}
+	foreach {vartype varform} {
+		"gvar" {\$\$\{([a-zA-Z][a-zA-Z0-9]*)\}}
+		"uvar" {\$\{([a-zA-Z][a-zA-Z0-9]*)\}}
+		"gvar" {\$\$([a-zA-Z][a-zA-Z0-9]*)}
+		"uvar" {\$([a-zA-Z][a-zA-Z0-9]*)}
 	} {
 	    while {[regexp -indices $varform $rollspec fieldidx varidx]} {
-		DEBUG 1 " substitution $rollspec"
+		DEBUG 1 " substitution of type $vartype $rollspec"
 		if {[incr it] > 100} {
 			error "too many iterations (circular reference?)"
 		}
 		set varname [string range $rollspec {*}$varidx]
-		if {[info exists DieRollPresetState($tkey,var,$varname)]} {
-			if {$DieRollPresetState($tkey,on,$varname)} {
-				set rollspec [string replace $rollspec {*}$fieldidx $DieRollPresetState($tkey,var,$varname)]
+		if {$vartype eq "gvar"} {
+			set vkey "sys,gvar,$varname"
+			set onkey "sys,gvar_on,$varname"
+		} else {
+			set vkey "$tkey,var,$varname"
+			set onkey "$tkey,on,$varname"
+		}
+		if {[info exists DieRollPresetState($vkey)]} {
+			if {$DieRollPresetState($onkey)} {
+				set rollspec [string replace $rollspec {*}$fieldidx $DieRollPresetState($vkey)]
 			} else {
 				set rollspec [string replace $rollspec {*}$fieldidx]
 			}
+		} elseif {$vartype eq "gvar"} {
+			error "system global variable <$varname> does not exist."
 		} else {
 			error "variable <$varname> does not exist for $for_user."
 		}
 	    }
 	}
-	DEBUG 1 " substitution $rollspec"
+	DEBUG 1 " substitution result $rollspec"
 	return $rollspec
 }
 
@@ -14779,6 +14921,43 @@ proc ConnectToServerByIdx {idx} {
 #*AddDieRollPreset <USER> <TKEY>
 #
 #*user_key name -> sanitized_name
+#
+# __TODO__
+# [ ] piname change to add g/u prefix dice_preset_data(collapse,<tkey>,<piname>)
+# [ ] 	see also DRPexpand, dice_preset_data(en,<tkey>,<piname>), DRPScheckVarEn
+#
+# PresetLists a user tkey ?-export?
+# 	Interprets contents of array a from caller's scope
+# 	returns dict of Modifiers, Rolls, CustomRolls
+#
+# 	if -export, also sets global 
+# 		DieRollPresetState <tkey>,*	
+# 		DieRollPresetState <tkey>,apply_order	{}
+# 		for modifiers
+# 			with variable names
+#	 			DieRollPresetState(<tkey>,var,<name>) = dierollspec
+#	 **NEW**		DieRollPresetState(sys,gvar,<name>) = dierollspec
+#	 **NEW**		DieRollPresetState(sys,gvar_on,<name>) = enabled (bool)
+#	 			DieRollPresetState(<tkey>,on,<name>) = enabled (bool)
+#	 			DieRollPresetState(<tkey>,g,<name>) = false
+#	 		without names
+#	 			DieRollPresetState(<tkey>,global,<seq>) = dierollspec
+#	 			DieRollPresetState(<tkey>,on,<name>) = enabled (bool)
+#	 			DieRollPresetState(<tkey>,g,<name>) = global (bool)
+#	 			DieRollPresetState(<tkey>,apply_order) {...,<seq>}	(append to list)
+#
+#
+# _render_die_roller
+# SaveDieRollPresets w user tkey: saves preset,<key>,* to file
+# LoadDieRollPresets w user tkey: loads from file, calls UpdateDicePresets <loadedlist> <user> then RequestDicePresets <user>
+# UpdateDicePresets
+# RequestDicePresets
+# CommitNewPreset user tkey: loads from .adrp<window-id-derived-from-<tkey>> to preset,<tkey>,<name> then calls UpdateDicePresets then RequestDicePresets
+# RollPreset w idx name user tkey: invokes preset,<tkey>,<name> with ad-hoc extra from <w>.extra widget by calling _do_roll
+# _do_roll
+#
+#
+#
 #
 # @[00]@| GMA-Mapper 4.28
 # @[01]@|
