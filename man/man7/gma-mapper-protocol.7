@@ -2441,13 +2441,22 @@ Stored tables MAY be stored as a die-roll preset with a
 field in the format
 .RS
 .LP
-.BI #; tblname ; flags ; dieexpr ; n0 ; t0 ;\fR...\fP; nN-1 ; tN-1 ;*; tN ;
+.BI # sequence ; flags \fR[\fP; client \fR]\fP| tblname
+.LP
+and the
+.B DieRollSpec
+field in the format
+.LP
+.BI ; dieexpr ; n0 ; t0 ;\fR...\fP; nN-1 ; tN-1 ;*; tN ;
 .LP
 The field delimeter 
 .RB (\*(lq ; \*(rq
-in this example) is arbitrary but must be consistent; it is whatever character appears after the
-.RB \*(lq # \*(rq
-character that declares this preset as a table definition.
+in this example) is arbitrary but must be consistent; it is whatever character appears as the first character in
+.B DieRollSpec
+(to allow for punctuation marks such as semicolons to appear in the table text as needed). The semicolon delimeters
+in the
+.B Name
+field are always semicolons.
 This declares a lookup table named
 .I tblname
 (which MUST be unique within the preset list). The set of

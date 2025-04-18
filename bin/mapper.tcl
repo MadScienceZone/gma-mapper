@@ -19,7 +19,7 @@
 # Auto-configure values
 set GMAMapperVersion {4.29-alpha.0}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
-set GMAMapperProtocol {416}         ;# @@##@@
+set GMAMapperProtocol {417}         ;# @@##@@
 set CoreVersionNumber {6.28}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
@@ -11471,14 +11471,31 @@ proc EditDieRollPresets {for_user tkey} {
 	wm title $w "Manage Die-Roll Presets for $for_user"
 	ttk::notebook $w.n
 	sframe new $w.n.r
+	sframe new $w.n.gr
 	sframe new $w.n.m
+	sframe new $w.n.gm
 	sframe new $w.n.c
+	sframe new $w.n.gc
 	set wnr [sframe content $w.n.r]
+	set wngr [sframe content $w.n.gr]
 	set wnm [sframe content $w.n.m]
+	set wngm [sframe content $w.n.gm]
 	set wnc [sframe content $w.n.c]
+	set wngc [sframe content $w.n.gc]
+	array set tabid {
+		Rolls 0
+		Modifiers 1
+		Custom 2
+		GlobalRolls 3
+		GlobalModifiers 4
+		GlobalCustom 5
+	}
 	$w.n add $w.n.r -state normal -sticky news -text Rolls
 	$w.n add $w.n.m -state normal -sticky news -text Modifiers
 	$w.n add $w.n.c -state disabled -sticky news -text Custom
+	$w.n add $w.n.gr -state disabled -sticky news -text "Global Rolls"
+	$w.n add $w.n.gm -state disabled -sticky news -text "Global Modifiers"
+	$w.n add $w.n.gc -state disabled -sticky news -text "Global Custom"
 	pack $w.n -expand 1 -fill both
 	pack [button $w.can -text Cancel -command "if \[tk_messageBox -type yesno -parent $w -icon warning -title {Confirm Cancel} -message {Are you sure you wish to abandon any changes you made to the die-roll preset list?} -default no] {destroy $w}"] -side left
 	pack [button $w.ok -text Save -command [list EDRPsaveAndDestroy $w $for_user $tkey]] -side right
@@ -11491,6 +11508,81 @@ proc EditDieRollPresets {for_user tkey} {
 
 	set dice_preset_data(tmp_presets,$tkey) [PresetLists dice_preset_data $for_user $tkey]
 	array unset dice_preset_data "tmp_presets,$tkey,*"
+
+#
+# process the read-only global things.
+# This uses some new logic that could be the start of a refactored approach to how the rest of
+# this routine could be moved to use in the future as well, which is why it looks a bit different.
+#
+#
+	set mi 0
+	foreach preset [concat \
+		[dict get $dice_preset_data(tmp_presets,$tkey) GlobalModifiers] \
+		[dict get $dice_preset_data(tmp_presets,$tkey) GlobalRolls] \
+		[dict get $dice_preset_data(tmp_presets,$tkey) GlobalCustomRolls] \
+	] {
+		set pd [GetPresetDetails $preset]
+		switch [dict get $pd type] {
+			preset {
+			}
+			modifier {
+				if {$mi == 0} {
+					# set up the notebook pane
+					$w.n tab $tabid(GlobalModifiers) -state normal
+					grid [label $wngm.tg -text Group] [label $wngm.t0 -text On] [label $wngm.t1 -text Name] [label $wngm.t2 -text Description] [label $wngm.t3 -text Expression] \
+						x x -sticky ew
+				}
+
+				if {[dict get $pd enabled]} {
+					set enabled "(en)"
+				} else {
+					set enabled ""
+				}
+				if {[set varname [dict get $pd var]] ne {}} {
+					set varname "as symbol \$\$\{$varname\}"
+				}
+				if {[dict get $pd global]} {
+					set glb "(...)x"
+				} else {
+					set glb ""
+				}
+				grid [label $wngm.group$mi -text [join [dict get $pd group] "\u25B6"]] \
+					[label $wngm.en$mi -text $enabled] \
+					[label $wngm.name$mi -text [dict get $pd name] -anchor w] \
+					[label $wngm.desc$mi -text [dict get $pd description] -anchor w] \
+					[label $wngm.dspec$mi -text [dict get $pd dieroll] -anchor w] \
+					[label $wngm.asvar$mi -text $varname -anchor w] \
+					[label $wngm.glb$mi -text $glb -anchor w] \
+					-sticky we
+				incr mi
+			}
+			table {
+			}
+			default {
+			}
+		}
+	}
+
+	#
+#	set global_vars [array names dice_preset_data "sys,preset,*"]
+#	DEBUG 0 "global_vars $global_vars"
+
+
+
+
+
+
+
+#	 **NEW**		DieRollPresetState(sys,gvar,<name>) = dierollspec
+#	 **NEW**		DieRollPresetState(sys,gvar_on,<name>) = enabled (bool)
+# dict get preset DisplayName/Description/DieRollSpec/Group/Enabled/Global
+
+
+
+
+
+
+
 	set i 0
 	foreach preset [dict get $dice_preset_data(tmp_presets,$tkey) Rolls] {
 		set dice_preset_data(tmp_presets,$tkey,R,$i) $preset
@@ -14956,6 +15048,202 @@ proc ConnectToServerByIdx {idx} {
 # RollPreset w idx name user tkey: invokes preset,<tkey>,<name> with ad-hoc extra from <w>.extra widget by calling _do_roll
 # _do_roll
 #
+
+#
+# This is an experimental start of a refactored approach to die-roll modifier/presets which
+# may replace some of the more messier earlier code, so there's some duplication here]
+# for the moment until this eventually replaces the older stuff.
+#
+
+# Given an encoded representation of a preset as stored in die_roll_presets, 
+# interpret it in detail, expanding all the relevant information for easy perusal.
+#
+# the source data is in the form 
+# 	dice_preset_data(sys,preset,<Name>) [dict Global Name Description DieRollSpec]
+# 	dice_preset_data(preset,<tkey>,<Name>) [dict ...]
+# we expand this into a new dictionary
+# 	type	preset|modifier|table
+# 	group	list
+#	seq	int
+#	name
+#	var	(empty if no variable name assigned)
+#	flags	list (original flag list)
+#	client	(original client data string)
+#	global	bool	true if g flag set
+#	enabled	bool	true if e flag set
+#	system	bool	true if system-wide global value
+#	table	list	[n0 t0 n1 t1 ... n-1 tN-1 "*" tN]
+#	delim	for tables, this is the delimiter character used for the DieRollSpec field.
+#	dieroll	dieroll spec (for tables, this is just the die-roll with the table spec removed)
+#	description
+#	_raw	saved copy of the original dictionary
+#
+proc GetPresetDetails {p} {
+	set d [dict create \
+		client {} \
+		delim {} \
+		description [dict get $p Description] \
+		dieroll [dict get $p DieRollSpec] \
+		enabled false \
+		flags {} \
+		global false \
+		group {} \
+		name [set name [dict get $p Name]] \
+		seq {} \
+		system false \
+		table {} \
+		type preset \
+		var {} \
+		_raw $p \
+	]
+	if {[dict exists $p Global] && [dict get $p Global]} {
+		dict set d system true
+	}
+	if {[set baridx [string first "|" $name]] < 0} {
+		# no name encoding; this is just a preset
+	} elseif {$baridx == 0} {
+		# the name is "|name" which really doesn't make sense
+		dict set d name [string range $name 1 end]
+	} else {
+		# the name may be encoded further, let's take a look.
+		dict set d name [string range $name $baridx+1 end]
+		set flags {}
+		if {[string range $name 0 0] eq "\u00A7"} {
+			dict set d type modifier
+			set flds [split [string range $name 1 $baridx-1] ";"]
+			if {[llength $flds] >= 2} {
+				dict set d var [lindex $flds 1]
+			}
+			if {[llength $flds] >= 3} {
+				dict set d flags [set flags [split [lindex $flds 2] {}]]
+			}
+			if {[llength $flds] >= 4} {
+				dict set d client [lindex $flds 3]
+			}
+		} elseif {[string range $name 0 0] eq "#"} {
+			dict set d type table
+			set flds [split [string range $name 1 $baridx-1] ";"]
+			if {[llength $flds] >= 2} {
+				dict set d flags [set flags [split [lindex $flds 1] {}]]
+			}
+			if {[llength $flds] >= 3} {
+				dict set d client [lindex $flds 2]
+			}
+			set delim [string range [set drs [dict get $p DieRollSpec]] 0 0]
+			dict set d delim $delim
+			set flds [split $drs $delim]
+			if {[llength $flds] % 2 != 1 || [lindex $flds 0] ne "" || [lindex $flds end] ne "" || [llength $flds] < 5 || [lindex $flds end-2] ne "*"} {
+				dict set d type invalid
+			} else {
+				dict set d dieroll [lindex $flds 1]
+				set tbl {}
+				set l 0
+				set i 0
+				foreach {n t} [lrange $flds 2 end-1] {
+					if {$i == [llength $flds]-5} {
+						if {$n ne "*"} {
+							dict set d type invalid
+							break
+						}
+					} elseif {![string is integer -strict $n} {
+						dict set d type invalid
+						break
+					}
+					incr i 2
+					lappend tbl $n $t
+				}
+			}
+			dict set d table $tbl
+		} else {
+			set flds [split [string range $name 0 $baridx-1] ";"]
+		}
+
+		if {[lsearch $flags e] >= 0} {dict set d enabled true}
+		if {[lsearch $flags g] >= 0} {dict set d global true}
+
+		set groups [split [lindex $flds 0] "\u25B6"]
+		dict set d seq [lindex groups 0]
+		if {[llength $groups] > 1} {
+			dict set d group [lrange $groups 1 end]
+		}
+
+		#<sequence>[\u25b6.*\u25b6.*...]|
+		#\ua7<sequence>[\u25b6.*\u25b6.*...];[<var>];[<flags>][;<client>]|
+		##<sequence>[\u25b6.*\u25b6.*...];<flags>][;<client>]|
+		#
+		#note that <sequence> need not be strictly numeric. GMA, for example, creates
+		#temporary battle groups with <sequences> that look like "$[F12]001".
+	}
+	return $d
+}
+
+proc _build_preset_group_name {name seq groups {prefix {}} {extra {}}} {
+	if {[llength $groups] > 0} {
+		if {$seq eq {}} {
+			set seq {000}
+		}
+		set seq [join [list $seq {*}$groups] "\u25B6"]
+	}
+	if {$seq eq {} && $prefix eq {} && $extra eq {}} {
+		return "$prefix$name"
+	}
+	return "$prefix$seq$extra|$name"
+}
+
+#
+# EncodePresetDetails reverses GetPresetDetails. Given a dictionary of digested preset details, this re-encodes the preset as the
+# GMA server expects to see it.
+#
+proc EncodePresetDetails {p} {
+	switch [dict get $p type] {
+		preset {
+			# preset:	Name: <seq>[<groups>]|<name>
+			return [dict create \
+				Global [dict get $p system] \
+				Name	    [_build_preset_group_name [dict get $p name] [dict get $p seq] [dict get $p groups]] \
+				Description [dict get $p description] \
+				DieRollSpec [dict get $p dieroll] \
+			]
+		}
+		modifier {
+			# mod:		Name: §<seq>[<groups>];[<var>];[<flags>][;<client>]|<name>
+			set extra [join [list \
+				[dict get $p var] \
+				[join [dict get $p flags] {}] \
+				[dict get $p client] \
+			] ";"]
+			return [dict create \
+				Global [dict get $p system] \
+				Name	    [_build_preset_group_name [dict get $p name] [dict get $p seq] [dict get $p groups] "\u00A7" ";$extra"] \
+				Description [dict get $p description] \
+				DieRollSpec [dict get $p dieroll] \
+			]
+		}
+		table {
+			# table:	Name: #<seq>[<groups>];[<flags>][;<client>]|<name>
+			#		DieRollSpec: ;<dieroll>;<n0>;<t0>;...;<nN-1>;<tN-1>;*;<tN>;
+			set extra [join [list \
+				[join [dict get $p flags] {}] \
+				[dict get $p client] \
+			] ";"]
+			return [dict create \
+				Global      [dict get $p system] \
+				Name	    [_build_preset_group_name [dict get $p name] [dict get $p seq] [dict get $p groups] "#" ";$extra"] \
+				Description [dict get $p description] \
+				DieRollSpec [join [list {} \
+					[dict get $p dieroll] \
+					{*}[dict get $p table] \
+					{}] [dict get $p delim]] \
+			]
+		}
+		default {
+			# we don't know what it was to start with so we can't put it back together
+			# again either, just return back what mess we were given originally.
+			return [dict get $p _raw]
+		}
+	}
+}
+
 #
 #
 #
