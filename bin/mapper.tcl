@@ -11474,27 +11474,35 @@ proc EditDieRollPresets {for_user tkey} {
 	sframe new $w.n.gr
 	sframe new $w.n.m
 	sframe new $w.n.gm
+	sframe new $w.n.t
+	sframe new $w.n.gt
 	sframe new $w.n.c
 	sframe new $w.n.gc
 	set wnr [sframe content $w.n.r]
 	set wngr [sframe content $w.n.gr]
 	set wnm [sframe content $w.n.m]
 	set wngm [sframe content $w.n.gm]
+	set wnt [sframe content $w.n.t]
+	set wngt [sframe content $w.n.gt]
 	set wnc [sframe content $w.n.c]
 	set wngc [sframe content $w.n.gc]
 	array set tabid {
 		Rolls 0
 		Modifiers 1
-		Custom 2
-		GlobalRolls 3
-		GlobalModifiers 4
-		GlobalCustom 5
+		Tables 2
+		Custom 3
+		GlobalRolls 4
+		GlobalModifiers 5
+		GlobalTables 6
+		GlobalCustom 7
 	}
 	$w.n add $w.n.r -state normal -sticky news -text Rolls
 	$w.n add $w.n.m -state normal -sticky news -text Modifiers
+	$w.n add $w.n.t -state disabled -sticky news -text Tables
 	$w.n add $w.n.c -state disabled -sticky news -text Custom
 	$w.n add $w.n.gr -state disabled -sticky news -text "Global Rolls"
 	$w.n add $w.n.gm -state disabled -sticky news -text "Global Modifiers"
+	$w.n add $w.n.gt -state disabled -sticky news -text "Global Tables"
 	$w.n add $w.n.gc -state disabled -sticky news -text "Global Custom"
 	pack $w.n -expand 1 -fill both
 	pack [button $w.can -text Cancel -command "if \[tk_messageBox -type yesno -parent $w -icon warning -title {Confirm Cancel} -message {Are you sure you wish to abandon any changes you made to the die-roll preset list?} -default no] {destroy $w}"] -side left
@@ -11518,6 +11526,7 @@ proc EditDieRollPresets {for_user tkey} {
 	set mi 0
 	set pi 0
 	set di 0
+	set ti 0
 	foreach preset [concat \
 		[dict get $dice_preset_data(tmp_presets,$tkey) GlobalModifiers] \
 		[dict get $dice_preset_data(tmp_presets,$tkey) GlobalRolls] \
@@ -11574,8 +11583,27 @@ proc EditDieRollPresets {for_user tkey} {
 					-sticky we
 				incr mi
 			}
-			tablex {
-				DEBUG 0 "table $pd"
+			table {
+				if {$ti == 0} {
+					$w.n tab $tabid(GlobalTables) -state normal
+					grid [label $wngt.tg -text Group] [label $wngt.t0 -text Name] \
+						[label $wngt.t1 -text Description] [label $wngt.t2 -text {Die Roll}] \
+						[label $wngt.t3 -text Table] -sticky we
+				}
+				grid [label $wngt.group$ti -text [join [dict get $pd group] "\u25B6"]] \
+					[label $wngt.name$ti -text [dict get $pd name] -anchor w -relief groove] \
+					[label $wngt.desc$ti -text [dict get $pd description] -anchor w -relief groove] \
+					[label $wngt.dieroll$ti -text [dict get $pd dieroll] -anchor w -relief groove] \
+					[frame $wngt.table$ti] \
+					-sticky we
+				set tii 0
+				foreach {tabn tabtxt} [dict get $pd table] {
+					grid [label $wngt.table$ti.n$tii -text $tabn -anchor e -relief groove] \
+						[label $wngt.table$ti.t$tii -text $tabtxt -anchor w -relief groove] \
+						-sticky we
+					incr tii
+				}
+				incr ti
 			}
 			default {
 				if {$di == 0} {
