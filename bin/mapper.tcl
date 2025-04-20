@@ -11516,6 +11516,8 @@ proc EditDieRollPresets {for_user tkey} {
 #
 #
 	set mi 0
+	set pi 0
+	set di 0
 	foreach preset [concat \
 		[dict get $dice_preset_data(tmp_presets,$tkey) GlobalModifiers] \
 		[dict get $dice_preset_data(tmp_presets,$tkey) GlobalRolls] \
@@ -11524,6 +11526,22 @@ proc EditDieRollPresets {for_user tkey} {
 		set pd [GetPresetDetails $preset]
 		switch [dict get $pd type] {
 			preset {
+				if {$pi == 0} {
+					# set up the notebook pane
+					$w.n tab $tabid(GlobalRolls) -state normal
+					grid [label $wngr.tg -text Group] \
+						[label $wngr.t0 -text Name] \
+						[label $wngr.t1 -text Description] \
+						[label $wngr.t2 -text {Die Roll Specification}] \
+						-sticky we
+				}
+				grid [label $wngr.group$pi -text [join [dict get $pd group] "\u25B6"]] \
+					[label $wngr.name$pi -text [dict get $pd name] -anchor w -relief groove] \
+					[label $wngr.desc$pi -text [dict get $pd description] -anchor w -relief groove] \
+					[label $wngr.dspec$pi -text [dict get $pd dieroll] -anchor w -relief groove] \
+					-sticky we
+
+				incr pi
 			}
 			modifier {
 				if {$mi == 0} {
@@ -11548,17 +11566,27 @@ proc EditDieRollPresets {for_user tkey} {
 				}
 				grid [label $wngm.group$mi -text [join [dict get $pd group] "\u25B6"]] \
 					[label $wngm.en$mi -text $enabled] \
-					[label $wngm.name$mi -text [dict get $pd name] -anchor w] \
-					[label $wngm.desc$mi -text [dict get $pd description] -anchor w] \
-					[label $wngm.dspec$mi -text [dict get $pd dieroll] -anchor w] \
-					[label $wngm.asvar$mi -text $varname -anchor w] \
-					[label $wngm.glb$mi -text $glb -anchor w] \
+					[label $wngm.name$mi -text [dict get $pd name] -anchor w -relief groove] \
+					[label $wngm.desc$mi -text [dict get $pd description] -anchor w -relief groove] \
+					[label $wngm.dspec$mi -text [dict get $pd dieroll] -anchor w -relief groove] \
+					[label $wngm.asvar$mi -text $varname -anchor w ] \
+					[label $wngm.glb$mi -text $glb -anchor w ] \
 					-sticky we
 				incr mi
 			}
-			table {
+			tablex {
+				DEBUG 0 "table $pd"
 			}
 			default {
+				if {$di == 0} {
+					$w.n tab $tabid(GlobalCustom) -state normal
+					grid [label $wngc.t0 -text Name] [label $wngc.t1 -text Description] [label $wngc.t2 -text Expression] -sticky ew
+				}
+				grid [label $wngc.name$di -text [dict get $preset Name] -relief groove -anchor w] \
+					[label $wngc.desc$di -text [dict get $preset Description] -relief groove -anchor w] \
+					[label $wngc.dspec$di -text [dict get $preset DieRollSpec] -relief groove -anchor w] \
+					-sticky ew
+				incr di
 			}
 		}
 	}
@@ -15145,7 +15173,7 @@ proc GetPresetDetails {p} {
 							dict set d type invalid
 							break
 						}
-					} elseif {![string is integer -strict $n} {
+					} elseif {![string is integer -strict $n]} {
 						dict set d type invalid
 						break
 					}
