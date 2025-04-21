@@ -17,7 +17,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.29-alpha.0}     ;# @@##@@
+set GMAMapperVersion {4.29-alpha.1}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {417}         ;# @@##@@
 set CoreVersionNumber {6.28}            ;# @@##@@
@@ -974,7 +974,7 @@ if {$tcl_platform(os) eq "Darwin"} {
 
 set ICON_DIR [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end-1 end lib MadScienceZone GMA Mapper icons]]]
 set BIN_DIR [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end end]]]
-foreach module {scrolledframe ustar gmaclock gmacolors gmautil gmaprofile gmaproto gmafile gmazones progressbar} {
+foreach module {scrolledframe ustar gmaclock gmacolors gmautil gmaprofile gmaproto gmafile gmazones progressbar minimarkup} {
 	source [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end end $module.tcl]]]
 }
 
@@ -1192,6 +1192,8 @@ proc create_main_menu {use_button} {
 
 	menu $mm.help
 	$mm.help add command -command {aboutMapper} -label "About Mapper..."
+	$mm.help add command -command {ShowDiceSyntax} -label "Die roller syntax ..."
+	$mm.help add command -command {gma::minimarkup::ShowMarkupSyntax} -label "Text markup syntax ..."
 }
 
 proc SaveDebugText {} {
@@ -10395,7 +10397,7 @@ proc DoCommandLoginSuccessful {} {
 		set is_GM true
 	}
 	refresh_title
-	set feature_set {}
+	set feature_set {GMA-MARKUP}
 
 	if {[dict get $_preferences colorize_die_rolls]} {
 		lappend feature_set DICE-COLOR-BOXES

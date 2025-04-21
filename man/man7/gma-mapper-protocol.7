@@ -699,6 +699,11 @@ die roll results to a client which isn't prepared to interpret them.
 The client supports formatting controls in die-roll label fields in the roll details
 in a format as described above for sub-titles. This allows custom colors to be used
 for special die-roll modifiers that need to stand out visually from all the rest.
+'\" <<New>>
+.TP
+.B GMA-MARKUP
+The client is capable of interpreting GMA markup formatting codes received in chat messages.
+'\" <</New>>
 '\" <</>>
 '\" <</>>
 .RE
@@ -2461,7 +2466,9 @@ This declares a lookup table named
 .I tblname
 (which MUST be unique within the preset list). The set of
 .I flags
-is up to the client to manage. At this time, no flags are defined.
+is up to the client to manage. Currently the only defined flag is
+.BR m ,
+which means the table's text may include GMA markup formatting codes.
 The
 .I dieexpr
 gives a standard die-roll expression which the client should send to the server whenever a roll on this
@@ -2469,7 +2476,9 @@ table is requested. Following this are a set of cases represented by numeric val
 .I n
 in increasing order along with corresponding text strings
 .I t
-which may contain GMA markup formatting codes.
+which may contain GMA markup formatting codes if the
+.B m
+flag is present.
 The last case, which is taken if the result of the die roll exceeded any of the values of
 .I n
 found up to that point, is represented by
@@ -2610,6 +2619,7 @@ The JSON payload may contain the following field:
 .BI Global " (bool)"
 If present and true, this requests a list of only the global, system-wide set of presets rather than all of the presets the client should 
 know about.
+'\" <</New>>
 '\" <<ital-is-var>>
 .TP
 .B For
@@ -4325,6 +4335,15 @@ The contents of the
 .B Recipients
 field are ignored; it should be omitted or set to
 .BR null .
+'\" <<New>>
+.TP
+.BI Markup " (bool)"
+If true, the text of this message may contain GMA markup formatting codes which the client SHOULD
+either filter out or interpret appropriately for display to the user. If a client did not indicate to the server
+that it was capable of understanding these codes via the
+.B ALLOW
+command (q.v.), then the server will filter out these codes before sending the message to that client.
+'\" <</New>>
 .TP
 .B Text
 The text of the message to be sent.
@@ -4502,7 +4521,7 @@ John Mechalas (elevation and movement modes).
 .LP
 This document defines map protocol version 417,
 which added support for system-wide die-roll presets and
-table definitions.
+table definitions and markup formatting in chat messages.
 '\" <</New>>
 .LP
 Version 416 added the
