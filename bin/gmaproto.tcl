@@ -184,7 +184,7 @@ namespace eval ::gmaproto {
 		TB      {Enabled ?}
 		TMACK	{RequestID s RequestingClient s RequestedBy s}
 		TMRQ	{Description s Expires s Targets l ShowToAll ? IsRunning ? RequestedBy s RequestingClient s RequestID s}
-		TO      {Sender s Recipients l MessageID i ToAll ? ToGM ? Text s Sent s}
+		TO      {Sender s Recipients l MessageID i ToAll ? ToGM ? Text s Sent s Markup ?}
 		UPDATES {Packages {a {Name s Instances {a {OS s Arch s Version s Token s}}}}}
 		WORLD   {Calendar s ClientSettings {o {MkdirPath s ImageBaseURL s ModuleCode s SCPDestination s ServerHostname s}}}
 		/CONN   {}
