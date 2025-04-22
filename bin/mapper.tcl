@@ -12560,7 +12560,44 @@ proc PresetLists {arrayname for_user tkey args} {
 	set pkeylen [string length "sys,preset,"]
 	foreach pkey [lsort [array names presets "sys,preset,*"]] {
 		set pname [string range $pkey $pkeylen end]
-		if {[regexp {^§(.*?);(.*?);(.*?)(?:;([^|]*))?(?:\|(.*))?$} $pname _ sequence varname flags client dname]} {
+		if {[regexp {^#(.*?);(.*?)(?:;([^|]*))?(?:\|(.*))?$} $pname _ sequence flags client dname]} {
+			set d $presets($pkey)
+			if {$dname eq {}} {
+				dict set d DisplayName {unnamed table}
+			} else {
+				dict set d DisplayName $dname
+			}
+			dict set d ClientData $client
+			foreach {flagcode flagname} {
+				m Markup
+			} {
+				if {[string first $flagcode $flags] >= 0} {
+					dict set d $flagname true
+				} else {
+					dict set d $flagname false
+				}
+			}
+
+			set sdata [split $sequence "\u25B6"]
+			if {[llength $sdata] > 1} {
+				dict set d Group [join [lrange $sdata 1 end] "\u25B6"]
+				set sdata [lindex $sdata 0]
+			} else {
+				dict set d Group {}
+			}
+			if {[scan $sdata %d%s n _] == 1} {
+				if {$n <= $seq} {
+					set n [incr seq]
+				} else {
+					set seq $n
+				}
+				dict set d DisplaySeq $n
+			} else {
+				dict set d DisplaySeq [incr seq]
+			}
+
+			lappend grolls $d
+		} elseif {[regexp {^§(.*?);(.*?);(.*?)(?:;([^|]*))?(?:\|(.*))?$} $pname _ sequence varname flags client dname]} {
 			set d $presets($pkey)
 			if {$dname eq {}} {
 				dict set d DisplayName {unnamed modifier}
@@ -13527,17 +13564,30 @@ proc UpdatePeerList {for_user tkey} {
 	}
 }
 
-proc SendDieRoll {recipients dice blind_p {tkey {}}} {
+proc SendDieRoll {recipients dice blind_p for_user tkey} {
 	global dice_preset_data
 	set d [ParseRecipientList $recipients TO ToGM $blind_p]
 	# Special case: table lookups are introduced by die-rolls that look like
 	# [title=] #tablename [...]
 	if {[regexp -- {^\s*(.*=)?\s*#(#?)\s*([a-zA-Z_]\w+)(.*?)$} $dice _ title globmark tablename rest]} {
+		set preset_data [PresetLists dice_preset_data $for_user $tkey]
 		if {$globmark eq "#"} {
-			if {![dict exists $tablename
-		::gmaproto::roll_dice "$title
+			set tbl [SearchForPreset $preset_data table $tablename -global -details]
+		} else {
+			set tbl [SearchForPreset $preset_data table $tablename -details]
+		}
 
-	::gmaproto::roll_dice $dice [dict get $d Recipients] [dict get $d ToAll] [dict get $d ToGM] [new_id]
+		if {$tbl eq {}} {
+			tk_messageBox -type ok -icon error -title "Undefined table"\
+				-message "You tried to make a die-roll using a random look-up table, but the name of the table does not appear in your die-roll preset list."\
+				-detail "Table name: #$globmark$tablename" -parent .
+			return
+		}
+
+		::gmaproto::roll_dice "$title [dict get $tbl dieroll] $rest" [dict get $d Recipients] [dict get $d ToAll] [dict get $d ToGM] "[new_id]#$globmark$tablename"
+	} else {
+		::gmaproto::roll_dice $dice [dict get $d Recipients] [dict get $d ToAll] [dict get $d ToGM] [new_id]
+	}
 }
 proc UpdateDicePresets {deflist for_user} {::gmaproto::define_dice_presets $deflist false $for_user}
 proc RequestDicePresets {for_user} {::gmaproto::query_dice_presets $for_user}
@@ -13693,7 +13743,7 @@ proc _do_roll {roll_string extra w for_user tkey} {
 	if {$for_user ne $local_user} {
 		set rollspec [AddToDieRollTitle $rollspec "(for $for_user)"]
 	}
-	SendDieRoll [_recipients $for_user $tkey] $rollspec $dice_preset_data(CHAT_blind,$tkey) $tkey
+	SendDieRoll [_recipients $for_user $tkey] $rollspec $dice_preset_data(CHAT_blind,$tkey) $for_user $tkey
 }
 
 proc AddToDieRollTitle {rollspec s} {
@@ -15264,8 +15314,6 @@ proc GetPresetDetails {p} {
 	return $d
 }
 
-	return [dict create Modifiers $mods Rolls $rolls CustomRolls $custom GlobalModifiers $gmods GlobalRolls $grolls GlobalCustomRolls $gcustom]
-
 # SearchForPreset dict type name ?-global? ?-details? -> dict
 #
 # Given a dictionary of presets such as that returned from PresetLists, which has "type" keys Modifiers, Rolls, CustomRolls, etc., search
@@ -15277,17 +15325,22 @@ proc GetPresetDetails {p} {
 # If the -details option is given, expand the returned dictionary further into its detailed description by calling GetPresetDetails on it
 # and returning that result instead.
 #
-proc SearchForPreset {d type name args} {
+proc SearchForPreset {d type target_name args} {
+	DEBUG 0 "SearchForPreset in $d"
+	DEBUG 0 "SearchForPreset args $type $target_name $args"
 	if {[lsearch -exact $args -global] >= 0} {
 		set collection {Global}
 	} else {
 		set collection {}
 	}
+	set filter_first {}
+	set require_first {}
 
-	swtich $type {
+	switch $type {
 		preset {
 			# search in [Global]Rolls for [...|]<name> as long as the field doesn't start with #
 			append collection Rolls
+			set filter_first {#}
 		}
 		modifier {
 			# search in [Global]Modifiers for [...|]<name>
@@ -15296,11 +15349,46 @@ proc SearchForPreset {d type name args} {
 		table {
 			# search in [Global]Rolls for #[...|]<name>
 			append collection Rolls
+			set require_first {#}
 		}
 		default {
 			error "Unsupported preset type '$type' passed to SearchForPreset '$name'"
 		}
 	}
+	if {![dict exists $d $collection]} {
+		return {}
+	}
+	foreach p [dict get $d $collection] {
+		if {[set baridx [string first {|} [set name [dict get $p Name]]]] <= 0} {
+			# <name> or |<name>
+			if {$require_first ne {}} {
+				# we can't possibly satisfy this condition
+				continue
+			}
+		} else {
+			# <prefix>|<name>
+			if {$filter_first ne {} && [string index $name 0] eq $filter_first} {
+				# this entry starts with the forbidden character, skip this
+				continue
+			}
+			if {$require_first ne {} && [string index $name 0] ne $require_first} {
+				# this entry doesn't start with the required character, skip this
+				continue
+			}
+		}
+
+		if {$baridx >= 0} {
+			set name [string range $name $baridx+1 end]
+		}
+		
+		if {$name eq $target_name} {
+			if {[lsearch -exact $args -details] >= 0} {
+				return [GetPresetDetails $p]
+			}
+			return $p
+		}
+	}
+	return {}
 }
 
 proc _build_preset_group_name {name seq groups {prefix {}} {extra {}}} {
@@ -15321,7 +15409,7 @@ proc _build_preset_group_name {name seq groups {prefix {}} {extra {}}} {
 # GMA server expects to see it.
 #
 proc EncodePresetDetails {p} {
-	switch [dict get $p type] {
+	switch [dict  get $p type] {
 		preset {
 			# preset:	Name: <seq>[<groups>]|<name>
 			return [dict create \
