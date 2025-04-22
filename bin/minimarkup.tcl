@@ -58,7 +58,7 @@ package provide gma::minimarkup 1.0
 package require Tcl 8.6
 
 namespace eval ::gma::minimarkup {
-	namespace export render
+	namespace export render strip
 
 	# Implements a subset of the GMA markup codes which can be shown in a text box as a single line
 	# (so no tables or line breaks, but pretty much everything else). We assume this text will be
@@ -100,6 +100,18 @@ namespace eval ::gma::minimarkup {
 	# blank line		paragraph break
 	# \\			line break
 	#
+	
+	# strips font style information from rendered text, returning a single
+	# string that may contain Unicode characters resulting from markup
+	# code interpretation.
+	proc strip {rendered_list} {
+		set output {}
+		foreach {fontstyle text} $rendered_list {
+			lappend output $text
+		}
+		return [join $output {}]
+	}
+
 	#
 	# Returns a list of tag text pairs where tag is one of:
 	# 	normal, bold, italic, bolditalic, section, subsection
@@ -110,7 +122,7 @@ namespace eval ::gma::minimarkup {
 		set newlines {}
 		foreach line $lines {
 			set label ""
-			if {[regexp {^(@+|#+)\s*(.*?)} $line _ bullets rest]} {
+			if {[regexp -- {^(@+|#+)\s*(.*?)} $line _ bullets rest]} {
 				for {set i 0} {$i < [llength $bullets]} {incr i} {
 					if {[lindex $bullets $i] eq "@"} {
 						if {$i > 5} {
@@ -184,10 +196,15 @@ namespace eval ::gma::minimarkup {
 			s {\\e}  "\\"
 		} {
 			if {$t == "r"} {
-				set srctext [regsub -all $old $srctext $new]
+				#DEBUG 0 "Looking to replace /$in/ in $srctext with $out"
+				set srctext [regsub -all -- $in $srctext $out]
+				#DEBUG 0 ": -> $srctext"
 			} else {
-				for {set start 0} {[set start [string first $old $srctext $start]] >= 0} {incr start [string length $new]} {
-					string replace $srctext $start $start+[string length $old] $new
+				#DEBUG 0 "Looking for $in in $srctext"
+				for {set start 0} {[set start [string first $in $srctext $start]] >= 0} {incr start [string length $out]} {
+					#DEBUG 0 ": found $in at $start, replacing $start-[expr $start+[string length $in]] with $out"
+					set srctext [string replace $srctext $start [expr $start+[string length $in]-1] $out]
+					#DEBUG 0 ": -> $srctext"
 				}
 			}
 		}
@@ -201,7 +218,7 @@ namespace eval ::gma::minimarkup {
 		foreach piece [split $srctext "\001"] {
 			switch [string range $piece 0 0] {
 				"I" {set italic [expr !$italic]}
-				"B" {set bold [expr $bold]}
+				"B" {set bold [expr !$bold]}
 				"L" {set link true}
 				"l" {set link false}
 				"S" {set subsection true}
@@ -227,6 +244,7 @@ namespace eval ::gma::minimarkup {
 			}
 			lappend finalset [string range $piece 1 end]
 		}
+		#DEBUG 0 "final $finalset"
 		return $finalset
 	}
 	proc ShowMarkupSyntax {} {
@@ -251,7 +269,7 @@ namespace eval ::gma::minimarkup {
 			{p  {Recipients whose clients do not support markup formatting will not see the codes in their messages.}}
 			{p {}}
 			{p  {Simple text effects like bold and italics may be achieved simply by typing }
-		         b  {**bold**} p { or } b {//italic//} p { (and can be combined, as in } b {**//bold italic//**}
+		         b  {**} i {bold text} b {**} p { or } b {//} i {italic text} b {//} p { (and can be combined, as in } b {**//} i {bold italic text} b {//**}
 			 p  {).}}
 			{p {}}
 			{p {Special characters are represented by easier to type codes, including }
@@ -286,6 +304,8 @@ namespace eval ::gma::minimarkup {
 				b {[[} i link b {|} i text b {]]} p { if you want to specify custom text for the link) will for now}
 			 	p {just be rendered in italics without actually creating a hyperlink.}}
 			{p {}}
+			{p {Bullet lists and numbered lists are normally introduced by } b @ p { and } b {#} p { characters at the first column of the line, with repeated characters such as }
+				b @@@ p {, } b {###} p {, or } b {#@#} p { to denote nested lists. Since the chat message formatter is oriented for single lines, it will do its best to handle them anyway as in-line lists.}}
 			{p {Since multi-line formatting is not supported here, line and paragraph breaks, as well as tables, are not supported at all.}}
 			{p {}}
 			{p {}}

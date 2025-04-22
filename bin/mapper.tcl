@@ -17,7 +17,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.29-alpha.1}     ;# @@##@@
+set GMAMapperVersion {4.29-alpha.2}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {417}         ;# @@##@@
 set CoreVersionNumber {6.28}            ;# @@##@@
@@ -12687,9 +12687,10 @@ proc DisplayChatMessage {d for_user args} {
 	global _preferences colortheme dice_preset_data local_user
 
 	if {$d ne {}} {
-		::gmautil::dassign $d Sender from Recipients recipientlist Text message Sent date_sent
+		::gmautil::dassign $d Sender from Recipients recipientlist Text message Sent date_sent Markup markup
 	} else {
 		lassign {} from recipientlist message date_sent
+		set markup false
 	}
 
 	if {$for_user eq {}} {
@@ -12833,6 +12834,7 @@ proc DisplayChatMessage {d for_user args} {
 		pack [button $wc.3.info -image $icon_info20 -command ShowDiceSyntax] -side right
 		::tooltip::tooltip $wc.3.info "Display help for how to write die rolls and use the chat window."
 		set dice_preset_data(CHAT_blind,$tkey) 0
+		set dice_preset_data(CHAT_markup_en,$tkey) [gmaproto::int_bool [dict get $_preferences markup_enabled]]
 		pack [ttk::checkbutton $wc.3.blind -text GM -variable dice_preset_data(CHAT_blind,$tkey)] -side right
 		#-selectcolor $check_select_color
 		#-indicatoron 1 
@@ -12847,6 +12849,7 @@ proc DisplayChatMessage {d for_user args} {
 		pack $wc.2.to -side left 
 		pack [entry $wc.2.entry -relief sunken -textvariable dice_preset_data(CHAT_text,$tkey)] -side left -fill x -expand 1
 		pack [button $wc.2.send -command RefreshPeerList -image $icon_arrow_refresh] -side right
+		pack [ttk::checkbutton $wc.2.markup -text M -variable dice_preset_data(CHAT_markup_en,$tkey)] -side right
 #		if {$for_user eq $local_user} {
 #			global icon_unlock
 #			pack [button $wc.2.lock -command [list ToggleChatLock $wc.2.lock $wc.1.text] -image $icon_unlock] -side right
@@ -12867,7 +12870,7 @@ proc DisplayChatMessage {d for_user args} {
 				begingroup best bonus constant critlabel critspec dc diebonus diespec discarded
 				endgroup exceeded fail from fullmax fullresult iteration label max maximized maxroll 
 				met min moddelim normal operator repeat result roll separator short sf success 
-				title to until worst system subtotal error notice timestamp stats
+				title to until worst system subtotal error notice timestamp stats bold italic bolditalic section subsection
 			} {
 				if {![dict exists $_preferences styles dierolls components $tag]} {
 					DEBUG 0 "Preferences profile is missing a definition for $tag; using default"
@@ -12918,11 +12921,11 @@ proc DisplayChatMessage {d for_user args} {
 	}
 
 	set system [expr [lsearch -exact $args "-system"] >= 0] 
-	_render_chat_message $wc.1.text $system $message $recipientlist $from [dict get $d ToAll] [dict get $d ToGM] $date_sent
+	_render_chat_message $wc.1.text $system $message $recipientlist $from [dict get $d ToAll] [dict get $d ToGM] $date_sent $markup
 	if {$system} {
-		TranscribeChat (system) $recipientlist $message [dict get $d ToAll] [dict get $d ToGM] $date_sent
+		TranscribeChat (system) $recipientlist $message [dict get $d ToAll] [dict get $d ToGM] $date_sent $markup
 	} else {
-		TranscribeChat $from $recipientlist $message [dict get $d ToAll] [dict get $d ToGM] $date_sent
+		TranscribeChat $from $recipientlist $message [dict get $d ToAll] [dict get $d ToGM] $date_sent $markup
 	}
 }
 
@@ -12941,7 +12944,7 @@ proc DisplayChatMessage {d for_user args} {
 #	}
 #}
 
-proc _render_chat_message {w system message recipientlist from toall togm {date_sent {}}} {
+proc _render_chat_message {w system message recipientlist from toall togm {date_sent {}} {markup false}} {
 	global SuppressChat _preferences LastDisplayedChatDate dice_preset_data
 
 	if {!$SuppressChat && [winfo exists $w]} {
@@ -12966,7 +12969,14 @@ proc _render_chat_message {w system message recipientlist from toall togm {date_
 				}
 			}
 			ChatAttribution $w $from $recipientlist $toall $togm
-			$w insert end "$message\n" normal
+			if {$markup} {
+				foreach {fontstyle text} [gma::minimarkup::render $message] {
+					$w insert end $text $fontstyle
+				}
+				$w insert end "\n" normal
+			} else {
+				$w insert end "$message\n" normal
+			}
 		}
 		$w see end
 #		if {![info exists dice_preset_data(chat_lock)] || $dice_preset_data(chat_lock)} {
@@ -13185,7 +13195,12 @@ proc LoadChatHistory {} {
 			if {[dict get $d Sender] eq {-system}} {
 				_render_chat_message $w 1 [dict get $d Text] {} {} false false $date_sent
 			} else {
-				_render_chat_message $w 0 [dict get $d Text] [dict get $d Recipients] [dict get $d Sender] [dict get $d ToAll] [dict get $d ToGM] $date_sent
+				if {[dict exists $d Markup] && [dict get $d Markup]} {
+					set markup true
+				} else {
+					set markup false
+				}
+				_render_chat_message $w 0 [dict get $d Text] [dict get $d Recipients] [dict get $d Sender] [dict get $d ToAll] [dict get $d ToGM] $date_sent $markup
 			}
 		}
                 CC	 {
@@ -13208,8 +13223,12 @@ proc LoadChatHistory {} {
 
 
 set chat_transcript_file {}
-proc TranscribeChat {from recipientlist message toall togm {date_sent {}}} {
+proc TranscribeChat {from recipientlist message toall togm {date_sent {}} {markup false}} {
 	global ChatTranscript
+	if {$markup} {
+		set message [gma::minimarkup::strip [gma::minimarkup::render $message]]
+	}
+
 	if {$ChatTranscript ne {}} {
 		if {[set private [Chat_text_attribution $from $recipientlist $toall $togm]] eq {}} {
 			_log_transcription "<$date_sent> $from: $message"
@@ -13508,17 +13527,25 @@ proc UpdatePeerList {for_user tkey} {
 	}
 }
 
-proc SendDieRoll {recipients dice blind_p} {
+proc SendDieRoll {recipients dice blind_p {tkey {}}} {
+	global dice_preset_data
 	set d [ParseRecipientList $recipients TO ToGM $blind_p]
+	# Special case: table lookups are introduced by die-rolls that look like
+	# [title=] #tablename [...]
+	if {[regexp -- {^\s*(.*=)?\s*#(#?)\s*([a-zA-Z_]\w+)(.*?)$} $dice _ title globmark tablename rest]} {
+		if {$globmark eq "#"} {
+			if {![dict exists $tablename
+		::gmaproto::roll_dice "$title
+
 	::gmaproto::roll_dice $dice [dict get $d Recipients] [dict get $d ToAll] [dict get $d ToGM] [new_id]
 }
 proc UpdateDicePresets {deflist for_user} {::gmaproto::define_dice_presets $deflist false $for_user}
 proc RequestDicePresets {for_user} {::gmaproto::query_dice_presets $for_user}
 
-proc SendChatMessage {recipients message} {
+proc SendChatMessage {recipients message {markup false}} {
 	set d [ParseRecipientList $recipients TO]
 	foreach msg [split $message "\n"] {
-		::gmaproto::chat_message $msg {} [dict get $d Recipients] [dict get $d ToAll] [dict get $d ToGM]
+		::gmaproto::chat_message $msg {} [dict get $d Recipients] [dict get $d ToAll] [dict get $d ToGM] $markup
 	}
 }
 
@@ -13666,7 +13693,7 @@ proc _do_roll {roll_string extra w for_user tkey} {
 	if {$for_user ne $local_user} {
 		set rollspec [AddToDieRollTitle $rollspec "(for $for_user)"]
 	}
-	SendDieRoll [_recipients $for_user $tkey] $rollspec $dice_preset_data(CHAT_blind,$tkey)
+	SendDieRoll [_recipients $for_user $tkey] $rollspec $dice_preset_data(CHAT_blind,$tkey) $tkey
 }
 
 proc AddToDieRollTitle {rollspec s} {
@@ -13707,9 +13734,9 @@ proc SendChatFromWindow {for_user tkey} {
 		}
 
 		if {$dice_preset_data(CHAT_blind,$tkey)} {
-			::gmaproto::chat_message $ctext {} {} false true
+			::gmaproto::chat_message $ctext {} {} false true $dice_preset_data(CHAT_markup_en,$tkey)
 		} else {
-			SendChatMessage [_recipients $for_user $tkey] $ctext
+			SendChatMessage [_recipients $for_user $tkey] $ctext $dice_preset_data(CHAT_markup_en,$tkey)
 		}
 		set dice_preset_data(CHAT_text,$tkey) {}
 	}
@@ -15136,6 +15163,8 @@ proc ConnectToServerByIdx {idx} {
 #	description
 #	_raw	saved copy of the original dictionary
 #
+
+
 proc GetPresetDetails {p} {
 	set d [dict create \
 		client {} \
@@ -15233,6 +15262,45 @@ proc GetPresetDetails {p} {
 		#temporary battle groups with <sequences> that look like "$[F12]001".
 	}
 	return $d
+}
+
+	return [dict create Modifiers $mods Rolls $rolls CustomRolls $custom GlobalModifiers $gmods GlobalRolls $grolls GlobalCustomRolls $gcustom]
+
+# SearchForPreset dict type name ?-global? ?-details? -> dict
+#
+# Given a dictionary of presets such as that returned from PresetLists, which has "type" keys Modifiers, Rolls, CustomRolls, etc., search
+# for one particular named entry of the given type, interpreting now names may be encoded for entries of that type, and return it.
+# If no such entry is found, return {} instead.
+#
+# The types supported are: modifier, table, or preset.
+# If the -global option is given, search in the global set of presets instead of the local ones.
+# If the -details option is given, expand the returned dictionary further into its detailed description by calling GetPresetDetails on it
+# and returning that result instead.
+#
+proc SearchForPreset {d type name args} {
+	if {[lsearch -exact $args -global] >= 0} {
+		set collection {Global}
+	} else {
+		set collection {}
+	}
+
+	swtich $type {
+		preset {
+			# search in [Global]Rolls for [...|]<name> as long as the field doesn't start with #
+			append collection Rolls
+		}
+		modifier {
+			# search in [Global]Modifiers for [...|]<name>
+			append collection Modifiers
+		}
+		table {
+			# search in [Global]Rolls for #[...|]<name>
+			append collection Rolls
+		}
+		default {
+			error "Unsupported preset type '$type' passed to SearchForPreset '$name'"
+		}
+	}
 }
 
 proc _build_preset_group_name {name seq groups {prefix {}} {extra {}}} {

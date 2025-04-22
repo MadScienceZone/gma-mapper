@@ -28,7 +28,7 @@ namespace eval ::gmaprofile {
 	variable font_repository
 	variable _default_color_table
 	variable minimum_file_version 1
-	variable maximum_file_version 8
+	variable maximum_file_version 9
 	array set _default_color_table {
 		fg,light           #000000
 		normal_fg,light    #000000
@@ -116,6 +116,7 @@ namespace eval ::gmaprofile {
 		image_format s
 		keep_tools ?
 		menu_button ?
+		markup_enabled ?
 		never_animate ?
 		preload ?
 		profiles {a {
@@ -196,6 +197,8 @@ namespace eval ::gmaprofile {
 	array set _description {
 		best       {When making "best of n" die rolls, this displays the number of rolls to attempt.}
 		begingroup {The operator (i.e., "(") which signals the start of a grouped sub-expression.}
+		bold       {This is the font and style to use for boldface text in chat messages.}
+		bolditalic {This is the font and style to use for bold italic text in chat messages.}
 		bonus      {An extra bonus added or subtracted from the roll, such as when confirming a critical hit with a bonus to the confirmation roll only.}
 		constant   {A constant value in the die roll expression, such as a bonus or penalty.}
 		critlabel  {An indicator that this roll is to confirm a critical hit.}
@@ -212,6 +215,7 @@ namespace eval ::gmaprofile {
 		from       {For chat messages and die rolls, this indicates who requested the roll.}
 		fullmax    {An indicator that the whole die-roll expression was forced to yield its maximum possible value.}
 		fullresult {The overall result of the die roll, displayed at the start of the line before the other details.}
+		italic     {This is the font and style to use for italic text in chat messages.}
 		iteration  {When making multiple rolls due to "|until" or "|repeat" options, this shows the roll number in that sequence.}
 		label      {An arbitrary label placed on a component (e.g., the "fire" in "1d6 fire").}
 		max        {Indicates a maximum limit placed on the result of the die roll (via the "|max" option).}
@@ -220,16 +224,18 @@ namespace eval ::gmaprofile {
 		met        {When a specific DC target is known for the die roll, this indicates that it was exactly met.}
 		min        {Indicates a minimum limit placed on the result of the die roll (via the "|min" option).}
 		moddelim   {This styles the delimiter used to separate modifiers from each other and the die roll specification.}
-		normal     {This is the style for text that doesn't fit into any other categories.}
+		normal     {This is the style for text that doesn't fit into any other categories and for normal chat message text.}
 		notice     {A notice sent to you from the server about your die-roll results.}
 		operator   {A math operator (such as "+", "-", etc.) between components of the die-roll request.}
 		repeat     {An indicator that you want the die-roll expression repeated a number of times.}
 		result     {The overal result of the die-roll request.}
 		roll       {This shows the actual results of the individual dice rolled (when forced to maximum value, the "maxroll" style is used instead).}
+		section    {This is the font and style to use for section titles in chat messages.}
 		separator  {Any punctuation that is used as a separator in the die-roll expression.}
 		sf         {An indicator that the "|sf" option was used to check for natural min and max rolls as automatic failure or success, along with custom labels, if any, for the success and failure outcomes.}
 		short      {When making a roll with a DC target, or using "|until", this indicates the amount by which this roll fell short of the target.}
 		stats      {When reporting statistics about multi-die roll sets such as those generated with "|repeat" options.}
+		subsection {This is the font and style to use for subsection titles in chat messages.}
 		total      {An indicator that you want to repeat the roll until the total of all rolls meets a target value.}
 		subtotal   {This shows a subtotal at various places in a complex, multi-dice roll expression.}
 		success    {If the roll includes clear success/fail criteria, this indicates why the roll succeeded.}
@@ -294,6 +300,7 @@ namespace eval ::gmaprofile {
 			chat_timestamp  true\
 			colorize_die_rolls true\
 			colorize_die_labels true\
+			markup_enabled true\
 			curl_path       [::gmautil::searchInPath curl]\
 			curl_insecure   false\
 			current_profile offline\
@@ -522,7 +529,7 @@ namespace eval ::gmaprofile {
 
 		json::write indented true
 		json::write aligned true
-		dict set data GMA_Mapper_preferences_version 8
+		dict set data GMA_Mapper_preferences_version 9
 		set f [open $filename w]
 		puts $f [::gmaproto::_encode_payload $data $_file_format]
 		close $f
@@ -589,7 +596,7 @@ namespace eval ::gmaprofile {
 		set _profile $_profile_backup
 	}
 	proc _save {} {
-		global animate colorize_die_rolls colorize_die_labels button_size bsizetext show_timers scaling dark image_format keep_tools preload
+		global animate colorize_die_rolls markup_enabled colorize_die_labels button_size bsizetext show_timers scaling dark image_format keep_tools preload
 		global imgtext debug_level debug_proto curl_path curl_insecure profiles menu_button never_animate
 		global major_interval major_offset_x major_offset_y
 		global minor_interval minor_offset_x minor_offset_y flash_updates
@@ -602,6 +609,7 @@ namespace eval ::gmaprofile {
 			chat_timestamp $chat_timestamp \
 			colorize_die_rolls $colorize_die_rolls \
 			colorize_die_labels $colorize_die_labels \
+			markup_enabled $markup_enabled \
 			curl_path $curl_path \
 			curl_insecure $curl_insecure \
 			dark $dark \
@@ -776,7 +784,7 @@ namespace eval ::gmaprofile {
 	}
 
 	proc editor {w d} {
-		global animate button_size bsizetext colorize_die_rolls colorize_die_labels show_timers scaling dark image_format keep_tools preload chat_timestamp
+		global animate button_size bsizetext colorize_die_rolls markup_enabled colorize_die_labels show_timers scaling dark image_format keep_tools preload chat_timestamp
 		global imgtext debug_proto debug_level curl_path curl_insecure profiles menu_button never_animate
 		global major_interval major_offset_x major_offset_y
 		global minor_interval minor_offset_x minor_offset_y flash_updates
@@ -795,6 +803,7 @@ namespace eval ::gmaprofile {
 			chat_timestamp chat_timestamp \
 			colorize_die_rolls colorize_die_rolls \
 			colorize_die_labels colorize_die_labels \
+			markup_enabled markup_enabled \
 			curl_path curl_path \
 			curl_insecure curl_insecure \
 			dark dark \
@@ -816,6 +825,7 @@ namespace eval ::gmaprofile {
 		set flash_updates [::gmaproto::int_bool $flash_updates]
 		set colorize_die_rolls [::gmaproto::int_bool $colorize_die_rolls]
 		set colorize_die_labels [::gmaproto::int_bool $colorize_die_labels]
+		set markup_enabled [::gmaproto::int_bool $markup_enabled]
 		set chat_timestamp [::gmaproto::int_bool $chat_timestamp]
 		set dark [::gmaproto::int_bool $dark]
 		set menu_button [::gmaproto::int_bool $menu_button]
@@ -1105,6 +1115,7 @@ namespace eval ::gmaprofile {
 		grid [ttk::checkbutton $w.n.a.chat_timestamp -text "Show timestamp in chat messages" -variable chat_timestamp] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.cdr -text "Enable colors in die-roll titles" -variable colorize_die_rolls] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.cdl -text "Enable colors in die-roll modifier labels" -variable colorize_die_labels] - - - - - - -sticky w
+		grid [ttk::checkbutton $w.n.a.mark -text "Enable markup by default in chat messages" -variable markup_enabled] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.dark -text "Dark theme" -variable dark] - - - - - - -sticky w
 		grid [ttk::label $w.n.a.scalingl -text "Visual scaling factor:"] [ttk::spinbox $w.n.a.scaling -textvariable scaling -from 1.0 -to 100.0 -increment 1.0 -format "%.1f" -width 5] -sticky we
 		grid [ttk::checkbutton $w.n.a.menu_button -text "Use menu button instead of menu bar" -variable menu_button] - - - - - - -sticky w
@@ -1346,6 +1357,11 @@ namespace eval ::gmaprofile {
 	proc default_fonts {} {
 		return [dict create \
 			Normal [dict create family Helvetica size 12 weight 0 slant 0 overstrike false underline false] \
+			Bold [dict create family Helvetica size 12 weight 1 slant 0 overstrike false underline false] \
+			Italic [dict create family Helvetica size 12 weight 0 slant 1 overstrike false underline false] \
+			BoldItalic [dict create family Helvetica size 12 weight 1 slant 1 overstrike false underline false] \
+			Title [dict create family Helvetica size 16 weight 1 slant 0 overstrike false underline false] \
+			Subtitle [dict create family Helvetica size 14 weight 1 slant 0 overstrike false underline false] \
 			Important [dict create family Helvetica size 12 weight 1 slant 0 overstrike false underline false] \
 			Special [dict create family Times     size 12 weight 0 slant 1 overstrike false underline false] \
 			System [dict create family Times     size 10 weight 0 slant 1 overstrike false underline false] \
@@ -1480,6 +1496,8 @@ namespace eval ::gmaprofile {
 				components [dict create \
 					begingroup  [dict create fg [dict create dark {} light {}] bg [dict create dark {} light {}] font Normal format {} overstrike false underline false offset 0]\
 					best      [dict create fg [dict create dark #aaaaaa light #888888] bg [dict create dark {} light {}] font Special format { best of %s} overstrike false underline false offset 0]\
+					bold      [dict create fg [dict create dark {} light {}] bg [dict create dark {} light {}] font Bold format {} overstrike false underline false offset 0]\
+					bolditalic [dict create fg [dict create dark {} light {}] bg [dict create dark {} light {}] font BoldItalic format {} overstrike false underline false offset 0]\
 					bonus     [dict create fg [dict create dark #fffb00 light #f05b00] bg [dict create dark {} light {}] font Normal format {} overstrike false underline false offset 0]\
 					constant  [dict create fg [dict create dark {} light {}] bg [dict create dark {} light {}] font Normal format {} overstrike false underline false offset 0]\
 					critlabel [dict create fg [dict create dark #fffb00 light #f05b00] bg [dict create dark {} light {}] font Special format {Confirm: } overstrike false underline false offset 0]\
@@ -1496,6 +1514,7 @@ namespace eval ::gmaprofile {
 					from      [dict create fg [dict create dark cyan light blue] bg [dict create dark {} light {}] font Normal format {} overstrike false underline false offset 0]\
 					fullmax   [dict create fg [dict create dark red light red] bg [dict create dark {} light {}] font Important format {maximized} overstrike false underline false offset 0]\
 					fullresult [dict create fg [dict create dark blue light #ffffff] bg [dict create dark white light blue] font FullResult format {} overstrike false underline false offset 0]\
+					italic    [dict create fg [dict create dark {} light {}] bg [dict create dark {} light {}] font Italic format {} overstrike false underline false offset 0]\
 					iteration [dict create fg [dict create dark #aaaaaa light #888888] bg [dict create dark {} light {}] font Special format { (roll #%s)} overstrike false underline false offset 0]\
 					label     [dict create fg [dict create dark cyan light blue] bg [dict create dark {} light {}] font Special format { %s} overstrike false underline false offset 0]\
 					max       [dict create fg [dict create dark #aaaaaa light #888888] bg [dict create dark {} light {}] font Special format {max %s} overstrike false underline false offset 0]\
@@ -1510,10 +1529,12 @@ namespace eval ::gmaprofile {
 					repeat    [dict create fg [dict create dark #aaaaaa light #888888] bg [dict create dark {} light {}] font Special format {repeat %s} overstrike false underline false offset 0]\
 					result    [dict create fg [dict create dark {} light {}] bg [dict create dark {} light {}] font Result format {} overstrike false underline false offset 0]\
 					roll      [dict create fg [dict create dark #00fa92 light green] bg [dict create dark {} light {}] font Normal format {{%s}} overstrike false underline false offset 0]\
+					section   [dict create fg [dict create dark {} light {}] bg [dict create dark {} light {}] font Title format {} overstrike false underline false offset 0]\
 					separator [dict create fg [dict create dark {} light {}] bg [dict create dark {} light {}] font Normal format {=} overstrike false underline false offset 0]\
 					sf        [dict create fg [dict create dark #aaaaaa light #888888] bg [dict create dark {} light {}] font Special format {} overstrike false underline false offset 0]\
 					short     [dict create fg [dict create dark red light red] bg [dict create dark {} light {}] font Special format { missed DC by %s} overstrike false underline false offset 0]\
 					stats     [dict create fg [dict create dark #aaaaaa light #888888] bg [dict create dark {} light {}] font Tiny format {} overstrike false underline false offset 0]\
+					subsection [dict create fg [dict create dark {} light {}] bg [dict create dark {} light {}] font Subtitle format {} overstrike false underline false offset 0]\
 					subtotal  [dict create fg [dict create dark #00fa92 light green] bg [dict create dark {} light {}] font Normal format {(%s)} overstrike false underline false offset 0]\
 					success   [dict create fg [dict create dark #00fa92 light green] bg [dict create dark {} light {}] font Important format {(%s) } overstrike false underline false offset 0]\
 					system    [dict create fg [dict create dark cyan light blue] bg [dict create dark {} light {}] font System format {} overstrike false underline false offset 0]\
