@@ -4005,6 +4005,13 @@ command. Clients MUST NOT send this command. The JSON payload includes the follo
 The name of the user who rolled the dice. 
 .TP
 '\" <</ital-is-var>>
+'\" <<New>>
+.BI Origin " (bool)"
+If present and true upon receipt of this message from the server, this indicates that the client receiving it was the same client who originated the
+die roll reqeust whose result is being reported here, as opposed to a client who is merely
+being given a copy of the results of another client's die roll.
+'\" <</New>>
+.TP
 .BI Recipients " (list of strings)"
 The names of the people the message was explicitly addressed to. For
 global messages, this should be
@@ -4303,6 +4310,13 @@ The name of the user sending the message. Clients SHOULD NOT set this field; it
 is set by the server when sending these messages to peers.
 .TP
 '\" <</ital-is-var>>
+'\" <<New>>
+.BI Origin " (bool)"
+If present and true upon receipt from the server, this means that the client receiving this message was the same client who sent 
+the original message,
+instead of merely receiving a copy of the message sent by a peer client. Clients MUST NOT set this field.
+'\" <</New>>
+.TP
 .BI Recipients " (list of strings)"
 The names of the people the message was explicitly addressed to. For
 global messages, this should be
@@ -4522,6 +4536,13 @@ John Mechalas (elevation and movement modes).
 This document defines map protocol version 417,
 which added support for system-wide die-roll presets and
 table definitions and markup formatting in chat messages.
+It also added the
+.B Origin
+field to the
+.B ROLL
+and
+.B TO
+messages.
 '\" <</New>>
 .LP
 Version 416 added the
