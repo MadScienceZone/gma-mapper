@@ -2262,7 +2262,7 @@ foreach icon_name {
 	dbracket_t dbracket_m dbracket_b dbracket__
 	delete add clock dieb16 -- *hourglass *hourglass_go *arrow_right *cross *bullet_go menu
 	stipple_100 stipple_75 stipple_50 stipple_25 stipple_12 stipple_88 lock unlock bullet_arrow_down bullet_arrow_right
-	bullet_arrow_down16 bullet_arrow_right16 tmrq
+	bullet_arrow_down16 bullet_arrow_right16 tmrq pencil
 } {
 	if {$icon_name eq {--}} {
 		if {$ImageFormat eq {png}} {
@@ -4284,7 +4284,7 @@ proc ShowDiceSyntax {} {
 		{p {}}
 		{p  {Select the recipient(s) to whom you wish to send a message, or select "To all" to send a global message to everyone. If you select one person, the message will be private to them. If you then select another person, they will be }
 		 i  {added to}
-		 p  {the conversation, so the message goes to all of them. Selecting "all" will clear the recipient selection. The message is sent when you press Return in the entry field.}}
+		 p  {the conversation, so the message goes to all of them. Selecting "all" will clear the recipient selection. The message is sent when you press Return in the entry field. If the "M" checkbox is selected, you can use simple GMA markup formatting codes in your chat messages (note that these are not supported in die rolls because they'd get confused with the die-roll expression operators).}}
 		{p {}}
 		{h1 {Die Roller Syntax}}
 		{p {}}
@@ -4365,19 +4365,38 @@ proc ShowDiceSyntax {} {
 		{p {}}
 		{p "You can color the die-roll title (everything before the = sign) or any individual modifier label by adding the special character \u2261 (U+2261) followed by a hex RGB color code like #334455 or a color name at the end of the label. Add two of these to specify both a foreground and background color. Separate titles or labels into multiple, separately colored parts by dividing them with \u2016 (U+2016) characters."}
 		{p {}}
+		{h1 {Lookup Tables}}
+		{p {}}
+		{p {If a random outcome lookup table is defined in your die-roll preset list, you can roll on that table and have the mapper's die roller look up what that random result means and let the other players know. To do so, just specify } b # i name p { to roll on the table defined under the specified }
+			i name p { or } b ## i name p { if the table is defined system-wide by your GM. This must appear at the start of the die-roll expression but may be followed by other modifiers you wish to be added to whatever dice are defined for the lookup table, plus other options such as repeats.}}
+		{p {}}
+		{p {The formal syntax definition for invoking a lookup table roll is:}}
+		{p {}}
+		{p [ i title b = p {] } b # p [ b # p ] i tablename p { [} i expr p ... p {] [} b | i options p ...]}
+		{p {}}
+		{p {So if, for example, a lookup table called "confusion" is defined to roll percentile dice (d100) and specifies a random action a confused creature will do based on ranges of numbers that come up on the dice when they're rolled, if you type } b #confusion p { as your die roll, the mapper will send }
+			b d100 p " to the server, get the result back (say, 42), which you will see just like any other die roll result, but will then also look that result up on the confusion table, to see that a value between 26\u201350 means the creature just babbles incoherently. It will then send a chat message out to everyone who was a recipient of the original die roll, with this additional information."}
+		{p {}}
+		{p {If you wanted to bias this effect to make the creature more confused by adding 25 to the die roll, just specify the roll as }
+			b #confusion+25 p {. This will add everything aftter the table name to the die roll, so the die roll sent to the server will be }
+			b d100+25 p {. Likewise, you could say things like } b {#confusion best of 2} p { or }
+			b {#confusion|repeat 10} p .}
+		{p {}}
 		{h1 {Presets}}
 		{p {}}
 		{p {Saving preset rolls to the server allows them to be available any time your client connects to it. Each preset is given a unique name. If another preset is added with the same name, it will replace the previous one.}}
-		{p {Clicking on the [Edit Presets...] button will allow you to add, remove, modify, and reorder the list of presets you have on file. You can also define modifiers and variables. These are fragments of die-roll expressions (such as "+2 inspiration") which you can turn on or off as you need them. When turned on, they are added to all of your die rolls (in the order they appear). You may also give them a variable name, in which case they will not be added to every die roll but will instead be substituted in place of the notation } b $ i name p { or } b $\{ i name b \} p {, where } i name p { is the name of the variable.}}
+		{p {}}
+		{p {Clicking on the [Edit Presets...] button will allow you to add, remove, modify, and reorder the list of presets you have on file. You can also define modifiers and variables. These are fragments of die-roll expressions (such as "+2 inspiration") which you can turn on or off as you need them. When turned on, they are added to all of your die rolls (in the order they appear). You may also give them a variable name, in which case they will not be added to every die roll but will instead be substituted in place of the notation } b $ i name p { or } b $\{ i name b \} p {, where } i name p { is the name of the variable. For variables defined at the global (system-wide) level, set by your GM for all players, use two dollar signs, as in } b $$ i name p { or } b $$\{ i name b \} p . }
 		{p {}}
 		{p {The export file for presets is a structured, record-based text file documented in gma-dice(5).}}
-		{p {See gma-dice-syntax(6) for more.}}
+		{p {See gma-dice-syntax(7) for more (run } b {gma man dice-syntax} p {).}}
 	} {
 		foreach {f t} $line {
 			$w.text insert end $t $f
 		}
 		$w.text insert end "\n"
 	}
+	$w.text configure -state disabled
 }
 
 # Begin drawing a new object of some type on the screen
@@ -10377,7 +10396,7 @@ proc DoCommandPS {d} {
 }
 
 proc DoCommandROLL {d} {
-	DisplayDieRoll $d
+	DisplayDieRoll $d -active
 	ChatHistoryAppend [list ROLL $d [dict get $d MessageID]]
 }
 
@@ -10746,7 +10765,7 @@ proc toIDName {n} {
 	return [regsub -all {\W} $n {}]
 }
 set die_roll_group false
-proc DisplayDieRoll {d} {
+proc DisplayDieRoll {d args} {
 	global icon_dieb16 icon_die16 icon_die16c SuppressChat drd_id LastDisplayedChatDate dice_preset_data die_roll_group
 	global icon_dbracket_b icon_dbracket_t icon_dbracket_m icon_dbracket__
 
@@ -10764,7 +10783,49 @@ proc DisplayDieRoll {d} {
 		{Result Details} details \
 		{Result InvalidRequest} is_invalid \
 		{Result ResultSuppressed} is_blind \
-		Sent             date_sent
+		Sent             date_sent \
+		ToAll		 to_all \
+		ToGM             to_GM \
+		Origin		 is_origin
+
+	if {[string index $request_id 0] eq {#} && [lsearch -exact $args -active] >= 0} {
+		lassign [split $request_id {;}] tablename tkey roll_id
+		DEBUG 0 "roll request ID $request_id breaks down to table $tablename, tkey $tkey, ID $roll_id"
+		global dice_preset_data
+		global is_GM
+		set tbl {}
+		set attrib {}
+
+		if {$is_origin && !$is_blind && !$is_invalid} {
+			# we're the original requester and this was a table lookup result we started.
+			# complete the table lookup and report out the results now
+			set preset_data [PresetLists dice_preset_data $tkey]
+			if {[string index $tablename 1] eq {#}} {
+				set tbl [SearchForPreset $preset_data table [string range $tablename 2 end] -global -details]
+			} else {
+				set tbl [SearchForPreset $preset_data table [string range $tablename 1 end] -details]
+			}
+		} elseif {$is_GM && $is_blind && !$is_invalid} {
+			# we're the GM and this user sent this blind to us. Can we find the table? maybe it was global.
+			if {[string index $tablename 1] eq {#}} {
+				set preset_data [PresetLists dice_preset_data GM]
+				set tbl [SearchForPreset $preset_data table [string range $tablename 2 end] -global -details]
+			} else {
+				::gmaproto::chat_message "($from blind-rolled $result on their lookup table $tablename)" {} {} false true false
+			}
+			set attrib "$from "
+		}
+		if {$tbl ne {}} {
+			DEBUG 0 "found table [dict get $tbl name], looking up result $result in it..."
+			foreach {v t} [dict get $tbl table] {
+				if {$v eq "*" || $result <= $v} {
+					DEBUG 0 "matched $v: $t"
+					::gmaproto::chat_message "$attrib rolled $result on [dict get $tbl name]: $t" {} $recipientlist $to_all $to_GM [dict get $tbl markup]
+					break
+				}
+			}
+		}
+	}
 
 	# Notation to show grouping of multiple result sets
 	if {$die_roll_group} {
@@ -11129,7 +11190,7 @@ proc _render_die_roller {w width height type for_user tkey args} {
 				}
 				array unset dice_preset_data "w,$tkey,*"
 			}
-			set preset_data [PresetLists dice_preset_data $for_user $tkey -export]
+			set preset_data [PresetLists dice_preset_data $tkey -export]
 			set i 0
 			#
 			# Modifiers
@@ -11500,7 +11561,7 @@ proc EditDieRollPresets {for_user tkey} {
 	}
 	$w.n add $w.n.r -state normal -sticky news -text Rolls
 	$w.n add $w.n.m -state normal -sticky news -text Modifiers
-	$w.n add $w.n.t -state disabled -sticky news -text Tables
+	$w.n add $w.n.t -state normal -sticky news -text Tables
 	$w.n add $w.n.c -state disabled -sticky news -text Custom
 	$w.n add $w.n.gr -state disabled -sticky news -text "Global Rolls"
 	$w.n add $w.n.gm -state disabled -sticky news -text "Global Modifiers"
@@ -11510,13 +11571,16 @@ proc EditDieRollPresets {for_user tkey} {
 	pack [button $w.can -text Cancel -command "if \[tk_messageBox -type yesno -parent $w -icon warning -title {Confirm Cancel} -message {Are you sure you wish to abandon any changes you made to the die-roll preset list?} -default no] {destroy $w}"] -side left
 	pack [button $w.ok -text Save -command [list EDRPsaveAndDestroy $w $for_user $tkey]] -side right
 
-	global icon_anchor_n icon_anchor_s icon_delete icon_add
+	global icon_anchor_n icon_anchor_s icon_delete icon_add icon_pencil
 	grid x [label $wnr.t0 -text Group] \
 		[label $wnr.t1 -text Name] [label $wnr.t2 -text Description] [label $wnr.t3 -text {Die-Roll Specification}] - \
 		x x [button $wnr.add -image $icon_add -command [list EDRPadd $w $for_user $tkey]] -sticky we
 	::tooltip::tooltip $wnr.add "Add a new die-roll preset"
+	grid x [label $wnt.t0 -text Group] \
+		[label $wnt.t1 -text Name] [label $wnt.t2 -text Description] [label $wnt.t3 -text {Die-Roll}] x [label $wnt.t4 -text {Table}] [button $wnt.add -image $icon_add -command [list EDRTadd $w $for_user $tkey]] -sticky we
+	::tooltip::tooltip $wnt.add "Add a new table"
 
-	set dice_preset_data(tmp_presets,$tkey) [PresetLists dice_preset_data $for_user $tkey]
+	set dice_preset_data(tmp_presets,$tkey) [PresetLists dice_preset_data $tkey]
 	array unset dice_preset_data "tmp_presets,$tkey,*"
 
 #
@@ -11532,6 +11596,7 @@ proc EditDieRollPresets {for_user tkey} {
 	foreach preset [concat \
 		[dict get $dice_preset_data(tmp_presets,$tkey) GlobalModifiers] \
 		[dict get $dice_preset_data(tmp_presets,$tkey) GlobalRolls] \
+		[dict get $dice_preset_data(tmp_presets,$tkey) GlobalTables] \
 		[dict get $dice_preset_data(tmp_presets,$tkey) GlobalCustomRolls] \
 	] {
 		set pd [GetPresetDetails $preset]
@@ -11638,8 +11703,31 @@ proc EditDieRollPresets {for_user tkey} {
 
 
 
-
-
+	set i 0
+	foreach preset [dict get $dice_preset_data(tmp_presets,$tkey) Tables] {
+		if {![dict exists $preset Group] || [set pgroup [dict get $preset Group]] eq {}} {
+			set pgroup {}
+		}
+		grid [button $wnt.gbtn$i -image $icon_bullet_arrow_right -command [list EditDRPGroup $wnt.group$i "Groups for Table #$i"]] \
+			[label $wnt.group$i -text $pgroup] \
+			[entry $wnt.name$i] \
+			[entry $wnt.desc$i] \
+			[entry $wnt.dspec$i] \
+			[button $wnt.edit$i -image $icon_pencil -command [list EDRTtbl $wnt.tbl$i $tkey $i "Table #$i"]] \
+			[frame $wnt.tbl$i] \
+			[button $wnt.del$i -image $icon_delete -command [list EDRTdel $w $for_user $tkey $i]] -sticky we
+		set dice_preset_data(tmp_presets,$tkey,T,$i) $preset
+		set dice_preset_data(tmp_presets,$tkey,T,$i,d) [set details [GetPresetDetails $preset]]
+		$wnt.name$i insert 0 [dict get $details name]
+		$wnt.desc$i insert 0 [dict get $details description]
+		$wnt.dspec$i insert 0 [dict get $details dieroll]
+		set ti 0
+		foreach {n t} [dict get $details table] {
+			grid [label $wnt.tbl$i.n$ti -text $n -anchor e -relief groove] [label $wnt.tbl$i.t$ti -text $t -anchor w -relief groove] -sticky we
+			incr ti
+		}
+		incr i
+	}
 
 	set i 0
 	foreach preset [dict get $dice_preset_data(tmp_presets,$tkey) Rolls] {
@@ -11741,8 +11829,12 @@ proc EditDieRollPresets {for_user tkey} {
 		$wnm.dn[expr $i - 1] configure -state disabled
 	}
 	grid columnconfigure $wnr 5 -weight 2
-	grid columnconfigure $wnm 4 -weight 2
+	grid columnconfigure $wnm 5 -weight 2
 	grid columnconfigure $wnc 2 -weight 2
+	grid columnconfigure $wnt 6 -weight 2
+	grid columnconfigure $wngr 3 -weight 2
+	grid columnconfigure $wngm 4 -weight 2
+	grid columnconfigure $wngt 4 -weight 2
 
 
 	tkwait window $w
@@ -12077,6 +12169,10 @@ proc EDRPsaveValues {w for_user tkey} {
 						Description [dict get $p Description]\
 						DieRollSpec [dict get $p DieRollSpec]]
 	}
+	foreach p [dict get $dice_preset_data(tmp_presets,$tkey) Tables] {
+		# these are already encoded so just send them out
+		lappend newpresets $p
+	}
 	UpdateDicePresets $newpresets $for_user
 }
 
@@ -12200,6 +12296,7 @@ proc EDRPgetValues {w for_user tkey} {
 	set wnr [sframe content $w.n.r]
 	set wnm [sframe content $w.n.m]
 	set wnc [sframe content $w.n.c]
+	set wnt [sframe content $w.n.t]
 	set n [llength [dict get $dice_preset_data(tmp_presets,$tkey) Rolls]]
 	dict set dice_preset_data(tmp_presets,$tkey) Rolls {}
 	for {set i 0} {$i < $n} {incr i} {
@@ -12211,6 +12308,27 @@ proc EDRPgetValues {w for_user tkey} {
 		dict set d Group [$wnr.group$i cget -text]
 
 		dict lappend dice_preset_data(tmp_presets,$tkey) Rolls $d
+	}
+
+	set n [llength [dict get $dice_preset_data(tmp_presets,$tkey) Tables]]
+	dict set dice_preset_data(tmp_presets,$tkey) Tables {}
+	for {set i 0} {$i < $n} {incr i} {
+		set d $dice_preset_data(tmp_presets,$tkey,T,$i,d)
+		if {[dict get $d table] eq {}} {
+			tk_messageBox -parent $w -type ok -icon error -title "Invalid table data" \
+			-message "The table \"[$wnt.name$i get]\" does not contain any data and won't be saved."
+			continue
+		}
+
+		dict set d seq [format %03d $i]
+		dict set d name [$wnt.name$i get]
+		dict set d description [$wnt.desc$i get]
+		dict set d dieroll [$wnt.dspec$i get]
+		dict set d group [split [$wnt.group$i cget -text] "\u25B6"]
+		set dice_preset_data(tmp_presets,$tkey,T,$i,d) $d
+		set dice_preset_data(tmp_presets,$tkey,T,$i) [set dd [EncodePresetDetails $d]]
+
+		dict lappend dice_preset_data(tmp_presets,$tkey) Tables $dd
 	}
 
 	set n [llength [dict get $dice_preset_data(tmp_presets,$tkey) CustomRolls]]
@@ -12339,6 +12457,34 @@ proc EditDRPGroup {l title} {
   	     [button $w.ok -command "EDRPgrpSave $lid $w $l" -text OK]
 	grid columnconfigure $w 1 -weight 2
 }
+proc EditDRPGroup {l title} {
+	global EDRPdata icon_add
+
+	set w .edrpgrp[set lid [to_window_id $l]]
+	if {[winfo exists $w]} {
+		DEBUG 1 "There is already a dialog open to edit $title; not making another."
+		return
+	}
+	toplevel $w
+	wm title $w $title
+	grid [label $w.desc1 -text "Edit the group name(s) or leave any of them blank to remove them."] - -sticky w
+	grid [label $w.desc2 -text "Click the \[+\] button to add a sub-group."] - -sticky w
+	if {[set EDRPdata($lid,n) [llength [set groups [split [$l cget -text] "\u25B6"]]]] == 0} {
+		set EDRPdata($lid,n) 1
+	}
+
+	for {set i 0} {$i < $EDRPdata($lid,n)} {incr i} {
+		if {$i == 0} {
+			grid [label $w.g$i -text Group:] [entry $w.e$i] [button $w.add -image $icon_add -command "EDRPgrpAdd $lid $w"]
+		} else {
+			grid [label $w.g$i -text Subgroup:] [entry $w.e$i]
+		}
+		$w.e$i insert 0 [lindex $groups $i]
+	}
+	grid [button $w.cancel -command "EDRPgrpDest $lid $w" -text Cancel] \
+  	     [button $w.ok -command "EDRPgrpSave $lid $w $l" -text OK]
+	grid columnconfigure $w 1 -weight 2
+}
 
 proc EDRPgrpAdd {k w} {
 	global EDRPdata
@@ -12364,6 +12510,218 @@ proc EDRPgrpDest {k w} {
 	global EDRPdata
 	array unset EDRPdata "$k,*"
 	destroy $w
+}
+
+proc EDRTtbl {wfld tkey i title} {
+	set rw .edrtTbl_${i}_${tkey}
+	if {[winfo exists $rw]} {
+		return
+	}
+
+
+	global global_bg_color dice_preset_data
+	global icon_add icon_delete
+	toplevel $rw -background $global_bg_color
+	wm title $rw "Edit $title Data \[$tkey#$i\]"
+	set w $rw.f
+	frame $w
+	pack $w -side top -expand true -fill both
+	set p [GetPresetDetails $dice_preset_data(tmp_presets,$tkey,T,$i)]
+	set dice_preset_data(tmp_presets,$tkey,T,$i,m) [::gmaproto::int_bool [dict get $p markup]]
+	grid [ttk::checkbutton $w.markup -text {Allow markup formatting} -variable dice_preset_data(tmp_presets,$tkey,T,$i,m) -onvalue 1 -offvalue 0]  \
+		[label $w.ttl -text Table] \
+		[button $w.add -image $icon_add -command [list EDRTtblAdd $w $tkey $i]] -sticky we
+	grid [frame $w.tbl] - - -sticky new
+	set row 0
+	foreach {v t} [set tbl [dict get $p table]] {
+		grid [entry $w.tbl.v$row -justify right -textvariable dice_preset_data(tmp_presets,$tkey,T,$i,v$row)] \
+			[entry $w.tbl.t$row -justify left -textvariable dice_preset_data(tmp_presets,$tkey,T,$i,t$row)] \
+			[button $w.tbl.del$row -image $icon_delete -command [list EDRTtblDel $w $tkey $i $row]] \
+			-sticky ew
+		set dice_preset_data(tmp_presets,$tkey,T,$i,v$row) $v
+		set dice_preset_data(tmp_presets,$tkey,T,$i,t$row) $t
+		incr row
+	}
+	set dice_preset_data(tmp_presets,$tkey,T,$i,l) $row
+	if {$row > 0} {
+		set dice_preset_data(tmp_presets,$tkey,T,$i,v[expr $row-1]) *
+		$w.tbl.v[expr $row-1] configure -state disabled -justify center
+	}
+	pack [button $rw.cancel -text Cancel -command [list EDRTtblCan $rw $tkey $i]] -side left
+	pack [button $rw.ok -text Save -command [list EDRTtblSave $rw $tkey $i $wfld]] -side right
+	wm protocol $rw WM_DELETE_WINDOW [list EDRTtblCan $rw $tkey $i]
+	grid columnconfigure $w.tbl 1 -weight 2
+	grid columnconfigure $w 1 -weight 2
+}
+
+proc EDRTtblSave {rw tkey i wfld} {
+	global dice_preset_data
+	set limit $dice_preset_data(tmp_presets,$tkey,T,$i,l)
+	set lastidx [expr $limit - 1]
+	set newtable {}
+	if {$limit == 0} {
+		tk_messageBox -parent $rw -type ok -icon error -title "Invalid table data" \
+			-message "This table contains errors. Correct the problem before saving the table." \
+			-detail "The table does not contain any data."
+		return
+	}
+
+	for {set r 0} {$r < $limit} {incr r} {
+		set v $dice_preset_data(tmp_presets,$tkey,T,$i,v$r)
+		set t $dice_preset_data(tmp_presets,$tkey,T,$i,t$r)
+		if {$r < $lastidx && ![string is integer -strict $v]} {
+			tk_messageBox -parent $rw -type ok -icon error -title "Invalid table data" \
+				-message "This table contains errors. Correct the problem before saving the table." \
+				-detail "The values in the left column must be integers, except the last one, which must be \"*\". In this case, \"$v\" is not an integer."
+			return
+		}
+		if {$r == $lastidx && $v ne "*"} {
+			tk_messageBox -parent $rw -type ok -icon error -title "Invalid table data" \
+				-message "This table contains errors. Correct the problem before saving the table." \
+				-detail "The values in the left column must be integers, except the last one, which must be \"*\". In this case, your last value is $v instead of \"*\"."
+			return
+		}
+		if {[string trim $t] eq {}} {
+			tk_messageBox -parent $rw -type ok -icon error -title "Invalid table data" \
+				-message "This table contains errors. Correct the problem before saving the table." \
+				-detail "The messages in the right column must not be blank."
+			return
+		}
+		if {$r == 0} {
+			set last $v
+		} elseif {$r < $lastidx && $v <= $last} {
+			tk_messageBox -parent $rw -type ok -icon error -title "Invalid table data" \
+				-message "This table contains errors. Correct the problem before saving the table." \
+				-detail "The values in the left column must be increasing in order as you go down the table. In this case, the value $v appears after the value $last."
+			return
+		}
+		lappend newtable $v $t
+	}
+	dict set dice_preset_data(tmp_presets,$tkey,T,$i,d) table $newtable
+	dict set dice_preset_data(tmp_presets,$tkey,T,$i,d) markup $dice_preset_data(tmp_presets,$tkey,T,$i,m)
+	set dice_preset_data(tmp_presets,$tkey,T,$i,d) [SyncPresetDetailFlags $dice_preset_data(tmp_presets,$tkey,T,$i,d)]
+	set widgets [grid slaves $wfld]
+	foreach fw $widgets {
+		grid forget $fw
+		destroy $fw
+	}
+	set r 0
+	foreach {n t} $newtable {
+		grid [label $wfld.n$r -text $n -anchor e -relief groove] [label $wfld.t$r -text $t -anchor w -relief groove] -sticky we
+		incr r
+	}
+
+	set dice_preset_data(tmp_presets,$tkey,T,$i) [EncodePresetDetails $dice_preset_data(tmp_presets,$tkey,T,$i,d)]
+	EDRTtblDest $rw $tkey $i
+}
+
+proc EDRTtblCan {w tkey i} {
+	if {[tk_messageBox -parent $w -type yesno -icon warning -default no -title "Are you sure?" \
+		-message "Are you sure you want to leave this form without saving your work? Any edits you made to this table will be lost."] ne "yes"} {
+			return
+	}
+	EDRTtblDest $w $tkey $i
+}
+proc EDRTtblDest {w tkey i} {
+	global dice_preset_data
+	array unset dice_preset_data(tmp_presets,$tkey,T,$i,v*)
+	array unset dice_preset_data(tmp_presets,$tkey,T,$i,t*)
+	array unset dice_preset_data(tmp_presets,$tkey,T,$i,l)
+	array unset dice_preset_data(tmp_presets,$tkey,T,$i,m)
+	destroy $w
+}
+
+proc EDRTtblAdd {w tkey i} {
+	global dice_preset_data icon_delete
+	set row $dice_preset_data(tmp_presets,$tkey,T,$i,l)
+	if {$row > 0} {
+		$w.tbl.v[expr $row - 1] configure -state normal -justify right
+		set dice_preset_data(tmp_presets,$tkey,T,$i,v[expr $row - 1]) {}
+	}
+	grid [entry $w.tbl.v$row -justify right -textvariable dice_preset_data(tmp_presets,$tkey,T,$i,v$row)] \
+		[entry $w.tbl.t$row -justify left -textvariable dice_preset_data(tmp_presets,$tkey,T,$i,t$row)] \
+		[button $w.tbl.del$row -image $icon_delete -command [list EDRTtblDel $w $tkey $i $row]] \
+		-sticky ew
+	set dice_preset_data(tmp_presets,$tkey,T,$i,v$row) *
+	set dice_preset_data(tmp_presets,$tkey,T,$i,t$row) {}
+	$w.tbl.v$row configure -state disabled -justify center
+	incr dice_preset_data(tmp_presets,$tkey,T,$i,l)
+}
+
+proc EDRTtblDel {w tkey i r} {
+	global dice_preset_data
+	set row $dice_preset_data(tmp_presets,$tkey,T,$i,l)
+	if {$row <= 0 || $i >= $row} {
+		return
+	}
+	for {set ii $r} {$ii < $row-1} {incr ii} {
+		set dice_preset_data(tmp_presets,$tkey,T,$i,v$ii) $dice_preset_data(tmp_presets,$tkey,T,$i,v[expr $ii+1])
+		set dice_preset_data(tmp_presets,$tkey,T,$i,t$ii) $dice_preset_data(tmp_presets,$tkey,T,$i,t[expr $ii+1])
+	}
+	array unset dice_preset_data(tmp_presets,$tkey,T,$i,v[expr $row-1]) {}
+	array unset dice_preset_data(tmp_presets,$tkey,T,$i,t[expr $row-1]) {}
+	grid forget $w.tbl.v[expr $row-1]
+	grid forget $w.tbl.t[expr $row-1]
+	grid forget $w.tbl.del[expr $row-1]
+	destroy $w.tbl.v[expr $row-1]
+	destroy $w.tbl.t[expr $row-1]
+	destroy $w.tbl.del[expr $row-1]
+	incr dice_preset_data(tmp_presets,$tkey,T,$i,l) -1
+	if {$row > 1} {
+		set dice_preset_data(tmp_presets,$tkey,T,$i,v[expr $row-2]) *
+		$w.tbl.v[expr $row-2] configure -justify center -state disabled
+	}
+}
+
+proc EDRTadd {w for_user tkey} {
+	global dice_preset_data icon_anchor_n icon_anchor_s icon_delete icon_colorwheel icon_bullet_arrow_right icon_pencil
+	set wnt [sframe content $w.n.t]
+	set d [dict create Name {} DisplayName {} DieRollSpec {} DisplaySeq {} Description {} AreaTag {} Group {}]
+	dict lappend dice_preset_data(tmp_presets,$tkey) Tables $d
+	set i [expr [llength [dict get $dice_preset_data(tmp_presets,$tkey) Tables]] - 1]
+	set dice_preset_data(tmp_presets,$tkey,T,$i) $d
+	set dice_preset_data(tmp_presets,$tkey,T,$i,d) [GetPresetDetails $d]
+	dict set dice_preset_data(tmp_presets,$tkey,T,$i,d) type table
+	dict set dice_preset_data(tmp_presets,$tkey,T,$i,d) delim ";"
+
+
+	grid [button $wnt.gbtn$i -image $icon_bullet_arrow_right -command [list EditDRPGroup $wnt.group$i "Groups for Table #$i"]] \
+	     [label $wnt.group$i -text {}] \
+	     [entry $wnt.name$i] \
+	     [entry $wnt.desc$i] \
+	     [entry $wnt.dspec$i] \
+	     [button $wnt.edit$i -image $icon_pencil -command [list EDRTtbl $wnt.tbl$i $tkey $i "Table #$i"]] \
+	     [frame $wnt.tbl$i] \
+	     [button $wnt.del$i -image $icon_delete -command [list EDRTdel $w $for_user $tkey $i]] -sticky we
+     	
+	::tooltip::tooltip $wnt.gbtn$i "Edit group(s) to which this table belongs"
+	::tooltip::tooltip $wnt.edit$i "Edit the table"
+	::tooltip::tooltip $wnt.del$i "Remove this table from the list"
+}
+
+proc EDRTdel {w for_user tkey i} {
+	if {[winfo exists .edrtTbl_${i}_${tkey}]} {
+		tk_messageBox -parent . -type ok -icon error -title "Table Editor Still Open" \
+			-message "You cannot delete this table while you still have a table editor window for it still open."
+		return
+	}
+
+	global dice_preset_data
+	set wnt [sframe content $w.n.t]
+	EDRPgetValues $w $for_user $tkey
+	if {[string trim [dict get [set t [lindex [dict get $dice_preset_data(tmp_presets,$tkey) Tables] $i]] DisplayName]] ne {} 
+ 	||  [string trim [dict get $t Description]] ne {}
+	||  [string trim [dict get $t DieRollSpec]] ne {}} {
+		if {[tk_messageBox -parent $w -type yesno -icon warning -default no -title "Are you sure?" \
+			-message "Are you sure you want to delete this table from the list?"] ne "yes"} {
+				return
+		}
+	}
+
+	dict set dice_preset_data(tmp_presets,$tkey) Tables [lreplace [dict get $dice_preset_data(tmp_presets,$tkey) Tables] $i $i]
+	set i [llength [dict get $dice_preset_data(tmp_presets,$tkey) Tables]]
+	grid forget $wnt.group$i $wnt.name$i $wnt.desc$i $wnt.dspec$i $wnt.edit$i $wnt.tbl$i $wnt.del$i $wnt.gbtn$i
+	destroy $wnt.group$i $wnt.name$i $wnt.desc$i $wnt.dspec$i $wnt.edit$i $wnt.tbl$i $wnt.del$i $wnt.gbtn$i
 }
 
 proc EDRPadd {w for_user tkey} {
@@ -12428,23 +12786,25 @@ proc EDRPaddModifier {w for_user tkey} {
 	EDRPupdateGUI $w $for_user $tkey
 }
 
-# PresetLists arrayname ?-export? -> dict of Rolls, CustomRolls, Modifiers which hold sorted lists of dicts
+# PresetLists arrayname ?-export? -> dict of Rolls, CustomRolls, Modifiers, Tables which hold sorted lists of dicts
 # 	-export: also set global array DieRollPresetState with
 # 		(var,<name>) = string
 # 		(global,<name>) = list of strings to apply to all die rolls
 # 		(on,<name>) = bool	true if (var,<name>) or (global,<name>) are enabled
 #
-proc PresetLists {arrayname for_user tkey args} {
+proc PresetLists {arrayname tkey args} {
 	upvar $arrayname presets
 	global DieRollPresetState
 	set export [expr [lsearch -exact $args -export] >= 0]
 	set mods {}
 	set rolls {}
 	set custom {}
+	set tables {}
 
 	set gmods {}
 	set grolls {}
 	set gcustom {}
+	set gtables {}
 
 	set seq 0
 	if {$export} {
@@ -12454,7 +12814,44 @@ proc PresetLists {arrayname for_user tkey args} {
 	set pkeylen [string length "preset,$tkey,"]
 	foreach pkey [lsort [array names presets "preset,$tkey,*"]] {
 		set pname [string range $pkey $pkeylen end]
-		if {[regexp {^§(.*?);(.*?);(.*?)(?:;([^|]*))?(?:\|(.*))?$} $pname _ sequence varname flags client dname]} {
+		if {[regexp {^#(.*?);(.*?)(?:;([^|]*))?(?:\|(.*))?$} $pname _ sequence flags client dname]} {
+			set d $presets($pkey)
+			if {$dname eq {}} {
+				dict set d DisplayName {unnamed table}
+			} else {
+				dict set d DisplayName $dname
+			}
+			dict set d ClientData $client
+			foreach {flagcode flagname} {
+				m Markup
+			} {
+				if {[string first $flagcode $flags] >= 0} {
+					dict set d $flagname true
+				} else {
+					dict set d $flagname false
+				}
+			}
+
+			set sdata [split $sequence "\u25B6"]
+			if {[llength $sdata] > 1} {
+				dict set d Group [join [lrange $sdata 1 end] "\u25B6"]
+				set sdata [lindex $sdata 0]
+			} else {
+				dict set d Group {}
+			}
+			if {[scan $sdata %d%s n _] == 1} {
+				if {$n <= $seq} {
+					set n [incr seq]
+				} else {
+					set seq $n
+				}
+				dict set d DisplaySeq $n
+			} else {
+				dict set d DisplaySeq [incr seq]
+			}
+
+			lappend tables $d
+		} elseif {[regexp {^§(.*?);(.*?);(.*?)(?:;([^|]*))?(?:\|(.*))?$} $pname _ sequence varname flags client dname]} {
 			set d $presets($pkey)
 			if {$dname eq {}} {
 				dict set d DisplayName {unnamed modifier}
@@ -12596,7 +12993,7 @@ proc PresetLists {arrayname for_user tkey args} {
 				dict set d DisplaySeq [incr seq]
 			}
 
-			lappend grolls $d
+			lappend gtables $d
 		} elseif {[regexp {^§(.*?);(.*?);(.*?)(?:;([^|]*))?(?:\|(.*))?$} $pname _ sequence varname flags client dname]} {
 			set d $presets($pkey)
 			if {$dname eq {}} {
@@ -12698,7 +13095,7 @@ proc PresetLists {arrayname for_user tkey args} {
 			}
 		}
 	}
-	return [dict create Modifiers $mods Rolls $rolls CustomRolls $custom GlobalModifiers $gmods GlobalRolls $grolls GlobalCustomRolls $gcustom]
+	return [dict create Modifiers $mods Rolls $rolls CustomRolls $custom GlobalModifiers $gmods GlobalRolls $grolls GlobalCustomRolls $gcustom Tables $tables GlobalTables $gtables]
 }
 
 proc EDRPcheckVar {w for_user tkey i} {
@@ -12873,6 +13270,7 @@ proc DisplayChatMessage {d for_user args} {
 		set dice_preset_data(CHAT_blind,$tkey) 0
 		set dice_preset_data(CHAT_markup_en,$tkey) [gmaproto::int_bool [dict get $_preferences markup_enabled]]
 		pack [ttk::checkbutton $wc.3.blind -text GM -variable dice_preset_data(CHAT_blind,$tkey)] -side right
+		::tooltip::tooltip $wc.3.blind "Send result of die roll ONLY to the GM."
 		#-selectcolor $check_select_color
 		#-indicatoron 1 
 
@@ -12887,6 +13285,7 @@ proc DisplayChatMessage {d for_user args} {
 		pack [entry $wc.2.entry -relief sunken -textvariable dice_preset_data(CHAT_text,$tkey)] -side left -fill x -expand 1
 		pack [button $wc.2.send -command RefreshPeerList -image $icon_arrow_refresh] -side right
 		pack [ttk::checkbutton $wc.2.markup -text M -variable dice_preset_data(CHAT_markup_en,$tkey)] -side right
+		::tooltip::tooltip $wc.2.markup "Enable GMA markup formatting codes in chat messages."
 #		if {$for_user eq $local_user} {
 #			global icon_unlock
 #			pack [button $wc.2.lock -command [list ToggleChatLock $wc.2.lock $wc.1.text] -image $icon_unlock] -side right
@@ -13570,7 +13969,7 @@ proc SendDieRoll {recipients dice blind_p for_user tkey} {
 	# Special case: table lookups are introduced by die-rolls that look like
 	# [title=] #tablename [...]
 	if {[regexp -- {^\s*(.*=)?\s*#(#?)\s*([a-zA-Z_]\w+)(.*?)$} $dice _ title globmark tablename rest]} {
-		set preset_data [PresetLists dice_preset_data $for_user $tkey]
+		set preset_data [PresetLists dice_preset_data $tkey]
 		if {$globmark eq "#"} {
 			set tbl [SearchForPreset $preset_data table $tablename -global -details]
 		} else {
@@ -13584,7 +13983,7 @@ proc SendDieRoll {recipients dice blind_p for_user tkey} {
 			return
 		}
 
-		::gmaproto::roll_dice "$title [dict get $tbl dieroll] $rest" [dict get $d Recipients] [dict get $d ToAll] [dict get $d ToGM] "[new_id]#$globmark$tablename"
+		::gmaproto::roll_dice "$title [dict get $tbl dieroll] $rest" [dict get $d Recipients] [dict get $d ToAll] [dict get $d ToGM] "#$globmark$tablename;$tkey;[new_id]"
 	} else {
 		::gmaproto::roll_dice $dice [dict get $d Recipients] [dict get $d ToAll] [dict get $d ToGM] [new_id]
 	}
@@ -15139,7 +15538,7 @@ proc ConnectToServerByIdx {idx} {
 #*UpdatePeerList <USER> <TKEY>
 #*_recipients <USER> <TKEY>
 #*_do_roll <DICE> <EXTRA> <W> <USER> <TKEY>
-#*PresetLists dice_preset_data <USER> <TKEY> -export
+#*PresetLists dice_preset_data <TKEY> -export
 #*DRPScheckVarEn <i> <id>  ==> DRPScheckVarEn <key> <id> <USER> <TKEY>
 #*DisplayDieRoll <d>
 #*RollPreset <w> <i> <pname> <USER> <TKEY>
@@ -15153,7 +15552,7 @@ proc ConnectToServerByIdx {idx} {
 # [ ] piname change to add g/u prefix dice_preset_data(collapse,<tkey>,<piname>)
 # [ ] 	see also DRPexpand, dice_preset_data(en,<tkey>,<piname>), DRPScheckVarEn
 #
-# PresetLists a user tkey ?-export?
+# PresetLists a tkey ?-export?
 # 	Interprets contents of array a from caller's scope
 # 	returns dict of Modifiers, Rolls, CustomRolls
 #
@@ -15204,8 +15603,9 @@ proc ConnectToServerByIdx {idx} {
 #	var	(empty if no variable name assigned)
 #	flags	list (original flag list)
 #	client	(original client data string)
-#	global	bool	true if g flag set
-#	enabled	bool	true if e flag set
+#	global	bool	true if g flag set      )
+#	enabled	bool	true if e flag set      ) consider these read-only; the flags field is the authoritative source
+#	markup  bool    true if m flag set      )
 #	system	bool	true if system-wide global value
 #	table	list	[n0 t0 n1 t1 ... n-1 tN-1 "*" tN]
 #	delim	for tables, this is the delimiter character used for the DieRollSpec field.
@@ -15214,6 +15614,16 @@ proc ConnectToServerByIdx {idx} {
 #	_raw	saved copy of the original dictionary
 #
 
+# 
+# update the flags value from the discrete flag booleans
+#
+proc SyncPresetDetailFlags {d} {
+	dict set d flags {}
+	if [dict get $d enabled] { dict lappend d flags e }
+	if [dict get $d global] { dict lappend d flags g }
+	if [dict get $d markup] { dict lappend d flags m }
+	return $d
+}
 
 proc GetPresetDetails {p} {
 	set d [dict create \
@@ -15225,6 +15635,7 @@ proc GetPresetDetails {p} {
 		flags {} \
 		global false \
 		group {} \
+		markup false \
 		name [set name [dict get $p Name]] \
 		seq {} \
 		system false \
@@ -15289,14 +15700,15 @@ proc GetPresetDetails {p} {
 					incr i 2
 					lappend tbl $n $t
 				}
+				dict set d table $tbl
 			}
-			dict set d table $tbl
 		} else {
 			set flds [split [string range $name 0 $baridx-1] ";"]
 		}
 
 		if {[lsearch $flags e] >= 0} {dict set d enabled true}
 		if {[lsearch $flags g] >= 0} {dict set d global true}
+		if {[lsearch $flags m] >= 0} {dict set d markup true}
 
 		set groups [split [lindex $flds 0] "\u25B6"]
 		dict set d seq [lindex groups 0]
@@ -15326,58 +15738,23 @@ proc GetPresetDetails {p} {
 # and returning that result instead.
 #
 proc SearchForPreset {d type target_name args} {
-	DEBUG 0 "SearchForPreset in $d"
-	DEBUG 0 "SearchForPreset args $type $target_name $args"
 	if {[lsearch -exact $args -global] >= 0} {
 		set collection {Global}
 	} else {
 		set collection {}
 	}
-	set filter_first {}
-	set require_first {}
 
 	switch $type {
-		preset {
-			# search in [Global]Rolls for [...|]<name> as long as the field doesn't start with #
-			append collection Rolls
-			set filter_first {#}
-		}
-		modifier {
-			# search in [Global]Modifiers for [...|]<name>
-			append collection Modifiers
-		}
-		table {
-			# search in [Global]Rolls for #[...|]<name>
-			append collection Rolls
-			set require_first {#}
-		}
-		default {
-			error "Unsupported preset type '$type' passed to SearchForPreset '$name'"
-		}
+		preset   { append collection Rolls }
+		modifier { append collection Modifiers }
+		table    { append collection Tables }
+		default  { error "Unsupported preset type '$type' passed to SearchForPreset '$name'" }
 	}
 	if {![dict exists $d $collection]} {
 		return {}
 	}
 	foreach p [dict get $d $collection] {
-		if {[set baridx [string first {|} [set name [dict get $p Name]]]] <= 0} {
-			# <name> or |<name>
-			if {$require_first ne {}} {
-				# we can't possibly satisfy this condition
-				continue
-			}
-		} else {
-			# <prefix>|<name>
-			if {$filter_first ne {} && [string index $name 0] eq $filter_first} {
-				# this entry starts with the forbidden character, skip this
-				continue
-			}
-			if {$require_first ne {} && [string index $name 0] ne $require_first} {
-				# this entry doesn't start with the required character, skip this
-				continue
-			}
-		}
-
-		if {$baridx >= 0} {
+		if {[set baridx [string first {|} [set name [dict get $p Name]]]] >= 0} {
 			set name [string range $name $baridx+1 end]
 		}
 		
@@ -15414,7 +15791,7 @@ proc EncodePresetDetails {p} {
 			# preset:	Name: <seq>[<groups>]|<name>
 			return [dict create \
 				Global [dict get $p system] \
-				Name	    [_build_preset_group_name [dict get $p name] [dict get $p seq] [dict get $p groups]] \
+				Name	    [_build_preset_group_name [dict get $p name] [dict get $p seq] [dict get $p group]] \
 				Description [dict get $p description] \
 				DieRollSpec [dict get $p dieroll] \
 			]
@@ -15428,7 +15805,7 @@ proc EncodePresetDetails {p} {
 			] ";"]
 			return [dict create \
 				Global [dict get $p system] \
-				Name	    [_build_preset_group_name [dict get $p name] [dict get $p seq] [dict get $p groups] "\u00A7" ";$extra"] \
+				Name	    [_build_preset_group_name [dict get $p name] [dict get $p seq] [dict get $p group] "\u00A7" ";$extra"] \
 				Description [dict get $p description] \
 				DieRollSpec [dict get $p dieroll] \
 			]
@@ -15436,18 +15813,32 @@ proc EncodePresetDetails {p} {
 		table {
 			# table:	Name: #<seq>[<groups>];[<flags>][;<client>]|<name>
 			#		DieRollSpec: ;<dieroll>;<n0>;<t0>;...;<nN-1>;<tN-1>;*;<tN>;
+			set delim [dict get $p delim]
+			set tabletext [join [dict get $p table] {}]
+			set delimidx -1
+			set delimset ";|,:/~><=!@_^`\001\002\003\004\005\006\007"
+			while {[string first $delim $tabletext] >= 0} {
+				incr delimidx
+				if {$delimidx >= [string length $delimset]} {
+					DEBUG 0 "Unable to find a free delimiter for table fields! the table probably won't be able to be represented correctly!"
+					break
+				}
+				DEBUG 1 "Delimiter $delim won't work in table. Trying [string index $delimset $delimidx]"
+				set delim [string index $delimset $delimidx]
+			}
+			
 			set extra [join [list \
 				[join [dict get $p flags] {}] \
 				[dict get $p client] \
 			] ";"]
 			return [dict create \
 				Global      [dict get $p system] \
-				Name	    [_build_preset_group_name [dict get $p name] [dict get $p seq] [dict get $p groups] "#" ";$extra"] \
+				Name	    [_build_preset_group_name [dict get $p name] [dict get $p seq] [dict get $p group] "#" ";$extra"] \
 				Description [dict get $p description] \
 				DieRollSpec [join [list {} \
 					[dict get $p dieroll] \
 					{*}[dict get $p table] \
-					{}] [dict get $p delim]] \
+					{}] $delim] \
 			]
 		}
 		default {
