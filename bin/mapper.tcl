@@ -1006,7 +1006,7 @@ set check_menu_color     [::gmaprofile::preferred_color $_preferences check_menu
 frame .toolbar2
 set MAIN_MENU {}
 proc update_main_menu {} {
-	global check_menu_color MAIN_MENU
+	global check_menu_color MAIN_MENU is_GM
 	foreach menu {view edit play edit.stipple edit.gridsnap edit.setwidth play.gridsnap view.timers} {
 		for {set i 0} {$i <= [$MAIN_MENU.$menu index last]} {incr i} {
 			if {[set mtype [$MAIN_MENU.$menu type $i]] eq {radiobutton} || $mtype eq {checkbutton}} {
@@ -1014,11 +1014,24 @@ proc update_main_menu {} {
 			}
 		}
 	}
+	if {$is_GM} {
+		set privcmdstate normal
+	} else {
+		set privcmdstate disabled
+	}
+	$MAIN_MENU.play entryconfigure "Edit System Die Roll Presets" -state $privcmdstate
 }
 
 proc create_main_menu {use_button} {
 	global MAIN_MENU CombatantScrollEnabled check_menu_color
-	global ForceElementsToTop NoFill d_OBJ_MODE StipplePattern
+	global ForceElementsToTop NoFill d_OBJ_MODE StipplePattern local_user is_GM
+
+	if {$is_GM} {
+		set privcmdstate normal
+	} else {
+		set privcmdstate disabled
+	}
+
 	if {$MAIN_MENU ne {}} {
 		return
 	}
@@ -1153,6 +1166,8 @@ proc create_main_menu {use_button} {
 	$mm.play add cascade -menu $mm.play.delegatemenu -state disabled -label "Access Die Rolls For..."
 	$mm.play add command -command {EditDelegateList} -label "Manage Die-Roll Preset Delegates..."
 	$mm.play add command -command {RefreshDelegates .delegates} -label "Refresh Die-Roll and Delegate Data from Server"
+	$mm.play add command -command EditRootDieRollPresets -label "Edit Die Roll Presets for $local_user"
+	$mm.play add command -command EditSystemDieRollPresets -label "Edit System Die Roll Presets" -state $privcmdstate
 	$mm.play add separator
 	$mm.play add command -command {display_initiative_clock} -label "Show Initiative Clock"
 	$mm.play add command -command {initiate_timer_request} -label "Request a New Timer"
@@ -10789,12 +10804,15 @@ proc DisplayDieRoll {d args} {
 		Origin		 is_origin
 
 	if {[string index $request_id 0] eq {#} && [lsearch -exact $args -active] >= 0} {
-		lassign [split $request_id {;}] tablename tkey roll_id
-		DEBUG 0 "roll request ID $request_id breaks down to table $tablename, tkey $tkey, ID $roll_id"
+		lassign [split $request_id {;}] tablename tkey flags roll_id
 		global dice_preset_data
 		global is_GM
 		set tbl {}
 		set attrib {}
+
+		if {[string first b $flags] >= 0} {
+			set is_blind true
+		}
 
 		if {$is_origin && !$is_blind && !$is_invalid} {
 			# we're the original requester and this was a table lookup result we started.
@@ -10816,11 +10834,9 @@ proc DisplayDieRoll {d args} {
 			set attrib "$from "
 		}
 		if {$tbl ne {}} {
-			DEBUG 0 "found table [dict get $tbl name], looking up result $result in it..."
 			foreach {v t} [dict get $tbl table] {
 				if {$v eq "*" || $result <= $v} {
-					DEBUG 0 "matched $v: $t"
-					::gmaproto::chat_message "$attrib rolled $result on [dict get $tbl name]: $t" {} $recipientlist $to_all $to_GM [dict get $tbl markup]
+					::gmaproto::chat_message "${attrib}rolled $result on [dict get $tbl name]: $t" {} $recipientlist $to_all $to_GM [dict get $tbl markup]
 					break
 				}
 			}
@@ -11106,6 +11122,18 @@ proc DRPexpand {w tkey piname j for_user} {
 	_render_die_roller $w 0 0 preset $for_user $tkey
 }
 		
+proc SetTableColors {row fgvar bgvar} {
+	global dark_mode _preferences colortheme
+	upvar $fgvar f
+	upvar $bgvar b
+	set f [dict get $_preferences styles dialogs normal_fg $colortheme]
+	if {[expr ($row % 2) == 0]} {
+		set b [dict get $_preferences styles dialogs even_bg $colortheme]
+	} else {
+		set b [dict get $_preferences styles dialogs odd_bg $colortheme]
+	}
+}
+
 proc _render_die_roller {w width height type for_user tkey args} {
 	global dice_preset_data last_known_size icon_delete icon_die16
 	global dark_mode _preferences colortheme icon_blank
@@ -11518,10 +11546,17 @@ proc EDRPsaveAndDestroy {w for_user tkey} {
 	destroy $w
 }
 
-proc EditDieRollPresets {for_user tkey} {
+proc EditRootDieRollPresets {} {
+	global local_user
+	DisplayChatMessage {} {}
+	EditDieRollPresets $local_user [root_user_key] false
+}
+
+proc EditDieRollPresets {for_user tkey {edit_system false}} {
 	global dice_preset_data
 	global icon_colorwheel
 	global icon_bullet_arrow_right
+	global is_GM
 
 	set w .edrp[to_window_id $tkey]
 
@@ -11570,6 +11605,7 @@ proc EditDieRollPresets {for_user tkey} {
 	pack $w.n -expand 1 -fill both
 	pack [button $w.can -text Cancel -command "if \[tk_messageBox -type yesno -parent $w -icon warning -title {Confirm Cancel} -message {Are you sure you wish to abandon any changes you made to the die-roll preset list?} -default no] {destroy $w}"] -side left
 	pack [button $w.ok -text Save -command [list EDRPsaveAndDestroy $w $for_user $tkey]] -side right
+
 
 	global icon_anchor_n icon_anchor_s icon_delete icon_add icon_pencil
 	grid x [label $wnr.t0 -text Group] \
@@ -11657,6 +11693,8 @@ proc EditDieRollPresets {for_user tkey} {
 						[label $wngt.t1 -text Description] [label $wngt.t2 -text {Die Roll}] \
 						[label $wngt.t3 -text Table] -sticky we
 				}
+
+
 				grid [label $wngt.group$ti -text [join [dict get $pd group] "\u25B6"]] \
 					[label $wngt.name$ti -text [dict get $pd name] -anchor w -relief groove] \
 					[label $wngt.desc$ti -text [dict get $pd description] -anchor w -relief groove] \
@@ -11665,8 +11703,9 @@ proc EditDieRollPresets {for_user tkey} {
 					-sticky we
 				set tii 0
 				foreach {tabn tabtxt} [dict get $pd table] {
-					grid [label $wngt.table$ti.n$tii -text $tabn -anchor e -relief groove] \
-						[label $wngt.table$ti.t$tii -text $tabtxt -anchor w -relief groove] \
+					SetTableColors $tii fgcolor bgcolor
+					grid [label $wngt.table$ti.n$tii -text $tabn -anchor e -relief groove -fg $fgcolor -bg $bgcolor] \
+						[label $wngt.table$ti.t$tii -text $tabtxt -anchor w -relief groove -fg $fgcolor -bg $bgcolor] \
 						-sticky we
 					incr tii
 				}
@@ -11723,7 +11762,8 @@ proc EditDieRollPresets {for_user tkey} {
 		$wnt.dspec$i insert 0 [dict get $details dieroll]
 		set ti 0
 		foreach {n t} [dict get $details table] {
-			grid [label $wnt.tbl$i.n$ti -text $n -anchor e -relief groove] [label $wnt.tbl$i.t$ti -text $t -anchor w -relief groove] -sticky we
+			SetTableColors $ti fgcolor bgcolor
+			grid [label $wnt.tbl$i.n$ti -text $n -anchor e -relief groove -fg $fgcolor -bg $bgcolor] [label $wnt.tbl$i.t$ti -text $t -anchor w -relief groove -fg $fgcolor -bg $bgcolor] -sticky we
 			incr ti
 		}
 		incr i
@@ -12607,7 +12647,8 @@ proc EDRTtblSave {rw tkey i wfld} {
 	}
 	set r 0
 	foreach {n t} $newtable {
-		grid [label $wfld.n$r -text $n -anchor e -relief groove] [label $wfld.t$r -text $t -anchor w -relief groove] -sticky we
+		SetTableColors $r fgcolor bgcolor
+		grid [label $wfld.n$r -text $n -anchor e -relief groove -fg $fgcolor -bg $bgcolor] [label $wfld.t$r -text $t -anchor w -relief groove -fg $fgcolor -bg $bgcolor] -sticky we
 		incr r
 	}
 
@@ -13982,8 +14023,13 @@ proc SendDieRoll {recipients dice blind_p for_user tkey} {
 				-detail "Table name: #$globmark$tablename" -parent .
 			return
 		}
+		if {[dict get $d ToGM]} {
+			set flags b
+		} else {
+			set flags {}
+		}
 
-		::gmaproto::roll_dice "$title [dict get $tbl dieroll] $rest" [dict get $d Recipients] [dict get $d ToAll] [dict get $d ToGM] "#$globmark$tablename;$tkey;[new_id]"
+		::gmaproto::roll_dice "$title [dict get $tbl dieroll] $rest" [dict get $d Recipients] [dict get $d ToAll] [dict get $d ToGM] "#$globmark$tablename;$tkey;$flags;[new_id]"
 	} else {
 		::gmaproto::roll_dice $dice [dict get $d Recipients] [dict get $d ToAll] [dict get $d ToGM] [new_id]
 	}
