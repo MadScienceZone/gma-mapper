@@ -232,7 +232,7 @@ namespace eval ::gma::minimarkup {
 			} elseif {$subsection} {
 				lappend finalset subsection
 			} elseif {$link} {
-				lappend finalset link
+				lappend finalset italic
 			} elseif {$bold && $italic} {
 				lappend finalset bolditalic
 			} elseif {$bold} {
@@ -316,5 +316,6 @@ namespace eval ::gma::minimarkup {
 			}
 			$w.text insert end "\n"
 		}
+		$w.text configure -state disabled
 	}
 }
