@@ -178,13 +178,13 @@ namespace eval ::gmaproto {
 		PS      {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l PolyGM ? Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}}}
 		READY   {}
 		REDIRECT {Host s Port i Reason s}
-		ROLL    {Sender s Recipients l MessageID i ToAll ? ToGM ? Title s Result {o {InvalidRequest ? ResultSuppressed ? Result i Details {a {Type s Value s}}}} RequestID s MoreResults ? Sent s Origin ?}
+		ROLL    {Replay ? Sender s Recipients l MessageID i ToAll ? ToGM ? Title s Result {o {InvalidRequest ? ResultSuppressed ? Result i Details {a {Type s Value s}}}} RequestID s MoreResults ? Sent s Origin ?}
 		SYNC    {}
 		SYNC-CHAT {Target i}
 		TB      {Enabled ?}
 		TMACK	{RequestID s RequestingClient s RequestedBy s}
 		TMRQ	{Description s Expires s Targets l ShowToAll ? IsRunning ? RequestedBy s RequestingClient s RequestID s}
-		TO      {Sender s Recipients l MessageID i ToAll ? ToGM ? Text s Sent s Markup ? Origin ?}
+		TO      {Replay ? Sender s Recipients l MessageID i ToAll ? ToGM ? Text s Sent s Markup ? Origin ?}
 		UPDATES {Packages {a {Name s Instances {a {OS s Arch s Version s Token s}}}}}
 		WORLD   {Calendar s ClientSettings {o {MkdirPath s ImageBaseURL s ModuleCode s SCPDestination s ServerHostname s}}}
 		/CONN   {}
