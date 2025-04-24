@@ -11541,9 +11541,15 @@ proc _resize_die_roller {w width height type for_user tkey} {
 	set resize_task($tkey,$type) {}
 }
 
-proc EDRPsaveAndDestroy {w for_user tkey} {
-	EDRPsaveValues $w $for_user $tkey
+proc EDRPsaveAndDestroy {w for_user tkey {system false}} {
+	EDRPsaveValues $w $for_user $tkey $system
 	destroy $w
+}
+
+proc EditSystemDieRollPresets {} {
+	global local_user
+	DisplayChatMessage {} {}
+	EditDieRollPresets $local_user [root_user_key] true
 }
 
 proc EditRootDieRollPresets {} {
@@ -11558,15 +11564,28 @@ proc EditDieRollPresets {for_user tkey {edit_system false}} {
 	global icon_bullet_arrow_right
 	global is_GM
 
+	if {$edit_system && !$is_GM} {
+		DEBUG 0 "You are not authorized to edit system presets."
+		return
+	}
+
 	set w .edrp[to_window_id $tkey]
 
 	if {[winfo exists $w]} {
-		DEBUG 1 "There is already a die roll preset editor window open for user $for_user; not making another."
+		DEBUG 0 "There is already a die roll preset editor window open for user $for_user; not making another."
 		return
 	}
 
 	toplevel $w
-	wm title $w "Manage Die-Roll Presets for $for_user"
+	if {$edit_system} {
+		wm title $w "Manage SYSTEM Die-Roll Presets \[as $for_user\]"
+		set dictpfx Global
+		set tabpfx {Global }
+	} else {
+		wm title $w "Manage Die-Roll Presets for $for_user"
+		set dictpfx {}
+		set tabpfx {}
+	}
 	ttk::notebook $w.n
 	sframe new $w.n.r
 	sframe new $w.n.gr
@@ -11594,9 +11613,9 @@ proc EditDieRollPresets {for_user tkey {edit_system false}} {
 		GlobalTables 6
 		GlobalCustom 7
 	}
-	$w.n add $w.n.r -state normal -sticky news -text Rolls
-	$w.n add $w.n.m -state normal -sticky news -text Modifiers
-	$w.n add $w.n.t -state normal -sticky news -text Tables
+	$w.n add $w.n.r -state normal -sticky news -text "${tabpfx}Rolls"
+	$w.n add $w.n.m -state normal -sticky news -text "${tabpfx}Modifiers"
+	$w.n add $w.n.t -state normal -sticky news -text "${tabpfx}Tables"
 	$w.n add $w.n.c -state disabled -sticky news -text Custom
 	$w.n add $w.n.gr -state disabled -sticky news -text "Global Rolls"
 	$w.n add $w.n.gm -state disabled -sticky news -text "Global Modifiers"
@@ -11604,7 +11623,7 @@ proc EditDieRollPresets {for_user tkey {edit_system false}} {
 	$w.n add $w.n.gc -state disabled -sticky news -text "Global Custom"
 	pack $w.n -expand 1 -fill both
 	pack [button $w.can -text Cancel -command "if \[tk_messageBox -type yesno -parent $w -icon warning -title {Confirm Cancel} -message {Are you sure you wish to abandon any changes you made to the die-roll preset list?} -default no] {destroy $w}"] -side left
-	pack [button $w.ok -text Save -command [list EDRPsaveAndDestroy $w $for_user $tkey]] -side right
+	pack [button $w.ok -text Save -command [list EDRPsaveAndDestroy $w $for_user $tkey $edit_system]] -side right
 
 
 	global icon_anchor_n icon_anchor_s icon_delete icon_add icon_pencil
@@ -11625,6 +11644,7 @@ proc EditDieRollPresets {for_user tkey {edit_system false}} {
 # this routine could be moved to use in the future as well, which is why it looks a bit different.
 #
 #
+	if {!$edit_system} {
 	set mi 0
 	set pi 0
 	set di 0
@@ -11724,6 +11744,7 @@ proc EditDieRollPresets {for_user tkey {edit_system false}} {
 			}
 		}
 	}
+	}
 
 	#
 #	set global_vars [array names dice_preset_data "sys,preset,*"]
@@ -11743,7 +11764,7 @@ proc EditDieRollPresets {for_user tkey {edit_system false}} {
 
 
 	set i 0
-	foreach preset [dict get $dice_preset_data(tmp_presets,$tkey) Tables] {
+	foreach preset [dict get $dice_preset_data(tmp_presets,$tkey) ${dictpfx}Tables] {
 		if {![dict exists $preset Group] || [set pgroup [dict get $preset Group]] eq {}} {
 			set pgroup {}
 		}
@@ -11770,7 +11791,7 @@ proc EditDieRollPresets {for_user tkey {edit_system false}} {
 	}
 
 	set i 0
-	foreach preset [dict get $dice_preset_data(tmp_presets,$tkey) Rolls] {
+	foreach preset [dict get $dice_preset_data(tmp_presets,$tkey) ${dictpfx}Rolls] {
 		set dice_preset_data(tmp_presets,$tkey,R,$i) $preset
 		if {![dict exists $preset Group] || [set pgroup [dict get $preset Group]] eq {}} {
 			set pgroup {}
@@ -11821,7 +11842,7 @@ proc EditDieRollPresets {for_user tkey {edit_system false}} {
 	set i 0
 	grid [label $wnm.t_] [label $wnm.tg -text Group] [label $wnm.t0 -text On] [label $wnm.t1 -text Name] [label $wnm.t2 -text Description] [label $wnm.t3 -text Expression] \
 		x x x x x x [button $wnm.add -image $icon_add -command [list EDRPaddModifier $w $for_user $tkey]] -sticky ew
-	foreach preset [dict get $dice_preset_data(tmp_presets,$tkey) Modifiers] {
+	foreach preset [dict get $dice_preset_data(tmp_presets,$tkey) ${dictpfx}Modifiers] {
 		set dice_preset_data(tmp_presets,$tkey,M,$i) $preset
 		grid [button $wnm.gbtn$i -image $icon_bullet_arrow_right -command [list EditDRPGroup $wnm.group$i "Groups for Modifier #$i"]] \
 		     [label $wnm.group$i -text {}] \
@@ -12141,7 +12162,9 @@ proc ECBT_add {w} {
 # It will send them back to us which will force an update
 # in the client at that time.
 #
-proc EDRPsaveValues {w for_user tkey} {
+# if system is true, we're sending the system-wide preset list, not our personal set.
+#
+proc EDRPsaveValues {w for_user tkey {system false}} {
 	global dice_preset_data
 	set newpresets {}
 	EDRPgetValues $w $for_user $tkey
@@ -12213,7 +12236,7 @@ proc EDRPsaveValues {w for_user tkey} {
 		# these are already encoded so just send them out
 		lappend newpresets $p
 	}
-	UpdateDicePresets $newpresets $for_user
+	UpdateDicePresets $newpresets $for_user $system
 }
 
 # remove item #i from rolls
@@ -14034,7 +14057,7 @@ proc SendDieRoll {recipients dice blind_p for_user tkey} {
 		::gmaproto::roll_dice $dice [dict get $d Recipients] [dict get $d ToAll] [dict get $d ToGM] [new_id]
 	}
 }
-proc UpdateDicePresets {deflist for_user} {::gmaproto::define_dice_presets $deflist false $for_user}
+proc UpdateDicePresets {deflist for_user {system false}} {::gmaproto::define_dice_presets $deflist false $for_user $system}
 proc RequestDicePresets {for_user} {::gmaproto::query_dice_presets $for_user}
 
 proc SendChatMessage {recipients message {markup false}} {
