@@ -4010,6 +4010,13 @@ The name of the user who rolled the dice.
 If present and true upon receipt of this message from the server, this indicates that the client receiving it was the same client who originated the
 die roll reqeust whose result is being reported here, as opposed to a client who is merely
 being given a copy of the results of another client's die roll.
+.TP
+.BI Replay " (bool)"
+If present and true upon receipt of this message from the server, this indicates that this message is being \*(lqreplayed\*(rq (e.g., as a result
+of a
+.B SYNC-CHAT
+request from the client) and this is not the original sending of the message. As such, the client SHOULD NOT make active responses to it such as
+performing lookup table reports on it.
 '\" <</New>>
 .TP
 .BI Recipients " (list of strings)"
@@ -4315,6 +4322,12 @@ is set by the server when sending these messages to peers.
 If present and true upon receipt from the server, this means that the client receiving this message was the same client who sent 
 the original message,
 instead of merely receiving a copy of the message sent by a peer client. Clients MUST NOT set this field.
+.TP
+.BI Replay " (bool)"
+If present and true upon receipt of this message from the server, this indicates that this message is being \*(lqreplayed\*(rq (e.g., as a result
+of a
+.B SYNC-CHAT
+request from the client) and this is not the original sending of the message. 
 '\" <</New>>
 .TP
 .BI Recipients " (list of strings)"
@@ -4538,7 +4551,9 @@ which added support for system-wide die-roll presets and
 table definitions and markup formatting in chat messages.
 It also added the
 .B Origin
-field to the
+and
+.B Replay
+fields to the
 .B ROLL
 and
 .B TO

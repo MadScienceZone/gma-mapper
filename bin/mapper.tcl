@@ -10801,9 +10801,11 @@ proc DisplayDieRoll {d args} {
 		Sent             date_sent \
 		ToAll		 to_all \
 		ToGM             to_GM \
-		Origin		 is_origin
+		Origin		 is_origin \
+		Replay		 is_replay
 
-	if {[string index $request_id 0] eq {#} && [lsearch -exact $args -active] >= 0} {
+
+	if {!$is_replay && [string index $request_id 0] eq {#} && [lsearch -exact $args -active] >= 0} {
 		lassign [split $request_id {;}] tablename tkey flags roll_id
 		global dice_preset_data
 		global is_GM
