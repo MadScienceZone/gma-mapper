@@ -2277,7 +2277,7 @@ foreach icon_name {
 	dbracket_t dbracket_m dbracket_b dbracket__
 	delete add clock dieb16 -- *hourglass *hourglass_go *arrow_right *cross *bullet_go menu
 	stipple_100 stipple_75 stipple_50 stipple_25 stipple_12 stipple_88 lock unlock bullet_arrow_down bullet_arrow_right
-	bullet_arrow_down16 bullet_arrow_right16 tmrq pencil
+	bullet_arrow_down16 bullet_arrow_right16 tmrq pencil die16g
 } {
 	if {$icon_name eq {--}} {
 		if {$ImageFormat eq {png}} {
@@ -10781,7 +10781,7 @@ proc toIDName {n} {
 }
 set die_roll_group false
 proc DisplayDieRoll {d args} {
-	global icon_dieb16 icon_die16 icon_die16c SuppressChat drd_id LastDisplayedChatDate dice_preset_data die_roll_group
+	global icon_dieb16 icon_die16 icon_die16g icon_die16c SuppressChat drd_id LastDisplayedChatDate dice_preset_data die_roll_group
 	global icon_dbracket_b icon_dbracket_t icon_dbracket_m icon_dbracket__
 
 	if {$SuppressChat} {
@@ -11135,7 +11135,7 @@ proc SetTableColors {row fgvar bgvar} {
 }
 
 proc _render_die_roller {w width height type for_user tkey args} {
-	global dice_preset_data last_known_size icon_delete icon_die16
+	global dice_preset_data last_known_size icon_delete icon_die16 icon_die16g
 	global dark_mode _preferences colortheme icon_blank
 
 	assert_last_known_size $tkey
@@ -11332,7 +11332,7 @@ proc _render_die_roller {w width height type for_user tkey args} {
 					if {$scope eq "g"} {
 						pack [ttk::checkbutton $wpi.enabled -variable dice_preset_data(en,$tkey,$piname) \
 							-command [list DRPScheckVarEn "en,$tkey,$piname" $id $for_user $tkey $scope]\
-							-text "\[g\] $t"] -side left
+							-text "\[system\] $t"] -side left
 					} {
 						pack [ttk::checkbutton $wpi.enabled -variable dice_preset_data(en,$tkey,$piname) \
 							-command [list DRPScheckVarEn "en,$tkey,$piname" $id $for_user $tkey $scope]\
@@ -11342,7 +11342,7 @@ proc _render_die_roller {w width height type for_user tkey args} {
 					if {$scope eq "g"} {
 						pack [ttk::checkbutton $wpi.enabled -variable dice_preset_data(en,$tkey,$piname) \
 							-command [list DRPScheckVarEn "en,$tkey,$piname" $id $for_user $tkey $scope]\
-							-text "\[g\] [dict get $preset DisplayName] (as \$\$\{$id\}): [dict get $preset DieRollSpec]"\
+							-text "\[system\] [dict get $preset DisplayName] (as \$\$\{$id\}): [dict get $preset DieRollSpec]"\
 						] -side left
 					} {
 						pack [ttk::checkbutton $wpi.enabled -variable dice_preset_data(en,$tkey,$piname) \
@@ -11379,11 +11379,15 @@ proc _render_die_roller {w width height type for_user tkey args} {
 			# 		else place button to close, continue to next level
 			# 	if we haven't abandoned the preset yet, finish rendering it
 			#
-			set _plist [dict get $preset_data Rolls]
-			lappend _plist {*}[dict get $preset_data CustomRolls]
 			set prev_grplist {}
 			set prev_collapse {}
-			foreach preset $_plist {
+			foreach scope {GlobalRolls Rolls} {
+			   foreach preset [dict get $preset_data $scope] {
+				if {$scope eq "GlobalRolls"} {
+					set dieicon $icon_die16g
+				} else {
+					set dieicon $icon_die16
+				}
 				set pname [dict get $preset Name]
 				set dname [dict get $preset DisplayName]
 				set desc [dict get $preset Description]
@@ -11456,7 +11460,7 @@ proc _render_die_roller {w width height type for_user tkey args} {
 					continue
 				}
 
-				pack [button $wpi.roll -image $icon_die16 -command "[list RollPreset $wpi $i $pname $for_user $tkey]"] -side left
+				pack [button $wpi.roll -image $dieicon -command "[list RollPreset $wpi $i $pname $for_user $tkey $scope]"] -side left
 				pack [label $w.preset$i.plus -text +] -side left
 				pack [entry $w.preset$i.extra -width 3] -side left
 				pack [label $w.preset$i.name -text ${dname}: -anchor w -font Tf12 \
@@ -11469,7 +11473,7 @@ proc _render_die_roller {w width height type for_user tkey args} {
 				bind $w.preset$i.extra <FocusIn> "_pop_open_extra $w.preset$i.extra -1"
 				bind $w.preset$i.extra <FocusOut> "_collapse_extra $w.preset$i.extra -1 $for_user $tkey"
 				incr i
-			}
+			}}
 			if {[dict get $_preferences styles dierolls compact_recents]} {
 				update
 				set i 0
@@ -11581,10 +11585,12 @@ proc EditDieRollPresets {for_user tkey {edit_system false}} {
 		wm title $w "Manage SYSTEM Die-Roll Presets \[as $for_user\]"
 		set dictpfx Global
 		set tabpfx {Global }
+		set varpfx {$$}
 	} else {
 		wm title $w "Manage Die-Roll Presets for $for_user"
 		set dictpfx {}
 		set tabpfx {}
+		set varpfx {$}
 	}
 	ttk::notebook $w.n
 	sframe new $w.n.r
@@ -11637,6 +11643,13 @@ proc EditDieRollPresets {for_user tkey {edit_system false}} {
 
 	set dice_preset_data(tmp_presets,$tkey) [PresetLists dice_preset_data $tkey]
 	array unset dice_preset_data "tmp_presets,$tkey,*"
+	if {$edit_system} {
+		# move global items to the editable areas
+		foreach area {Modifiers Rolls Tables CustomRolls} {
+			dict set dice_preset_data(tmp_presets,$tkey) $area [dict get $dice_preset_data(tmp_presets,$tkey) Global$area]
+			dict set dice_preset_data(tmp_presets,$tkey) Global$area {}
+		}
+	}
 
 #
 # process the read-only global things.
@@ -11764,7 +11777,7 @@ proc EditDieRollPresets {for_user tkey {edit_system false}} {
 
 
 	set i 0
-	foreach preset [dict get $dice_preset_data(tmp_presets,$tkey) ${dictpfx}Tables] {
+	foreach preset [dict get $dice_preset_data(tmp_presets,$tkey) Tables] {
 		if {![dict exists $preset Group] || [set pgroup [dict get $preset Group]] eq {}} {
 			set pgroup {}
 		}
@@ -11791,7 +11804,7 @@ proc EditDieRollPresets {for_user tkey {edit_system false}} {
 	}
 
 	set i 0
-	foreach preset [dict get $dice_preset_data(tmp_presets,$tkey) ${dictpfx}Rolls] {
+	foreach preset [dict get $dice_preset_data(tmp_presets,$tkey) Rolls] {
 		set dice_preset_data(tmp_presets,$tkey,R,$i) $preset
 		if {![dict exists $preset Group] || [set pgroup [dict get $preset Group]] eq {}} {
 			set pgroup {}
@@ -11842,7 +11855,7 @@ proc EditDieRollPresets {for_user tkey {edit_system false}} {
 	set i 0
 	grid [label $wnm.t_] [label $wnm.tg -text Group] [label $wnm.t0 -text On] [label $wnm.t1 -text Name] [label $wnm.t2 -text Description] [label $wnm.t3 -text Expression] \
 		x x x x x x [button $wnm.add -image $icon_add -command [list EDRPaddModifier $w $for_user $tkey]] -sticky ew
-	foreach preset [dict get $dice_preset_data(tmp_presets,$tkey) ${dictpfx}Modifiers] {
+	foreach preset [dict get $dice_preset_data(tmp_presets,$tkey) Modifiers] {
 		set dice_preset_data(tmp_presets,$tkey,M,$i) $preset
 		grid [button $wnm.gbtn$i -image $icon_bullet_arrow_right -command [list EditDRPGroup $wnm.group$i "Groups for Modifier #$i"]] \
 		     [label $wnm.group$i -text {}] \
@@ -11850,7 +11863,7 @@ proc EditDieRollPresets {for_user tkey {edit_system false}} {
 		     [entry $wnm.name$i] \
 		     [entry $wnm.desc$i] \
 		     [entry $wnm.dspec$i] \
-		     [ttk::checkbutton $wnm.varp$i -text "as symbol $\{" -variable dice_preset_data(EDRP_mod_ven,$tkey,$i) -command [list EDRPcheckVar $w $for_user $tkey $i]]\
+		     [ttk::checkbutton $wnm.varp$i -text "as symbol ${varpfx}\{" -variable dice_preset_data(EDRP_mod_ven,$tkey,$i) -command [list EDRPcheckVar $w $for_user $tkey $i]]\
 		     [entry $wnm.var$i -width 6]\
 		     [label $wnm.rb$i -text \} -anchor w] \
 		     [ttk::checkbutton $wnm.g$i -text "()x" -variable dice_preset_data(EDRP_mod_g,$tkey,$i)] \
@@ -14221,12 +14234,18 @@ proc AddToDieRollTitle {rollspec s} {
 	return "$s=$rollspec"
 }
 
-proc RollPreset {w idx name for_user tkey} {
+proc RollPreset {w idx name for_user tkey scope} {
 	global dice_preset_data
 
-	if {[info exists dice_preset_data(preset,$tkey,$name)]} {
+	if {$scope eq "GlobalRolls"} {
+		set key "sys,preset"
+	} else {
+		set key "preset,$tkey"
+	}
+
+	if {[info exists dice_preset_data($key,$name)]} {
 		set extra [string trim [$w.extra get]]
-		_do_roll [dict get $dice_preset_data(preset,$tkey,$name) DieRollSpec] $extra $w $for_user $tkey
+		_do_roll [dict get $dice_preset_data($key,$name) DieRollSpec] $extra $w $for_user $tkey
 	}
 }
 
@@ -15961,3 +15980,16 @@ proc EncodePresetDetails {p} {
 # @[50]@| This software is not intended for any use or application in which
 # @[51]@| the safety of lives or property would be at risk due to failure or
 # @[52]@| defect of the software.
+#
+#/EDRPgetValues ... system
+#/EDRPdel ... system
+#/EDRPdelModifier ... system
+#/EDRPdelCustom ... system
+#/EDRPlower ... system
+#/EDRPlowerModifier ... system
+#/EDRPraise ... system
+#/EDRPraiseModifier ... system
+#/EDRTdel ... system
+#/EDRPadd ... system
+#/EDRPaddModifier ... system
+# TODO stop sending lookup results for messages that are too old

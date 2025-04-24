@@ -1401,7 +1401,7 @@ proc ::gmaproto::comment {text} {
 
 proc ::gmaproto::define_dice_presets {plist app {for_user {}} {globals_only false}} {
 	if {$globals_only} {
-		set target {Globals true}
+		set target {Global true}
 	} else {
 		set target [list For $for_user]
 	}
