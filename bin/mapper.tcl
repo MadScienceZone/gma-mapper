@@ -17,7 +17,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.29-alpha.2}     ;# @@##@@
+set GMAMapperVersion {4.29-beta.0}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {417}         ;# @@##@@
 set CoreVersionNumber {6.28}            ;# @@##@@
@@ -11223,6 +11223,118 @@ proc _render_die_roller {w width height type for_user tkey args} {
 			set preset_data [PresetLists dice_preset_data $tkey -export]
 			set i 0
 			#
+			# Table Names
+			#
+			global DieRollPresetState
+			set prev_grplist {}
+			set prev_collapse {}
+			foreach {scope preset_set} {g GlobalTables u Tables} {
+			    foreach preset [dict get $preset_data $preset_set] {
+				set wpi $w.preset$i
+				DEBUG 4 "create frame $wpi"
+				set dname [dict get $preset DisplayName]
+				set pname [dict get $preset Name]
+				set piname [to_window_id $scope$pname]
+
+				set grplist [split [dict get $preset Group] "\u25B6"]
+				if {![info exists dice_preset_data(collapse,$tkey,$piname)] || \
+					[llength $dice_preset_data(collapse,$tkey,$piname)] != [llength $grplist]} {
+						set dice_preset_data(collapse,$tkey,$piname) [lmap x $grplist { expr 0 }]
+				}
+				try {
+					set controls {}
+					for {set j 0} {$j < [llength $grplist]} {incr j} {
+						if {$j < [llength $prev_grplist] && [lindex $prev_grplist $j] eq [lindex $grplist $j]} {
+							if {![lindex $prev_collapse $j]} {
+								# part of closed group we already showed above.
+								# same level-j group as the previous line, and since that was closed
+								# we will be too. So we don't even need to show this preset at all.
+								return -level 0 -code $CONTINUE_OUTER_LOOP
+							}
+							# part of open group we already showed above. add a spacer here and keep looking.
+							lappend controls _
+							continue
+						} elseif {![lindex $dice_preset_data(collapse,$tkey,$piname) $j]} {
+							# start of new group at level j but we're closed here.
+							# set an expand button and stop.
+							lappend controls >
+							set prev_collapse [lreplace $prev_collapse $j end 0]
+							break
+						} else {
+							# start of new group at level j and we're open here.
+							# set a collapse button and continue.
+							lappend controls v
+							set prev_collapse [lreplace $prev_collapse $j end 1]
+						}
+					}
+				} on $CONTINUE_OUTER_LOOP {} {
+					continue
+				}
+				set prev_grplist $grplist
+				set wpi $w.preset$i
+				set dice_preset_data(w,$tkey,$pname) $wpi
+				pack [frame $wpi] -side top -expand 0 -fill x
+				set bgcolor [$wpi cget -background]
+				try {
+					for {set j 0} {$j < [llength $controls]} {incr j} {
+						switch [lindex $controls $j] {
+							_ {
+								pack [button $wpi.gb$j -image $icon_blank -relief flat] -side left
+								pack [label $wpi.gl$j -text [lindex $grplist $j] -fg $bgcolor -bg $bgcolor] -side left
+							}
+							> {
+								pack [button $wpi.gb$j -image $icon_bullet_arrow_right -relief flat -command [list DRPexpand $w $tkey $piname $j $for_user]] -side left
+								pack [label $wpi.gl$j -text [lindex $grplist $j]] -side left
+								return -level 0 -code $CONTINUE_OUTER_LOOP
+							}
+							v {
+								pack [button $wpi.gb$j -image $icon_bullet_arrow_down -relief flat -command [list DRPexpand $w $tkey $piname $j $for_user]] -side left
+								pack [label $wpi.gl$j -text [lindex $grplist $j]] -side left
+							}
+							default {
+								pack [label $wpi.gb$j -text "??"] -side left
+								pack [label $wpi.gl$j -text "??"] -side left
+							}
+						}
+					}
+				} on $CONTINUE_OUTER_LOOP {} {
+					incr i
+					continue
+				}
+
+
+
+#				set dice_preset_data(w,$tkey,$pname) $wpi
+#				pack [frame $wpi] -side top -expand 0 -fill x
+#				set grplist [split [dict get $preset Group] "\u25B6"]
+#				if {![info exists dice_preset_data(collapse,$tkey,$piname)] || \
+#					[llength $dice_preset_data(collapse,$tkey,$piname)] != [llength $grplist]} {
+#						set dice_preset_data(collapse,$tkey,$piname) [lmap x $grplist { expr 0 }]
+#				}
+#				for {set j 0} {$j < [llength $grplist]} {incr j} {
+#					if {[lindex $dice_preset_data(collapse,$tkey,$piname) $j]} {
+#						pack [button $wpi.gb$j -image $icon_bullet_arrow_down -relief flat -command [list DRPexpand $w $tkey $piname]] [label $wpi.gl$j -text [lindex $grplist $j]] -side left
+#					} else {
+#						pack [button $wpi.gb$j -image $icon_bullet_arrow_right -relief flat -command [list DRPexpand $w $tkey $piname]] [label $wpi.gl$j -text [lindex $grplist $j]] -side left
+#						break
+#					}
+#				}
+#				if {$j < [llength $grplist]} {
+#					incr i
+#					continue
+#				}
+
+				if {$scope eq "g"} {
+					pack [button $wpi.tablename -text "##$dname" -command [list RollTable "##$dname" $for_user $tkey]] -side left
+				} {
+					pack [button $wpi.tablename -text "#$dname" -command [list RollTable "#$dname" $for_user $tkey]] -side left
+				}
+				::tooltip::tooltip $wpi.tablename "* [dict get $preset Description]"
+				incr i
+			   }
+			}
+
+			#
 			# Modifiers
 			#
 			global DieRollPresetState
@@ -11333,11 +11445,12 @@ proc _render_die_roller {w width height type for_user tkey args} {
 					}
 					if {$scope eq "g"} {
 						pack [ttk::checkbutton $wpi.enabled -variable dice_preset_data(en,$tkey,$piname) \
-							-command [list DRPScheckVarEn "en,$tkey,$piname" $id $for_user $tkey $scope]\
+							-command [list DRPScheckVarEn "en,$tkey,$piname" g$id $for_user $tkey u]\
 							-text "\[system\] $t"] -side left
+						# ^^hack
 					} {
 						pack [ttk::checkbutton $wpi.enabled -variable dice_preset_data(en,$tkey,$piname) \
-							-command [list DRPScheckVarEn "en,$tkey,$piname" $id $for_user $tkey $scope]\
+							-command [list DRPScheckVarEn "en,$tkey,$piname" u$id $for_user $tkey $scope]\
 							-text $t] -side left
 					}
 				} else {
@@ -12890,7 +13003,8 @@ proc PresetLists {arrayname tkey args} {
 		array unset DieRollPresetState "$tkey,*"
 		set DieRollPresetState($tkey,apply_order) {}
 	}
-	set pkeylen [string length "preset,$tkey,"]
+
+        set pkeylen [string length "preset,$tkey,"]
 	foreach pkey [lsort [array names presets "preset,$tkey,*"]] {
 		set pname [string range $pkey $pkeylen end]
 		if {[regexp {^#(.*?);(.*?)(?:;([^|]*))?(?:\|(.*))?$} $pname _ sequence flags client dname]} {
@@ -12983,10 +13097,10 @@ proc PresetLists {arrayname tkey args} {
 					}
 				} else {
 					set id [dict get $d DisplaySeq]
-					set DieRollPresetState($tkey,global,$id) [dict get $d DieRollSpec]
-					set DieRollPresetState($tkey,on,$id) [dict get $d Enabled]
-					set DieRollPresetState($tkey,g,$id) [dict get $d Global]
-					lappend DieRollPresetState($tkey,apply_order) $id
+					set DieRollPresetState($tkey,global,u$id) [dict get $d DieRollSpec]
+					set DieRollPresetState($tkey,on,u$id) [dict get $d Enabled]
+					set DieRollPresetState($tkey,g,u$id) [dict get $d Global]
+					lappend DieRollPresetState($tkey,apply_order) u$id
 				}
 			}
 		} else {
@@ -13124,12 +13238,11 @@ proc PresetLists {arrayname tkey args} {
 						DEBUG 0 "Variables must begin with a letter and include only letters and numbers."
 					}
 				} else {
-					# TODO
-					#set id [dict get $d DisplaySeq]
-					#set DieRollPresetState($tkey,global,$id) [dict get $d DieRollSpec]
-					#set DieRollPresetState($tkey,on,$id) [dict get $d Enabled]
-					#set DieRollPresetState($tkey,g,$id) [dict get $d Global]
-					#lappend DieRollPresetState($tkey,apply_order) $id
+					set id [dict get $d DisplaySeq]
+					set DieRollPresetState($tkey,global,g$id) [dict get $d DieRollSpec]
+					set DieRollPresetState($tkey,on,g$id) [dict get $d Enabled]
+					set DieRollPresetState($tkey,g,g$id) [dict get $d Global]
+					lappend DieRollPresetState($tkey,apply_order) g$id
 				}
 			}
 		} else {
@@ -14082,6 +14195,14 @@ proc SendChatMessage {recipients message {markup false}} {
 	}
 }
 
+proc RollTable {name for_user tkey} {
+	global dice_preset_data
+	set w $dice_preset_data(cw,$tkey)
+	set wr [sframe content $w.p.recent.sf]
+	set dice_preset_data(CHAT_dice,$tkey) $name
+	SendDieRollFromWindow $w $wr $for_user $tkey
+}
+
 proc SendDieRollFromWindow {w wr for_user tkey} {
 	global dice_preset_data
 
@@ -14206,9 +14327,10 @@ proc _do_roll {roll_string extra w for_user tkey} {
 
 	if {[catch {
 		set rollspec [_apply_die_roll_mods $roll_string $extra { ad hoc}]
-		DEBUG 1 " after ad hoc: $rollspec"
+		DEBUG 1 " after ad hoc: $rollspec apply=[info exists DieRollPresetState($tkey,apply_order)]"
 		if {[info exists DieRollPresetState($tkey,apply_order)]} {
 			foreach id $DieRollPresetState($tkey,apply_order) {
+				DEBUG 1 "  apply $id $DieRollPresetState($tkey,on,$id):$DieRollPresetState($tkey,global,$id):$DieRollPresetState($tkey,g,$id)"
 				if {$DieRollPresetState($tkey,on,$id)} {
 					set rollspec [_apply_die_roll_mods $rollspec $DieRollPresetState($tkey,global,$id) {} $DieRollPresetState($tkey,g,$id)]
 					DEBUG 1 " after $DieRollPresetState($tkey,global,$id): $rollspec"
@@ -15939,6 +16061,16 @@ proc EncodePresetDetails {p} {
 	}
 }
 
+# DieRollPresetState
+# 	<tkey>,on,<varname>		var behind checkbutton (user)
+# 	<tkey>,var,<varname>	value
+# 	<tkey>,g,<varname>	false for vars
+# 	sys,gvar_on,<varname>	var behind checkbutton (user)
+#
+# 	<tkey>,global,<seq>	mod spec				<tkey>,
+# 	<tkey>,on,<seq>		en?			==>
+# 	<tkey>,g,<seq>		glob?
+# 	<tkey>,apply_order	{<seq>,...}
 #
 #
 #
@@ -15982,16 +16114,3 @@ proc EncodePresetDetails {p} {
 # @[50]@| This software is not intended for any use or application in which
 # @[51]@| the safety of lives or property would be at risk due to failure or
 # @[52]@| defect of the software.
-#
-#/EDRPgetValues ... system
-#/EDRPdel ... system
-#/EDRPdelModifier ... system
-#/EDRPdelCustom ... system
-#/EDRPlower ... system
-#/EDRPlowerModifier ... system
-#/EDRPraise ... system
-#/EDRPraiseModifier ... system
-#/EDRTdel ... system
-#/EDRPadd ... system
-#/EDRPaddModifier ... system
-# TODO stop sending lookup results for messages that are too old
