@@ -123,21 +123,21 @@ namespace eval ::gma::minimarkup {
 		foreach line $lines {
 			set label ""
 			if {[regexp -- {^(@+|#+)\s*(.*?)} $line _ bullets rest]} {
-				for {set i 0} {$i < [llength $bullets]} {incr i} {
-					if {[lindex $bullets $i] eq "@"} {
+				for {set i 0} {$i < [string length $bullets]} {incr i} {
+					if {[string index $bullets $i] eq "@"} {
 						if {$i > 5} {
 							append label *
 						} else {
 							append label [lindex [list "\u2022" "\u2023" "\u2043" "\u25cb" "\u261e" "\u2605"] $i]
 						}
 					} else {
-						while {[llength levels] < $i} {
+						while {[llength $levels] <= $i} {
 							lappend levels 0
 						}
-						if {$i == [expr [llength $bullets] - 1]} {
-							lreplace levels $i $i [expr [lindex $levels $i] + 1]
+						if {$i == [expr [string length $bullets] - 1]} {
+							set levels [lreplace $levels $i $i [expr [lindex $levels $i] + 1]]
 						} 
-						append label [format "(%d)" [lindex $levels $i]]
+						append label "([lindex $levels $i])"
 					}
 				}
 				set line "$label $rest"
