@@ -1,12 +1,12 @@
 ########################################################################################
 #  _______  _______  _______                ___       _______   _____                  #
 # (  ____ \(       )(  ___  ) Game         /   )     / ___   ) / ___ \                 #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |( (___) )                #
-# | |      | || || || (___) | Assistant  / (_) (_        /   ) \     /                 #
-# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /  / ___ \                 #
-# | | \_  )| |   | || (   ) |                ) (      /   _/  ( (   ) )                #
-# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\( (___) )                #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/ \_____/                 #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |( (   ) )                #
+# | |      | || || || (___) | Assistant  / (_) (_        /   )( (___) |                #
+# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /  \____  |                #
+# | | \_  )| |   | || (   ) |                ) (      /   _/        ) |                #
+# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\/\____) )                #
+# (_______)|/     \||/     \| Client         (_)  (_)\_______/\______/                 #
 #                                                                                      #
 ########################################################################################
 #
@@ -1121,9 +1121,9 @@ proc exists {w} {
 
 }
 #
-# @[00]@| GMA-Mapper 4.28
+# @[00]@| GMA-Mapper 4.29
 # @[01]@|
-# @[10]@| Overall GMA package Copyright © 1992–2024 by Steven L. Willoughby (AKA MadScienceZone)
+# @[10]@| Overall GMA package Copyright © 1992–2025 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
 # @[12]@| Aloha, Oregon, USA. All Rights Reserved. Some components were introduced at different
 # @[13]@| points along that historical time line.
