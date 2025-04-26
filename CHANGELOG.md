@@ -3,7 +3,7 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.29          <!-- @@##@@ -->
+ * This Package Version: 4.29.1          <!-- @@##@@ -->
  * Effective Date: 25-Apr-2025               <!-- @@##@@ -->
 
 ## Compatibility
@@ -16,6 +16,10 @@
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.29.1
+## Fixes
+ * Corrected packaging error in release zip/tar files.
 
 # 4.29
 ## Enhancements
