@@ -1,7 +1,7 @@
 '\" t
 '\" <<ital-is-var>>
 '\" <<bold-is-fixed>>
-.TH GMA-MAPPER 6 "GMA-Mapper 4.28" 15-Jan-2025 "Games" \" @@mp@@
+.TH GMA-MAPPER 6 "GMA-Mapper 4.29" 25-Apr-2025 "Games" \" @@mp@@
 .SH NAME
 gma mapper \- GMA battle grid map
 .SH SYNOPSIS
@@ -1252,6 +1252,24 @@ any arbitrary subset of users. Selecting \*(lq(all)\*(rq will clear all selectio
 The \*(lqrefresh\*(rq button to the right of the entry box will update the recipient selection
 menu with the current set of logged-in users.
 .LP
+To the right of the entry line there is also a checkbox with the letter "M". If selected, this
+allows GMA markup formatting codes to be typed in your messages. This allows, for example,
+boldface text to be specified by surrounding text in
+'\" <</bold-is-fixed>>
+.B "**double asterisks**"
+'\" <<bold-is-fixed>>
+and italics by surrounding text in
+'\" <</ital-is-var>>
+.IR "//double slashes//" .
+'\" <<ital-is-var>>
+See 
+.BR gma-markup (7)
+'\" <<TeX>>
+'\" (p.~\pageref{manpage:gma-markup:7})
+'\" <</TeX>>
+for a more complete explanation.
+.BR
+.LP
 The bottom entry line is for making die rolls. Into the entry box you may type any die roll
 string such as would be accepted to the
 .B DieRoller.do_roll()
@@ -1290,9 +1308,21 @@ sort the presets in the window. This allows arbitrary sort ordering without clut
 The file load and save buttons at the bottom of the pane are used to load and save the preset
 list to local disk files which have the format documented in
 .BR gma-dice (5).
+.LP
+If your (or the system-wide) set of presets includes variables, modifiers, or lookup tables, they will
+appear in this pane as well.
 .RE
 .RE
 '\" <</>>
+.TP
+Display Initiative Clock
+This button calls up the combat initiative window which displays a set of timers which keep track of interesting
+events such as how long spells or other timed effects have left until they expire, the running campaign time clock,
+initiaitive turns, and other tactical information of use during combat.
+.TP
+Request a New Timer
+Clicking on this button allows you to make a request to the GM to add a new timer to the initiative clock display for
+something you want to track in the game.
 '\" <</>>
 .LP
 The final block of tool buttons control global operations of the mapper:
@@ -1773,4 +1803,4 @@ The
 .RB ( \-\-character )
 option is no longer supported.
 .SH COPYRIGHT
-Part of the GMA software suite, copyright \(co 1992\-2024 by Steven L. Willoughby, Aloha, Oregon, USA. All Rights Reserved. Distributed under BSD-3-Clause License. \"@m(c)@
+Part of the GMA software suite, copyright \(co 1992\-2025 by Steven L. Willoughby, Aloha, Oregon, USA. All Rights Reserved. Distributed under BSD-3-Clause License. \"@m(c)@

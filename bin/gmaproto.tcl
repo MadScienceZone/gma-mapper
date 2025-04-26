@@ -1,12 +1,12 @@
 ########################################################################################
 #  _______  _______  _______                ___       _______   _____                  #
 # (  ____ \(       )(  ___  ) Game         /   )     / ___   ) / ___ \                 #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |( (___) )                #
-# | |      | || || || (___) | Assistant  / (_) (_        /   ) \     /                 #
-# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /  / ___ \                 #
-# | | \_  )| |   | || (   ) |                ) (      /   _/  ( (   ) )                #
-# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\( (___) )                #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/ \_____/                 #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |( (   ) )                #
+# | |      | || || || (___) | Assistant  / (_) (_        /   )( (___) |                #
+# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /  \____  |                #
+# | | \_  )| |   | || (   ) |                ) (      /   _/        ) |                #
+# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\/\____) )                #
+# (_______)|/     \||/     \| Client         (_)  (_)\_______/\______/                 #
 #                                                                                      #
 ########################################################################################
 #
@@ -57,9 +57,9 @@ package require base64 2.4.2
 package require uuid 1.0.1
 
 namespace eval ::gmaproto {
-	variable protocol 416
+	variable protocol 417
 	variable min_protocol 333
-	variable max_protocol 416
+	variable max_protocol 417
 	variable max_max_protocol 499
 	variable debug_f {}
 	variable legacy false
@@ -144,10 +144,10 @@ namespace eval ::gmaproto {
 		CONN    {PeerList {a {Addr s User s Client s LastPolo f IsAuthenticated ? IsMe ?}}}
 		CS      {Absolute f Relative f Running ?}
 		D       {Recipients l ToAll ? ToGM ? RollSpec s RequestID s}
-		DD      {For s Presets {a {Name s Description s DieRollSpec s}}}
-		DD+     {For s Presets {a {Name s Description s DieRollSpec s}}}
-		DD/     {For s Filter s}
-		DD=     {For s Presets {a {Name s Description s DieRollSpec s}} DelegateFor l Delegates l}
+		DD      {Global ? For s Presets {a {Name s Description s DieRollSpec s}}}
+		DD+     {Global ? For s Presets {a {Name s Description s DieRollSpec s}}}
+		DD/     {Global ? For s Filter s}
+		DD=     {Global ? For s Presets {a {Global ? Name s Description s DieRollSpec s}} DelegateFor l Delegates l}
 		DDD	{For s Delegates l}
 		DENIED  {Reason s}
 		DR      {For s}
@@ -178,13 +178,13 @@ namespace eval ::gmaproto {
 		PS      {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l PolyGM ? Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}}}
 		READY   {}
 		REDIRECT {Host s Port i Reason s}
-		ROLL    {Sender s Recipients l MessageID i ToAll ? ToGM ? Title s Result {o {InvalidRequest ? ResultSuppressed ? Result i Details {a {Type s Value s}}}} RequestID s MoreResults ? Sent s}
+		ROLL    {Replay ? Sender s Recipients l MessageID i ToAll ? ToGM ? Title s Result {o {InvalidRequest ? ResultSuppressed ? Result i Details {a {Type s Value s}}}} RequestID s MoreResults ? Sent s Origin ?}
 		SYNC    {}
 		SYNC-CHAT {Target i}
 		TB      {Enabled ?}
 		TMACK	{RequestID s RequestingClient s RequestedBy s}
 		TMRQ	{Description s Expires s Targets l ShowToAll ? IsRunning ? RequestedBy s RequestingClient s RequestID s}
-		TO      {Sender s Recipients l MessageID i ToAll ? ToGM ? Text s Sent s}
+		TO      {Replay ? Sender s Recipients l MessageID i ToAll ? ToGM ? Text s Sent s Markup ? Origin ?}
 		UPDATES {Packages {a {Name s Instances {a {OS s Arch s Version s Token s}}}}}
 		WORLD   {Calendar s ClientSettings {o {MkdirPath s ImageBaseURL s ModuleCode s SCPDestination s ServerHostname s}}}
 		/CONN   {}
@@ -1377,8 +1377,8 @@ proc ::gmaproto::_construct {input types} {
 proc ::gmaproto::adjust_view {x y grid_label} {
 	::gmaproto::_protocol_send AV Grid $grid_label XView $x YView $y
 }
-proc ::gmaproto::chat_message {message sender recipients to_all to_gm} {
-	::gmaproto::_protocol_send TO Recipients $recipients ToAll $to_all ToGM $to_gm Text $message
+proc ::gmaproto::chat_message {message sender recipients to_all to_gm {markup false}} {
+	::gmaproto::_protocol_send TO Recipients $recipients ToAll $to_all ToGM $to_gm Text $message Markup $markup
 }
 proc ::gmaproto::timer_request {id description expires {is_running true} {targets {}} {to_all true}} {
 	::gmaproto::_protocol_send TMRQ RequestID $id Description $description Expires $expires Targets $targets IsRunning $is_running ShowToAll $to_all
@@ -1399,16 +1399,22 @@ proc ::gmaproto::comment {text} {
 	::gmaproto::_protocol_send_raw "// $text"
 }
 
-proc ::gmaproto::define_dice_presets {plist app {for_user {}}} {
-	if {$app} {
-		::gmaproto::_protocol_send DD+ Presets $plist For $for_user
+proc ::gmaproto::define_dice_presets {plist app {for_user {}} {globals_only false}} {
+	if {$globals_only} {
+		set target {Global true}
 	} else {
-		::gmaproto::_protocol_send DD Presets $plist For $for_user
+		set target [list For $for_user]
+	}
+
+	if {$app} {
+		::gmaproto::_protocol_send DD+ Presets $plist {*}$target
+	} else {
+		::gmaproto::_protocol_send DD Presets $plist {*}$target
 	}
 }
 
-proc ::gmaproto::filter_dice_presets {regex} {
-	::gmaproto::_protocol_send DD/ Filter $regex
+proc ::gmaproto::filter_dice_presets {regex {globals_only false}} {
+	::gmaproto::_protocol_send DD/ Filter $regex Global $globals_only
 }
 
 proc ::gmaproto::load_from {server_id cache_only merge} {
@@ -1419,8 +1425,8 @@ proc ::gmaproto::mark {x y} {
 	::gmaproto::_protocol_send MARK X $x Y $y
 }
 
-proc ::gmaproto::query_dice_presets {for_user} {
-	::gmaproto::_protocol_send DR For $for_user
+proc ::gmaproto::query_dice_presets {{for_user {}} {globals_only false}} {
+	::gmaproto::_protocol_send DR For $for_user Global $globals_only
 }
 
 proc ::gmaproto::define_dice_delegates {for_user delegate_list} {
@@ -2320,9 +2326,9 @@ proc ::gmaproto::normalize_dict {cmd d} {
 	return [::gmaproto::new_dict_from_json $cmd [::gmaproto::json_from_dict $cmd $d]]
 }
 
-# @[00]@| GMA-Mapper 4.28
+# @[00]@| GMA-Mapper 4.29
 # @[01]@|
-# @[10]@| Overall GMA package Copyright © 1992–2024 by Steven L. Willoughby (AKA MadScienceZone)
+# @[10]@| Overall GMA package Copyright © 1992–2025 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
 # @[12]@| Aloha, Oregon, USA. All Rights Reserved. Some components were introduced at different
 # @[13]@| points along that historical time line.

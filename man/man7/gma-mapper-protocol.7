@@ -1,7 +1,7 @@
 '\" t
-'\" *** 416 ***
+'\" *** 417 ***
 '\" <<ital-is-var>>
-.TH GMA-MAPPER-PROTOCOL 7 "GMA-Mapper 4.28" 15-Jan-2025 "Protocols" \" @@mp@@
+.TH GMA-MAPPER-PROTOCOL 7 "GMA-Mapper 4.29" 25-Apr-2025 "Protocols" \" @@mp@@
 .SH NAME
 gma-mapper-protocol \- GMA client/server protocol specification
 '\" <<New>>
@@ -81,7 +81,7 @@ be implemented to wait synchronously for a server
 response during the authentication negotiation stage.
 .LP
 '\" <</bold-is-fixed>>
-.B "This describes protocol version 416."
+.B "This describes protocol version 417."
 '\" <<bold-is-fixed>>
 These notes are intended to be 
 detailed enough to implement a client from and should be considered
@@ -699,6 +699,11 @@ die roll results to a client which isn't prepared to interpret them.
 The client supports formatting controls in die-roll label fields in the roll details
 in a format as described above for sub-titles. This allows custom colors to be used
 for special die-roll modifiers that need to stand out visually from all the rest.
+'\" <<New>>
+.TP
+.B GMA-MARKUP
+The client is capable of interpreting GMA markup formatting codes received in chat messages.
+'\" <</New>>
 '\" <</>>
 '\" <</>>
 .RE
@@ -2247,6 +2252,14 @@ The value is a regular expression. The server will delete all die-roll
 presets whose
 .B Name
 attribute matches this regular expression.
+'\" <<New>>
+'\" <</ital-is-var>>
+.TP
+.BI Global " (bool)"
+If present and true, this operation filters items out of the system-wide global set of presets
+instead of a user's set. This makes this a privileged command.
+'\" <<ital-is-var>>
+'\" <</New>>
 .TP
 .B For
 The name of the user whose presets are being filtered. This is optional;
@@ -2275,6 +2288,29 @@ The username of the player for whom these presets were stored. The default, if n
 name is given or if it is empty, is the currently logged-in user.
 .TP
 '\" <</ital-is-var>>
+'\" <<New>>
+.BI Global " (bool)"
+If present and true, these presets are the system-wide set that apply to all users rather than those of the target user.
+For the
+.B DD
+command, this means the operation is redefining the entire set of system-wide presets. For
+.BR DD+ ,
+the operation is adding to the system-wide presets without changing the other existing ones.
+.RS
+.LP
+Note that when any of these commands are sent with this parameter set to true,
+they become privileged commands.
+.LP
+In the 
+.B DD=
+response from the server, the presence of this parameter with a true value indicates that this 
+contains only the system-wide presets. In this case, clients MUST NOT conclude that the absence of the user's personal
+presets in the payload means it can delete its copy of the user's presets. Without the
+.B Global
+parameter, this message contains all presets the client should know about, including the user's set plus the system-wide globals.
+.RE
+'\" <</New>>
+.TP
 .BI DelegateFor " (list of strings)"
 The list of all the other users for whom the target user is a delegate.
 .TP
@@ -2283,11 +2319,25 @@ The list of delegates who also have visibility and control for the owner's prese
 If empty or missing, there are no delegates.
 .TP
 .BI Presets " (list of objects)"
-'\" <<ital-is-var>>
 Each element in this list describes a single preset. It has the following
 fields:
 '\" <<list>>
 .RS
+'\" <<New>>
+.TP
+.BI Global " (bool)"
+If this parameter is present and true, it indicates that this preset was defined at a system-wide level and may
+not be changed or deleted by the user. The client MUST track it separately and MUST NOT confuse it with a non-global preset
+with the same name. This parameter is only set by the server. Clients MAY NOT set this when defining or modifying presets and sending them
+to the server.
+.RS
+.LP
+Clients MAY locally present the name of global presets, variables, and modifiers in a way that distinguishes them from user presets
+(e.g., by prefixing them with a symbol) to ensure that they can't be confused even if the user accidentally creates a local preset with
+the same name).
+.RE
+'\" <</New>>
+'\" <<ital-is-var>>
 .TP
 .BI Name
 The name by which this preset is identified to the user. This MUST
@@ -2388,8 +2438,64 @@ is a modifier in the \*(lqmonster\*(rq group.
 '\" <</TeX>>
 Clients SHOULD allow users to collapse all of the die rolls with the same group name(s) appearing consecutively
 in the die-roll preset list.
+'\" <<New>>
 .TP
 4.
+Stored tables MAY be stored as a die-roll preset with a
+.B Name
+field in the format
+.RS
+.LP
+.BI # sequence ; flags \fR[\fP; client \fR]\fP| tblname
+.LP
+and the
+.B DieRollSpec
+field in the format
+.LP
+.BI ; dieexpr ; n0 ; t0 ;\fR...\fP; nN-1 ; tN-1 ;*; tN ;
+.LP
+The field delimeter 
+.RB (\*(lq ; \*(rq
+in this example) is arbitrary but must be consistent; it is whatever character appears as the first character in
+.B DieRollSpec
+(to allow for punctuation marks such as semicolons to appear in the table text as needed). The semicolon delimeters
+in the
+.B Name
+field are always semicolons.
+This declares a lookup table named
+.I tblname
+(which MUST be unique within the preset list). The set of
+.I flags
+is up to the client to manage. Currently the only defined flag is
+.BR m ,
+which means the table's text may include GMA markup formatting codes.
+The
+.I dieexpr
+gives a standard die-roll expression which the client should send to the server whenever a roll on this
+table is requested. Following this are a set of cases represented by numeric values
+.I n
+in increasing order along with corresponding text strings
+.I t
+which may contain GMA markup formatting codes if the
+.B m
+flag is present.
+The last case, which is taken if the result of the die roll exceeded any of the values of
+.I n
+found up to that point, is represented by
+.RB \*(lq * \*(rq.
+.LP
+When the user wishes to invoke a random roll using the lookup table, the client will send a die-roll request
+to the server with
+.I dieexpr
+(along with, perhaps, additional modifiers and options) to get a random result back, which is then compared to
+the values in the lookup table until a value is found that is greater than or equal to the result, or the final
+.RB \*(lq * \*(rq
+value is reached, whereupon the corresponding text string is displayed by the client to the user in some
+appropriate fashion. Clients SHOULD transmit this result to other clients via a CHAT message.
+'\" <</New>>
+.RE
+.TP
+5.
 Clients 
 MUST 
 gracefully handle the existence of data formats not listed
@@ -2507,6 +2613,14 @@ command back to the requesting client.
 The JSON payload may contain the following field:
 .RS
 '\" <<list>>
+'\" <<New>>
+.TP
+'\" <</ital-is-var>>
+.BI Global " (bool)"
+If present and true, this requests a list of only the global, system-wide set of presets rather than all of the presets the client should 
+know about.
+'\" <</New>>
+'\" <<ital-is-var>>
 .TP
 .B For
 The name of the user whose presets are being requested.
@@ -2771,12 +2885,14 @@ to the indicated requesting client.
 The JSON payload includes the following fields:
 .RS
 .TP
+'\" <</ital-is-var>>
 .BI "IsError " (bool)
 If true, this notice indicates that the request failed because it contains an error that prevents it from being
 carried out.
 .TP
 .BI "IsDiscretionary " (bool)
 If true, this notice is the result of a decision by the GM to decline the player's request.
+'\" <</ital-is-var>>
 .TP
 .B Command
 The original command being referenced.
@@ -3889,6 +4005,20 @@ command. Clients MUST NOT send this command. The JSON payload includes the follo
 The name of the user who rolled the dice. 
 .TP
 '\" <</ital-is-var>>
+'\" <<New>>
+.BI Origin " (bool)"
+If present and true upon receipt of this message from the server, this indicates that the client receiving it was the same client who originated the
+die roll reqeust whose result is being reported here, as opposed to a client who is merely
+being given a copy of the results of another client's die roll.
+.TP
+.BI Replay " (bool)"
+If present and true upon receipt of this message from the server, this indicates that this message is being \*(lqreplayed\*(rq (e.g., as a result
+of a
+.B SYNC-CHAT
+request from the client) and this is not the original sending of the message. As such, the client SHOULD NOT make active responses to it such as
+performing lookup table reports on it.
+'\" <</New>>
+.TP
 .BI Recipients " (list of strings)"
 The names of the people the message was explicitly addressed to. For
 global messages, this should be
@@ -4135,7 +4265,7 @@ or
 .RB \*(lq "3 hours" \*(rq,
 or an expression in the form
 .LP
-.RI [[ days \fB:\fP] hours \fB:\fP] minutes \fB:\fP seconds \fB.\fP tenths
+.RI [[ days \fB:\fP] hours \fB:\fP] minutes \fB:\fP seconds [\fB.\fP tenths ]
 .LP
 so
 .RB \*(lq "3 hours" \*(rq,
@@ -4149,6 +4279,7 @@ sets one that expires two rounds in the past (which may not be as useless as it 
 on the circumstances in the game, but probably is).
 .RE
 .TP
+'\" <</ital-is-var>>
 .BI "Targets " "(list of strings)"
 If this is empty, the timer is assumed to apply to everyone. Otherwise, it applies to the individuals named in the
 list. If these are the names of players, they should match their login names exactly.
@@ -4159,7 +4290,8 @@ If true, the timer should be visible to the players. Otherwise, only the GM sees
 .BI "IsRunning " (bool)
 If true, the timer should start running immediately. Otherwise, the GM will need to manually start it at a future point in time.
 .TP
-.BI "RequestedBy"
+'\" <<ital-is-var>>
+.B "RequestedBy"
 The user name of the user who initiated this request. Clients NEED NOT supply this field; it will be supplied
 by the server as it relays the request on to the GM.
 .TP
@@ -4185,6 +4317,19 @@ The name of the user sending the message. Clients SHOULD NOT set this field; it
 is set by the server when sending these messages to peers.
 .TP
 '\" <</ital-is-var>>
+'\" <<New>>
+.BI Origin " (bool)"
+If present and true upon receipt from the server, this means that the client receiving this message was the same client who sent 
+the original message,
+instead of merely receiving a copy of the message sent by a peer client. Clients MUST NOT set this field.
+.TP
+.BI Replay " (bool)"
+If present and true upon receipt of this message from the server, this indicates that this message is being \*(lqreplayed\*(rq (e.g., as a result
+of a
+.B SYNC-CHAT
+request from the client) and this is not the original sending of the message. 
+'\" <</New>>
+.TP
 .BI Recipients " (list of strings)"
 The names of the people the message was explicitly addressed to. For
 global messages, this should be
@@ -4217,6 +4362,15 @@ The contents of the
 .B Recipients
 field are ignored; it should be omitted or set to
 .BR null .
+'\" <<New>>
+.TP
+.BI Markup " (bool)"
+If true, the text of this message may contain GMA markup formatting codes which the client SHOULD
+either filter out or interpret appropriately for display to the user. If a client did not indicate to the server
+that it was capable of understanding these codes via the
+.B ALLOW
+command (q.v.), then the server will filter out these codes before sending the message to that client.
+'\" <</New>>
 .TP
 .B Text
 The text of the message to be sent.
@@ -4392,14 +4546,26 @@ John Mechalas (elevation and movement modes).
 .SH HISTORY
 '\" <<New>>
 .LP
-This document defines map protocol version 416,
-which added the
-.B TMRQ
-message and the
-.B IsDiscretionary
-parameter to the
-.B PRIV
-message.
+This document defines map protocol version 417,
+which added support for system-wide die-roll presets and
+table definitions and markup formatting in chat messages.
+It also added the
+.B Origin
+and
+.B Replay
+fields to the
+.B ROLL
+and
+.B TO
+messages.
+'\" <</New>>
+.LP
+Version 416 added the
+.BR FAILED ,
+.BR TMRQ ,
+and
+.B TMACK
+messages.
 .LP
 Version 415 added the 
 .B Iterations
@@ -4408,7 +4574,6 @@ parameter to the
 message.
 .LP
 Version 414 changed 
-'\" <</New>>
 the definition of the
 .B DENIED
 message to allow it to be sent at any time during the
@@ -4586,4 +4751,4 @@ and
 .B M@ 
 commands.
 .SH COPYRIGHT
-Part of the GMA software suite, copyright \(co 1992\-2024 by Steven L. Willoughby, Aloha, Oregon, USA. All Rights Reserved. Distributed under BSD-3-Clause License. \"@m(c)@
+Part of the GMA software suite, copyright \(co 1992\-2025 by Steven L. Willoughby, Aloha, Oregon, USA. All Rights Reserved. Distributed under BSD-3-Clause License. \"@m(c)@
