@@ -3,19 +3,28 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.28          <!-- @@##@@ -->
- * Effective Date: 17-Jan-2025               <!-- @@##@@ -->
+ * This Package Version: 4.29          <!-- @@##@@ -->
+ * Effective Date: 25-Apr-2025               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.28 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.30 <!-- @@##@@ -->
  * GMA Mapper File Format: 23	     <!-- @@##@@ -->
- * GMA Mapper Protocol: 416        <!-- @@##@@ -->
- * GMA Mapper Preferences File Format: 8 <!-- @@##@@ -->
+ * GMA Mapper Protocol: 417        <!-- @@##@@ -->
+ * GMA Mapper Preferences File Format: 9 <!-- @@##@@ -->
 
 ## DEPRECATION NOTICE
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.29
+## Enhancements
+ * Implements server protocol 417, which is documented here in manpage gma-mapper-procotol(7).
+ * Adds GMA markup formatting codes to chat messages. (Requires server 5.27.0 or later.)
+ * Adds random lookup tables to the die-roll preset system. This allows you to define a lookup table based on a random die roll where a random outcome is to be determined. Once defined, you can activate the table by clicking its button in the die roller or typing `#` followed by the table name as part of a larger die-roll expression to roll the dice and automatically look up, and report out, the resulting action according to the table.
+ * Implements system-wide die-roll presets, modifiers, and lookup tables. The GM may now define these globally for all users to access (read-only) instead of being required to define their own separate copies of the same modifiers when there are common modifiers that everyone needs to use in the campaign.
+## Fixes
+ * Introduced some new streamlined code that will eventually form the basis for refactoring out some older cruft (at the moment it's redundantly implementing some new features with newer, better code but will eventually supersede the older stuff).
 
 # 4.28
 ## Enhancements
