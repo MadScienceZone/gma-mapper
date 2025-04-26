@@ -2492,10 +2492,26 @@ the values in the lookup table until a value is found that is greater than or eq
 .RB \*(lq * \*(rq
 value is reached, whereupon the corresponding text string is displayed by the client to the user in some
 appropriate fashion. Clients SHOULD transmit this result to other clients via a CHAT message.
-'\" <</New>>
 .RE
 .TP
 5.
+Clients MAY encode arbitrary dictionaries of complex data into presets by encoding the
+.B Name
+field as
+.RS
+.LP
+.BI \[co]\fR[\fP sequence \fR]\fP| tblname
+.LP
+where
+.I sequence
+is an optional sequence and/or group hierarchy as described above. In this case, the
+.B DieRollSpec
+field MUST be a properly-formed JSON object string with no newline characters that encodes the data being stored
+in this preset. The \*(lq\[co]\*(rq character is the Unicode codepoint U+00A9.
+.RE
+'\" <</New>>
+.TP
+6.
 Clients 
 MUST 
 gracefully handle the existence of data formats not listed
