@@ -2,12 +2,12 @@
 ########################################################################################
 #  _______  _______  _______                ___       _______   _____                  #
 # (  ____ \(       )(  ___  ) Game         /   )     / ___   ) / ___ \                 #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |( (___) )                #
-# | |      | || || || (___) | Assistant  / (_) (_        /   ) \     /                 #
-# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /  / ___ \                 #
-# | | \_  )| |   | || (   ) |                ) (      /   _/  ( (   ) )                #
-# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\( (___) )                #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/ \_____/                 #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |( (   ) )                #
+# | |      | || || || (___) | Assistant  / (_) (_        /   )( (___) |                #
+# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /  \____  |                #
+# | | \_  )| |   | || (   ) |                ) (      /   _/        ) |                #
+# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\/\____) )                #
+# (_______)|/     \||/     \| Client         (_)  (_)\_______/\______/                 #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -17,10 +17,10 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.29-beta.0}     ;# @@##@@
+set GMAMapperVersion {4.29}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {417}         ;# @@##@@
-set CoreVersionNumber {6.28}            ;# @@##@@
+set CoreVersionNumber {6.30}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -4396,6 +4396,8 @@ proc ShowDiceSyntax {} {
 			b #confusion+25 p {. This will add everything aftter the table name to the die roll, so the die roll sent to the server will be }
 			b d100+25 p {. Likewise, you could say things like } b {#confusion best of 2} p { or }
 			b {#confusion|repeat 10} p .}
+		{p {}}
+		{p {If necessary to avoid confusion with surrounding text, you can enclose the name of the table in braces just as you can with variable names, so you could invoke the above table lookup as } b {#{confusion}} p { (or as } b {##{confusion}} p { if it were defined at the system level by the GM).}}
 		{p {}}
 		{h1 {Presets}}
 		{p {}}
@@ -14160,7 +14162,8 @@ proc SendDieRoll {recipients dice blind_p for_user tkey} {
 	set d [ParseRecipientList $recipients TO ToGM $blind_p]
 	# Special case: table lookups are introduced by die-rolls that look like
 	# [title=] #tablename [...]
-	if {[regexp -- {^\s*(.*=)?\s*#(#?)\s*([a-zA-Z_]\w+)(.*?)$} $dice _ title globmark tablename rest]} {
+	if {[regexp -- {^\s*(.*=)?\s*#(#?)\{([a-zA-Z_]\w*)\}(.*?)$} $dice _ title globmark tablename rest] ||
+	    [regexp -- {^\s*(.*=)?\s*#(#?)([a-zA-Z_]\w*)(.*?)$} $dice _ title globmark tablename rest]} {
 		set preset_data [PresetLists dice_preset_data $tkey]
 		if {$globmark eq "#"} {
 			set tbl [SearchForPreset $preset_data table $tablename -global -details]
@@ -16074,7 +16077,7 @@ proc EncodePresetDetails {p} {
 #
 #
 #
-# @[00]@| GMA-Mapper 4.28
+# @[00]@| GMA-Mapper 4.29
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2025 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
