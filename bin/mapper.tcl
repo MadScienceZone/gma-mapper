@@ -17,7 +17,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.29.1}     ;# @@##@@
+set GMAMapperVersion {4.29.2-alpha.0}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {417}         ;# @@##@@
 set CoreVersionNumber {6.30}            ;# @@##@@
@@ -11955,7 +11955,7 @@ proc EditDieRollPresets {for_user tkey {edit_system false}} {
 	grid [label $wnc.t1 -text Name] [label $wnc.t2 -text Description] [label $wnc.t3 -text {Die-Roll Specification}] -sticky we
 	set i 0
 	if {[llength [set custompresets [dict get $dice_preset_data(tmp_presets,$tkey) CustomRolls]]] > 0} {
-		$w.n tab 2 -state normal
+		$w.n tab $tabid(Custom) -state normal
 		grid [label $wnc.desc -text "These presets don't conform to standard conventions so we can't manage them"] - - - -sticky w
 		grid [label $wnc.desc1 -text "as normal. They appear here as-is from your server preset list."] - - - -sticky w
 		foreach preset $custompresets {
