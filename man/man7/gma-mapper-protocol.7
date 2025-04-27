@@ -2332,9 +2332,15 @@ with the same name. This parameter is only set by the server. Clients MAY NOT se
 to the server.
 .RS
 .LP
-Clients MAY locally present the name of global presets, variables, and modifiers in a way that distinguishes them from user presets
-(e.g., by prefixing them with a symbol) to ensure that they can't be confused even if the user accidentally creates a local preset with
-the same name).
+We RECOMMEND clients use a notation to make system-wide and per-user preset names distinct to the user. For example, the GMA Mapper uses single
+prefix characters on names for variables and tables as in
+.B $foo
+and
+.BR #bar ,
+but double prefix characters for system-wide names, as in
+.B $$foo
+and
+.BR ##bar .
 .RE
 '\" <</New>>
 '\" <<ital-is-var>>
@@ -2557,10 +2563,11 @@ preset names have these forms:
 .br
 (Again, the
 .B >
-here represents the Unicode codepoint U+25B6, and the square brackets around
+here represents the Unicode codepoint U+25B6.)
 the area ID are literal square bracket characters.)
-.RE
 '\" <</TeX>>
+Note that the square brackets around the area name in GMA's preset naming convention are literal square bracket characters.
+.RE
 .RE
 '\" <</>>
 .RE
