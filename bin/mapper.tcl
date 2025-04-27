@@ -4407,6 +4407,8 @@ proc ShowDiceSyntax {} {
 		{p {}}
 		{p {The export file for presets is a structured, record-based text file documented in gma-dice(5).}}
 		{p {See gma-dice-syntax(7) for more (run } b {gma man dice-syntax} p {).}}
+		{p {}}
+		{p {Why } b {$} p { for variable names and } b {#} p { for table names? Just because there's a long standing tradition of using the former as a variable prefix in scripting languages such as Unix and Linux shell scripts and scripting languages such as perl, awk, and tcl. In the latter case, because the octothorpe or pound sign visually resembles the horizontal and vertical rules that separate the rows and columns of a table which struck my imagination at the time and I just ran with that idea.}}
 	} {
 		foreach {f t} $line {
 			$w.text insert end $t $f
