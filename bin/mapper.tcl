@@ -2277,7 +2277,7 @@ foreach icon_name {
 	dbracket_t dbracket_m dbracket_b dbracket__
 	delete add clock dieb16 -- *hourglass *hourglass_go *arrow_right *cross *bullet_go menu
 	stipple_100 stipple_75 stipple_50 stipple_25 stipple_12 stipple_88 lock unlock bullet_arrow_down bullet_arrow_right
-	bullet_arrow_down16 bullet_arrow_right16 tmrq pencil die16g
+	bullet_arrow_down16 bullet_arrow_right16 tmrq pencil die16g die16success die16fail
 } {
 	if {$icon_name eq {--}} {
 		if {$ImageFormat eq {png}} {
@@ -10786,7 +10786,7 @@ proc toIDName {n} {
 set die_roll_group false
 proc DisplayDieRoll {d args} {
 	global icon_dieb16 icon_die16 icon_die16g icon_die16c SuppressChat drd_id LastDisplayedChatDate dice_preset_data die_roll_group
-	global icon_dbracket_b icon_dbracket_t icon_dbracket_m icon_dbracket__
+	global icon_dbracket_b icon_dbracket_t icon_dbracket_m icon_dbracket__ icon_die16success icon_die16fail
 
 	if {$SuppressChat} {
 		return
@@ -10877,9 +10877,10 @@ proc DisplayDieRoll {d args} {
 	}
 	set icon $icon_die16
 	foreach dd $details {
-		if {[dict get $dd Type] eq "critlabel"} {
-			set icon $icon_die16c
-			break
+		switch -exact [dict get $dd Type] {
+			"critlabel" {set icon $icon_die16c; break}
+			"success"   {set icon $icon_die16success; break}
+			"fail"      {set icon $icon_die16fail; break}
 		}
 	}
 	if {$is_blind || $is_invalid} {
