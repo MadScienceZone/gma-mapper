@@ -24,6 +24,7 @@ versions.
       * Rolls with the `|c` option (e.g. attack rolls) which fail on natural 1 and succeed on natural 20 rolls.
       * Rolls with the `|sf` option (e.g. saving throws) which fail on natural 1 and succeed on natural 20 rolls.
       * Percentile rolls (e.g. "`42%`") based on whether the value rolled indicated success or failure.
+ * Added dict preset data format to protocol specification.
 
 ## Fixes
  * Fixes display of custom die-roll preset data.
