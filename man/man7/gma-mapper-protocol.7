@@ -1,7 +1,7 @@
 '\" t
 '\" *** 417 ***
 '\" <<ital-is-var>>
-.TH GMA-MAPPER-PROTOCOL 7 "GMA-Mapper 4.29.1" 25-Apr-2025 "Protocols" \" @@mp@@
+.TH GMA-MAPPER-PROTOCOL 7 "GMA-Mapper 4.30" 06-May-2025 "Protocols" \" @@mp@@
 .SH NAME
 gma-mapper-protocol \- GMA client/server protocol specification
 '\" <<New>>
@@ -2332,9 +2332,15 @@ with the same name. This parameter is only set by the server. Clients MAY NOT se
 to the server.
 .RS
 .LP
-Clients MAY locally present the name of global presets, variables, and modifiers in a way that distinguishes them from user presets
-(e.g., by prefixing them with a symbol) to ensure that they can't be confused even if the user accidentally creates a local preset with
-the same name).
+We RECOMMEND clients use a notation to make system-wide and per-user preset names distinct to the user. For example, the GMA Mapper uses single
+prefix characters on names for variables and tables as in
+.B $foo
+and
+.BR #bar ,
+but double prefix characters for system-wide names, as in
+.B $$foo
+and
+.BR ##bar .
 .RE
 '\" <</New>>
 '\" <<ital-is-var>>
@@ -2492,10 +2498,26 @@ the values in the lookup table until a value is found that is greater than or eq
 .RB \*(lq * \*(rq
 value is reached, whereupon the corresponding text string is displayed by the client to the user in some
 appropriate fashion. Clients SHOULD transmit this result to other clients via a CHAT message.
-'\" <</New>>
 .RE
 .TP
 5.
+Clients MAY encode arbitrary dictionaries of complex data into presets by encoding the
+.B Name
+field as
+.RS
+.LP
+.BI \[co]\fR[\fP sequence \fR]\fP| tblname
+.LP
+where
+.I sequence
+is an optional sequence and/or group hierarchy as described above. In this case, the
+.B DieRollSpec
+field MUST be a properly-formed JSON object string with no newline characters that encodes the data being stored
+in this preset. The \*(lq\[co]\*(rq character is the Unicode codepoint U+00A9.
+.RE
+'\" <</New>>
+.TP
+6.
 Clients 
 MUST 
 gracefully handle the existence of data formats not listed
@@ -2542,8 +2564,10 @@ preset names have these forms:
 (Again, the
 .B >
 here represents the Unicode codepoint U+25B6.)
-.RE
+the area ID are literal square bracket characters.)
 '\" <</TeX>>
+Note that the square brackets around the area name in GMA's preset naming convention are literal square bracket characters.
+.RE
 .RE
 '\" <</>>
 .RE

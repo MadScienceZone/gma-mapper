@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       _______   _____       __         #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___   ) / ___ \     /  \        #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   )  |( (   ) )    \/) )       #
-# | |      | || || || (___) | Assistant  / (_) (_        /   )( (___) |      | |       #
-# | | ____ | |(_)| ||  ___  |           (____   _)     _/   /  \____  |      | |       #
-# | | \_  )| |   | || (   ) |                ) (      /   _/        ) |      | |       #
-# | (___) || )   ( || )   ( | Mapper         | |   _ (   (__/\/\____) ) _  __) (_      #
-# (_______)|/     \||/     \| Client         (_)  (_)\_______/\______/ (_) \____/      #
+#  _______  _______  _______                ___       ______   _______                 #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \ (  __   )                #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \| (  )  |                #
+# | |      | || || || (___) | Assistant  / (_) (_       ___) /| | /   |                #
+# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( | (/ /) |                #
+# | | \_  )| |   | || (   ) |                ) (           ) \|   / | |                #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /|  (__) |                #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/ (_______)                #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -17,7 +17,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.29.1}     ;# @@##@@
+set GMAMapperVersion {4.30}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {417}         ;# @@##@@
 set CoreVersionNumber {6.30}            ;# @@##@@
@@ -2277,7 +2277,7 @@ foreach icon_name {
 	dbracket_t dbracket_m dbracket_b dbracket__
 	delete add clock dieb16 -- *hourglass *hourglass_go *arrow_right *cross *bullet_go menu
 	stipple_100 stipple_75 stipple_50 stipple_25 stipple_12 stipple_88 lock unlock bullet_arrow_down bullet_arrow_right
-	bullet_arrow_down16 bullet_arrow_right16 tmrq pencil die16g
+	bullet_arrow_down16 bullet_arrow_right16 tmrq pencil die16g die16success die16fail
 } {
 	if {$icon_name eq {--}} {
 		if {$ImageFormat eq {png}} {
@@ -4407,6 +4407,8 @@ proc ShowDiceSyntax {} {
 		{p {}}
 		{p {The export file for presets is a structured, record-based text file documented in gma-dice(5).}}
 		{p {See gma-dice-syntax(7) for more (run } b {gma man dice-syntax} p {).}}
+		{p {}}
+		{p {Why } b {$} p { for variable names and } b {#} p { for table names? Just because there's a long standing tradition of using the former as a variable prefix in scripting languages such as Unix and Linux shell scripts and scripting languages such as perl, awk, and tcl. In the latter case, because the octothorpe or pound sign visually resembles the horizontal and vertical rules that separate the rows and columns of a table which struck my imagination at the time and I just ran with that idea.}}
 	} {
 		foreach {f t} $line {
 			$w.text insert end $t $f
@@ -10784,7 +10786,7 @@ proc toIDName {n} {
 set die_roll_group false
 proc DisplayDieRoll {d args} {
 	global icon_dieb16 icon_die16 icon_die16g icon_die16c SuppressChat drd_id LastDisplayedChatDate dice_preset_data die_roll_group
-	global icon_dbracket_b icon_dbracket_t icon_dbracket_m icon_dbracket__
+	global icon_dbracket_b icon_dbracket_t icon_dbracket_m icon_dbracket__ icon_die16success icon_die16fail
 
 	if {$SuppressChat} {
 		return
@@ -10875,9 +10877,10 @@ proc DisplayDieRoll {d args} {
 	}
 	set icon $icon_die16
 	foreach dd $details {
-		if {[dict get $dd Type] eq "critlabel"} {
-			set icon $icon_die16c
-			break
+		switch -exact [dict get $dd Type] {
+			"critlabel" {set icon $icon_die16c; break}
+			"success"   {set icon $icon_die16success; break}
+			"fail"      {set icon $icon_die16fail; break}
 		}
 	}
 	if {$is_blind || $is_invalid} {
@@ -11955,7 +11958,7 @@ proc EditDieRollPresets {for_user tkey {edit_system false}} {
 	grid [label $wnc.t1 -text Name] [label $wnc.t2 -text Description] [label $wnc.t3 -text {Die-Roll Specification}] -sticky we
 	set i 0
 	if {[llength [set custompresets [dict get $dice_preset_data(tmp_presets,$tkey) CustomRolls]]] > 0} {
-		$w.n tab 2 -state normal
+		$w.n tab $tabid(Custom) -state normal
 		grid [label $wnc.desc -text "These presets don't conform to standard conventions so we can't manage them"] - - - -sticky w
 		grid [label $wnc.desc1 -text "as normal. They appear here as-is from your server preset list."] - - - -sticky w
 		foreach preset $custompresets {
@@ -16077,7 +16080,7 @@ proc EncodePresetDetails {p} {
 #
 #
 #
-# @[00]@| GMA-Mapper 4.29.1
+# @[00]@| GMA-Mapper 4.30
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2025 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

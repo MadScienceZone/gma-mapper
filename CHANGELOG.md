@@ -3,8 +3,8 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.29.1          <!-- @@##@@ -->
- * Effective Date: 25-Apr-2025               <!-- @@##@@ -->
+ * This Package Version: 4.30          <!-- @@##@@ -->
+ * Effective Date: 06-May-2025               <!-- @@##@@ -->
 
 ## Compatibility
  * GMA Core API Library Version: 6.30 <!-- @@##@@ -->
@@ -16,6 +16,19 @@
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.30
+## Enhancement
+ * Now shows visually when a die roll is known to be a success or failure. Previously, this was already indicated in the detailed results that followed the die roll result number, but it was easy to miss if just quickly glancing at the total number. For example, if looking at the result of an attack roll you might notice that the attack roll exceeded an opponent's AC, but might not have noticed that the roll itself was a natural 1, even though if you looked just a little more to the right there was a prominent "MISS" tag displayed. Now the die icon color changes to indicate this.
+   * This follows the "success" and "fail" detail tag types, which indicates:
+      * Rolls with the `|c` option (e.g. attack rolls) which fail on natural 1 and succeed on natural 20 rolls.
+      * Rolls with the `|sf` option (e.g. saving throws) which fail on natural 1 and succeed on natural 20 rolls.
+      * Percentile rolls (e.g. "`42%`") based on whether the value rolled indicated success or failure.
+ * Added dict preset data format to protocol specification.
+
+## Fixes
+ * Fixes display of custom die-roll preset data.
+ * Small updates to documentation.
 
 # 4.29.1
 ## Fixes
