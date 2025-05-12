@@ -17,6 +17,10 @@ The support for old server protocols (<400) and map file formats (<20) will be d
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
+# 4.30.1
+## Fixes
+ * Die roll coloring now also includes DC-based success/failure determination (red if DC is missed, green if DC is met or exceeded, but still red if natural 1 or green if nat 20 if that also applies to the same die roll since that takes precedence)
+
 # 4.30
 ## Enhancement
  * Now shows visually when a die roll is known to be a success or failure. Previously, this was already indicated in the detailed results that followed the die roll result number, but it was easy to miss if just quickly glancing at the total number. For example, if looking at the result of an attack roll you might notice that the attack roll exceeded an opponent's AC, but might not have noticed that the roll itself was a natural 1, even though if you looked just a little more to the right there was a prominent "MISS" tag displayed. Now the die icon color changes to indicate this.
