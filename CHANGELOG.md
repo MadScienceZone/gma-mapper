@@ -3,8 +3,8 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.30          <!-- @@##@@ -->
- * Effective Date: 06-May-2025               <!-- @@##@@ -->
+ * This Package Version: 4.30.1          <!-- @@##@@ -->
+ * Effective Date: 11-May-2025               <!-- @@##@@ -->
 
 ## Compatibility
  * GMA Core API Library Version: 6.30 <!-- @@##@@ -->
@@ -16,6 +16,10 @@
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.30.1
+## Fixes
+ * Die roll coloring now also includes DC-based success/failure determination (red if DC is missed, green if DC is met or exceeded, but still red if natural 1 or green if nat 20 if that also applies to the same die roll since that takes precedence)
 
 # 4.30
 ## Enhancement
