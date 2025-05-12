@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       ______   _______                 #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \ (  __   )                #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \| (  )  |                #
-# | |      | || || || (___) | Assistant  / (_) (_       ___) /| | /   |                #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( | (/ /) |                #
-# | | \_  )| |   | || (   ) |                ) (           ) \|   / | |                #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /|  (__) |                #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/ (_______)                #
+#  _______  _______  _______                ___       ______   _______      __         #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \ (  __   )    /  \        #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \| (  )  |    \/) )       #
+# | |      | || || || (___) | Assistant  / (_) (_       ___) /| | /   |      | |       #
+# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( | (/ /) |      | |       #
+# | | \_  )| |   | || (   ) |                ) (           ) \|   / | |      | |       #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /|  (__) | _  __) (_      #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/ (_______)(_) \____/      #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -17,7 +17,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.30}     ;# @@##@@
+set GMAMapperVersion {4.30.1}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {417}         ;# @@##@@
 set CoreVersionNumber {6.30}            ;# @@##@@
@@ -10878,9 +10878,11 @@ proc DisplayDieRoll {d args} {
 	set icon $icon_die16
 	foreach dd $details {
 		switch -exact [dict get $dd Type] {
-			"critlabel" {set icon $icon_die16c; break}
-			"success"   {set icon $icon_die16success; break}
-			"fail"      {set icon $icon_die16fail; break}
+			"critlabel"        {set icon $icon_die16c; break}
+			"success"          {set icon $icon_die16success; break}
+			"fail"             {set icon $icon_die16fail; break}
+			"short"            {set icon $icon_die16fail}
+			"exceeded" - "met" {set icon $icon_die16success}
 		}
 	}
 	if {$is_blind || $is_invalid} {
@@ -16080,7 +16082,7 @@ proc EncodePresetDetails {p} {
 #
 #
 #
-# @[00]@| GMA-Mapper 4.30
+# @[00]@| GMA-Mapper 4.30.1
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2025 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
