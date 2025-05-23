@@ -2506,11 +2506,15 @@ Clients MAY encode arbitrary dictionaries of complex data into presets by encodi
 field as
 .RS
 .LP
-.BI \[co]\fR[\fP sequence \fR]\fP| name
+.BI \[co]\fR[\fP sequence \fR[\fP; client_data \fR]]\fP| name
 .LP
 where
 .I sequence
-is an optional sequence and/or group hierarchy as described above. In this case, the
+is an optional sequence and/or group hierarchy as described above,
+and
+.I client_data
+is an arbitrary string to be interpreted by other programs consuming this preset data as they choose. \
+In this case, the
 .B DieRollSpec
 field MUST be a properly-formed JSON object string with no newline characters that encodes the data being stored
 in this preset. The \*(lq\[co]\*(rq character is the Unicode codepoint U+00A9.
