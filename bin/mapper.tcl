@@ -11252,7 +11252,7 @@ proc _render_die_roller {w width height type for_user tkey args} {
 					set controls {}
 					for {set j 0} {$j < [llength $grplist]} {incr j} {
 						if {$j < [llength $prev_grplist] && [lindex $prev_grplist $j] eq [lindex $grplist $j]} {
-							if {![lindex $prev_collapse $j]} {
+							if {[lindex $prev_collapse $j] eq {} || ![lindex $prev_collapse $j]} {
 								# part of closed group we already showed above.
 								# same level-j group as the previous line, and since that was closed
 								# we will be too. So we don't even need to show this preset at all.
@@ -11364,7 +11364,7 @@ proc _render_die_roller {w width height type for_user tkey args} {
 					set controls {}
 					for {set j 0} {$j < [llength $grplist]} {incr j} {
 						if {$j < [llength $prev_grplist] && [lindex $prev_grplist $j] eq [lindex $grplist $j]} {
-							if {![lindex $prev_collapse $j]} {
+							if {[lindex $prev_collapse $j] eq {} || ![lindex $prev_collapse $j]} {
 								# part of closed group we already showed above.
 								# same level-j group as the previous line, and since that was closed
 								# we will be too. So we don't even need to show this preset at all.
@@ -11525,7 +11525,7 @@ proc _render_die_roller {w width height type for_user tkey args} {
 					set controls {}
 					for {set j 0} {$j < [llength $grplist]} {incr j} {
 						if {$j < [llength $prev_grplist] && [lindex $prev_grplist $j] eq [lindex $grplist $j]} {
-							if {![lindex $prev_collapse $j]} {
+							if {[lindex $prev_collapse $j] eq {} || ![lindex $prev_collapse $j]} {
 								# part of closed group we already showed above.
 								# same level-j group as the previous line, and since that was closed
 								# we will be too. So we don't even need to show this preset at all.
@@ -12908,7 +12908,9 @@ proc EDRTdel {w for_user tkey i} {
 	global dice_preset_data
 	set wnt [sframe content $w.n.t]
 	EDRPgetValues $w $for_user $tkey
-	if {[string trim [dict get [set t [lindex [dict get $dice_preset_data(tmp_presets,$tkey) Tables] $i]] DisplayName]] ne {} 
+	set t [lindex [dict get $dice_preset_data(tmp_presets,$tkey) Tables] $i]
+	if {([dict exists $t DisplayName] && [string trim [dict get $t DisplayName]] ne {})
+	||  ([dict exists $t Name] && [string trim [dict get $t Name]] ne {})
  	||  [string trim [dict get $t Description]] ne {}
 	||  [string trim [dict get $t DieRollSpec]] ne {}} {
 		if {[tk_messageBox -parent $w -type yesno -icon warning -default no -title "Are you sure?" \
