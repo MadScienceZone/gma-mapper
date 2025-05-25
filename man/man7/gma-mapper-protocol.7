@@ -1,7 +1,7 @@
 '\" t
 '\" *** 417 ***
 '\" <<ital-is-var>>
-.TH GMA-MAPPER-PROTOCOL 7 "GMA-Mapper 4.30.1" 11-May-2025 "Protocols" \" @@mp@@
+.TH GMA-MAPPER-PROTOCOL 7 "GMA-Mapper 4.30.2" 24-May-2025 "Protocols" \" @@mp@@
 .SH NAME
 gma-mapper-protocol \- GMA client/server protocol specification
 '\" <<New>>
@@ -2497,7 +2497,7 @@ to the server with
 the values in the lookup table until a value is found that is greater than or equal to the result, or the final
 .RB \*(lq * \*(rq
 value is reached, whereupon the corresponding text string is displayed by the client to the user in some
-appropriate fashion. Clients SHOULD transmit this result to other clients via a CHAT message.
+appropriate fashion. Clients SHOULD transmit this result to other clients via a TO message.
 .RE
 .TP
 5.
@@ -2534,43 +2534,17 @@ program itself automates the creation and destruction of ephemeral presets
 for combatants on an encounter-by-encounter basis. The names for these presets
 include an additional component,
 .IR area ,
-which identifies the dungeon location or encounter identifier. This means the GMA
-preset names have these forms:
-'\" <<TeX>>
-'\"
-'\" \z{\$[}\Var*{area}\z{]}\Var*{sequence}\z{|}\Var*{area}\\
-'\" \z{\$[}\Var*{area}\z{]}\Var*{sequence}$\blacktriangleright$\Var*{monster}\z{|}\Var*{area}\\
-'\" \z{\$[}\Var*{area}\z{]}\Var*{sequence}$\blacktriangleright$\Var*{monster}$\blacktriangleright$\z{saves|}\Var*{area}\\
-'\" \z{\$[}\Var*{area}\z{]}\Var*{sequence}$\blacktriangleright$\Var*{monster}$\blacktriangleright$\z{skills|}\Var*{area}\\
-'\" \z{\$[}\Var*{area}\z{]}\Var*{sequence}$\blacktriangleright$\Var*{monster}$\blacktriangleright$\z{other|}\Var*{area}\\
-'\" \z{\$[}\Var*{area}\z{]}\Var*{sequence}$\blacktriangleright$\Var*{monster}$\blacktriangleright$\z{special|}\Var*{area}\\
-'\" \z{\S}\Var*{sequence}\z{;}\Var*{var}\z{;}\Var*{flags}\z{;\$[}\Var*{area}\z{]|}\Var*{area}\\
-'\" \z{\S}\Var*{sequence}$\blacktriangleright$\Var*{monster}\z{;}\Var*{var}\z{;}\Var*{flags}\z{;\$[}\Var*{area}\z{]|}\Var*{area}
-'\"
-.RS
-.br
-.BI $[ area ] sequence | area
-.br
-.BI $[ area ] sequence > monster | area
-.br
-.BI $[ area ] sequence > monster >saves| area
-.br
-.BI $[ area ] sequence > monster >skills| area
-.br
-.BI $[ area ] sequence > monster >other| area
-.br
-.BI $[ area ] sequence > monster >special| area
-.br
-.BI \[sc] sequence ; var ; flags ;$[ area ]| area
-.br
-.BI \[sc] sequence > monster ; var ; flags ;$[ area ]| area
-.br
-(Again, the
-.B >
-here represents the Unicode codepoint U+25B6.)
-'\" <</TeX>>
-Note that the square brackets around the area name in GMA's preset naming convention are literal square bracket characters.
-.RE
+which identifies the dungeon location or encounter identifier. 
+'\" <<New>>
+To accomplish this, GMA prepends the string
+.BI $[ area ]
+to the
+.I client_data
+field for any of the complex types which support that. Otherwise it prepends that string to
+the
+.I sequence
+value.
+'\" <</New>>
 .RE
 '\" <</>>
 .RE
