@@ -3,11 +3,11 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.30.1          <!-- @@##@@ -->
- * Effective Date: 11-May-2025               <!-- @@##@@ -->
+ * This Package Version: 4.30.2          <!-- @@##@@ -->
+ * Effective Date: 24-May-2025               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.30 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.32-alpha.0 <!-- @@##@@ -->
  * GMA Mapper File Format: 23	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 417        <!-- @@##@@ -->
  * GMA Mapper Preferences File Format: 9 <!-- @@##@@ -->
@@ -16,6 +16,11 @@
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.30.2
+## Fixes
+ * Corrected an error that sometimes occurs when editing die-roll presets loaded from the server.
+ * Updates to the text of the server protocol document to note encoding formats for die roll preset object types.
 
 # 4.30.1
 ## Fixes
