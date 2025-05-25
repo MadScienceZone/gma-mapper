@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       ______   _______      __         #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \ (  __   )    /  \        #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \| (  )  |    \/) )       #
-# | |      | || || || (___) | Assistant  / (_) (_       ___) /| | /   |      | |       #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( | (/ /) |      | |       #
-# | | \_  )| |   | || (   ) |                ) (           ) \|   / | |      | |       #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /|  (__) | _  __) (_      #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/ (_______)(_) \____/      #
+#  _______  _______  _______                ___       ______   _______     _______     #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \ (  __   )   / ___   )    #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \| (  )  |   \/   )  |    #
+# | |      | || || || (___) | Assistant  / (_) (_       ___) /| | /   |       /   )    #
+# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( | (/ /) |     _/   /     #
+# | | \_  )| |   | || (   ) |                ) (           ) \|   / | |    /   _/      #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /|  (__) | _ (   (__/\    #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/ (_______)(_)\_______/    #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -17,10 +17,10 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.30.1}     ;# @@##@@
+set GMAMapperVersion {4.30.2}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {417}         ;# @@##@@
-set CoreVersionNumber {6.30}            ;# @@##@@
+set CoreVersionNumber {6.32-alpha.0}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -11252,7 +11252,7 @@ proc _render_die_roller {w width height type for_user tkey args} {
 					set controls {}
 					for {set j 0} {$j < [llength $grplist]} {incr j} {
 						if {$j < [llength $prev_grplist] && [lindex $prev_grplist $j] eq [lindex $grplist $j]} {
-							if {![lindex $prev_collapse $j]} {
+							if {[lindex $prev_collapse $j] eq {} || ![lindex $prev_collapse $j]} {
 								# part of closed group we already showed above.
 								# same level-j group as the previous line, and since that was closed
 								# we will be too. So we don't even need to show this preset at all.
@@ -11364,7 +11364,7 @@ proc _render_die_roller {w width height type for_user tkey args} {
 					set controls {}
 					for {set j 0} {$j < [llength $grplist]} {incr j} {
 						if {$j < [llength $prev_grplist] && [lindex $prev_grplist $j] eq [lindex $grplist $j]} {
-							if {![lindex $prev_collapse $j]} {
+							if {[lindex $prev_collapse $j] eq {} || ![lindex $prev_collapse $j]} {
 								# part of closed group we already showed above.
 								# same level-j group as the previous line, and since that was closed
 								# we will be too. So we don't even need to show this preset at all.
@@ -11525,7 +11525,7 @@ proc _render_die_roller {w width height type for_user tkey args} {
 					set controls {}
 					for {set j 0} {$j < [llength $grplist]} {incr j} {
 						if {$j < [llength $prev_grplist] && [lindex $prev_grplist $j] eq [lindex $grplist $j]} {
-							if {![lindex $prev_collapse $j]} {
+							if {[lindex $prev_collapse $j] eq {} || ![lindex $prev_collapse $j]} {
 								# part of closed group we already showed above.
 								# same level-j group as the previous line, and since that was closed
 								# we will be too. So we don't even need to show this preset at all.
@@ -12908,7 +12908,9 @@ proc EDRTdel {w for_user tkey i} {
 	global dice_preset_data
 	set wnt [sframe content $w.n.t]
 	EDRPgetValues $w $for_user $tkey
-	if {[string trim [dict get [set t [lindex [dict get $dice_preset_data(tmp_presets,$tkey) Tables] $i]] DisplayName]] ne {} 
+	set t [lindex [dict get $dice_preset_data(tmp_presets,$tkey) Tables] $i]
+	if {([dict exists $t DisplayName] && [string trim [dict get $t DisplayName]] ne {})
+	||  ([dict exists $t Name] && [string trim [dict get $t Name]] ne {})
  	||  [string trim [dict get $t Description]] ne {}
 	||  [string trim [dict get $t DieRollSpec]] ne {}} {
 		if {[tk_messageBox -parent $w -type yesno -icon warning -default no -title "Are you sure?" \
@@ -16082,7 +16084,7 @@ proc EncodePresetDetails {p} {
 #
 #
 #
-# @[00]@| GMA-Mapper 4.30.1
+# @[00]@| GMA-Mapper 4.30.2
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2025 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
