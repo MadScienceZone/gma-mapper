@@ -156,7 +156,7 @@ namespace eval ::gmaproto {
 		FAILED	{IsError ? IsDiscretionary ? Command s Reason s RequestID s RequestedBy s RequestingClient s}
 		GRANTED {User s}
 		HPACK	{RequestID s RequestingClient s RequestedBy s}
-		HPREQ   {Target s RequestID s RequestingClient s RequestedBy s Health {o {MaxHP i TmpHP i LethalDamage i NonLethalDamage i}}}
+		HPREQ   {Target s Description s RequestID s RequestingClient s RequestedBy s Health {o {MaxHP i LethalDamage i NonLethalDamage i}} TmpHP {o {TmpHP i TmpWounds i Expires s}}}
 		I       {ActorID s Hours i Minutes i Seconds i Rounds i Count i}
 		IL      {InitiativeList {a {Slot i CurrentHP i Name s IsHolding ? HasReadiedAction ? IsFlatFooted ?}}}
 		L       {File s IsLocalFile ? CacheOnly ? Merge ?}
@@ -1384,8 +1384,8 @@ proc ::gmaproto::chat_message {message sender recipients to_all to_gm {markup fa
 	::gmaproto::_protocol_send TO Recipients $recipients ToAll $to_all ToGM $to_gm Text $message Markup $markup
 }
 
-proc ::gmaproto::hit_point_request {id target max_hp tmp_hp lethal non_lethal} {
-	::gmaproto::_protocol_send HPREQ RequestID $id Target $target Health [dict create MaxHP $max_hp TmpHP $tmp_hp LethalDamage $lethal NonLethalDamage $non_lethal]
+proc ::gmaproto::hit_point_request_d {d} {
+	::gmaproto::_protocol_send HPREQ {*}$d
 }
 
 proc ::gmaproto::timer_request {id description expires {is_running true} {targets {}} {to_all true}} {
