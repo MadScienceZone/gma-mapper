@@ -3012,6 +3012,9 @@ The JSON payload for this message includes the following fields:
 .B Target
 The name of the creature as it appears on the map.
 .TP
+.B Description
+Text description of what this request is for, where it came from, etc.
+.TP
 .B RequestedBy
 The user name of the user who initiated this request. Clients NEED NOT
 supply this field; it will be supplied by the server as it relays the request on
@@ -3030,7 +3033,9 @@ is suggested for this value.
 .TP
 '\" <</ital-is-var>>
 .BI Healh " (object)"
-The health object values you wish to set. The only values which will be considered
+The health object values you wish to set. If this is
+.BR null ,
+no changes are requested. Otherwise, the only values which will be considered
 for this request are:
 .RS
 '\" <<list>>
@@ -3038,17 +3043,38 @@ for this request are:
 .BI MaxHP " (int)"
 The creature's maximum number of hit points.
 .TP
-.BI TmpHP " (int)"
-The creature's temporary hit points beyond their maximum.
-.TP
 .BI LethalDamage " (int)"
 The amount of lethal damage sustained.
 .TP
 .BI NonLethalDamage " (int)"
 The amount of non-lethal damage sustained.
 '\" <</>>
-'\" <<ital-is-var>>
 .RE
+.TP
+.BI TmpHP " (object)"
+A request to add temporary hit points to the creature. If
+.BR null ,
+no temporary hit points are being requested. Otherwise, the following fields
+are expected:
+.RS
+'\" <<list>>
+.TP
+.BI TmpHP " (int)"
+The number of temporary hit points to add to the creature's temporary hit point pool.
+.TP
+.BI TmpWounds " (int)"
+The number of temporary hit points already removed due to damage (usually this will be zero, but just in case this request needs to account for something that's already happened, this may be noted here).
+.TP
+.BI Expires " (duration)"
+The time remaining until the temporary hit points expire, in the same format as
+for the
+.B Expires
+field in the
+.B TMREQ
+message (q.v.).
+'\" <</>>
+.RE
+'\" <<ital-is-var>>
 .RE
 '\" <</>>
 '\" <</New>>
