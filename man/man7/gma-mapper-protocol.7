@@ -3009,8 +3009,11 @@ value as the original request.
 The JSON payload for this message includes the following fields:
 .TP
 '\" <<list>>
-.B Target
-The name of the creature as it appears on the map.
+.BI Targets " (list of strings)"
+The names of the creatures as they appear on the map.
+This should hold a single value when requesting an update to a character's hit point total,
+but may, for example, be useful to specify multiple characters at once for communal spells
+granting many people at once a block of temporary hit points.
 .TP
 .B Description
 Text description of what this request is for, where it came from, etc.
@@ -3062,7 +3065,7 @@ are expected:
 .BI TmpHP " (int)"
 The number of temporary hit points to add to the creature's temporary hit point pool.
 .TP
-.BI TmpWounds " (int)"
+.BI TmpDamage " (int)"
 The number of temporary hit points already removed due to damage (usually this will be zero, but just in case this request needs to account for something that's already happened, this may be noted here).
 .TP
 .BI Expires " (duration)"
@@ -3890,6 +3893,9 @@ The creature's maximum number of hit points.
 .TP
 .BI TmpHP " (int)"
 The creature's temporary hit points, in addition to their maximum.
+.TP
+.BI TmpDamage " (int)"
+The number of hit points worth of damage suffered against the temporary hit point total.
 '\" <</New>>
 .TP
 .BI LethalDamage " (int)"
