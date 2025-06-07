@@ -1,5 +1,5 @@
 '\" t
-'\" *** 417 ***
+'\" *** 418 ***
 '\" <<ital-is-var>>
 .TH GMA-MAPPER-PROTOCOL 7 "GMA-Mapper 4.30.2" 24-May-2025 "Protocols" \" @@mp@@
 .SH NAME
@@ -81,7 +81,7 @@ be implemented to wait synchronously for a server
 response during the authentication negotiation stage.
 .LP
 '\" <</bold-is-fixed>>
-.B "This describes protocol version 417."
+.B "This describes protocol version 418."
 '\" <<bold-is-fixed>>
 These notes are intended to be 
 detailed enough to implement a client from and should be considered
@@ -218,6 +218,8 @@ since all communications are asynchronous.
 '\"  \z{ECHO}   &C$\leftrightarrow$S&\z{ECHO}   &no &\acronym{JSON}&Send data for server to echo back\\
 '\"  \z{FAILED} &C$\leftrightarrow$S&---        &yes&\acronym{JSON}&Request failed or denied by GM\\
 '\"  \z{GRANTED}&C$\leftarrow$S     &---        &N/A&\acronym{JSON}&Server grants access\\
+'\"  \z{HPACK}  &C$\leftrightarrow$S&---	&yes&\acronym{JSON}&Acknowledge hit point request\\
+'\"  \z{HPREQ}  &C$\leftrightarrow$S&\z{HPACK}/\z{FAILED}&no&\acronym{JSON}&Request hit point change\\
 '\"  \z{I}      &C$\leftrightarrow$S&---        &yes&\acronym{JSON}&Indicate turn in combat\\
 '\"  \z{IL}     &C$\leftrightarrow$S&---        &yes&\acronym{JSON}&Update the initiative list\\
 '\"  \z{L}      &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Load elements from file\\
@@ -290,6 +292,9 @@ FilterCoreData	CORE/	C\[->]S	\fR\(em\fP	yes	JSON	Filter availability of the game
 FilterDicePresets	DD/	C\[->]S	DD=	maybe	JSON	Remove some presets for user
 FilterImages	AI/	C\[->]S	\fR\(em\fP	yes	JSON	Filter saved image definitions
 Granted	GRANTED	C\[<-]S	\fR\(em\fP	N/A	JSON	Server grants access
+HitPontAcknowledge	HPACK	C\[<>]S	\fR\(em\fP	yes	JSON	Acknowledge hit point update request
+HitPointRequest	HPREQ	C\[<>]S	FAILED	no	JSON	Request change in hit points
+\^	\^	\^	HPACK	\^	\^	\^
 LoadArcObject	LS-ARC	C\[<>]S	\fR\(em\fP	no	JSON	Add an arc to the map
 LoadCircleObject	LS-CIRC	C\[<>]S	\fR\(em\fP	no	JSON	Add an ellipse to the map
 LoadFrom	L	C\[<>]S	\fR\(em\fP	no	JSON	Load elements from file
@@ -2374,6 +2379,27 @@ etc. The numbers need not be strictly consecutive.
 Clients SHOULD use dictionary sorting for preset items so that the numeric sort-order sequence value
 is correctly arranged regardless of number of characters; however the recommendation here is also to
 pad them with zeroes to three digits for the benefit of clients which cannot or will not do so.
+'\" <<New>>
+Clients MAY include optional
+.I flags
+and
+.I client_data
+fields delimited semicolons following the sequence value (e.g.,
+.RB \*(lq 042;b|example \*(rq). 
+This contains a number of single-character flags.
+The following flag is currently recognized:
+.RS
+'\" <<list>>
+.TP
+.B b
+Send the die roll blindly to the GM only.
+.LP
+This means the full definition of the simple preset name is:
+.LP
+.IR sequence [\fB;\fP flags [\fB;\fP client_data ]]\fB|\fP name
+'\" <</>>
+.RE
+'\" <</New>>
 .TP
 2.
 Stored variables MAY be stored as a die-roll preset with a
@@ -2472,9 +2498,18 @@ This declares a lookup table named
 .I tblname
 (which MUST be unique within the preset list). The set of
 .I flags
-is up to the client to manage. Currently the only defined flag is
-.BR m ,
-which means the table's text may include GMA markup formatting codes.
+is up to the client to manage. Currently the defined flags are:
+.RS
+'\" <<list>>
+.TP
+.B b
+The die rolls should be send blindly to the GM only.
+.TP
+.B m
+the table's text may include GMA markup formatting codes
+.RE
+.\" <</>>
+.LP
 The
 .I dieexpr
 gives a standard die-roll expression which the client should send to the server whenever a roll on this
@@ -2928,6 +2963,124 @@ if the
 client authenticated as the GM.
 '\" <</>>
 .RE
+'\" <<New>>
+.TP
+.B HPACK
+Acknowledge a hit point change request made via a previous
+.B HPREQ
+message. The JSON payload for this message has the following fields:
+.RS
+'\" <<list>>
+.TP
+.B RequestID
+The ID of the original request, as sent by the client when making it.
+.TP
+.B RequestingClient
+The client connection ID as it appeared in the original request.
+.TP
+.B RequestedBy
+The user name of the original requester. If the server is unable to locate the original requesting client connection as
+specified by the
+.B RequestingClient
+field, it MAY send
+.B HPACK
+messages to clients logged in by the user named in this field instead.
+'\" <</>>
+.RE
+.TP
+.B HPREQ
+Request an update to a target creature's hit points. This request will be sent to the GM for approval. If the GM
+approves, the creature's hit points will be amended in the system and will be reflected as appropriate in the
+tracking information sent by the server. The client SHOULD also receive a corresponding
+.B HPACK
+message acknowledging this request.
+Clients
+MUST cope with the possibility of not receiving those acknowledgement messages
+or there being long delays between the request and acknowledgement.
+If
+the GM declines to accept the request, or if the request contains an
+error, a 
+.B FAILED 
+message SHOULD be sent back to the requesting client with the
+same 
+.B RequestID 
+value as the original request.
+.RS
+The JSON payload for this message includes the following fields:
+.TP
+'\" <<list>>
+.BI Targets " (list of strings)"
+The names of the creatures as they appear on the map.
+This should hold a single value when requesting an update to a character's hit point total,
+but may, for example, be useful to specify multiple characters at once for communal spells
+granting many people at once a block of temporary hit points.
+.TP
+.B Description
+Text description of what this request is for, where it came from, etc.
+.TP
+.B RequestedBy
+The user name of the user who initiated this request. Clients NEED NOT
+supply this field; it will be supplied by the server as it relays the request on
+to the GM.
+.TP
+.B RequestingClient
+The client connection ID of the user who initiated this request. Clients
+MUST NOT supply this field; it will be supplied by the server as it relays
+the request on to the GM. The meaning of this value is opaque and is only
+used by the server.
+.TP
+.B RequestID
+A unique identifier for this request. Replies sent back to the requesting
+client in regard to this request will reference this same ID. A UUID string
+is suggested for this value.
+.TP
+'\" <</ital-is-var>>
+.BI Healh " (object)"
+The health object values you wish to set. If this is
+.BR null ,
+no changes are requested. Otherwise, the only values which will be considered
+for this request are:
+.RS
+'\" <<list>>
+.TP
+.BI MaxHP " (int)"
+The creature's maximum number of hit points.
+.TP
+.BI LethalDamage " (int)"
+The amount of lethal damage sustained.
+.TP
+.BI NonLethalDamage " (int)"
+The amount of non-lethal damage sustained.
+'\" <</>>
+.RE
+.TP
+.BI TmpHP " (object)"
+A request to add temporary hit points to the creature. If
+.BR null ,
+no temporary hit points are being requested. Otherwise, the following fields
+are expected:
+.RS
+'\" <<list>>
+.TP
+.BI TmpHP " (int)"
+The number of temporary hit points to add to the creature's temporary hit point pool.
+.TP
+.BI TmpDamage " (int)"
+The number of temporary hit points already removed due to damage (usually this will be zero, but just in case this request needs to account for something that's already happened, this may be noted here).
+.TP
+.BI Expires " (duration)"
+The time remaining until the temporary hit points expire, in the same format as
+for the
+.B Expires
+field in the
+.B TMREQ
+message (q.v.).
+'\" <</>>
+.RE
+'\" <<ital-is-var>>
+.RE
+'\" <</>>
+'\" <</New>>
 .TP
 .B I
 Update the time clock for initiative-based actions.  If the mapper
@@ -3736,6 +3889,14 @@ following fields:
 .TP
 .BI MaxHP " (int)"
 The creature's maximum number of hit points.
+'\" <<New>>
+.TP
+.BI TmpHP " (int)"
+The creature's temporary hit points, in addition to their maximum.
+.TP
+.BI TmpDamage " (int)"
+The number of hit points worth of damage suffered against the temporary hit point total.
+'\" <</New>>
 .TP
 .BI LethalDamage " (int)"
 The amount of lethal damage sustained.
@@ -4547,8 +4708,12 @@ John Mechalas (elevation and movement modes).
 .SH HISTORY
 '\" <<New>>
 .LP
-This document defines map protocol version 417,
-which added support for system-wide die-roll presets and
+This document defines map protocol version 418,
+which adds support for temporary hit point tracking and user requests for hit point changes.
+.LP
+'\" <</New>>
+Version 417 introduced
+support for system-wide die-roll presets,
 table definitions and markup formatting in chat messages.
 It also added the
 .B Origin
