@@ -156,7 +156,7 @@ namespace eval ::gmaproto {
 		FAILED	{IsError ? IsDiscretionary ? Command s Reason s RequestID s RequestedBy s RequestingClient s}
 		GRANTED {User s}
 		HPACK	{RequestID s RequestingClient s RequestedBy s}
-		HPREQ   {Target s Description s RequestID s RequestingClient s RequestedBy s Health {o {MaxHP i LethalDamage i NonLethalDamage i}} TmpHP {o {TmpHP i TmpWounds i Expires s}}}
+		HPREQ   {Targets l Description s RequestID s RequestingClient s RequestedBy s Health {o {MaxHP i LethalDamage i NonLethalDamage i}} TmpHP {o {TmpHP i TmpDamage i Expires s}}}
 		I       {ActorID s Hours i Minutes i Seconds i Rounds i Count i}
 		IL      {InitiativeList {a {Slot i CurrentHP i Name s IsHolding ? HasReadiedAction ? IsFlatFooted ?}}}
 		L       {File s IsLocalFile ? CacheOnly ? Merge ?}
@@ -177,7 +177,7 @@ namespace eval ::gmaproto {
 		PRIV    {Command s Reason s}
 		POLO    {}
 		PROGRESS {OperationID s Title s Value i MaxValue i IsDone ? Targets l IsTimer ?}
-		PS      {ID s Name s Health {o {MaxHP i TmpHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l PolyGM ? Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}}}
+		PS      {ID s Name s Health {o {MaxHP i TmpHP i TmpDamage i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l PolyGM ? Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}}}
 		READY   {}
 		REDIRECT {Host s Port i Reason s}
 		ROLL    {Replay ? Sender s Recipients l MessageID i ToAll ? ToGM ? Title s Result {o {InvalidRequest ? ResultSuppressed ? Result i Details {a {Type s Value s}}}} RequestID s MoreResults ? Sent s Origin ?}

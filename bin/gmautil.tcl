@@ -577,6 +577,24 @@ proc ::gmautil::dassign {dictval args} {
     }
 }
 
+# this is identical to dassign, except that the var may be a tuple with a provided default value
+# to use if the key does not exist in the dictionary.
+proc ::gmautil::dassigndef {dictval args} {
+	foreach {k var} $args {
+		if {[llength $var] > 1} {
+			upvar 1 [lindex $var 0] v
+			if {![dict exists $dictval {*}$k]} {
+				set v [lindex $var 1]
+			} else {
+				set v [dict get $dictval {*}$k]
+			}
+		} else {
+			upvar 1 $var v
+			set v [dict get $dictval {*}$k]
+		}
+	}
+}
+
 # Search for a command in the user's PATH
 proc ::gmautil::searchInPath {cmd} {
 	global env
