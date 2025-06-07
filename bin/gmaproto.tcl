@@ -57,9 +57,9 @@ package require base64 2.4.2
 package require uuid 1.0.1
 
 namespace eval ::gmaproto {
-	variable protocol 418
+	variable protocol 417
 	variable min_protocol 333
-	variable max_protocol 418
+	variable max_protocol 417
 	variable max_max_protocol 499
 	variable debug_f {}
 	variable legacy false
@@ -155,8 +155,6 @@ namespace eval ::gmaproto {
 		ECHO    {s s i i o d ReceivedTime s SentTime s}
 		FAILED	{IsError ? IsDiscretionary ? Command s Reason s RequestID s RequestedBy s RequestingClient s}
 		GRANTED {User s}
-		HPACK	{RequestID s RequestingClient s RequestedBy s}
-		HPREQ   {Targets l Description s RequestID s RequestingClient s RequestedBy s Health {o {MaxHP i LethalDamage i NonLethalDamage i}} TmpHP {o {TmpHP i TmpDamage i Expires s}}}
 		I       {ActorID s Hours i Minutes i Seconds i Rounds i Count i}
 		IL      {InitiativeList {a {Slot i CurrentHP i Name s IsHolding ? HasReadiedAction ? IsFlatFooted ?}}}
 		L       {File s IsLocalFile ? CacheOnly ? Merge ?}
@@ -177,7 +175,7 @@ namespace eval ::gmaproto {
 		PRIV    {Command s Reason s}
 		POLO    {}
 		PROGRESS {OperationID s Title s Value i MaxValue i IsDone ? Targets l IsTimer ?}
-		PS      {ID s Name s Health {o {MaxHP i TmpHP i TmpDamage i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l PolyGM ? Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}}}
+		PS      {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l PolyGM ? Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}}}
 		READY   {}
 		REDIRECT {Host s Port i Reason s}
 		ROLL    {Replay ? Sender s Recipients l MessageID i ToAll ? ToGM ? Title s Result {o {InvalidRequest ? ResultSuppressed ? Result i Details {a {Type s Value s}}}} RequestID s MoreResults ? Sent s Origin ?}
@@ -1379,15 +1377,9 @@ proc ::gmaproto::_construct {input types} {
 proc ::gmaproto::adjust_view {x y grid_label} {
 	::gmaproto::_protocol_send AV Grid $grid_label XView $x YView $y
 }
-
 proc ::gmaproto::chat_message {message sender recipients to_all to_gm {markup false}} {
 	::gmaproto::_protocol_send TO Recipients $recipients ToAll $to_all ToGM $to_gm Text $message Markup $markup
 }
-
-proc ::gmaproto::hit_point_request_d {d} {
-	::gmaproto::_protocol_send HPREQ {*}$d
-}
-
 proc ::gmaproto::timer_request {id description expires {is_running true} {targets {}} {to_all true}} {
 	::gmaproto::_protocol_send TMRQ RequestID $id Description $description Expires $expires Targets $targets IsRunning $is_running ShowToAll $to_all
 }
