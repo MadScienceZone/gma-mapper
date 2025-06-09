@@ -11896,9 +11896,30 @@ proc EditDieRollPresets {for_user tkey {edit_system false}} {
 					[frame $wngt.table$ti] \
 					-sticky we
 				set tii 0
+				set istart 1
 				foreach {tabn tabtxt} [dict get $pd table] {
 					SetTableColors $tii fgcolor bgcolor
-					grid [label $wngt.table$ti.n$tii -text $tabn -anchor e -relief groove -fg $fgcolor -bg $bgcolor] \
+					if {$istart == $tabn} {
+						set nlabel $tabn
+						set istart [expr $tabn + 1]
+					} elseif {$tabn eq "*"} {
+						if {$istart ne {}} {
+							set nlabel "${istart}+"
+						} else {
+							set nlabel "*"
+						}
+					} elseif {$istart eq {}} {
+						set nlabel "...-${tabn}"
+					} else {
+						if {[catch {
+							set nlabel [format "%d-%d" $istart $tabn]
+							set istart [expr $tabn + 1]
+						}]} {
+							set nlabel "${istart}-${tabn}"
+							set istart {}
+						}
+					}
+					grid [label $wngt.table$ti.n$tii -text $nlabel -anchor e -relief groove -fg $fgcolor -bg $bgcolor] \
 						[label $wngt.table$ti.t$tii -text $tabtxt -anchor w -relief groove -fg $fgcolor -bg $bgcolor] \
 						-sticky we
 					incr tii
@@ -11956,9 +11977,31 @@ proc EditDieRollPresets {for_user tkey {edit_system false}} {
 		$wnt.desc$i insert 0 [dict get $details description]
 		$wnt.dspec$i insert 0 [dict get $details dieroll]
 		set ti 0
+		set istart 1
 		foreach {n t} [dict get $details table] {
 			SetTableColors $ti fgcolor bgcolor
-			grid [label $wnt.tbl$i.n$ti -text $n -anchor e -relief groove -fg $fgcolor -bg $bgcolor] [label $wnt.tbl$i.t$ti -text $t -anchor w -relief groove -fg $fgcolor -bg $bgcolor] -sticky we
+			if {$istart == $n} {
+				set nlabel $n
+				set istart [expr $n + 1]
+			} elseif {$n eq "*"} {
+				if {$istart ne {}} {
+					set nlabel "${istart}+"
+				} else {
+					set nlabel "*"
+				}
+			} elseif {$istart eq {}} {
+				set nlabel "...-${n}"
+			} else {
+				if {[catch {
+					set nlabel [format "%d-%d" $istart $n]
+					set istart [expr $n + 1]
+				}]} {
+					set nlabel "${istart}-${n}"
+					set istart {}
+				}
+			}
+
+			grid [label $wnt.tbl$i.n$ti -text $nlabel -anchor e -relief groove -fg $fgcolor -bg $bgcolor] [label $wnt.tbl$i.t$ti -text $t -anchor w -relief groove -fg $fgcolor -bg $bgcolor] -sticky we
 			incr ti
 		}
 		incr i
@@ -12843,9 +12886,30 @@ proc EDRTtblSave {rw tkey i wfld} {
 		destroy $fw
 	}
 	set r 0
+	set istart 1
 	foreach {n t} $newtable {
 		SetTableColors $r fgcolor bgcolor
-		grid [label $wfld.n$r -text $n -anchor e -relief groove -fg $fgcolor -bg $bgcolor] [label $wfld.t$r -text $t -anchor w -relief groove -fg $fgcolor -bg $bgcolor] -sticky we
+		if {$istart == $n} {
+			set nlabel $n
+			set istart [expr $n + 1]
+		} elseif {$n eq "*"} {
+			if {$istart ne {}} {
+				set nlabel "${istart}+"
+			} else {
+				set nlabel "*"
+			}
+		} elseif {$istart eq {}} {
+			set nlabel "...-${n}"
+		} else {
+			if {[catch {
+				set nlabel [format "%d-%d" $istart $n]
+				set istart [expr $n + 1]
+			}]} {
+				set nlabel "${istart}-${n}"
+				set istart {}
+			}
+		}
+		grid [label $wfld.n$r -text $nlabel -anchor e -relief groove -fg $fgcolor -bg $bgcolor] [label $wfld.t$r -text $t -anchor w -relief groove -fg $fgcolor -bg $bgcolor] -sticky we
 		incr r
 	}
 

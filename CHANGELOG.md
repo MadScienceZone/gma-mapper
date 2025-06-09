@@ -21,6 +21,7 @@ versions.
 ## Enhancement
  * Supports server protocol 418.
  * Now reports temporary hit points in health bars as a blue zone between permanent hit points (green) and non-lethal damage (yellow). This requires a server running protocol verion 418 and GM client which supplies temporary hit point data.
+ * Display of tables in the "edit presets" dialog does a better job of showing ranges of values in the left column.
 
 # 4.30.2
 ## Fixes
