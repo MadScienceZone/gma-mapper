@@ -17,6 +17,11 @@ The support for old server protocols (<400) and map file formats (<20) will be d
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
+# 4.31 (unreleased)
+## Enhancement
+ * Supports server protocol 418.
+ * Now reports temporary hit points in health bars as a blue zone between permanent hit points (green) and non-lethal damage (yellow). This requires a server running protocol verion 418 and GM client which supplies temporary hit point data.
+
 # 4.30.2
 ## Fixes
  * Corrected an error that sometimes occurs when editing die-roll presets loaded from the server.

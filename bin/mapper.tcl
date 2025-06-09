@@ -17,9 +17,9 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.30.2-tmphp}     ;# @@##@@
+set GMAMapperVersion {4.31-alpha.1}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
-set GMAMapperProtocol {417}         ;# @@##@@
+set GMAMapperProtocol {418}         ;# @@##@@
 set CoreVersionNumber {6.32-alpha.0}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
@@ -6607,12 +6607,14 @@ proc RenderSomeone {w id {norecurse false}} {
 			} else {
 				# not quite dead yet:
 				#
+				# old:
 				#   |<----------------Xhw------------------->|
 				#   |________________________________________|
 				#   |////////////|::::::::::|################|
 				#  Xh0   health  |   non-l  |     lethal    Xhl
 				#               Xhh        Xhn
 				#
+				# new:
 				#   |<----------------Xhw----------------------------->|
 				#   |__________________________________________________|
 				#   |////////////|\\\\\\\\\|::::::::::|################|
