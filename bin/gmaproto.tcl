@@ -10,7 +10,6 @@
 #                                                                                      #
 ########################################################################################
 #
-#
 # Mapper JSON protocol handling functions.
 # Steve Willoughby <steve@madscience.zone>
 #
