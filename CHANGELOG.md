@@ -3,19 +3,25 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.30.2          <!-- @@##@@ -->
- * Effective Date: 24-May-2025               <!-- @@##@@ -->
+ * This Package Version: 4.31          <!-- @@##@@ -->
+ * Effective Date: 11-Jun-2025               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.32-alpha.0 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.32 <!-- @@##@@ -->
  * GMA Mapper File Format: 23	     <!-- @@##@@ -->
- * GMA Mapper Protocol: 417        <!-- @@##@@ -->
+ * GMA Mapper Protocol: 418        <!-- @@##@@ -->
  * GMA Mapper Preferences File Format: 9 <!-- @@##@@ -->
 
 ## DEPRECATION NOTICE
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.31
+## Enhancement
+ * Supports server protocol 418.
+ * Now reports temporary hit points in health bars as a blue zone between permanent hit points (green) and non-lethal damage (yellow). This requires a server running protocol verion 418 and GM client which supplies temporary hit point data.
+ * Display of tables in the "edit presets" dialog does a better job of showing ranges of values in the left column.
 
 # 4.30.2
 ## Fixes
