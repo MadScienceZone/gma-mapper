@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       ______   _______     _______     #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \ (  __   )   / ___   )    #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \| (  )  |   \/   )  |    #
-# | |      | || || || (___) | Assistant  / (_) (_       ___) /| | /   |       /   )    #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( | (/ /) |     _/   /     #
-# | | \_  )| |   | || (   ) |                ) (           ) \|   / | |    /   _/      #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /|  (__) | _ (   (__/\    #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/ (_______)(_)\_______/    #
+#  _______  _______  _______                ___       ______    __                     #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \  /  \                    #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \ \/) )                   #
+# | |      | || || || (___) | Assistant  / (_) (_       ___) /   | |                   #
+# | | ____ | |(_)| ||  ___  |           (____   _)     (___ (    | |                   #
+# | | \_  )| |   | || (   ) |                ) (           ) \   | |                   #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  / __) (_                  #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/  \____/                  #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -17,10 +17,10 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.30.2}     ;# @@##@@
+set GMAMapperVersion {4.31}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
-set GMAMapperProtocol {417}         ;# @@##@@
-set CoreVersionNumber {6.32-alpha.0}            ;# @@##@@
+set GMAMapperProtocol {418}         ;# @@##@@
+set CoreVersionNumber {6.32}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -6582,11 +6582,19 @@ proc RenderSomeone {w id {norecurse false}} {
 			} else {
 				# not quite dead yet:
 				#
+				# old:
 				#   |<----------------Xhw------------------->|
 				#   |________________________________________|
 				#   |////////////|::::::::::|################|
 				#  Xh0   health  |   non-l  |     lethal    Xhl
 				#               Xhh        Xhn
+				#
+				# new:
+				#   |<----------------Xhw----------------------------->|
+				#   |__________________________________________________|
+				#   |////////////|\\\\\\\\\|::::::::::|################|
+				#  Xh0   health  |   tmp   |   non-l  |     lethal    Xhl
+				#               Xhh       Xht        Xhn
 				#
 				# XXX if maxhp=0
 				# XXX set width and outline based on condition
@@ -11857,9 +11865,30 @@ proc EditDieRollPresets {for_user tkey {edit_system false}} {
 					[frame $wngt.table$ti] \
 					-sticky we
 				set tii 0
+				set istart 1
 				foreach {tabn tabtxt} [dict get $pd table] {
 					SetTableColors $tii fgcolor bgcolor
-					grid [label $wngt.table$ti.n$tii -text $tabn -anchor e -relief groove -fg $fgcolor -bg $bgcolor] \
+					if {$istart == $tabn} {
+						set nlabel $tabn
+						set istart [expr $tabn + 1]
+					} elseif {$tabn eq "*"} {
+						if {$istart ne {}} {
+							set nlabel "${istart}+"
+						} else {
+							set nlabel "*"
+						}
+					} elseif {$istart eq {}} {
+						set nlabel "...-${tabn}"
+					} else {
+						if {[catch {
+							set nlabel [format "%d-%d" $istart $tabn]
+							set istart [expr $tabn + 1]
+						}]} {
+							set nlabel "${istart}-${tabn}"
+							set istart {}
+						}
+					}
+					grid [label $wngt.table$ti.n$tii -text $nlabel -anchor e -relief groove -fg $fgcolor -bg $bgcolor] \
 						[label $wngt.table$ti.t$tii -text $tabtxt -anchor w -relief groove -fg $fgcolor -bg $bgcolor] \
 						-sticky we
 					incr tii
@@ -11917,9 +11946,31 @@ proc EditDieRollPresets {for_user tkey {edit_system false}} {
 		$wnt.desc$i insert 0 [dict get $details description]
 		$wnt.dspec$i insert 0 [dict get $details dieroll]
 		set ti 0
+		set istart 1
 		foreach {n t} [dict get $details table] {
 			SetTableColors $ti fgcolor bgcolor
-			grid [label $wnt.tbl$i.n$ti -text $n -anchor e -relief groove -fg $fgcolor -bg $bgcolor] [label $wnt.tbl$i.t$ti -text $t -anchor w -relief groove -fg $fgcolor -bg $bgcolor] -sticky we
+			if {$istart == $n} {
+				set nlabel $n
+				set istart [expr $n + 1]
+			} elseif {$n eq "*"} {
+				if {$istart ne {}} {
+					set nlabel "${istart}+"
+				} else {
+					set nlabel "*"
+				}
+			} elseif {$istart eq {}} {
+				set nlabel "...-${n}"
+			} else {
+				if {[catch {
+					set nlabel [format "%d-%d" $istart $n]
+					set istart [expr $n + 1]
+				}]} {
+					set nlabel "${istart}-${n}"
+					set istart {}
+				}
+			}
+
+			grid [label $wnt.tbl$i.n$ti -text $nlabel -anchor e -relief groove -fg $fgcolor -bg $bgcolor] [label $wnt.tbl$i.t$ti -text $t -anchor w -relief groove -fg $fgcolor -bg $bgcolor] -sticky we
 			incr ti
 		}
 		incr i
@@ -12804,9 +12855,30 @@ proc EDRTtblSave {rw tkey i wfld} {
 		destroy $fw
 	}
 	set r 0
+	set istart 1
 	foreach {n t} $newtable {
 		SetTableColors $r fgcolor bgcolor
-		grid [label $wfld.n$r -text $n -anchor e -relief groove -fg $fgcolor -bg $bgcolor] [label $wfld.t$r -text $t -anchor w -relief groove -fg $fgcolor -bg $bgcolor] -sticky we
+		if {$istart == $n} {
+			set nlabel $n
+			set istart [expr $n + 1]
+		} elseif {$n eq "*"} {
+			if {$istart ne {}} {
+				set nlabel "${istart}+"
+			} else {
+				set nlabel "*"
+			}
+		} elseif {$istart eq {}} {
+			set nlabel "...-${n}"
+		} else {
+			if {[catch {
+				set nlabel [format "%d-%d" $istart $n]
+				set istart [expr $n + 1]
+			}]} {
+				set nlabel "${istart}-${n}"
+				set istart {}
+			}
+		}
+		grid [label $wfld.n$r -text $nlabel -anchor e -relief groove -fg $fgcolor -bg $bgcolor] [label $wfld.t$r -text $t -anchor w -relief groove -fg $fgcolor -bg $bgcolor] -sticky we
 		incr r
 	}
 
@@ -16084,7 +16156,7 @@ proc EncodePresetDetails {p} {
 #
 #
 #
-# @[00]@| GMA-Mapper 4.30.2
+# @[00]@| GMA-Mapper 4.31
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2025 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
