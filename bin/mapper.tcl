@@ -2702,15 +2702,17 @@ proc CreateHealthStatsToolTip {mob_id {extra_condition {}}} {
 
 	if {[dict exists $MOBdata($mob_id) Health] && [dict get $MOBdata($mob_id) Health] ne {}} {
 		set has_health_info true
-		::gmautil::dassign [dict get $MOBdata($mob_id) Health] \
-			MaxHP 			maxhp \
+		::gmautil::dassigndef [dict get $MOBdata($mob_id) Health] \
+			MaxHP 		maxhp \
 			LethalDamage 	lethal \
 			NonLethalDamage	nonlethal \
-			Con 			con \
+			Con 		con \
 			IsFlatFooted 	flatp \
-			IsStable 		stablep \
-			HPBlur			server_blur_pct \
-			Condition		condition
+			IsStable 	stablep \
+			HPBlur		server_blur_pct \
+			Condition	condition \
+			TmpHP		{tmp_hp 0} \
+			TmpDamage	{tmp_damage 0}
 		if {$condition ne {}} {
 			switch -exact -- $condition {
 				dead { set dead true }
@@ -2718,11 +2720,19 @@ proc CreateHealthStatsToolTip {mob_id {extra_condition {}}} {
 				default { lappend conditions $condition }
 			}
 		}
-		if {$nonlethal > $maxhp} {
-			set lethal [expr $lethal + ($nonlethal - $maxhp)]
-			set nonlethal $maxhp
-		}
-		set true_hp_remaining [expr $maxhp - $lethal]
+
+		# Really, we shouldn't be calculating this here because we're just
+		# reporting it. the data SHOULD already be correct before we get it.
+		# So I'm removing the calculations that used to be here and trusting
+		# that we are being sent reliable data (this also helps us see if there's
+		# an upstream bug so the mapper isn't somehow compensating for it by recalculating
+		# the hitpoints locally for display).
+		#
+		#if {$nonlethal > ($maxhp + $tmp_hp - $tmp_damage)} {
+			#set lethal [expr $lethal + ($nonlethal - $maxhp)]
+			#set nonlethal $maxhp
+		#}
+		#set true_hp_remaining [expr $maxhp + $tmp_hp - $tmp_damage - $lethal]
 	}
 
 	if {[llength [set statuslist [dict get $MOBdata($mob_id) StatusList]]] > 0} {
@@ -2741,24 +2751,25 @@ proc CreateHealthStatsToolTip {mob_id {extra_condition {}}} {
 		global blur_all blur_pct
 		set client_blur {}
 		set server_blur {}
+		set hp_temporary {}
 		if {$blur_all || [dict get $MOBdata($mob_id) CreatureType] != 2} {
-			set hp_remaining [blur_hp $maxhp $lethal]
+			set hp_remaining [blur_hp [expr $maxhp+$tmp_hp-$tmp_damage] $lethal]
 			if {$blur_pct > 0} {
 				set client_blur [format "(\u00B1%d%%)" $blur_pct]
 			}
 		} else {
-			set hp_remaining [expr $maxhp - $lethal]
+			set hp_remaining [expr ($maxhp+$tmp_hp-$tmp_damage) - $lethal]
 		}
 		if {$server_blur_pct > 0} {
 			# server blur overrides local one
 			set client_blur {}
-			set hp_remaining [expr $maxhp - $lethal]
+			set hp_remaining [expr ($maxhp+$tmp_hp-$tmp_damage) - $lethal]
 			set server_blur [format "\u00B1%d%%" $server_blur_pct]
 		}
 		if {!$dead} {
 			if {[dict get $MOBdata($mob_id) CreatureType] == 2} {
 				# player
-				if {$maxhp == 0} {
+				if {($maxhp+$tmp_hp-$tmp_damage) == 0} {
 					# we don't know the total hp (yet?) so just say how much damage they have
 					if {$lethal == 0} {
 						append tiptext " no lethal wounds"
@@ -2766,14 +2777,17 @@ proc CreateHealthStatsToolTip {mob_id {extra_condition {}}} {
 						append tiptext [format " %d%s%s lethal wounds" $lethal $client_blur $server_blur]
 					}
 				} else {
-					append tiptext [format " %d/%d%s%s HP" $hp_remaining $maxhp $client_blur $server_blur]
+					if {$tmp_hp > 0} {
+						set hp_temporary [format " (+%d temporary hp)" $tmp_hp]
+					}
+					append tiptext [format " %d/%d%s%s%s HP" $hp_remaining $maxhp $hp_temporary $client_blur $server_blur]
 				}
 				if {$nonlethal != 0} {
 					append tiptext [format " (%d non-lethal)" $nonlethal]
 				}
 			} else {
 				# not a player; so we're not quite as direct about health status
-				if {$maxhp == 0} {
+				if {($maxhp+$tmp_hp-$tmp_damage) == 0} {
 					# we don't know the creatures's hit point total
 					append tiptext [format " %d%s%s lethal damage" $lethal $client_blur $server_blur]
 					if {$nonlethal != 0} {
@@ -2781,14 +2795,14 @@ proc CreateHealthStatsToolTip {mob_id {extra_condition {}}} {
 					}
 				} else {
 					# otherwise we know more about what the damage means in context
-					if {$lethal > $maxhp} {
+					if {$lethal > ($maxhp+$tmp_hp-$tmp_damage)} {
 						if {[lsearch -exact $conditions dying] < 0} {
 							lappend conditions dying
 						} 
 					} else {
 						# n%+x+x
-						append tiptext [format " %d%%%s%s HP" [expr (100 * $hp_remaining)/$maxhp] $client_blur $server_blur]
-						if {$nonlethal != 0 && $maxhp != $lethal} {
+						append tiptext [format " %d%%%s%s HP" [expr (100 * $hp_remaining)/($maxhp+$tmp_hp-$tmp_damage)] $client_blur $server_blur]
+						if {$nonlethal != 0 && ($maxhp+$tmp_hp-$tmp_damage) != $lethal} {
 							append tiptext [format " (%d%% of remaining hp non-lethal)" [expr (100*$nonlethal)/$hp_remaining]]
 						}
 					}
@@ -6458,9 +6472,11 @@ proc RenderSomeone {w id {norecurse false}} {
 	set condition {}
 
 	if {[set hd [dict get $MOBdata($id) Health]] ne {}} {
-		::gmautil::dassign $hd \
+		::gmautil::dassigndef $hd \
 			Condition condition \
 			MaxHP maxhp \
+			TmpHP {tmp_hp 0} \
+			TmpDamage {tmp_damage 0} \
 			LethalDamage lethal \
 			NonLethalDamage nonlethal \
 			Con grace \
@@ -6470,16 +6486,25 @@ proc RenderSomeone {w id {norecurse false}} {
 		set show_healthbar true
 		global blur_all blur_pct
 
-		if {$nonlethal > $maxhp} {
-			set lethal [expr $lethal + ($nonlethal - $maxhp)]
-			set nonlethal $maxhp
-		}
-		set true_hp_remaining [expr $maxhp - $lethal]
+		# I removed the calculations here to adjust the hit points based on the game rules
+		# for things like nonlethal damage because we're supposed to just be reporting the stats
+		# and they SHOULD be correct already before we get them. This way we aren't potentially
+		# hiding a bug upstream.
+		# 
+		# We will just show the MaxHP, TmpHP, TmpDamage, LethalDamage, and NonLethalDamage as given to us.
+		#  ___________________________________________
+		# |_______G______|____B_____|___Y___|___R_____|
+		# |<-M+T-Td-N-L->|<- T-Td ->|<- N ->|<-- L  ->|
+		# |<-------------M+T------------------------->|
+		# |<----hp_remaining--------------->|
 
+		set effective_hp [expr $maxhp + $tmp_hp - $tmp_damage]
+		
+		set true_hp_remaining [expr $effective_hp - $lethal]
 		if {($blur_all || [dict get $MOBdata($id) CreatureType] != 2) && $server_blur_hp == 0} {
-			set hp_remaining [blur_hp $maxhp $lethal]
+			set hp_remaining [blur_hp $effective_hp $lethal]
 		} else {
-			set hp_remaining [expr $maxhp - $lethal]
+			set hp_remaining $true_hp_remaining
 		}
 
 
@@ -6487,7 +6512,7 @@ proc RenderSomeone {w id {norecurse false}} {
 			set condition {}
 		} elseif {$condition eq {}} {
 			# calculate condition automatically, otherwise it's forced
-			if {$maxhp <= 0 || ($true_hp_remaining <= -$grace)} { 
+			if {$effective_hp <= 0 || ($true_hp_remaining <= -$grace)} { 
 				set condition dead 
 				# We're making the change locally here instead of broadcasting it out
 				# because all the other map clients will be acting on the same logic
@@ -6566,7 +6591,7 @@ proc RenderSomeone {w id {norecurse false}} {
 					DEBUG 1 "$id is dying but has con grace zone of $grace"
 					set Xhb $Xh0
 				} else {
-					set Xhb [expr max($Xh0, $Xhl - ($Xhw * (double($lethal - $maxhp)/$grace)))]
+					set Xhb [expr max($Xh0, $Xhl - ($Xhw * (double($lethal - $effective_hp)/$grace)))]
 				}
 				set bw $HealthBarConditionFrameWidth
 				if {$stablep} {
@@ -6577,7 +6602,7 @@ proc RenderSomeone {w id {norecurse false}} {
 				$w create rectangle $Xh0 $Yh0 $Xhb $Yh1 -width $bw -outline $bc -fill red -tags $Thl
 				$w create rectangle $Xhb $Yh0 $Xhl $Yh1 -width $bw -outline $bc -fill black -tags $Thl
 				if {$full_stats} {
-					$w create text $TxX $TxY -anchor center -fill white -text [format "%d/%d" [expr $maxhp-$lethal] $maxhp] -tags $Thl
+					$w create text $TxX $TxY -anchor center -fill white -text [format "%d/%d" [expr $effective_hp-$lethal] $effective_hp] -tags $Thl
 				}
 			} else {
 				# not quite dead yet:
@@ -6599,8 +6624,8 @@ proc RenderSomeone {w id {norecurse false}} {
 				# XXX if maxhp=0
 				# XXX set width and outline based on condition
 
-				if {$maxhp <= 0} {
-					DEBUG 0 "$id has max HP of $maxhp; how did we even get this far without noticing that? BUG!"
+				if {$effective_hp <= 0} {
+					DEBUG 0 "$id has effective max HP of $effective_hp; how did we even get this far without noticing that? BUG!"
 					return
 				}
 
@@ -6614,12 +6639,18 @@ proc RenderSomeone {w id {norecurse false}} {
 
 				# using maxhp-hp_remaining instead of lethal to account for blurring
 				# we don't blur nonlethal for now but it's showing relative to the blurred lethal damage
-				set Xhn [expr max($Xh0, $Xhl - ($Xhw * (double($maxhp-$hp_remaining)/$maxhp)))]
-				set Xhh [expr max($Xh0, $Xhn - ($Xhw * (double($nonlethal)/$maxhp)))]
-				DEBUG 3 "-- X: $Xhw $Xh0 $Xhl $Xhn $Xhh; Y: $Yh0 $Yh1; $Thl"
+				set Xhn [expr (max($Xh0, $Xhl - ($Xhw * (double($effective_hp-$hp_remaining)/$effective_hp))))]
+				set Xht [expr (max($Xh0, $Xhn - ($Xhw * (double($nonlethal)/$effective_hp))))]
+				set Xhh [expr (max($Xh0, $Xht - ($Xhw * (double($tmp_hp-$tmp_damage)/$effective_hp))))]
+				#set Xhn [expr max($Xh0, $Xhl - ($Xhw * (double($maxhp-$hp_remaining)/$maxhp)))]
+				#set Xhh [expr max($Xh0, $Xhn - ($Xhw * (double($nonlethal)/$maxhp)))]
+				#DEBUG 3 "-- X: $Xhw $Xh0 $Xhl $Xhn $Xhh; Y: $Yh0 $Yh1; $Thl"
 				$w create rectangle $Xh0 $Yh0 $Xhh $Yh1 -width $bw -outline $bc -fill green -tags $Thl
+				if {$tmp_hp - $tmp_damage > 0} {
+					$w create rectangle $Xhh $Yh0 $Xht $Yh1 -width $bw -outline $bc -fill blue -tags $Thl
+				}
 				if {$nonlethal > 0} {
-					$w create rectangle $Xhh $Yh0 $Xhn $Yh1 -width $bw -outline $bc -fill yellow -tags $Thl
+					$w create rectangle $Xht $Yh0 $Xhn $Yh1 -width $bw -outline $bc -fill yellow -tags $Thl
 				}
 				if {$lethal > 0} {
 					$w create rectangle $Xhn $Yh0 $Xhl $Yh1 -width $bw -outline $bc -fill red -tags $Thl
