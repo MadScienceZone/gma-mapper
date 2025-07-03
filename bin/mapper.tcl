@@ -1170,7 +1170,11 @@ proc create_main_menu {use_button} {
 	$mm.play add command -command EditSystemDieRollPresets -label "Edit System Die Roll Presets" -state $privcmdstate
 	$mm.play add separator
 	$mm.play add command -command {display_initiative_clock} -label "Show Initiative Clock"
-	$mm.play add command -command {initiate_timer_request} -label "Request a New Timer"
+	$mm.play add separator
+	$mm.play add command -command {initiate_timer_request} -label "Request a New Timer..."
+	$mm.play add command -command {initiate_hp_request -tmp} -label "Request Temporary Hit Points..."
+	$mm.play add command -command {initiate_hp_request} -label "Request Permanent Hit Point Adjustment..."
+	$mm.play add separator
 	# gridsnap nil .25 .5 1
 	menu $mm.play.gridsnap
 	$mm.play add cascade -menu $mm.play.gridsnap -label "Creature token grid snap"
@@ -1182,7 +1186,6 @@ proc create_main_menu {use_button} {
 	} {
 		$mm.play.gridsnap add radiobutton -label $label -selectcolor $check_menu_color -variable CreatureGridSnap -value $value
 	}
-	$mm.play add separator
 	$mm.play add command -command {ClearSelection} -label "Deselect All"
 	menu $mm.tools
 	$mm.tools add command -command {checkForUpdates} -label "Check for Updates..."
@@ -15359,6 +15362,79 @@ proc start_ping_marker {w x y seq} {
 #  |                    [+]
 #
 
+proc initiate_hp_request {args} {
+	# put up a new dialog to make a request for hp changes. We leave this up until dismissed or accepted by the GM.
+	global global_bg_color icon_info20
+
+	set this_request [new_id]
+	set w .hprq_$this_request
+	if {[lsearch -exact $args -tmp] >= 0} {
+		set title "Temporary HP"
+		set tmp true
+	} else {
+		set title "HP Change"
+		set tmp false
+	}
+
+	toplevel $w -background $global_bg_color
+	wm title $w "New ${title} Request"
+	grid [label $w.dl -text "Description:"]  -row 0 -column 0 -sticky w
+	grid [entry $w.de -width 64]         - - -row 0 -column 1 -sticky we
+	if {$tmp} {
+		grid [label $w.el -text "Expires:"]      -row 1 -column 0 -sticky w
+		grid [entry $w.ee -width 64]         - - -row 1 -column 1 -sticky we
+		grid [label $w.tl -text "Targets (CHARACTER name):"]      -row 2 -column 0 -sticky w
+		grid [entry $w.te -width 64]             -row 2 -column 1 -sticky we
+		grid [button $w.tm -command "ihr_personal_target $w" -text "ME"] -row 2 -column 2
+		grid [button $w.tb -command "ihr_build_target_list $w" -text "..."] -row 2 -column 3
+		::tooltip::tooltip $w.el {Temporary HP expiration as "@[[[y-]m-]d] h:m[:s[.t]]", "[+-][d:]h:m[:s[.t]]", or "[+-]n units"}
+		::tooltip::tooltip $w.ee {Temporary HP expiration as "@[[[y-]m-]d] h:m[:s[.t]]", "[+-][d:]h:m[:s[.t]]", or "[+-]n units"}
+		::tooltip::tooltip $w.tl {Players who should receive temporary HP (space-separated)}
+		::tooltip::tooltip $w.te {Players who should receive temporary HP (space-separated)}
+		::tooltip::tooltip $w.tb {Build list of targets interactively}
+		::tooltip::tooltip $w.tm {Just give them to me}
+		grid [label $w.xl -text "Requested temporary HP allocation:"]  -row 3 -column 0 -sticky w
+		grid [entry $w.xe -width 4]                 -row 3 -column 1 -sticky w
+		grid [label $w.ll -text "Lethal damage already against it:"]   -row 4 -column 0 -sticky w
+		grid [entry $w.le -width 4]                 -row 4 -column 1 -sticky w
+		::tooltip::tooltip $w.xl {How many additional temporary hit points you're asking for now.}
+		::tooltip::tooltip $w.xe {How many additional temporary hit points you're asking for now.}
+		::tooltip::tooltip $w.ll {How much, if any, damage was already taken against THIS request number of temporary hit points?}
+		::tooltip::tooltip $w.le {How much, if any, damage was already taken against THIS request number of temporary hit points?}
+		$w.le delete 0 end
+		$w.le insert 0 0
+	} else {
+		grid [label $w.tl -text "Target (CHARACTER name):"]      -row 1 -column 0 -sticky w
+		grid [entry $w.te -width 64]             -row 1 -column 1 -sticky we
+		grid [button $w.tm -command "ihr_personal_target $w" -text "ME"] -row 1 -column 2
+		grid [label $w.xl -text "Max HP:"]          -row 2 -column 0 -sticky w
+		grid [entry $w.xe -width 4]                 -row 2 -column 1 -sticky w
+		grid [label $w.ll -text "Lethal damage:"]   -row 3 -column 0 -sticky w
+		grid [entry $w.le -width 4]                 -row 3 -column 1 -sticky w
+		grid [label $w.nl -text "Nonlethal damage:"] -row 4 -column 0 -sticky w
+		grid [entry $w.ne -width 4]                 -row 4 -column 1 -sticky w
+		::tooltip::tooltip $w.xl {Your total maximum hit points (NOT including temporary HP).}
+		::tooltip::tooltip $w.xe {Your total maximum hit points (NOT including temporary HP).}
+		::tooltip::tooltip $w.ll {Total lethal damage currently suffered.}
+		::tooltip::tooltip $w.le {Total lethal damage currently suffered.}
+		::tooltip::tooltip $w.nl {Total nonlethal damage currently suffered.}
+		::tooltip::tooltip $w.ne {Total nonlethal damage currently suffered.}
+		$w.le delete 0 end
+		$w.le insert 0 0
+		$w.ne delete 0 end
+		$w.ne insert 0 0
+	}
+
+	grid x [label $w.ml -text {}] - - -sticky we
+	grid [button $w.cancel -command "destroy $w" -text Cancel] -row 6 -column 0 -sticky w
+	grid [button $w.info -command "ihr_info" -image $icon_info20] - -row 6 -column 1
+	grid [button $w.ok -command "ihr_commit $w $tmp $this_request" -text Request] -row 6 -column 3 -sticky e
+	::tooltip::tooltip $w.dl {Describe the nature of your request.}
+	::tooltip::tooltip $w.de {Describe the nature of your request.}
+	::tooltip::tooltip $w.cancel {Dismiss this dialog box without taking further action.}
+	::tooltip::tooltip $w.info {Display help information about requesting hit point changes.}
+	::tooltip::tooltip $w.ok {Submit this request to the GM.}
+}
 
 proc initiate_timer_request {} {
 	# put up a new dialog to make a request for a timer. We leave this up until dismissed or accepted by the GM.
@@ -15472,10 +15548,63 @@ proc itr_info {} {
 	}
 }
 
+proc ihr_info {} {
+	set w .timer_request_help
+	create_dialog $w
+	wm title $w "How to Request Adjustments to your Hit Points"
+	grid [text $w.text -yscrollcommand "$w.sb set"] \
+	     [scrollbar $w.sb -orient vertical -command "$w.text yview"]\
+		 	-sticky news
+	grid columnconfigure $w 0 -weight 1
+	grid rowconfigure $w 0 -weight 1
+	$w.text tag configure h1 -justify center -font Tf14
+	$w.text tag configure h2 -justify center -font Tf12
+	$w.text tag configure p -font Nf12 -wrap word
+	$w.text tag configure i -font If12 -wrap word
+	$w.text tag configure b -font Tf12 -wrap word
+
+	foreach line {
+		{h1 {Requesting Adjustments to Your Hit Points}}
+		{p {}}
+		{p  {Your character hit points are tracked by GMA along with the other creatures involved in combat, so it's important that the system have an accurate idea of how many hit points you have at all times. There are two kinds of requests you can make to adjust this: updating the GM's record of your character's total hit points and wounds, and requesting a number of temporary hit points.}
+		 i { Note that the GM must be logged in at the same time in order to receive and act on your request.}}
+		{p {}}
+		{h2 {Requesting Temporary Hit Points}}
+		{p {If you want to add a number of hit points to your total "pool" of temporary hp, submit a request by choosing "Request Temporary Hit Points..." from the Play menu. Fill in the dialog that pops up with the required information: description of why the request is being made (say, the spell you cast to get the temporary hit points, for example), and when they expire (using any of the forms allowed for timers such as "10 rounds", "12 hours", "[1d4] minutes", or "@12:30").}}
+		{p {}}
+		{p {List the } b {character names} p { (} i {not} p { player or login names) for all the people who will be receiving these temporary hit points. If you click the "ME" button, your own login name will be filled in (but note that this only works if your login name is exactly the same as your character's name as it appears on the map). Likewise, clicking on the "..." button brings up a selection box to let you choose which of the logged-in users to include in the list of targets (again, assuming their login names match the character names on the map). The names in this target list are separated from each other with spaces.}}
+		{p {}}
+		{p {Enter the number of hit points you want to add in the next box on the form. If you already have temporary hit poinst allocated to your character, this many will be added to that existing number. If for some reason your character already took damage that was taken off the temporary hit point total, it's better to still ask for the full number you were supposed to have been given but also note the amount of damage in the following field on the form, so both are correctly accounted for.}}
+		{p {}}
+		{p {When ready, click the } b {Request} p { button. If you leave the dialog box up and there is a problem with the request you'll be informed and given the chance to correct the issue and resubmit it, or once the GM accepts the temporary hit point request the dialog will go away on its own.}}
+		{p {}}
+		{h2 {Requesting Adjustment To Permanent Hit Point Totals}}
+		{p {If you want to correct the GM's records for how many hit points your character currently has, choose "Request Permanent Hit Point Adjustment..." from the Play menu. Fill in the dialog that pops up with the required information: description of why the request is being made (optionally), and the target } b {character name} p { (} i {not} p { player or login name) for your character. If you click the "ME" button, your login name will be filled in (but note that this only works if your login name is exactly the same as your character's name as it appears on the map).}}
+
+		{p {}}
+		{p {Enter the number of maximum hit points your character should have when fully healed (not counting any temporary hit points), the amount of current lethal damage suffered, and the amount of current nonlethal damage in the next three fields.}}
+		{p {}}
+		{p {When ready, click the } b {Request} p { button. If you leave the dialog box up and there is a problem with the request you'll be informed and given the chance to correct the issue and resubmit it, or once the GM accepts the hit point change request the dialog will go away on its own.}}
+	} {
+		foreach {f t} $line {
+			$w.text insert end $t $f
+		}
+		$w.text insert end "\n"
+	}
+}
+
+proc ihr_personal_target {w} {
+	itr_personal_target $w
+}
+
 proc itr_personal_target {w} {
 	global local_user
 	$w.te delete 0 end
 	$w.te insert end [list $local_user]
+}
+
+proc ihr_build_target_list {parent} {
+	itr_build_target_list $parent
 }
 
 proc itr_build_target_list {parent} {
@@ -15560,6 +15689,112 @@ proc itr_commit {w request_id} {
 	}
 	$w.sb state disabled
 	$w.rb state disabled
+}
+
+proc ihr_commit {w tmp request_id} {
+	set desc [string trim [$w.de get]]
+	set targets [string trim [$w.te get]]
+	set hp [$w.xe get]
+	if {![string is integer $hp]} {
+		$w.ml configure -foreground red -text "Invalid hit point value: must be an integer."
+		return
+	}
+	set lethal [$w.le get]
+	if {[string trim $lethal] eq {}} {
+		set lethal "0"
+	}
+	if {![string is integer $lethal]} {
+		$w.ml configure -foreground red -text "Invalid lethal damage value: must be an integer (enter 0 if none)."
+		return
+	}
+
+	if {$tmp} {
+		set exp [string trim [$w.ee get]]
+		if {$exp eq {}} {
+			$w.ml configure -foreground red -text "Expiration time is required."
+			return
+		}
+	} else {
+		set nonlethal [$w.ne get]
+		if {[string trim $nonlethal] eq {}} {
+			set nonlethal "0"
+		}
+		if {![string is integer $nonlethal]} {
+			$w.ml configure -foreground red -text "Invalid nonlethal damage value: must be an integer (enter 0 if none)."
+			return
+		}
+	}
+
+	if {![string is list $targets]} {
+		$w.ml configure -foreground red -text "Target list has invalid format (unbalanced braces, maybe?)"
+		return
+	}
+
+	if {$tmp} {
+		::gmaproto::hit_point_request_d [dict create \
+			Targets $targets \
+			Description $desc \
+			RequestID $request_id \
+			TmpHP [dict create \
+				TmpHP $hp \
+				LethalDamage $lethal \
+				Expires $exp \
+			]\
+		]
+	} else {
+		::gmaproto::hit_point_request_d [dict create \
+			Targets $targets \
+			Description $desc \
+			RequestID $request_id \
+			Health [dict create \
+				MaxHP $hp \
+				LethalDamage $lethal \
+				NonLethalDamage $nonlethal \
+			]\
+		]
+	}
+
+	$w.cancel configure -text Dismiss
+	$w.ok configure -text Pending... -state disabled
+	$w.ml configure -text "Waiting for GM to accept hit point request into system..."
+	foreach ww {de ee te xe le ne tm tb} {
+		catch {$w.$ww configure -state disabled}
+	}
+}
+
+proc ihr_failed {request_id reason} {
+	if {[catch {
+		set w .hprq_$request_id
+		foreach ww {de ee te xe le ne tm tb} {
+			catch {$w.$ww configure -state normal}
+		}
+		$w.ok configure -state normal -text Request
+		$w.cancel configure -text Cancel
+		$w.ml configure -text $reason -foreground red
+	}]} {
+		tk_messageBox -parent . -type ok -icon error -title "HP Request Failed" \
+			-message $reason
+	}
+}
+
+proc ihr_accepted {request_id} {
+	set w .hprq_$request_id
+	catch {
+		$w.ml configure -text "HP request accepted." -foreground "#008800"
+		$w.ok configure -command "destroy $w" -text "Ok 5" -state normal
+		after 1000 "ihr_destroy $w 4"
+	}
+}
+
+proc ihr_destroy {w t} {
+	catch {
+		if {$t == 0} {
+			destroy $w
+		} else {
+			$w.ok configure -text "OK $t"
+			after 1000 "ihr_destroy $w [expr $t - 1]"
+		}
+	}
 }
 
 proc itr_failed {request_id reason} {
