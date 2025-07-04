@@ -9690,12 +9690,20 @@ proc DoCommandTMACK {d} {
 	itr_accepted [dict get $d RequestID]
 }
 
+proc DoCommandHPACK {d} {
+	# Acknowledge our timer request. If we're still showing a request dialog, update/dismiss it
+	# based on RequestID field
+	ihr_accepted [dict get $d RequestID]
+}
+
 proc DoCommandFAILED {d} {
 	# Indicate general failure. If we're still showing a timer request dialog, update it based on
 	# IsError, IsDiscretionary, Reason, ReqeustID
 	# also: Command
 	if {[string range [dict get $d Command] 0 3] eq "TMRQ"} {
 		itr_failed [dict get $d RequestID] [dict get $d Reason]
+	} elseif {[string range [dict get $d Command] 0 4] eq "HPREQ"} {
+		ihr_failed [dict get $d RequestID] [dict get $d Reason]
 	} else {
 		tk_messageBox -parent . -type ok -icon error -title "Operation Failed" \
 			-message "[dict get $d Reason]"
