@@ -1,15 +1,13 @@
 '\" t
 '\" *** 418 ***
 '\" <<ital-is-var>>
-.TH GMA-MAPPER-PROTOCOL 7 "GMA-Mapper 4.31" 11-Jun-2025 "Protocols" \" @@mp@@
+.TH GMA-MAPPER-PROTOCOL 7 "GMA-Mapper 4.32" 04-Jul-2025 "Protocols" \" @@mp@@
 .SH NAME
 gma-mapper-protocol \- GMA client/server protocol specification
-'\" <<New>>
 .SH EXPERIMENTAL
 .LP
 .B "This document includes experimental changes to the protocol which have not yet been officially released."
 '\" <<bold-is-fixed>>
-'\" <</New>>
 .SH DESCRIPTION
 .LP
 The
@@ -704,11 +702,9 @@ die roll results to a client which isn't prepared to interpret them.
 The client supports formatting controls in die-roll label fields in the roll details
 in a format as described above for sub-titles. This allows custom colors to be used
 for special die-roll modifiers that need to stand out visually from all the rest.
-'\" <<New>>
 .TP
 .B GMA-MARKUP
 The client is capable of interpreting GMA markup formatting codes received in chat messages.
-'\" <</New>>
 '\" <</>>
 '\" <</>>
 .RE
@@ -2257,14 +2253,12 @@ The value is a regular expression. The server will delete all die-roll
 presets whose
 .B Name
 attribute matches this regular expression.
-'\" <<New>>
 '\" <</ital-is-var>>
 .TP
 .BI Global " (bool)"
 If present and true, this operation filters items out of the system-wide global set of presets
 instead of a user's set. This makes this a privileged command.
 '\" <<ital-is-var>>
-'\" <</New>>
 .TP
 .B For
 The name of the user whose presets are being filtered. This is optional;
@@ -2293,7 +2287,6 @@ The username of the player for whom these presets were stored. The default, if n
 name is given or if it is empty, is the currently logged-in user.
 .TP
 '\" <</ital-is-var>>
-'\" <<New>>
 .BI Global " (bool)"
 If present and true, these presets are the system-wide set that apply to all users rather than those of the target user.
 For the
@@ -2314,7 +2307,6 @@ presets in the payload means it can delete its copy of the user's presets. Witho
 .B Global
 parameter, this message contains all presets the client should know about, including the user's set plus the system-wide globals.
 .RE
-'\" <</New>>
 .TP
 .BI DelegateFor " (list of strings)"
 The list of all the other users for whom the target user is a delegate.
@@ -2328,7 +2320,6 @@ Each element in this list describes a single preset. It has the following
 fields:
 '\" <<list>>
 .RS
-'\" <<New>>
 .TP
 .BI Global " (bool)"
 If this parameter is present and true, it indicates that this preset was defined at a system-wide level and may
@@ -2347,7 +2338,6 @@ but double prefix characters for system-wide names, as in
 and
 .BR ##bar .
 .RE
-'\" <</New>>
 '\" <<ital-is-var>>
 .TP
 .BI Name
@@ -2379,7 +2369,6 @@ etc. The numbers need not be strictly consecutive.
 Clients SHOULD use dictionary sorting for preset items so that the numeric sort-order sequence value
 is correctly arranged regardless of number of characters; however the recommendation here is also to
 pad them with zeroes to three digits for the benefit of clients which cannot or will not do so.
-'\" <<New>>
 Clients MAY include optional
 .I flags
 and
@@ -2399,7 +2388,6 @@ This means the full definition of the simple preset name is:
 .IR sequence [\fB;\fP flags [\fB;\fP client_data ]]\fB|\fP name
 '\" <</>>
 .RE
-'\" <</New>>
 .TP
 2.
 Stored variables MAY be stored as a die-roll preset with a
@@ -2470,7 +2458,6 @@ is a modifier in the \*(lqmonster\*(rq group.
 '\" <</TeX>>
 Clients SHOULD allow users to collapse all of the die rolls with the same group name(s) appearing consecutively
 in the die-roll preset list.
-'\" <<New>>
 .TP
 4.
 Stored tables MAY be stored as a die-roll preset with a
@@ -2554,7 +2541,6 @@ In this case, the
 field MUST be a properly-formed JSON object string with no newline characters that encodes the data being stored
 in this preset. The \*(lq\[co]\*(rq character is the Unicode codepoint U+00A9.
 .RE
-'\" <</New>>
 .TP
 6.
 Clients 
@@ -2570,7 +2556,6 @@ for combatants on an encounter-by-encounter basis. The names for these presets
 include an additional component,
 .IR area ,
 which identifies the dungeon location or encounter identifier. 
-'\" <<New>>
 To accomplish this, GMA prepends the string
 .BI $[ area ]
 to the
@@ -2579,7 +2564,6 @@ field for any of the complex types which support that. Otherwise it prepends tha
 the
 .I sequence
 value.
-'\" <</New>>
 .RE
 '\" <</>>
 .RE
@@ -2649,13 +2633,11 @@ command back to the requesting client.
 The JSON payload may contain the following field:
 .RS
 '\" <<list>>
-'\" <<New>>
 .TP
 '\" <</ital-is-var>>
 .BI Global " (bool)"
 If present and true, this requests a list of only the global, system-wide set of presets rather than all of the presets the client should 
 know about.
-'\" <</New>>
 '\" <<ital-is-var>>
 .TP
 .B For
@@ -2907,7 +2889,6 @@ The time when the server sent the response packet to the client.
 .RE
 
 '\" <</>>
-'\" <<New>>
 .TP
 .B FAILED
 Gives notice that a client request was not accepted. This may be issued by the server
@@ -2947,7 +2928,6 @@ The client ID of the original requester. When the
 .B FAILED
 message is sent by a GM client, the server will relay it to this client session.
 .RE
-'\" <</New>>
 .TP
 .B GRANTED
 Access to the server is granted. The server will send this to a client; no client should send it. The JSON payload contains the field:
@@ -2963,7 +2943,6 @@ if the
 client authenticated as the GM.
 '\" <</>>
 .RE
-'\" <<New>>
 .TP
 .B HPACK
 Acknowledge a hit point change request made via a previous
@@ -3080,7 +3059,6 @@ message (q.v.).
 '\" <<ital-is-var>>
 .RE
 '\" <</>>
-'\" <</New>>
 .TP
 .B I
 Update the time clock for initiative-based actions.  If the mapper
@@ -3745,12 +3723,10 @@ respond with a valid
 .B AUTH
 command before any of its commands to the server will be accepted. The server will also
 refuse to send the client any map updates until it has successfully authenticated.
-'\" <<New>>
 .TP
 .BI Iterations " (int)"
 The number of rounds of hashing to apply to generate the challenge response. This
 value SHOULD be in the range [64,4095].
-'\" <</New>>
 .TP
 .BI ServerStarted " (RFC 3339-formatted datetime string)"
 The absolute wall-clock time that the server was started.
@@ -3844,7 +3820,6 @@ about progress. If a client does send progress update messages to other
 peers, it should be clear that what is being tracked is a process that the
 other clients are interested in.
 .LP
-'\" <<New>>
 As a special case, the server may send this message with
 .B OperationID=*
 and
@@ -3856,7 +3831,6 @@ message is sent with the
 .B OperationID
 of a timer that was dismissed in this way, clients should treat it like a new
 timer being created at that point.
-'\" <</New>>
 .RE
 '\" <<list>>
 .TP
@@ -3889,14 +3863,12 @@ following fields:
 .TP
 .BI MaxHP " (int)"
 The creature's maximum number of hit points.
-'\" <<New>>
 .TP
 .BI TmpHP " (int)"
 The creature's temporary hit points, in addition to their maximum.
 .TP
 .BI TmpDamage " (int)"
 The number of hit points worth of damage suffered against the temporary hit point total.
-'\" <</New>>
 .TP
 .BI LethalDamage " (int)"
 The amount of lethal damage sustained.
@@ -4167,7 +4139,6 @@ command. Clients MUST NOT send this command. The JSON payload includes the follo
 The name of the user who rolled the dice. 
 .TP
 '\" <</ital-is-var>>
-'\" <<New>>
 .BI Origin " (bool)"
 If present and true upon receipt of this message from the server, this indicates that the client receiving it was the same client who originated the
 die roll reqeust whose result is being reported here, as opposed to a client who is merely
@@ -4179,7 +4150,6 @@ of a
 .B SYNC-CHAT
 request from the client) and this is not the original sending of the message. As such, the client SHOULD NOT make active responses to it such as
 performing lookup table reports on it.
-'\" <</New>>
 .TP
 .BI Recipients " (list of strings)"
 The names of the people the message was explicitly addressed to. For
@@ -4335,7 +4305,6 @@ If true, the client SHOULD display its toolbar. If false, the client SHOULD NOT
 display it. The client may override this request based on the user's preferences.
 '\" <</>>
 .RE
-'\" <<New>>
 .TP
 .B TMACK
 Acknowledges a timer request. If a client receives this, it means the GM has accepted their
@@ -4466,7 +4435,6 @@ A unique identifier for this request. Replies sent back to the requesting client
 this same ID. A UUID string is suggested for this value.
 .RE
 .RE
-'\" <</New>>
 .TP
 .B TO
 Send chat message to a set of recipients. 
@@ -4479,7 +4447,6 @@ The name of the user sending the message. Clients SHOULD NOT set this field; it
 is set by the server when sending these messages to peers.
 .TP
 '\" <</ital-is-var>>
-'\" <<New>>
 .BI Origin " (bool)"
 If present and true upon receipt from the server, this means that the client receiving this message was the same client who sent 
 the original message,
@@ -4490,7 +4457,6 @@ If present and true upon receipt of this message from the server, this indicates
 of a
 .B SYNC-CHAT
 request from the client) and this is not the original sending of the message. 
-'\" <</New>>
 .TP
 .BI Recipients " (list of strings)"
 The names of the people the message was explicitly addressed to. For
@@ -4524,7 +4490,6 @@ The contents of the
 .B Recipients
 field are ignored; it should be omitted or set to
 .BR null .
-'\" <<New>>
 .TP
 .BI Markup " (bool)"
 If true, the text of this message may contain GMA markup formatting codes which the client SHOULD
@@ -4532,7 +4497,6 @@ either filter out or interpret appropriately for display to the user. If a clien
 that it was capable of understanding these codes via the
 .B ALLOW
 command (q.v.), then the server will filter out these codes before sending the message to that client.
-'\" <</New>>
 .TP
 .B Text
 The text of the message to be sent.
@@ -4706,12 +4670,10 @@ and
 Steve Willoughby / steve@madscience.zone;
 John Mechalas (elevation and movement modes).
 .SH HISTORY
-'\" <<New>>
 .LP
 This document defines map protocol version 418,
 which adds support for temporary hit point tracking and user requests for hit point changes.
 .LP
-'\" <</New>>
 Version 417 introduced
 support for system-wide die-roll presets,
 table definitions and markup formatting in chat messages.
@@ -4724,7 +4686,6 @@ fields to the
 and
 .B TO
 messages.
-'\" <</New>>
 .LP
 Version 416 added the
 .BR FAILED ,
