@@ -17,6 +17,10 @@ The support for old server protocols (<400) and map file formats (<20) will be d
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
+# 4.33
+## Enhancement
+ * Chat messages may now be "pinned" in a priority window.
+
 # 4.32
 ## Enhancement
  * Users may request that the GM update their current hit point totals by filling out a dialog box in their mapper with their current maximum hit points, lethal, and nonlethal wounds.
