@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___       ______   _______                 #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \ / ___   )                #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \\/   )  |                #
-# | |      | || || || (___) | Assistant  / (_) (_       ___) /    /   )                #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ (   _/   /                 #
-# | | \_  )| |   | || (   ) |                ) (           ) \ /   _/                  #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /(   (__/\                #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/ \_______/                #
+#  _______  _______  _______                ___       ______   ______                  #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \ / ___  \                 #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \\/   \  \                #
+# | |      | || || || (___) | Assistant  / (_) (_       ___) /   ___) /                #
+# | | ____ | |(_)| ||  ___  |           (____   _)     (___ (   (___ (                 #
+# | | \_  )| |   | || (   ) |                ) (           ) \      ) \                #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  //\___/  /                #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/ \______/                 #
 #                                                                                      #
 ########################################################################################
 #
@@ -56,9 +56,9 @@ package require base64 2.4.2
 package require uuid 1.0.1
 
 namespace eval ::gmaproto {
-	variable protocol 418
+	variable protocol 419
 	variable min_protocol 333
-	variable max_protocol 418
+	variable max_protocol 419
 	variable max_max_protocol 499
 	variable debug_f {}
 	variable legacy false
@@ -185,7 +185,7 @@ namespace eval ::gmaproto {
 		TB      {Enabled ?}
 		TMACK	{RequestID s RequestingClient s RequestedBy s}
 		TMRQ	{Description s Expires s Targets l ShowToAll ? IsRunning ? RequestedBy s RequestingClient s RequestID s}
-		TO      {Replay ? Sender s Recipients l MessageID i ToAll ? ToGM ? Text s Sent s Markup ? Origin ?}
+		TO      {Replay ? Sender s Recipients l MessageID i ToAll ? ToGM ? Text s Sent s Markup ? Origin ? Pin ?}
 		UPDATES {Packages {a {Name s Instances {a {OS s Arch s Version s Token s}}}}}
 		WORLD   {Calendar s ClientSettings {o {MkdirPath s ImageBaseURL s ModuleCode s SCPDestination s ServerHostname s}}}
 		/CONN   {}
@@ -1379,8 +1379,8 @@ proc ::gmaproto::adjust_view {x y grid_label} {
 	::gmaproto::_protocol_send AV Grid $grid_label XView $x YView $y
 }
 
-proc ::gmaproto::chat_message {message sender recipients to_all to_gm {markup false}} {
-	::gmaproto::_protocol_send TO Recipients $recipients ToAll $to_all ToGM $to_gm Text $message Markup $markup
+proc ::gmaproto::chat_message {message sender recipients to_all to_gm {markup false} {pinned false}} {
+	::gmaproto::_protocol_send TO Recipients $recipients ToAll $to_all ToGM $to_gm Text $message Markup $markup Pin $pinned
 }
 
 proc ::gmaproto::hit_point_request_d {d} {
@@ -2333,7 +2333,7 @@ proc ::gmaproto::normalize_dict {cmd d} {
 	return [::gmaproto::new_dict_from_json $cmd [::gmaproto::json_from_dict $cmd $d]]
 }
 
-# @[00]@| GMA-Mapper 4.32
+# @[00]@| GMA-Mapper 4.33
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2025 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
