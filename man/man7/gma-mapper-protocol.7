@@ -1,7 +1,7 @@
 '\" t
-'\" *** 418 ***
+'\" *** 419 ***
 '\" <<ital-is-var>>
-.TH GMA-MAPPER-PROTOCOL 7 "GMA-Mapper 4.32" 04-Jul-2025 "Protocols" \" @@mp@@
+.TH GMA-MAPPER-PROTOCOL 7 "GMA-Mapper 4.33" 05-Jul-2025 "Protocols" \" @@mp@@
 .SH NAME
 gma-mapper-protocol \- GMA client/server protocol specification
 .SH EXPERIMENTAL
@@ -79,7 +79,7 @@ be implemented to wait synchronously for a server
 response during the authentication negotiation stage.
 .LP
 '\" <</bold-is-fixed>>
-.B "This describes protocol version 418."
+.B "This describes protocol version 419."
 '\" <<bold-is-fixed>>
 These notes are intended to be 
 detailed enough to implement a client from and should be considered
@@ -4490,7 +4490,7 @@ The contents of the
 .B Recipients
 field are ignored; it should be omitted or set to
 .BR null .
-.TP
+."TP
 .BI Markup " (bool)"
 If true, the text of this message may contain GMA markup formatting codes which the client SHOULD
 either filter out or interpret appropriately for display to the user. If a client did not indicate to the server
@@ -4500,6 +4500,12 @@ command (q.v.), then the server will filter out these codes before sending the m
 .TP
 .B Text
 The text of the message to be sent.
+'\" <<New>>
+.TP
+.BI "Pin " (bool)
+If present and true, this message should be pinned in the recipients' chat windows as a persistent message
+until dismissed by the recipient.
+'\" <</New>>
 '\" <<ital-is-var>>
 .RE
 '\" <</>>
@@ -4671,8 +4677,11 @@ Steve Willoughby / steve@madscience.zone;
 John Mechalas (elevation and movement modes).
 .SH HISTORY
 .LP
-This document defines map protocol version 418,
-which adds support for temporary hit point tracking and user requests for hit point changes.
+This document defines map protocol version 419,
+which adds support for pinned chat messages.
+.LP
+Version 418 
+added support for temporary hit point tracking and user requests for hit point changes.
 .LP
 Version 417 introduced
 support for system-wide die-roll presets,

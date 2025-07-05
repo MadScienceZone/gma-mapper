@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       ______   _______                 #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \ / ___   )                #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \\/   )  |                #
-# | |      | || || || (___) | Assistant  / (_) (_       ___) /    /   )                #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ (   _/   /                 #
-# | | \_  )| |   | || (   ) |                ) (           ) \ /   _/                  #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /(   (__/\                #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/ \_______/                #
+#  _______  _______  _______                ___       ______   ______                  #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \ / ___  \                 #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \\/   \  \                #
+# | |      | || || || (___) | Assistant  / (_) (_       ___) /   ___) /                #
+# | | ____ | |(_)| ||  ___  |           (____   _)     (___ (   (___ (                 #
+# | | \_  )| |   | || (   ) |                ) (           ) \      ) \                #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  //\___/  /                #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/ \______/                 #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -17,10 +17,10 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.32}     ;# @@##@@
+set GMAMapperVersion {4.33}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
-set GMAMapperProtocol {418}         ;# @@##@@
-set CoreVersionNumber {6.33}            ;# @@##@@
+set GMAMapperProtocol {419}         ;# @@##@@
+set CoreVersionNumber {6.34.1}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -1191,6 +1191,7 @@ proc create_main_menu {use_button} {
 	$mm.tools add command -command {checkForUpdates} -label "Check for Updates..."
 	$mm.tools add separator
 	$mm.tools add command -command {ResetChatHistory -1} -label "Clear Chat History"
+	$mm.tools add command -command {ClearPinnedChats} -label {Clear Pinned Chat Messages}
 	$mm.tools add cascade -menu $mm.tools.rch -label "Reset Chat History"
 	$mm.tools add separator
 	$mm.tools add command -command {CleanupImageCache 0} -label "Clear Image Cache"
@@ -1212,6 +1213,20 @@ proc create_main_menu {use_button} {
 	$mm.help add command -command {aboutMapper} -label "About Mapper..."
 	$mm.help add command -command {ShowDiceSyntax} -label "Die roller syntax ..."
 	$mm.help add command -command {gma::minimarkup::ShowMarkupSyntax} -label "Text markup syntax ..."
+}
+
+proc ClearPinnedChats {} {
+	global dice_preset_data
+
+	set tkey [root_user_key] 
+	set w $dice_preset_data(cw,$tkey)
+	if {[catch {
+		$w.p.pinnedchat.1.text configure -state normal 
+		$w.p.pinnedchat.1.text delete 1.0 end
+		$w.p.pinnedchat.1.text configure -state disabled 
+	} err]} {
+		DEBUG 0 $err
+	}
 }
 
 proc SaveDebugText {} {
@@ -2280,7 +2295,7 @@ foreach icon_name {
 	dbracket_t dbracket_m dbracket_b dbracket__
 	delete add clock dieb16 -- *hourglass *hourglass_go *arrow_right *cross *bullet_go menu
 	stipple_100 stipple_75 stipple_50 stipple_25 stipple_12 stipple_88 lock unlock bullet_arrow_down bullet_arrow_right
-	bullet_arrow_down16 bullet_arrow_right16 tmrq pencil die16g die16success die16fail
+	bullet_arrow_down16 bullet_arrow_right16 tmrq pencil die16g die16success die16fail star smstar
 } {
 	if {$icon_name eq {--}} {
 		if {$ImageFormat eq {png}} {
@@ -13436,10 +13451,11 @@ proc DisplayChatMessage {d for_user args} {
 	global _preferences colortheme dice_preset_data local_user
 
 	if {$d ne {}} {
-		::gmautil::dassign $d Sender from Recipients recipientlist Text message Sent date_sent Markup markup
+		::gmautil::dassign $d Sender from Recipients recipientlist Text message Sent date_sent Markup markup Pin pinned
 	} else {
 		lassign {} from recipientlist message date_sent
 		set markup false
+		set pinned false
 	}
 
 	if {$for_user eq {}} {
@@ -13463,6 +13479,7 @@ proc DisplayChatMessage {d for_user args} {
 
 	set w $dice_preset_data(cw,$tkey)
 	set wc   $w.p.chat
+	set wpc  $w.p.pinnedchat
 	set wrsf $w.p.recent
 	set wpsf $w.p.preset
 
@@ -13530,6 +13547,7 @@ proc DisplayChatMessage {d for_user args} {
 			wm title $w "Die Rolls for $for_user"
 			ttk::labelframe $wc -text "Dice for $for_user"
 		}
+		ttk::labelframe $wpc -text "Pinned Messages"
 		ttk::labelframe $wrsf -text "Recent Rolls"
 		ttk::labelframe $wpsf -text "Preset Rolls"
 		pack [sframe new $wrsf.sf -anchor w] -side top -fill both -expand 1
@@ -13539,6 +13557,7 @@ proc DisplayChatMessage {d for_user args} {
 		bind $wrsf <Configure> "ResizeDieRoller $wr %w %h recent $for_user $tkey"
 		bind $wpsf <Configure> "ResizeDieRoller $wp %w %h preset $for_user $tkey"
 
+		$w.p add $wpc
 		$w.p add $wc
 		$w.p add $wrsf
 		$w.p add $wpsf
@@ -13565,6 +13584,7 @@ proc DisplayChatMessage {d for_user args} {
 		::tooltip::tooltip $wp.add.upd "Refresh preset list from server"
 
 		if {$for_user eq $local_user} {
+			pack [frame $wpc.1] -side top -expand 1 -fill both
 			pack [frame $wc.1] -side top -expand 1 -fill both
 		}
 		pack [frame $wc.2]\
@@ -13572,6 +13592,8 @@ proc DisplayChatMessage {d for_user args} {
 			-side top -expand 0 -fill x
 
 		if {$for_user eq $local_user} {
+			pack [text $wpc.1.text -yscrollcommand "$wpc.1.sb set" -height 10 -width 10 -state disabled] -side left -expand 1 -fill both
+			pack [scrollbar $wpc.1.sb -orient vertical -command "$wpc.1.text yview"] -side right -expand 0 -fill y
 			pack [text $wc.1.text -yscrollcommand "$wc.1.sb set" -height 10 -width 10 -state disabled] -side left -expand 1 -fill both
 			pack [scrollbar $wc.1.sb -orient vertical -command "$wc.1.text yview"] -side right -expand 0 -fill y
 		}
@@ -13584,6 +13606,7 @@ proc DisplayChatMessage {d for_user args} {
 		::tooltip::tooltip $wc.3.info "Display help for how to write die rolls and use the chat window."
 		set dice_preset_data(CHAT_blind,$tkey) 0
 		set dice_preset_data(CHAT_markup_en,$tkey) [gmaproto::int_bool [dict get $_preferences markup_enabled]]
+		set dice_preset_data(CHAT_pinned_en,$tkey) 0
 		pack [ttk::checkbutton $wc.3.blind -text GM -variable dice_preset_data(CHAT_blind,$tkey)] -side right
 		::tooltip::tooltip $wc.3.blind "Send result of die roll ONLY to the GM."
 		#-selectcolor $check_select_color
@@ -13595,10 +13618,12 @@ proc DisplayChatMessage {d for_user args} {
 		$wc.2.to.menu add checkbutton -label GM -onvalue 1 -offvalue 0 -variable dice_preset_data(CHAT_TO,$tkey,GM) -command [list update_chat_to $for_user $tkey] -selectcolor $check_menu_color
 
 		set dice_preset_data(CHAT_text,$tkey) {}
+		global icon_star
 
 		pack $wc.2.to -side left 
 		pack [entry $wc.2.entry -relief sunken -textvariable dice_preset_data(CHAT_text,$tkey)] -side left -fill x -expand 1
 		pack [button $wc.2.send -command RefreshPeerList -image $icon_arrow_refresh] -side right
+		pack [ttk::checkbutton $wc.2.pinned -image $icon_star -variable dice_preset_data(CHAT_pinned_en,$tkey)] -side right	; #TODO
 		pack [ttk::checkbutton $wc.2.markup -text M -variable dice_preset_data(CHAT_markup_en,$tkey)] -side right
 		::tooltip::tooltip $wc.2.markup "Enable GMA markup formatting codes in chat messages."
 #		if {$for_user eq $local_user} {
@@ -13629,6 +13654,7 @@ proc DisplayChatMessage {d for_user args} {
 				}
 				set options {}
 				$wc.1.text tag delete $tag
+				$wpc.1.text tag delete $tag
 				foreach {k o t} {
 					fg         -foreground c
 					bg         -background c
@@ -13652,6 +13678,7 @@ proc DisplayChatMessage {d for_user args} {
 				}
 
 				$wc.1.text tag configure $tag {*}$options
+				$wpc.1.text tag configure $tag {*}$options
 				DEBUG 3 "Configure tag $tag as $options"
 			}
 		}
@@ -13672,11 +13699,11 @@ proc DisplayChatMessage {d for_user args} {
 	}
 
 	set system [expr [lsearch -exact $args "-system"] >= 0] 
-	_render_chat_message $wc.1.text $system $message $recipientlist $from [dict get $d ToAll] [dict get $d ToGM] $date_sent $markup
+	_render_chat_message $wc.1.text $system $message $recipientlist $from [dict get $d ToAll] [dict get $d ToGM] $date_sent $markup $pinned
 	if {$system} {
-		TranscribeChat (system) $recipientlist $message [dict get $d ToAll] [dict get $d ToGM] $date_sent $markup
+		TranscribeChat (system) $recipientlist $message [dict get $d ToAll] [dict get $d ToGM] $date_sent $markup $pinned
 	} else {
-		TranscribeChat $from $recipientlist $message [dict get $d ToAll] [dict get $d ToGM] $date_sent $markup
+		TranscribeChat $from $recipientlist $message [dict get $d ToAll] [dict get $d ToGM] $date_sent $markup $pinned
 	}
 }
 
@@ -13695,8 +13722,14 @@ proc DisplayChatMessage {d for_user args} {
 #	}
 #}
 
-proc _render_chat_message {w system message recipientlist from toall togm {date_sent {}} {markup false}} {
+proc _render_chat_message {w system message recipientlist from toall togm {date_sent {}} {markup false} {pinned false}} {
 	global SuppressChat _preferences LastDisplayedChatDate dice_preset_data
+
+	if {$pinned} {
+		if {[set start [string first .chat.1 $w]] >= 0} {
+			set w [string replace $w $start $start+6 .pinnedchat.1]
+		}
+	}
 
 	if {!$SuppressChat && [winfo exists $w]} {
 		$w configure -state normal
@@ -13916,6 +13949,9 @@ proc BlankChatHistoryDisplay {} {
 #			$dice_preset_data(cw,$tkey).p.chat.1.text configure -state disabled
 #		}
 		$dice_preset_data(cw,$tkey).p.chat.1.text configure -state disabled
+		$dice_preset_data(cw,$tkey).p.pinnnedchat.1.text configure -state normal
+		$dice_preset_data(cw,$tkey).p.pinnnedchat.1.text delete 1.0 end
+		$dice_preset_data(cw,$tkey).p.pinnnedchat.1.text configure -state disabled
 		update
 	}
 }
@@ -13951,7 +13987,12 @@ proc LoadChatHistory {} {
 				} else {
 					set markup false
 				}
-				_render_chat_message $w 0 [dict get $d Text] [dict get $d Recipients] [dict get $d Sender] [dict get $d ToAll] [dict get $d ToGM] $date_sent $markup
+				if {[dict exists $d Pin] && [dict get $d Pin]} {
+					set pinned true
+				} else {
+					set pinned false
+				}
+				_render_chat_message $w 0 [dict get $d Text] [dict get $d Recipients] [dict get $d Sender] [dict get $d ToAll] [dict get $d ToGM] $date_sent $markup $pinned
 			}
 		}
                 CC	 {
@@ -13974,17 +14015,22 @@ proc LoadChatHistory {} {
 
 
 set chat_transcript_file {}
-proc TranscribeChat {from recipientlist message toall togm {date_sent {}} {markup false}} {
+proc TranscribeChat {from recipientlist message toall togm {date_sent {}} {markup false} {pinned false}} {
 	global ChatTranscript
 	if {$markup} {
 		set message [gma::minimarkup::strip [gma::minimarkup::render $message]]
 	}
+	if {$pinned} {
+		set pinmsg " **PINNED**"
+	} else {
+		set pinmsg ""
+	}
 
 	if {$ChatTranscript ne {}} {
 		if {[set private [Chat_text_attribution $from $recipientlist $toall $togm]] eq {}} {
-			_log_transcription "<$date_sent> $from: $message"
+			_log_transcription "<$date_sent> $from: $message$pinmsg"
 		} else {
-			_log_transcription "<$date_sent> $from ($private): $message"
+			_log_transcription "<$date_sent> $from ($private): $message$pinmsg"
 		}
 	}
 }
@@ -14312,10 +14358,10 @@ proc SendDieRoll {recipients dice blind_p for_user tkey} {
 proc UpdateDicePresets {deflist for_user {system false}} {::gmaproto::define_dice_presets $deflist false $for_user $system}
 proc RequestDicePresets {for_user} {::gmaproto::query_dice_presets $for_user}
 
-proc SendChatMessage {recipients message {markup false}} {
+proc SendChatMessage {recipients message {markup false} {pinned false}} {
 	set d [ParseRecipientList $recipients TO]
 	foreach msg [split $message "\n"] {
-		::gmaproto::chat_message $msg {} [dict get $d Recipients] [dict get $d ToAll] [dict get $d ToGM] $markup
+		::gmaproto::chat_message $msg {} [dict get $d Recipients] [dict get $d ToAll] [dict get $d ToGM] $markup $pinned
 	}
 }
 
@@ -14519,11 +14565,12 @@ proc SendChatFromWindow {for_user tkey} {
 		}
 
 		if {$dice_preset_data(CHAT_blind,$tkey)} {
-			::gmaproto::chat_message $ctext {} {} false true $dice_preset_data(CHAT_markup_en,$tkey)
+			::gmaproto::chat_message $ctext {} {} false true $dice_preset_data(CHAT_markup_en,$tkey) $dice_preset_data(CHAT_pinned_en,$tkey)
 		} else {
-			SendChatMessage [_recipients $for_user $tkey] $ctext $dice_preset_data(CHAT_markup_en,$tkey)
+			SendChatMessage [_recipients $for_user $tkey] $ctext $dice_preset_data(CHAT_markup_en,$tkey) $dice_preset_data(CHAT_pinned_en,$tkey)
 		}
 		set dice_preset_data(CHAT_text,$tkey) {}
+		set dice_preset_data(CHAT_pinned_en,$tkey) 0
 	}
 }
 
@@ -16430,7 +16477,7 @@ proc EncodePresetDetails {p} {
 #
 #
 #
-# @[00]@| GMA-Mapper 4.32
+# @[00]@| GMA-Mapper 4.33
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2025 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
