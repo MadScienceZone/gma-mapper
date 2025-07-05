@@ -3,19 +3,23 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.32          <!-- @@##@@ -->
- * Effective Date: 04-Jul-2025               <!-- @@##@@ -->
+ * This Package Version: 4.33          <!-- @@##@@ -->
+ * Effective Date: 05-Jul-2025               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.33 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.34.1 <!-- @@##@@ -->
  * GMA Mapper File Format: 23	     <!-- @@##@@ -->
- * GMA Mapper Protocol: 418        <!-- @@##@@ -->
+ * GMA Mapper Protocol: 419        <!-- @@##@@ -->
  * GMA Mapper Preferences File Format: 9 <!-- @@##@@ -->
 
 ## DEPRECATION NOTICE
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.33
+## Enhancement
+ * Chat messages may now be "pinned" in a priority window.
 
 # 4.32
 ## Enhancement
