@@ -3,7 +3,7 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.33          <!-- @@##@@ -->
+ * This Package Version: 4.33.1          <!-- @@##@@ -->
  * Effective Date: 05-Jul-2025               <!-- @@##@@ -->
 
 ## Compatibility
@@ -16,6 +16,10 @@
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.33.1
+## Fixes
+ * Corrects cryptographic signature on release files.
 
 # 4.33
 ## Enhancement
