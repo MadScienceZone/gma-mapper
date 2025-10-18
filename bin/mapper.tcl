@@ -11353,13 +11353,14 @@ proc _render_die_roller {w width height type for_user tkey args} {
 							_ {
 								pack [button $wpi.gb$j -image $icon_blank -relief flat] -side left
 								pack [label $wpi.gl$j -text [lindex $grplist $j] -fg $bgcolor -bg $bgcolor] -side left
+# --EXP--
+#							> {
+#								pack [button $wpi.gb$j -image $icon_bullet_arrow_right -relief flat -command [list DRPexpand $w $tkey $piname $j $for_user]] -side left
+#								pack [label $wpi.gl$j -text [lindex $grplist $j]] -side left
+#								return -level 0 -code $CONTINUE_OUTER_LOOP
+#							}
 							}
-							> {
-								pack [button $wpi.gb$j -image $icon_bullet_arrow_right -relief flat -command [list DRPexpand $w $tkey $piname $j $for_user]] -side left
-								pack [label $wpi.gl$j -text [lindex $grplist $j]] -side left
-								return -level 0 -code $CONTINUE_OUTER_LOOP
-							}
-							v {
+							v - > {
 								pack [button $wpi.gb$j -image $icon_bullet_arrow_down -relief flat -command [list DRPexpand $w $tkey $piname $j $for_user]] -side left
 								pack [label $wpi.gl$j -text [lindex $grplist $j]] -side left
 							}
@@ -11465,13 +11466,14 @@ proc _render_die_roller {w width height type for_user tkey args} {
 							_ {
 								pack [button $wpi.gb$j -image $icon_blank -relief flat] -side left
 								pack [label $wpi.gl$j -text [lindex $grplist $j] -fg $bgcolor -bg $bgcolor] -side left
+# --EXP--
+#							> {
+#								pack [button $wpi.gb$j -image $icon_bullet_arrow_right -relief flat -command [list DRPexpand $w $tkey $piname $j $for_user]] -side left
+#								pack [label $wpi.gl$j -text [lindex $grplist $j]] -side left
+#								return -level 0 -code $CONTINUE_OUTER_LOOP
+#							}
 							}
-							> {
-								pack [button $wpi.gb$j -image $icon_bullet_arrow_right -relief flat -command [list DRPexpand $w $tkey $piname $j $for_user]] -side left
-								pack [label $wpi.gl$j -text [lindex $grplist $j]] -side left
-								return -level 0 -code $CONTINUE_OUTER_LOOP
-							}
-							v {
+							v - > {
 								pack [button $wpi.gb$j -image $icon_bullet_arrow_down -relief flat -command [list DRPexpand $w $tkey $piname $j $for_user]] -side left
 								pack [label $wpi.gl$j -text [lindex $grplist $j]] -side left
 							}
@@ -11626,13 +11628,14 @@ proc _render_die_roller {w width height type for_user tkey args} {
 							_ {
 								pack [button $wpi.gb$j -image $icon_blank -relief flat] -side left
 								pack [label $wpi.gl$j -text [lindex $grplist $j] -fg $bgcolor -bg $bgcolor] -side left
+# --EXP--
+#							> {
+#								pack [button $wpi.gb$j -image $icon_bullet_arrow_right -relief flat -command [list DRPexpand $w $tkey $piname $j $for_user]] -side left
+#								pack [label $wpi.gl$j -text [lindex $grplist $j]] -side left
+#								return -level 0 -code $CONTINUE_OUTER_LOOP
+#							}
 							}
-							> {
-								pack [button $wpi.gb$j -image $icon_bullet_arrow_right -relief flat -command [list DRPexpand $w $tkey $piname $j $for_user]] -side left
-								pack [label $wpi.gl$j -text [lindex $grplist $j]] -side left
-								return -level 0 -code $CONTINUE_OUTER_LOOP
-							}
-							v {
+							v - > {
 								pack [button $wpi.gb$j -image $icon_bullet_arrow_down -relief flat -command [list DRPexpand $w $tkey $piname $j $for_user]] -side left
 								pack [label $wpi.gl$j -text [lindex $grplist $j]] -side left
 							}
