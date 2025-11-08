@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       ______   ______       __         #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \ / ___  \     /  \        #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \\/   \  \    \/) )       #
-# | |      | || || || (___) | Assistant  / (_) (_       ___) /   ___) /      | |       #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ (   (___ (       | |       #
-# | | \_  )| |   | || (   ) |                ) (           ) \      ) \      | |       #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  //\___/  / _  __) (_      #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/ \______/ (_) \____/      #
+#  _______  _______  _______                ___       ______      ___                  #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \    /   )                 #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \  / /) |                 #
+# | |      | || || || (___) | Assistant  / (_) (_       ___) / / (_) (_                #
+# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( (____   _)               #
+# | | \_  )| |   | || (   ) |                ) (           ) \     ) (                 #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /     | |                 #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/      (_)                 #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -17,10 +17,10 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.33.1}     ;# @@##@@
+set GMAMapperVersion {4.34}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {419}         ;# @@##@@
-set CoreVersionNumber {6.34.1}            ;# @@##@@
+set CoreVersionNumber {6.36.1}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -1054,14 +1054,14 @@ proc create_main_menu {use_button} {
 	$mm add cascade -menu $mm.tools -label Tools
 	$mm add cascade -menu $mm.help -label Help
 	menu $mm.file
-	$mm.file add command -command {loadfile {}} -label "Load Map File..."
-	$mm.file add command -command {loadfile {} -merge} -label "Merge Map File..."
-	$mm.file add command -command savefile -label "Save Map File..."
+	$mm.file add command -command {loadfile {}} -label "Load Map File..." -accelerator "^O"
+	$mm.file add command -command {loadfile {} -merge} -label "Merge Map File..." -accelerator "Alt-O"
+	$mm.file add command -command savefile -label "Save Map File..." -accelerator "^S"
 	$mm.file add separator
 	$mm.file add command -command restartMapper -label "Restart Mapper"
 	$mm.file add command -command exitchk -label Exit
 	menu $mm.edit
-	$mm.edit add radiobutton -command playtool -label "Normal Play Mode" -selectcolor $check_menu_color -variable d_OBJ_MODE -value nil
+	$mm.edit add radiobutton -command playtool -label "Normal Play Mode" -selectcolor $check_menu_color -variable d_OBJ_MODE -value nil -accelerator "Alt-N"
 	$mm.edit add separator
 	$mm.edit add command -command {cleargrid; ::gmaproto::clear E*} -label "Clear All Map Elements"
 	$mm.edit add command -command {clearplayers monster; ::gmaproto::clear M*} -label "Clear All Monsters"
@@ -1069,17 +1069,17 @@ proc create_main_menu {use_button} {
 	$mm.edit add command -command {clearplayers *; ::gmaproto::clear P*; ::gmaproto::clear M*} -label "Clear All Creatures"
 	$mm.edit add command -command {cleargrid; clearplayers *; ::gmaproto::clear *} -label "Clear All Objects"
 	$mm.edit add separator
-	$mm.edit add radiobutton -command linetool -label "Draw Lines" -selectcolor $check_menu_color -variable d_OBJ_MODE -value line
-	$mm.edit add radiobutton -command recttool -label "Draw Rectangles" -selectcolor $check_menu_color -variable d_OBJ_MODE -value rect
-	$mm.edit add radiobutton -command polytool -label "Draw Polygons" -selectcolor $check_menu_color -variable d_OBJ_MODE -value poly
-	$mm.edit add radiobutton -command circtool -label "Draw Circles/Ellipses" -selectcolor $check_menu_color -variable d_OBJ_MODE -value circ
-	$mm.edit add radiobutton -command arctool  -label "Draw Arcs" -selectcolor $check_menu_color -variable d_OBJ_MODE -value arc
-	$mm.edit add radiobutton -command texttool -label "Add Text..." -selectcolor $check_menu_color -variable d_OBJ_MODE -value text
-	$mm.edit add radiobutton -command killtool -label "Remove Objects" -selectcolor $check_menu_color -variable d_OBJ_MODE -value kill
-	$mm.edit add radiobutton -command movetool -label "Move Objects" -selectcolor $check_menu_color -variable d_OBJ_MODE -value move
-	$mm.edit add radiobutton -command stamptool -label "Stamp Objects" -selectcolor $check_menu_color -variable d_OBJ_MODE -value tile
+	$mm.edit add radiobutton -command linetool -label "Draw Lines" -selectcolor $check_menu_color -variable d_OBJ_MODE -value line -accelerator "Alt-L"
+	$mm.edit add radiobutton -command recttool -label "Draw Rectangles" -selectcolor $check_menu_color -variable d_OBJ_MODE -value rect -accelerator Alt-R
+	$mm.edit add radiobutton -command polytool -label "Draw Polygons" -selectcolor $check_menu_color -variable d_OBJ_MODE -value poly -accelerator Alt-P
+	$mm.edit add radiobutton -command circtool -label "Draw Circles/Ellipses" -selectcolor $check_menu_color -variable d_OBJ_MODE -value circ -accelerator Alt-E
+	$mm.edit add radiobutton -command arctool  -label "Draw Arcs" -selectcolor $check_menu_color -variable d_OBJ_MODE -value arc -accelerator Alt-A
+	$mm.edit add radiobutton -command texttool -label "Add Text..." -selectcolor $check_menu_color -variable d_OBJ_MODE -value text -accelerator Alt-T
+	$mm.edit add radiobutton -command killtool -label "Remove Objects" -selectcolor $check_menu_color -variable d_OBJ_MODE -value kill -accelerator Alt-X
+	$mm.edit add radiobutton -command movetool -label "Move Objects" -selectcolor $check_menu_color -variable d_OBJ_MODE -value move -accelerator Alt-M
+	$mm.edit add radiobutton -command stamptool -label "Stamp Objects" -selectcolor $check_menu_color -variable d_OBJ_MODE -value tile -accelerator Alt-S
 	$mm.edit add separator
-	$mm.edit add checkbutton -onvalue true -offvalue false -selectcolor $check_menu_color -variable ForceElementsToTop -label "Force Drawn Elements to Top"
+	$mm.edit add checkbutton -onvalue true -offvalue false -selectcolor $check_menu_color -variable ForceElementsToTop -label "Force Drawn Elements to Top" -accelerator "^T"
 	$mm.edit add separator
 	$mm.edit add checkbutton -command _showNoFill -label "Fill Shapes" -onvalue 0 -offvalue 1 -variable NoFill -selectcolor $check_menu_color
 	$mm.edit add command -command {colorpick fill} -label "Choose Fill Color..."
@@ -1130,12 +1130,12 @@ proc create_main_menu {use_button} {
 	}
 
 	$mm.edit add separator
-	$mm.edit add command -command {unloadfile {}} -label "Remove Elements from File..."
+	$mm.edit add command -command {unloadfile {}} -label "Remove Elements from File..." -accelerator "^Alt-O"
 	$mm.edit add separator
 	$mm.edit add command -command {editPreferences} -label "Preferences..."
 	menu $mm.view
 	$mm.view add checkbutton -command {toolBarState -1} -label "Show Toolbar" -onvalue 1 -offvalue 0 -selectcolor $check_menu_color -variable ShowToolBar
-	$mm.view add checkbutton -command {setGridEnable} -label "Show Map Grid" -onvalue 1 -offvalue 0 -selectcolor $check_menu_color -variable ShowMapGrid
+	$mm.view add checkbutton -command {setGridEnable} -label "Show Map Grid" -onvalue 1 -offvalue 0 -selectcolor $check_menu_color -variable ShowMapGrid -accelerator G
 	$mm.view add checkbutton -command {RefreshMOBs} -label "Show Health Stats" -onvalue 1 -offvalue 0 -selectcolor $check_menu_color -variable ShowHealthStats
 	menu $mm.view.timers
 	$mm.view add cascade -menu $mm.view.timers -label "Show Timers"
@@ -1143,24 +1143,24 @@ proc create_main_menu {use_button} {
 	$mm.view.timers add radiobutton -label "mine" -selectcolor $check_menu_color -variable TimerScope -value mine -command populate_timer_widgets
 	$mm.view.timers add radiobutton -label "all" -selectcolor $check_menu_color -variable TimerScope -value all -command populate_timer_widgets
 	$mm.view add separator
-	$mm.view add command -command {zoomInBy 2} -label "Zoom In"
-	$mm.view add command -command {zoomInBy 0.5} -label "Zoom Out"
-	$mm.view add command -command {resetZoom} -label "Restore Zoom"
+	$mm.view add command -command {zoomInBy 2} -label "Zoom In" -accelerator "^+"
+	$mm.view add command -command {zoomInBy 0.5} -label "Zoom Out" -accelerator "^-"
+	$mm.view add command -command {resetZoom} -label "Restore Zoom" -accelerator "^0"
 	$mm.view add separator
-	$mm.view add command -command {FindNearby} -label "Scroll to Visible Objects"
+	$mm.view add command -command {FindNearby} -label "Scroll to Visible Objects" -accelerator Alt-V
 	$mm.view add command -command {SyncView} -label "Scroll Others' Views to Match Mine"
 	$mm.view add checkbutton -onvalue true -offvalue false -selectcolor $check_menu_color -variable CombatantScrollEnabled -label "Scroll to Follow Combatants"
 	$mm.view add command -command {GoToGridCoords} -label "Go to Map Location..."
 	$mm.view add separator
-	$mm.view add command -command {refreshScreen} -label "Refresh Display"
+	$mm.view add command -command {refreshScreen} -label "Refresh Display" -accelerator "^R"
 	$mm.view add separator
 	$mm.view add command -command {animation_stop -all} -label "Stop Animations"
 	menu $mm.play
 	menu $mm.play.servers
 	menu $mm.play.delegatemenu
 	$mm.play add checkbutton -onvalue 1 -offvalue 0 -selectcolor $check_menu_color -variable MOB_COMBATMODE -label "Combat Mode" -command setcombatfrommenu
-	$mm.play add command -command {aoetool} -label "Indicate Area of Effect"
-	$mm.play add command -command {rulertool} -label "Measure Distance Along Line(s)"
+	$mm.play add command -command {aoetool} -label "Indicate Area of Effect" -accelerator "^A"
+	$mm.play add command -command {rulertool} -label "Measure Distance Along Line(s)" -accelerator "^D"
 	$mm.play add command -command {DisplayChatMessage {} {}} -label "Show Chat/Die-roll Window"
 	$mm.play add separator
 	$mm.play add cascade -menu $mm.play.delegatemenu -state disabled -label "Access Die Rolls For..."
@@ -1213,6 +1213,42 @@ proc create_main_menu {use_button} {
 	$mm.help add command -command {aboutMapper} -label "About Mapper..."
 	$mm.help add command -command {ShowDiceSyntax} -label "Die roller syntax ..."
 	$mm.help add command -command {gma::minimarkup::ShowMarkupSyntax} -label "Text markup syntax ..."
+
+	#
+	# set up key bindings
+	#
+	bind . <Control-Key-o> 	{display_message "loading map file..."; loadfile {}}
+	bind . <Alt-Key-o> 	{display_message "merging map file..."; loadfile {} -merge}
+	bind . <Control-Key-s>	{display_message "saving map..."; savefile}
+	bind . <Control-Alt-Key-o> {display_message "unloading objects from file..."; unloadfile {}}
+	bind . <Alt-Key-n>	{playtool; display_message "Selected normal play mode"}
+	bind . <Alt-Key-l>	{linetool; display_message "Selected line tool \[Alt-1 arrows, ALt-3 dashes\]"}
+	bind . <Alt-Key-r>	{recttool; display_message "Selected rectangle tool \[Alt-3 dashes\]"}
+	bind . <Alt-Key-p>	{polytool; display_message "Selected polygon tool \[Alt-1 join, Alt-2 spline, Alt-3 dashes\]"}
+	bind . <Alt-Key-e>	{circtool; display_message "Selected ellipse tool \[Alt-3 dashes\]"}
+	bind . <Alt-Key-a>	{arctool; display_message "Selected arc tool \[Alt-1 mode, Alt-3 dashes\]"}
+	bind . <Alt-Key-t>	{texttool; display_message "Selected text tool \[Alt-1 font, Alt-2 anchor\]"}
+	bind . <Alt-Key-x>	{killtool; display_message "Selected kill tool"}
+	bind . <Alt-Key-m>	{movetool; display_message "Selected move tool"}
+	bind . <Alt-Key-s>	{stamptool; display_message "Selected stamp tool"}
+	bind . <Control-Key-t>	{
+		global ForceElementsToTop 
+		if {$ForceElementsToTop} {
+			set ForceElementsToTop false
+			display_message "NOT forcing elements to top to stack"
+		} else {
+			set ForceElementsToTop true
+			display_message "Forcing elements to top to stack"
+		}
+	}
+	bind . <Key-g>		{toggleGridEnable}
+	bind . <Control-Key-plus>	{global zoom; zoomInBy 2; display_message "Zoomed in to $zoom"}
+	bind . <Control-Key-minus>	{global zoom; zoomInBy 0.5; display_message "Zoomed out to $zoom"}
+	bind . <Control-Key-0>	{global zoom; resetZoom; display_message "Reset zoom to $zoom"}
+	bind . <Alt-Key-v>	{FindNearby; display_message "Scrolled to visible objects"}
+	bind . <Control-Key-r>	{refreshScreen; display_message "Display refreshed"}
+	bind . <Control-Key-a>	{aoetool; display_message "Selected area-of-effect tool \[Alt-1 shape, Alt-2 spread\]"}
+	bind . <Control-Key-d>	{rulertool; display_message "Selected ruler tool"}
 }
 
 proc ClearPinnedChats {} {
@@ -3595,10 +3631,21 @@ proc canceltool {} {
 	bind . <Key-k> {}
 	bind . <Key-l> {}
 	bind . <Key-j> {}
+	bind . <Shift-Key-Left> {}
+	bind . <Shift-Key-Right> {}
+	bind . <Shift-Key-Up> {}
+	bind . <Shift-Key-Down> {}
+	bind . <Shift-Key-h> {}
+	bind . <Shift-Key-k> {}
+	bind . <Shift-Key-l> {}
+	bind . <Shift-Key-j> {}
 	bind . <Key-u> {}
 	bind . <Key-d> {}
 	bind . <Key-f> {}
 	bind . <Key-b> {}
+	bind . <Alt-Key-1> {}
+	bind . <Alt-Key-2> {}
+	bind . <Alt-Key-3> {}
 	set OBJ_BLINK {}
 }
 
@@ -3645,6 +3692,8 @@ proc aoetool {} {
 	.toolbar.mode2 configure -image $icon_no_spread -command toggleAoeSpread
 	::tooltip::tooltip .toolbar.mode {Cycle Area Shape}
 	::tooltip::tooltip .toolbar.mode2 {Toggle AoE Spread Mode (experimental)}
+	bind . <Alt-Key-1> toggleAoeShape
+	bind . <Alt-Key-2> toggleAoeSpread
 	set_OBJ_MODE aoe
 	set AOE_SHAPE radius
 	set AOE_SPREAD 0
@@ -3675,6 +3724,8 @@ proc linetool {} {
 	.toolbar.mode3 configure -image $icon_dash0 -command cycleDashStyle
 	::tooltip::tooltip .toolbar.mode2 {Cycle arrow style}
 	::tooltip::tooltip .toolbar.mode3 {Cycle dash style}
+	bind . <Alt-Key-1> cycleArrowStyle
+	bind . <Alt-Key-3> cycleDashStyle
 	set ARROWSTYLE none
 	set DASHSTYLE {}
 	set_OBJ_MODE line
@@ -3694,6 +3745,9 @@ proc polytool {} {
 	.toolbar.mode configure -image $icon_join_bevel -command toggleJoinStyle
 	.toolbar.mode2 configure -image $icon_spline_0 -command toggleSpline
 	.toolbar.mode3 configure -image $icon_dash0 -command cycleDashStyle
+	bind . <Alt-Key-1> toggleJoinStyle
+	bind . <Alt-Key-2> toggleSpline
+	bind . <Alt-Key-3> cycleDashStyle
 	::tooltip::tooltip .toolbar.mode {Cycle join style}
 	::tooltip::tooltip .toolbar.mode2 {Cycle spline level}
 	::tooltip::tooltip .toolbar.mode3 {Cycle dash style}
@@ -3734,6 +3788,8 @@ proc texttool {} {
 	set ClockDisplay $CurrentTextString
 	catch {tk fontchooser configure -parent . -font [lindex $CURRENT_FONT 0] -command [list SelectFont $canvas]}
 	bind . <<TkFontchooserFontChanged>> [list SelectFont $canvas]
+	bind . <Alt-Key-1> toggleFontChooser
+	bind . <Alt-Key-2> cycleAnchor
 }
 
 proc SelectText {x y} {
@@ -3899,6 +3955,7 @@ proc recttool {} {
 	.toolbar.mode3 configure -image $icon_dash0 -command cycleDashStyle
 	::tooltip::tooltip .toolbar.mode3 {Cycle dash style}
 	$canvas configure -cursor dotbox
+	bind . <Alt-Key-3> cycleDashStyle
 	set DASHSTYLE {}
 	set_OBJ_MODE rect
 }
@@ -3915,6 +3972,7 @@ proc circtool {} {
 	.toolbar.mode3 configure -image $icon_dash0 -command cycleDashStyle
 	::tooltip::tooltip .toolbar.mode3 {Cycle dash style}
 	$canvas configure -cursor circle
+	bind . <Alt-Key-3> cycleDashStyle
 	set_OBJ_MODE circ
 	set DASHSTYLE {}
 }
@@ -3936,6 +3994,8 @@ proc arctool {} {
 	::tooltip::tooltip .toolbar.mode {Cycle arc style}
 	set ARCMODE pieslice
 	set DASHSTYLE {}
+	bind . <Alt-Key-1> toggleArcMode
+	bind . <Alt-Key-3> cycleDashStyle
 }
 
 proc toggleArcMode {} {
@@ -3983,10 +4043,18 @@ proc movetool {} {
 	bind . <Key-d> "NudgeObjectZ $canvas down"
 	bind . <Key-f> "NudgeObjectZ $canvas front"
 	bind . <Key-b> "NudgeObjectZ $canvas back"
+	bind . <Shift-Key-h> "NudgeObject $canvas -10 0"
+	bind . <Shift-Key-l> "NudgeObject $canvas 10 0"
+	bind . <Shift-Key-k> "NudgeObject $canvas 0 -10"
+	bind . <Shift-Key-j> "NudgeObject $canvas 0 10"
 	bind . <Key-h> "NudgeObject $canvas -1 0"
 	bind . <Key-l> "NudgeObject $canvas 1 0"
 	bind . <Key-k> "NudgeObject $canvas 0 -1"
 	bind . <Key-j> "NudgeObject $canvas 0 1"
+	bind . <Shift-Key-Left> "NudgeObject $canvas -10 0"
+	bind . <Shift-Key-Right> "NudgeObject $canvas 10 0"
+	bind . <Shift-Key-Up> "NudgeObject $canvas 0 -10"
+	bind . <Shift-Key-Down> "NudgeObject $canvas 0 10"
 	bind . <Key-Left> "NudgeObject $canvas -1 0"
 	bind . <Key-Right> "NudgeObject $canvas 1 0"
 	bind . <Key-Up> "NudgeObject $canvas 0 -1"
@@ -16477,7 +16545,7 @@ proc EncodePresetDetails {p} {
 #
 #
 #
-# @[00]@| GMA-Mapper 4.33.1
+# @[00]@| GMA-Mapper 4.34
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2025 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
