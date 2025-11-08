@@ -3,11 +3,11 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.33.1          <!-- @@##@@ -->
- * Effective Date: 05-Jul-2025               <!-- @@##@@ -->
+ * This Package Version: 4.34          <!-- @@##@@ -->
+ * Effective Date: 07-Nov-2025               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.34.1 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.36.1 <!-- @@##@@ -->
  * GMA Mapper File Format: 23	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 419        <!-- @@##@@ -->
  * GMA Mapper Preferences File Format: 9 <!-- @@##@@ -->
@@ -16,6 +16,13 @@
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.34
+## Enhancement
+ * Adds keybindings for most toolbar/menu commands, allowing more rapid work when doing repetitive tasks in the mapper, when hitting a key may be more convenient than clicking through the menus or using the toolbar.
+ * Holding SHIFT while using the up, down, left, right, h, j, k, or l keys while using the move tool now moves the object by 10 pixels at a time instead of the normal 1 pixel (the unshifted behavior).
+## Fixes
+ * Corrected a typo in the source of the gma-mapper-protocol(7) manpage.
 
 # 4.33.1
 ## Fixes
