@@ -2204,6 +2204,12 @@ or \*(lq1d20\*(rq if there was no previous one.
 .TP
 .B Target
 The name of the creature to whom this die roll is being specifically targeted.
+If the die-roll spec contains a
+.B |target
+option, that will override any value passed here and will be reflected in
+the
+.B Target
+field of the results sent back from the server.
 .TP
 .B Type
 The type of die roll. Normally this is left out or blank, but it may be a string that describes
@@ -2222,7 +2228,6 @@ This will also force the same behavior as putting the
 option in the
 .B RollSpec
 string.
-.B damage
 .TP
 .B attack-ff
 As
@@ -2248,6 +2253,10 @@ Doesn't affect the process of rolling the dice, but the
 .B gma
 program will deduct the result value from the target creature's hit point total upon receipt of the
 results.
+.LP
+Certain die-roll spec options may automatically imply the type value. In which case,
+the die-roll options take precedence and will be reflected in the results
+returned from the server.
 .RE
 '\" <</>>
 '\" <</New>>
@@ -3081,6 +3090,20 @@ The amount of lethal damage sustained.
 .TP
 .BI NonLethalDamage " (int)"
 The amount of non-lethal damage sustained.
+'\" <<New>>
+.TP
+.BI AC " (int)"
+Current armor class
+.TP
+.BI FlatFootedAC " (int)"
+Current flat-footed armor class
+.TP
+.BI TouchAC " (int)"
+Current touch armor class.
+.TP
+.BI CMD " (int)"
+Current combat maneuver defense.
+'\" <</New>>
 '\" <</>>
 .RE
 .TP
@@ -3165,9 +3188,19 @@ is an object with the following fields:
 .BI Slot " (int)"
 The slot number. As currently implemented this is a number in the range [0,59] which
 gives the \*(lqcount\*(rq (1/10th second) in the round where this creature may act.
+'\" <<Warning>>
 .TP
 .BI CurrentHP " (int)"
 The creature's current hit point total.
+'\" <</bold-is-fixed>>
+.B "This field is deprecated."
+'\" <<bold-is-fixed>>
+Clients MUST use the
+.B OA
+command to change a creature's health attribute when hit points change
+instead of sending the current hit points here. A future version will remove
+support for this field.
+'\" <</Warning>>
 .TP
 .BI Name
 The creature's name as displayed on the map.
@@ -3966,6 +3999,7 @@ The creature's current touch armor class.
 .TP
 .BI CMD " (int)"
 The creature's current combat maneuver defense.
+'\" <</New>>
 '\" <</>>
 .RE
 .TP
