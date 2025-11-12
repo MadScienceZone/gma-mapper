@@ -1,121 +1,413 @@
-# sframe.tcl
-    # Paul Walton
-    # Create a ttk-compatible, scrollable frame widget.
-    #   Usage:
-    #       sframe new <path> ?-toplevel true?  ?-anchor nsew?
-    #       -> <path>
+if {[info exists ::scrolledframe::version]} { return }
+  namespace eval ::scrolledframe \
+  {
+  # beginning of ::scrolledframe namespace definition
+
+    package require Tk 8.4
+    namespace export scrolledframe
+
+  # ==============================
+  #
+  # scrolledframe
+  set version 0.9.1
+  set (debug,place) 0
+  #
+  # a scrolled frame
+  #
+  # (C) 2003, ulis
+  #
+  # NOL licence (No Obligation Licence)
+  #
+  # Changes (C) 2004, KJN
+  #
+  # NOL licence (No Obligation Licence)
+  # ==============================
+  #
+  # Hacked package, no documentation, sorry
+  # See example at bottom
+  #
+  # ------------------------------
+  # v 0.9.1
+  #  automatic scroll on resize
+  # ==============================
+
+    package provide Scrolledframe $version
+
+    # --------------
     #
-    #       sframe content <path>
-    #       -> <path of child frame where the content should go>
-    
-    namespace eval ::sframe {
-        namespace ensemble create
-        namespace export *
-    
-        # Create a scrollable frame or window.
-        proc new {path args} {
-            # Use the ttk theme's background for the canvas and toplevel
-            set bg [ttk::style lookup TFrame -background]
-            if { [ttk::style theme use] eq "aqua" } {
-                # Use a specific color on the aqua theme as 'ttk::style lookup' is not accurate.
-                set bg "#e9e9e9"
-            }
-        
-            # Create the main frame or toplevel.
-            if { [dict exists $args -toplevel]  &&  [dict get $args -toplevel] } {
-                toplevel $path  -bg $bg
-            } else {
-                ttk::frame $path
-            }
-            
-            # Create a scrollable canvas with scrollbars which will always be the same size as the main frame.
-            set canvas [canvas $path.canvas -bg $bg -bd 0 -highlightthickness 0 -yscrollcommand [list $path.scrolly set] -xscrollcommand [list $path.scrollx set]]
-            ttk::scrollbar $path.scrolly -orient vertical   -command [list $canvas yview]
-            ttk::scrollbar $path.scrollx -orient horizontal -command [list $canvas xview]
-            
-            # Create a container frame which will always be the same size as the canvas or content, whichever is greater. 
-            # This allows the child content frame to be properly packed and also is a surefire way to use the proper ttk background.
-            set container [ttk::frame $canvas.container]
-            pack propagate $container 0
-            
-            # Create the content frame. Its size will be determined by its contents. This is useful for determining if the 
-            # scrollbars need to be shown.
-            set content [ttk::frame $container.content]
-            
-            # Pack the content frame and place the container as a canvas item.
-            set anchor "n"
-            if { [dict exists $args -anchor] } {
-                set anchor [dict get $args -anchor]
-            }
-            pack $content -anchor $anchor -expand 1 -fill both
-            $canvas create window 0 0 -window $container -anchor nw
-            
-            # Grid the scrollable canvas sans scrollbars within the main frame.
-            grid $canvas   -row 0 -column 0 -sticky nsew
-            grid rowconfigure    $path 0 -weight 1
-            grid columnconfigure $path 0 -weight 1
-            
-            # Make adjustments when the sframe is resized or the contents change size.
-            bind $path.canvas <Expose> [list [namespace current]::resize $path]
-            
-            # Mousewheel bindings for scrolling.
-            bind [winfo toplevel $path] <MouseWheel>       [list +[namespace current] scroll $path yview %W %D]
-            bind [winfo toplevel $path] <Shift-MouseWheel> [list +[namespace current] scroll $path xview %W %D]
-            
-            return $path
-        }
-    
-    
-        # Given the toplevel path of an sframe widget, return the path of the child frame suitable for content.
-        proc content {path} {
-            return $path.canvas.container.content
-        }
-    
-    
-        # Make adjustments when the the sframe is resized or the contents change size.
-        proc resize {path} {
-            set canvas    $path.canvas
-            set container $canvas.container
-            set content   $container.content
-    
-            # Set the size of the container. At a minimum use the same width & height as the canvas.
-            set width  [winfo width $canvas]
-            set height [winfo height $canvas]
-            
-            # If the requested width or height of the content frame is greater then use that width or height.
-            if { [winfo reqwidth $content] > $width } {
-                set width [winfo reqwidth $content]
-            }
-            if { [winfo reqheight $content] > $height } {
-                set height [winfo reqheight $content]
-            }
-            $container configure  -width $width  -height $height
-    
-            # Configure the canvas's scroll region to match the height and width of the container.
-            $canvas configure -scrollregion [list 0 0 $width $height]
-    
-            # Show or hide the scrollbars as necessary.
-            # Horizontal scrolling.
-            if { [winfo reqwidth $content] > [winfo width $canvas] } {
-                grid $path.scrollx  -row 1 -column 0 -sticky ew
-            } else {
-                grid forget $path.scrollx
-            }
-            # Vertical scrolling.
-            if { [winfo reqheight $content] > [winfo height $canvas] } {
-                grid $path.scrolly  -row 0 -column 1 -sticky ns
-            } else {
-                grid forget $path.scrolly
-            }
-            return
-        }
-    
-    
-        # Handle mousewheel scrolling.    
-        proc scroll {path view W D} {
-            if { [winfo exists $path.canvas]  &&  [string match $path.canvas* $W] } {
-                $path.canvas $view scroll [expr {-$D}] units
-            }
-            return
-        }
+    # create a scrolled frame
+    #
+    # --------------
+    # parm1: widget name
+    # parm2: options key/value list
+    # --------------
+    proc scrolledframe {w args} \
+    {
+      variable {}
+      # create a scrolled frame
+      frame $w
+      # trap the reference
+      rename $w ::scrolledframe::_$w
+      # redirect to dispatch
+      interp alias {} $w {} ::scrolledframe::dispatch $w
+      # create scrollable internal frame
+      frame $w.scrolled -highlightt 0 -padx 0 -pady 0
+      # place it
+      place $w.scrolled -in $w -x 0 -y 0
+      if {$(debug,place)} { puts "place $w.scrolled -in $w -x 0 -y 0" } ;#DEBUG
+      # init internal data
+      set ($w:vheight) 0
+      set ($w:vwidth) 0
+      set ($w:vtop) 0
+      set ($w:vleft) 0
+      set ($w:xscroll) ""
+      set ($w:yscroll) ""
+      set ($w:width)    0
+      set ($w:height)   0
+      set ($w:fillx)    0
+      set ($w:filly)    0
+      # configure
+      if {$args != ""} { uplevel 1 ::scrolledframe::config $w $args }
+      # bind <Configure>
+      bind $w <Configure> [namespace code [list resize $w]]
+      bind $w.scrolled <Configure> [namespace code [list resize $w]]
+      # return widget ref
+      return $w
     }
+
+    # --------------
+    #
+    # dispatch the trapped command
+    #
+    # --------------
+    # parm1: widget name
+    # parm2: operation
+    # parm2: operation args
+    # --------------
+    proc dispatch {w cmd args} \
+    {
+      variable {}
+      switch -glob -- $cmd \
+      {
+        con*    { uplevel 1 [linsert $args 0 ::scrolledframe::config $w] }
+        xvi*    { uplevel 1 [linsert $args 0 ::scrolledframe::xview  $w] }
+        yvi*    { uplevel 1 [linsert $args 0 ::scrolledframe::yview  $w] }
+        default { uplevel 1 [linsert $args 0 ::scrolledframe::_$w    $cmd] }
+      }
+    }
+
+    # --------------
+    # configure operation
+    #
+    # configure the widget
+    # --------------
+    # parm1: widget name
+    # parm2: options
+    # --------------
+    proc config {w args} \
+    {
+      variable {}
+      set options {}
+      set flag 0
+      foreach {key value} $args \
+      {
+        switch -glob -- $key \
+        {
+          -fill   \
+          {
+            # new fill option: what should the scrolled object do if it is smaller than the viewing window?
+            if {$value == "none"} {
+               set ($w:fillx) 0
+               set ($w:filly) 0
+            } elseif {$value == "x"} {
+               set ($w:fillx) 1
+               set ($w:filly) 0
+            } elseif {$value == "y"} {
+               set ($w:fillx) 0
+               set ($w:filly) 1
+            } elseif {$value == "both"} {
+               set ($w:fillx) 1
+               set ($w:filly) 1
+            } else {
+               error "invalid value: should be \"$w configure -fill value\", where \"value\" is \"x\", \"y\", \"none\", or \"both\""
+            }
+            resize $w force
+            set flag 1
+          }
+          -xsc*   \
+          {
+            # new xscroll option
+            set ($w:xscroll) $value
+            set flag 1
+          }
+          -ysc*   \
+          {
+            # new yscroll option
+            set ($w:yscroll) $value
+            set flag 1
+          }
+          default { lappend options $key $value }
+        }
+      }
+      # check if needed
+      if {!$flag || $options != ""} \
+      {
+        # call frame config
+        uplevel 1 [linsert $options 0 ::scrolledframe::_$w config]
+      }
+    }
+
+    # --------------
+    # resize proc
+    #
+    # Update the scrollbars if necessary, in response to a change in either the viewing window
+    # or the scrolled object. 
+    # Replaces the old resize and the old vresize
+    # A <Configure> call may mean any change to the viewing window or the scrolled object.
+    # We only need to resize the scrollbars if the size of one of these objects has changed.
+    # Usually the window sizes have not changed, and so the proc will not resize the scrollbars.
+    # --------------
+    # parm1: widget name
+    # parm2: pass anything to force resize even if dimensions are unchanged
+    # --------------
+    proc resize {w args} \
+    {
+      variable {}
+      set force [llength $args]
+
+      set _vheight     $($w:vheight)
+      set _vwidth      $($w:vwidth)
+      # compute new height & width
+      set ($w:vheight) [winfo reqheight $w.scrolled]
+      set ($w:vwidth)  [winfo reqwidth  $w.scrolled]
+
+      # The size may have changed, e.g. by manual resizing of the window
+      set _height     $($w:height)
+      set _width      $($w:width)
+      set ($w:height) [winfo height $w] ;# gives the actual height of the viewing window
+      set ($w:width)  [winfo width  $w] ;# gives the actual width of the viewing window
+
+
+      if {$force || $($w:vheight) != $_vheight || $($w:height) != $_height} {
+        # resize the vertical scroll bar
+        yview $w scroll 0 unit
+        # yset $w
+      }
+
+      if {$force || $($w:vwidth) != $_vwidth || $($w:width) != $_width} {
+        # resize the horizontal scroll bar
+        xview $w scroll 0 unit
+        # xset $w
+      }
+    } ;# end proc resize
+
+
+    # --------------
+    # xset proc
+    #
+    # resize the visible part
+    # --------------
+    # parm1: widget name
+    # --------------
+    proc xset {w} \
+    {
+      variable {}
+      # call the xscroll command
+      set cmd $($w:xscroll)
+      if {$cmd != ""} { catch { eval $cmd [xview $w] } }
+    }
+
+    # --------------
+    # yset proc
+    #
+    # resize the visible part
+    # --------------
+    # parm1: widget name
+    # --------------
+    proc yset {w} \
+    {
+      variable {}
+      # call the yscroll command
+      set cmd $($w:yscroll)
+      if {$cmd != ""} { catch { eval $cmd [yview $w] } }
+    }
+
+    # -------------
+    # xview
+    #
+    # called on horizontal scrolling
+    # -------------
+    # parm1: widget path
+    # parm2: optional moveto or scroll
+    # parm3: fraction if parm2 == moveto, count unit if parm2 == scroll
+    # -------------
+    # return: scrolling info if parm2 is empty
+    # -------------
+    proc xview {w {cmd ""} args} \
+    {
+      variable {}
+      # check args
+      set len [llength $args]
+      switch -glob -- $cmd \
+      {
+        ""      {set args {}}
+        mov*    \
+        { if {$len != 1} { error "wrong # args: should be \"$w xview moveto fraction\"" } }
+        scr*    \
+        { if {$len != 2} { error "wrong # args: should be \"$w xview scroll count unit\"" } }
+        default \
+        { error "unknown operation \"$cmd\": should be empty, moveto or scroll" }
+      }
+      # save old values:
+      set _vleft $($w:vleft)
+      set _vwidth $($w:vwidth)
+      set _width  $($w:width)
+      # compute new vleft
+      set count ""
+      switch $len \
+      {
+        0       \
+        {
+          # return fractions
+          if {$_vwidth == 0} { return {0 1} }
+          set first [expr {double($_vleft) / $_vwidth}]
+          set last [expr {double($_vleft + $_width) / $_vwidth}]
+          if {$last > 1.0} { return {0 1} }
+          return [list $first $last]
+        }
+        1       \
+        {
+          # absolute movement
+          set vleft [expr {int(double($args) * $_vwidth)}]
+        }
+        2       \
+        {
+          # relative movement
+          foreach {count unit} $args break
+          if {[string match p* $unit]} { set count [expr {$count * 9}] }
+          set vleft [expr {$_vleft + $count * 0.1 * $_width}]
+        }
+      }
+      if {$vleft + $_width > $_vwidth} { set vleft [expr {$_vwidth - $_width}] }
+      if {$vleft < 0} { set vleft 0 }
+      if {$vleft != $_vleft || $count == 0} \
+      {
+        set ($w:vleft) $vleft
+        xset $w
+        if {$($w:fillx) && ($_vwidth < $_width || $($w:xscroll) == "") } {
+          # "scrolled object" is not scrolled, because it is too small or because no scrollbar was requested
+          # fillx means that, in these cases, we must tell the object what its width should be
+          place $w.scrolled -in $w -x [expr {-$vleft}] -width $_width
+          if {$(debug,place)} { puts "place $w.scrolled -in $w -x [expr {-$vleft}] -width $_width" } ;#DEBUG
+        } else {
+          place $w.scrolled -in $w -x [expr {-$vleft}] -width {}
+          if {$(debug,place)} { puts "place $w.scrolled -in $w -x [expr {-$vleft}] -width {}" } ;#DEBUG
+        }
+
+      }
+    }
+
+    # -------------
+    # yview
+    #
+    # called on vertical scrolling
+    # -------------
+    # parm1: widget path
+    # parm2: optional moveto or scroll
+    # parm3: fraction if parm2 == moveto, count unit if parm2 == scroll
+    # -------------
+    # return: scrolling info if parm2 is empty
+    # -------------
+    proc yview {w {cmd ""} args} \
+    {
+      variable {}
+      # check args
+      set len [llength $args]
+      switch -glob -- $cmd \
+      {
+        ""      {set args {}}
+        mov*    \
+        { if {$len != 1} { error "wrong # args: should be \"$w yview moveto fraction\"" } }
+        scr*    \
+        { if {$len != 2} { error "wrong # args: should be \"$w yview scroll count unit\"" } }
+        default \
+        { error "unknown operation \"$cmd\": should be empty, moveto or scroll" }
+      }
+      # save old values
+      set _vtop $($w:vtop)
+      set _vheight $($w:vheight)
+  #    set _height [winfo height $w]
+      set _height $($w:height)
+      # compute new vtop
+      set count ""
+      switch $len \
+      {
+        0       \
+        {
+          # return fractions
+          if {$_vheight == 0} { return {0 1} }
+          set first [expr {double($_vtop) / $_vheight}]
+          set last [expr {double($_vtop + $_height) / $_vheight}]
+          if {$last > 1.0} { return {0 1} }
+          return [list $first $last]
+        }
+        1       \
+        {
+          # absolute movement
+          set vtop [expr {int(double($args) * $_vheight)}]
+        }
+        2       \
+        {
+          # relative movement
+          foreach {count unit} $args break
+          if {[string match p* $unit]} { set count [expr {$count * 9}] }
+          set vtop [expr {$_vtop + $count * 0.1 * $_height}]
+        }
+      }
+      if {$vtop + $_height > $_vheight} { set vtop [expr {$_vheight - $_height}] }
+      if {$vtop < 0} { set vtop 0 }
+      if {$vtop != $_vtop || $count == 0} \
+      {
+        set ($w:vtop) $vtop
+        yset $w
+        if {$($w:filly) && ($_vheight < $_height || $($w:yscroll) == "")} {
+          # "scrolled object" is not scrolled, because it is too small or because no scrollbar was requested
+          # filly means that, in these cases, we must tell the object what its height should be
+          place $w.scrolled -in $w -y [expr {-$vtop}] -height $_height
+          if {$(debug,place)} { puts "place $w.scrolled -in $w -y [expr {-$vtop}] -height $_height" } ;#DEBUG
+        } else {
+          place $w.scrolled -in $w -y [expr {-$vtop}] -height {}
+          if {$(debug,place)} { puts "place $w.scrolled -in $w -y [expr {-$vtop}] -height {}" } ;#DEBUG
+        }
+      }
+    }
+
+  # end of ::scrolledframe namespace definition
+}
+
+# sframe::new <path> ?-anchor w? -> <path>
+# sframe::content path -> <path>.scrolled
+
+namespace eval ::sframe {
+    namespace import ::scrolledframe::scrolledframe
+    namespace ensemble create
+    namespace export *
+    proc new {w args} {
+        frame $w
+        scrolledframe $w.sf {*}[dict remove [dict merge [dict create -height 150 -width 150] $args] -anchor] \
+		-xscrollcommand [list $w.hs set] \
+		-yscrollcommand [list $w.vs set] -fill both
+        scrollbar $w.vs -command [list $w.sf yview] -orient vertical
+        scrollbar $w.hs -command [list $w.sf xview] -orient horizontal
+        grid $w.sf -row 0 -column 0 -sticky nsew
+        grid $w.vs -row 0 -column 1 -sticky ns
+        grid $w.hs -row 1 -column 0 -sticky ew
+        grid rowconfigure $w 0 -weight 1
+        grid columnconfigure $w 0 -weight 1
+	return $w
+    }
+    
+    proc content {w} {
+    	return $w.sf.scrolled
+    }
+}
