@@ -1,7 +1,7 @@
 '\" t
 '\" *** 419 ***
 '\" <<ital-is-var>>
-.TH GMA-MAPPER-PROTOCOL 7 "GMA-Mapper 4.34" 07-Nov-2025 "Protocols" \" @@mp@@
+.TH GMA-MAPPER-PROTOCOL 7 "GMA-Mapper 4.34.1" 11-Nov-2025 "Protocols" \" @@mp@@
 .SH NAME
 gma-mapper-protocol \- GMA client/server protocol specification
 .SH EXPERIMENTAL
@@ -1269,26 +1269,6 @@ Description of what will bypass the DR.
 .TP
 .B Immunities
 A description of the things the creature is immune from.
-.TP
-.B Resists
-A description of the resistances the creature has.
-.TP
-.BI "Speed " (object)
-The creature's movement speed, as an object with the following fields:
-'\" <<list>>
-.RS
-.TP
-.B Code
-The encoded list of speeds.
-.TP
-.B Special
-Additional commentary about movement speed.
-'\" <</>>
-.RE
-.TP
-.B SpecialAttacks
-A description of the various special attacks the creature may make.
-
 .TP
 .B Resists
 A description of the resistances the creature has.
@@ -4082,6 +4062,13 @@ As
 but indicates the distance for reach weapons.
 '\" <</>>
 .RE
+'\" <<New>>
+.TP
+.BI Targets " (list of strings)"
+The list of designated combat targets. If non-empty, the first creature named in this attribute
+is the target of attack die rolls and all creatures named are the targets of any damage die rolls
+made by this creature.
+'\" <</New>>
 .LP
 (Added in protocol 406.)
 '\" <</>>
