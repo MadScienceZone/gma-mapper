@@ -974,7 +974,7 @@ if {$tcl_platform(os) eq "Darwin"} {
 
 set ICON_DIR [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end-1 end lib MadScienceZone GMA Mapper icons]]]
 set BIN_DIR [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end end]]]
-foreach module {scrolledframe2 ustar gmaclock gmacolors gmautil gmaprofile gmaproto gmafile gmazones progressbar minimarkup} {
+foreach module {scrolledframe ustar gmaclock gmacolors gmautil gmaprofile gmaproto gmafile gmazones progressbar minimarkup} {
 	source [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end end $module.tcl]]]
 }
 
@@ -11607,7 +11607,7 @@ proc _render_die_roller {w width height type for_user tkey args} {
 					}
 				}
 				if {![info exists dice_preset_data(en,$tkey,$piname)]} {
-#					trace add variable dice_preset_data(en,$tkey,$piname) {array read write unset} TRACEvar
+					#trace add variable dice_preset_data(en,$tkey,$piname) {array read write unset} TRACEvar
 					set dice_preset_data(en,$tkey,$piname) [::gmaproto::int_bool [dict get $preset Enabled]]
 				} else {
 					#TRACE "variable dice_preset_data(en,$tkey,$piname) already exists with value $dice_preset_data(en,$tkey,$piname)"
@@ -13193,6 +13193,7 @@ proc EDRPaddModifier {w for_user tkey} {
 proc PresetLists {arrayname tkey args} {
 	upvar $arrayname presets
 	global DieRollPresetState
+	global dice_preset_data
 	set export [expr [lsearch -exact $args -export] >= 0]
 	set mods {}
 	set rolls {}
@@ -13289,14 +13290,23 @@ proc PresetLists {arrayname tkey args} {
 			}
 
 			lappend mods $d
+			set u_piname [to_window_id u[dict get $d Name]]
+
 			if {$export} {
 				if {[set varname [string trim [dict get $d Variable]]] ne {}} {
 					if {[string is alpha -strict [string range $varname 0 0]] &&
 					([string length $varname] == 1 ||
 					[string is alnum -strict [string range $varname 1 end]])} {
 						set DieRollPresetState($tkey,var,$varname) [dict get $d DieRollSpec]
-						set DieRollPresetState($tkey,on,$varname) [dict get $d Enabled]
+						if {[info exists dice_preset_data(en,$tkey,$varname)]} {
+							set DieRollPresetState($tkey,on,$varname) $dice_preset_data(en,$tkey,$varname)
+						} else {
+							set DieRollPresetState($tkey,on,$varname) [dict get $d Enabled]
+						}
 						set DieRollPresetState($tkey,g,$varname) false
+						#trace add variable DieRollPresetState($tkey,on,$varname) {array read write unset} TRACEvar
+						#trace add variable DieRollPresetState($tkey,var,$varname) {array read write unset} TRACEvar
+						#trace add variable DieRollPresetState($tkey,g,$varname) {array read write unset} TRACEvar
 					} else {
 						DEBUG 0 "Invalid modifier variable name <$varname>. This variable will be ignored."
 						DEBUG 0 "Variables must begin with a letter and include only letters and numbers."
@@ -13304,9 +13314,20 @@ proc PresetLists {arrayname tkey args} {
 				} else {
 					set id [dict get $d DisplaySeq]
 					set DieRollPresetState($tkey,global,u$id) [dict get $d DieRollSpec]
-					set DieRollPresetState($tkey,on,u$id) [dict get $d Enabled]
+					#puts "=== $d"
+					if {[info exists dice_preset_data(en,$tkey,$u_piname)]} {
+						set DieRollPresetState($tkey,on,u$id) $dice_preset_data(en,$tkey,$u_piname)
+						#puts "*** set value for u$id to $DieRollPresetState($tkey,on,u$id) from $dice_preset_data(en,$tkey,$u_piname)"
+						lappend DieRollPresetState($tkey,apply_order) u$id
+					} else {
+						set DieRollPresetState($tkey,on,u$id) [dict get $d Enabled]
+						#puts "*** set value for u$id to $DieRollPresetState($tkey,on,u$id) because no var in $d"
+						lappend DieRollPresetState($tkey,apply_order) u$id
+					}
 					set DieRollPresetState($tkey,g,u$id) [dict get $d Global]
-					lappend DieRollPresetState($tkey,apply_order) u$id
+					#trace add variable DieRollPresetState($tkey,on,u$id) {array read write unset} TRACEvar
+					#trace add variable DieRollPresetState($tkey,global,u$id) {array read write unset} TRACEvar
+					#trace add variable DieRollPresetState($tkey,g,u$id) {array read write unset} TRACEvar
 				}
 			}
 		} else {
@@ -13432,13 +13453,18 @@ proc PresetLists {arrayname tkey args} {
 			}
 
 			lappend gmods $d
+			set g_piname [to_window_id g[dict get $d Name]]
 			if {$export} {
 				if {[set varname [string trim [dict get $d Variable]]] ne {}} {
 					if {[string is alpha -strict [string range $varname 0 0]] &&
 					([string length $varname] == 1 ||
 					[string is alnum -strict [string range $varname 1 end]])} {
 						set DieRollPresetState(sys,gvar,$varname) [dict get $d DieRollSpec]
-						set DieRollPresetState(sys,gvar_on,$varname) [dict get $d Enabled]
+						if {[info exists dice_preset_data(sys,gvar_on,$g_piname)]} {
+							set DieRollPresetState(sys,gvar_on,$varname) $dice_preset_data(sys,gvar_on,$g_piname)
+						} else {
+							set DieRollPresetState(sys,gvar_on,$varname) [dict get $d Enabled]
+						}
 					} else {
 						DEBUG 0 "Invalid modifier variable name <$varname>. This variable will be ignored."
 						DEBUG 0 "Variables must begin with a letter and include only letters and numbers."
@@ -13446,7 +13472,11 @@ proc PresetLists {arrayname tkey args} {
 				} else {
 					set id [dict get $d DisplaySeq]
 					set DieRollPresetState($tkey,global,g$id) [dict get $d DieRollSpec]
-					set DieRollPresetState($tkey,on,g$id) [dict get $d Enabled]
+					if {[info exists dice_preset_data(en,$tkey,$g_piname)]} {
+						set DieRollPresetState($tkey,on,g$id) $dice_preset_data(en,$tkey,$g_piname)
+					} else {
+						set DieRollPresetState($tkey,on,g$id) [dict get $d Enabled]
+					}
 					set DieRollPresetState($tkey,g,g$id) [dict get $d Global]
 					lappend DieRollPresetState($tkey,apply_order) g$id
 				}
@@ -16533,6 +16563,9 @@ proc EncodePresetDetails {p} {
 }
 
 # dice_preset_data
+#	collapse,<tkey>,<piname> bool
+#	to_window_id {g|u}[Name]
+#
 # 	en,<tkey>,<piname>	-> DRPScheckVarEn en,<tkey>,<piname> [g|u|]<id> <user> <tkey> u|<scope>
 #	EDRP_mod_g,<tkey>,<i>	-> bool (Global flag)
 #	EDRP_mod_ven,<tkey>,<i>	-> bool 1=has var name 0=doesn't
