@@ -974,7 +974,7 @@ if {$tcl_platform(os) eq "Darwin"} {
 
 set ICON_DIR [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end-1 end lib MadScienceZone GMA Mapper icons]]]
 set BIN_DIR [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end end]]]
-foreach module {scrolledframe ustar gmaclock gmacolors gmautil gmaprofile gmaproto gmafile gmazones progressbar minimarkup} {
+foreach module {scrolledframe2 ustar gmaclock gmacolors gmautil gmaprofile gmaproto gmafile gmazones progressbar minimarkup} {
 	source [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end end $module.tcl]]]
 }
 
@@ -16532,6 +16532,19 @@ proc EncodePresetDetails {p} {
 	}
 }
 
+# dice_preset_data
+# 	en,<tkey>,<piname>	-> DRPScheckVarEn en,<tkey>,<piname> [g|u|]<id> <user> <tkey> u|<scope>
+#	EDRP_mod_g,<tkey>,<i>	-> bool (Global flag)
+#	EDRP_mod_ven,<tkey>,<i>	-> bool 1=has var name 0=doesn't
+#	EDRP_mod_en,<tkey>,<i>	-> 
+#
+# On receipt of DD=
+#	destroy all dice_preset_data(w,<tkey>,*) widgets
+#	unset sys,preset,* and w,<tkey>,* and possibly preset,<tkey>,*
+#	_render_die_roller into sframe
+#	
+#
+#
 # DieRollPresetState
 # 	<tkey>,on,<varname>		var behind checkbutton (user)
 # 	<tkey>,var,<varname>	value
