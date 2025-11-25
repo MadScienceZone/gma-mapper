@@ -1,5 +1,5 @@
 '\" t
-'\" *** 419 ***
+'\" *** 420 ***
 '\" <<ital-is-var>>
 .TH GMA-MAPPER-PROTOCOL 7 "GMA-Mapper 4.34.1" 11-Nov-2025 "Protocols" \" @@mp@@
 .SH NAME
@@ -187,6 +187,7 @@ since all communications are asynchronous.
 '\"  \z{/CONN}  &C$\rightarrow$S    &\z{CONN}   &no &none          &Request list of peer clients\\
 '\"  \z{ACCEPT} &C$\rightarrow$S    &---        &no &\acronym{JSON}&Subscribe to a set of messages\\
 '\"  \z{AC}     &C$\leftarrow$S     &---        &N/A&\acronym{JSON}&Add primary PC to party\\
+'\"  \Z{AKA}    &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Declare character name for a player\\
 '\"  \z{ALLOW}  &C$\rightarrow$S    &---        &no &\acronym{JSON}&Indicate supported features\\
 '\"  \z{AUTH}   &C$\rightarrow$S    &\z{GRANTED}&no &\acronym{JSON}&Authenticate to server\\
 '\"  \z{AV}     &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Scroll clients' views\\
@@ -275,6 +276,7 @@ AdjustView	AV	C\[<>]S	\fR\(em\fP	no	JSON	Scroll clients' views
 Allow	ALLOW	C\[->]S	\fR\(em\fP	no	JSON	Indicate supported features
 Auth	AUTH	C\[->]S	GRANTED	no	JSON	Authenticate to server
 Challenge	OK	C\[<-]S	AUTH	N/A	JSON	Ask client to authenticate
+CharacterName	AKA	C\[<>]S	\fR\(em\fP	no	JSON	Declare character name for a player
 ChatMessage	TO	C\[<>]S	\fR\(em\fP	no	JSON	Send chat message
 Clear	CLR	C\[<>]S	\fR\(em\fP	no	JSON	Remove objects from client
 ClearChat	CC	C\[<>]S	\fR\(em\fP	no	JSON	Clear the chat history
@@ -658,6 +660,33 @@ the opposite is done: images whose names match
 will be removed.
 .RE
 '\" <</>>
+'\" <<New>>
+.TP
+.B AKA
+Declare that the logged-in user is controlling one or more characters
+on the VTT map. Normally, the mapper tool will assume that users are controlling
+creatures whose names (as known on the map) match the players' login usernames.
+If that is not the case for any given player,
+this command may be sent by that player's client
+to indicate what creature token(s) they are controlling, so the other map
+clients (and any other interested programs) can know who is who on the battlefield.
+The JSON payload has the following fields:
+'\" <<list>>
+.RS
+.TP
+'\" <</ital-is-var>>
+.BI Names " (list of strings)"
+The names of the creatures this player is controlling.
+.TP
+.B User
+The login name for the user's session. This field is not normally supplied
+as part of the request by the player's client. It will be filled in by the
+server when relaying the
+.B AKA
+message to all peer clients, using the requester's logged in user name in
+this field.
+.RE
+'\" <</New>>
 .TP
 .B ALLOW
 The client MAY send this command to the server after logging in. This tells
@@ -666,7 +695,6 @@ JSON payload has the following field:
 .RS
 '\" <<list>>
 .TP
-'\" <</ital-is-var>>
 .BI Features " (list of strings)"
 '\" <<ital-is-var>>
 This is a list of feature names which the client wishes to enable.
@@ -1008,6 +1036,14 @@ command from the peer.
 .TP
 .BI IsAuthenticated " (bool)"
 If true, the client successfully negotiated the server's authentication process.
+'\" <<New>>
+.TP
+.BI AKA " (list of strings)"
+The list of creature names, if any, that the player is controlling instead of
+a creature matching the
+.B User
+field value.
+'\" <</New>>
 .TP
 .BI IsMe " (bool)"
 '\" <<ital-is-var>>
@@ -4783,7 +4819,9 @@ John Mechalas (elevation and movement modes).
 .SH HISTORY
 .LP
 This document defines map protocol version 420,
-which introduces targets to die rolls and armor class as a tracked creature health item.
+which introduces targets to die rolls and armor class as a tracked creature health item. It also introduces the
+.B AKA
+command.
 .LP
 Version 419
 added support for pinned chat messages.
