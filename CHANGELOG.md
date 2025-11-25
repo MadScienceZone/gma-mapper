@@ -3,8 +3,8 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.34          <!-- @@##@@ -->
- * Effective Date: 07-Nov-2025               <!-- @@##@@ -->
+ * This Package Version: 4.34.1          <!-- @@##@@ -->
+ * Effective Date: 11-Nov-2025               <!-- @@##@@ -->
 
 ## Compatibility
  * GMA Core API Library Version: 6.36.1 <!-- @@##@@ -->
@@ -16,6 +16,13 @@
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.34.1
+## Fixes
+ * Corrected bug with modifier enable checkbuttons not tracking the internal state of the modifiers.
+ * Replaced scrolled frame code with a faster implementation.
+## Updates
+ * Added informatin to the gma-mapper-protocol(7) documentation in anticipation of future capabilities.
 
 # 4.34
 ## Enhancement
