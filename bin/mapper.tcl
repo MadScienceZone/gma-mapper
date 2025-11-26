@@ -10206,8 +10206,9 @@ proc DoCommandCLR@ {d} {
 
 # PeerList now includes AKA attribute
 proc DoCommandCONN {d} {
-	global local_user PeerList local_aka
+	global local_user PeerList local_aka PeerAKA
 	set PeerList {}
+	array unset PeerAKA
 
 	foreach peer [dict get $d PeerList] {
 		::gmautil::dassign $peer User peer_user
@@ -10221,6 +10222,9 @@ proc DoCommandCONN {d} {
 				# we check for "None" because of the behavior of the Python server (sigh)
 				if {$peer_user ne $local_user} {
 					lappend PeerList $peer_user
+					if {[dict exists $peer AKA]} {
+						set PeerAKA($peer_user) [dict get $peer AKA]
+					}
 					DEBUG 3 "Peerlist=$PeerList"
 				} else {
 					DEBUG 2 "Excluding $peer (this is my username)"
@@ -10242,7 +10246,7 @@ proc DoCommandCONN {d} {
 }
 
 proc DoCommandAKA {d} {
-	global PeerList local_aka local_user
+	global PeerList local_aka local_user PeerAKA
 
 	::gmautil::dassigndef $d Names {names {}} User {user {}}
 	if {$user eq {}} {
@@ -10252,16 +10256,8 @@ proc DoCommandAKA {d} {
 	if {$user eq $local_user} {
 		set local_aka $names
 	} else {
-		for {set i 0} {$i < [llength $PeerList]} {incr i} {
-			if {[dict get [set p [lindex $PeerList $i]] User] eq $user} {
-				set PeerList [lreplace $PeerList $i $i [dict replace $p AKA $names]]
-				DEBUG 1 "Replaced $user character names at position $i"
-			}
-		}
+		set PeerAKA($user) $names
 	}
-
-	DEBUG 1 "New peer list is $PeerList"
-	DEBUG 1 "Local AKA is $local_aka"
 }
 
 proc DoCommandDD= {d} {
@@ -10470,9 +10466,18 @@ proc create_timer_widget {id} {
 		DEBUG 1 "Not showing timer $id because timer display is turned off."
 		return
 	}
-	if {$TimerScope eq "mine" && [lsearch -exact $timer_progress_data(targets:$id) $local_user] < 0} {
-		DEBUG 1 "Not showing timer $id because $local_user is not in $timer_progress_data(targets:$id)"
-		return
+	if {$TimerScope eq "mine"} {
+		set ok false
+		foreach my_name [my_map_names] {
+			if {[lsearch -exact $timer_progress_data(targets:$id) $my_name] >= 0} {
+				set ok true
+				break
+			}
+		}
+		if {!$ok} {
+			DEBUG 1 "Not showing timer $id because $local_user is not in $timer_progress_data(targets:$id)"
+			return
+		}
 	}
 
 	set wid [to_window_id $id]
@@ -14448,21 +14453,24 @@ proc ChatAttribution {w from recipientlist toall togm} {
 
 proc UpdatePeerList {for_user tkey} {
 	# Update chat window widgets from peer list
-	global PeerList LastKnownPeers check_menu_color dice_preset_data
+	global PeerList LastKnownPeers check_menu_color dice_preset_data no_dice
 
-	if {[catch {
-		set tomenu $dice_preset_data(cw,$tkey).p.chat.2.to.menu
-		$tomenu delete 2 end
-		foreach name [lsort -dictionary -unique $PeerList] {
-			if {$name ne {GM}} {
-				$tomenu add checkbutton -label $name -onvalue 1 -offvalue 0 -variable dice_preset_data(CHAT_TO,$tkey,$name) -command [list update_chat_to $for_user $tkey] -selectcolor $check_menu_color
-				if {![info exists dice_preset_data(CHAT_TO,$tkey,$name)]} {
-					set dice_preset_data(CHAT_TO,$tkey,$name) 0
+
+	if {!$no_dice} {
+		if {[catch {
+			set tomenu $dice_preset_data(cw,$tkey).p.chat.2.to.menu
+			$tomenu delete 2 end
+			foreach name [lsort -dictionary -unique $PeerList] {
+				if {$name ne {GM}} {
+					$tomenu add checkbutton -label $name -onvalue 1 -offvalue 0 -variable dice_preset_data(CHAT_TO,$tkey,$name) -command [list update_chat_to $for_user $tkey] -selectcolor $check_menu_color
+					if {![info exists dice_preset_data(CHAT_TO,$tkey,$name)]} {
+						set dice_preset_data(CHAT_TO,$tkey,$name) 0
+					}
 				}
 			}
+		} err]} {
+			DEBUG 1 "UpdatePeerList failed: $err"
 		}
-	} err]} {
-		DEBUG 1 "UpdatePeerList failed: $err"
 	}
 
 	global local_user
@@ -15592,27 +15600,34 @@ proc initiate_hp_request {args} {
 		set tmp false
 	}
 
+	if {[set map_names [my_map_names]] eq {}} {
+		check_aka
+	}
+
 	toplevel $w -background $global_bg_color
 	wm title $w "New ${title} Request"
-	grid [label $w.dl -text "Description:"]  -row 0 -column 0 -sticky w
-	grid [entry $w.de -width 64]         - - -row 0 -column 1 -sticky we
+	if {$map_names eq {}} {
+		grid [label $w.ex -text "We don't know for sure which character you're controlling. If you designate that and start this request over, the \[ME\] and \[...\] buttons will work better." -fg red] - - - -row 0 -column 0 -sticky we
+	}
+	grid [label $w.dl -text "Description:"]  -row 1 -column 0 -sticky w
+	grid [entry $w.de -width 64]         - - -row 1 -column 1 -sticky we
 	if {$tmp} {
-		grid [label $w.el -text "Expires:"]      -row 1 -column 0 -sticky w
-		grid [entry $w.ee -width 64]         - - -row 1 -column 1 -sticky we
-		grid [label $w.tl -text "Targets (CHARACTER name):"]      -row 2 -column 0 -sticky w
-		grid [entry $w.te -width 64]             -row 2 -column 1 -sticky we
-		grid [button $w.tm -command "ihr_personal_target $w" -text "ME"] -row 2 -column 2
-		grid [button $w.tb -command "ihr_build_target_list $w" -text "..."] -row 2 -column 3
+		grid [label $w.el -text "Expires:"]      -row 2 -column 0 -sticky w
+		grid [entry $w.ee -width 64]         - - -row 2 -column 1 -sticky we
+		grid [label $w.tl -text "Targets (CHARACTER name):"]      -row 3 -column 0 -sticky w
+		grid [entry $w.te -width 64]             -row 3 -column 1 -sticky we
+		grid [button $w.tm -command "ihr_personal_target $w" -text "ME"] -row 3 -column 2
+		grid [button $w.tb -command "ihr_build_target_list $w" -text "..."] -row 3 -column 3
 		::tooltip::tooltip $w.el {Temporary HP expiration as "@[[[y-]m-]d] h:m[:s[.t]]", "[+-][d:]h:m[:s[.t]]", or "[+-]n units"}
 		::tooltip::tooltip $w.ee {Temporary HP expiration as "@[[[y-]m-]d] h:m[:s[.t]]", "[+-][d:]h:m[:s[.t]]", or "[+-]n units"}
 		::tooltip::tooltip $w.tl {Players who should receive temporary HP (space-separated)}
 		::tooltip::tooltip $w.te {Players who should receive temporary HP (space-separated)}
 		::tooltip::tooltip $w.tb {Build list of targets interactively}
 		::tooltip::tooltip $w.tm {Just give them to me}
-		grid [label $w.xl -text "Requested temporary HP allocation:"]  -row 3 -column 0 -sticky w
-		grid [entry $w.xe -width 4]                 -row 3 -column 1 -sticky w
-		grid [label $w.ll -text "Lethal damage already against it:"]   -row 4 -column 0 -sticky w
-		grid [entry $w.le -width 4]                 -row 4 -column 1 -sticky w
+		grid [label $w.xl -text "Requested temporary HP allocation:"]  -row 4 -column 0 -sticky w
+		grid [entry $w.xe -width 4]                 -row 4 -column 1 -sticky w
+		grid [label $w.ll -text "Lethal damage already against it:"]   -row 5 -column 0 -sticky w
+		grid [entry $w.le -width 4]                 -row 5 -column 1 -sticky w
 		::tooltip::tooltip $w.xl {How many additional temporary hit points you're asking for now.}
 		::tooltip::tooltip $w.xe {How many additional temporary hit points you're asking for now.}
 		::tooltip::tooltip $w.ll {How much, if any, damage was already taken against THIS request number of temporary hit points?}
@@ -15620,15 +15635,15 @@ proc initiate_hp_request {args} {
 		$w.le delete 0 end
 		$w.le insert 0 0
 	} else {
-		grid [label $w.tl -text "Target (CHARACTER name):"]      -row 1 -column 0 -sticky w
-		grid [entry $w.te -width 64]             -row 1 -column 1 -sticky we
-		grid [button $w.tm -command "ihr_personal_target $w" -text "ME"] -row 1 -column 2
-		grid [label $w.xl -text "Max HP:"]          -row 2 -column 0 -sticky w
-		grid [entry $w.xe -width 4]                 -row 2 -column 1 -sticky w
-		grid [label $w.ll -text "Lethal damage:"]   -row 3 -column 0 -sticky w
-		grid [entry $w.le -width 4]                 -row 3 -column 1 -sticky w
-		grid [label $w.nl -text "Nonlethal damage:"] -row 4 -column 0 -sticky w
-		grid [entry $w.ne -width 4]                 -row 4 -column 1 -sticky w
+		grid [label $w.tl -text "Target (CHARACTER name):"]      -row 2 -column 0 -sticky w
+		grid [entry $w.te -width 64]             -row 2 -column 1 -sticky we
+		grid [button $w.tm -command "ihr_personal_target $w" -text "ME"] -row 2 -column 2
+		grid [label $w.xl -text "Max HP:"]          -row 3 -column 0 -sticky w
+		grid [entry $w.xe -width 4]                 -row 3 -column 1 -sticky w
+		grid [label $w.ll -text "Lethal damage:"]   -row 4 -column 0 -sticky w
+		grid [entry $w.le -width 4]                 -row 4 -column 1 -sticky w
+		grid [label $w.nl -text "Nonlethal damage:"] -row 5 -column 0 -sticky w
+		grid [entry $w.ne -width 4]                 -row 5 -column 1 -sticky w
 		::tooltip::tooltip $w.xl {Your total maximum hit points (NOT including temporary HP).}
 		::tooltip::tooltip $w.xe {Your total maximum hit points (NOT including temporary HP).}
 		::tooltip::tooltip $w.ll {Total lethal damage currently suffered.}
@@ -15641,10 +15656,13 @@ proc initiate_hp_request {args} {
 		$w.ne insert 0 0
 	}
 
+	if {$map_names eq {}} {
+		$w.tm configure -state disabled
+	}
 	grid x [label $w.ml -text {}] - - -sticky we
-	grid [button $w.cancel -command "destroy $w" -text Cancel] -row 6 -column 0 -sticky w
-	grid [button $w.info -command "ihr_info" -image $icon_info20] - -row 6 -column 1
-	grid [button $w.ok -command "ihr_commit $w $tmp $this_request" -text Request] -row 6 -column 3 -sticky e
+	grid [button $w.cancel -command "destroy $w" -text Cancel] -row 7 -column 0 -sticky w
+	grid [button $w.info -command "ihr_info" -image $icon_info20] - -row 7 -column 1
+	grid [button $w.ok -command "ihr_commit $w $tmp $this_request" -text Request] -row 7 -column 3 -sticky e
 	::tooltip::tooltip $w.dl {Describe the nature of your request.}
 	::tooltip::tooltip $w.de {Describe the nature of your request.}
 	::tooltip::tooltip $w.cancel {Dismiss this dialog box without taking further action.}
@@ -15816,7 +15834,7 @@ proc ihr_personal_target {w} {
 proc itr_personal_target {w} {
 	global local_user
 	$w.te delete 0 end
-	$w.te insert end [list $local_user]
+	$w.te insert end [my_map_names]
 }
 
 proc ihr_build_target_list {parent} {
@@ -15824,10 +15842,16 @@ proc ihr_build_target_list {parent} {
 }
 
 proc itr_build_target_list {parent} {
-	global global_bg_color PeerList local_user
+	global global_bg_color PeerList local_user PeerAKA PC_IDs MOBid target_names
 
-	set users $PeerList
-	lappend users $local_user
+	foreach peer $PeerList {
+		if {[info exists PeerAKA($peer)]} {
+			lappend users {*}$PeerAKA($peer)
+		} elseif {[info exists PC_IDs($peer)] || [info exists MOBid($peer)]} {
+			lappend users $peer
+		}
+	}
+	lappend users {*}[my_map_names]
 
 	set w ${parent}_t
 	catch {destroy $w}
@@ -15836,8 +15860,10 @@ proc itr_build_target_list {parent} {
 	grid columnconfigure $w 1 -weight 2
 	grid [ttk::checkbutton $w._all -text "Toggle All" -command "itr_toggle $w"] - - -sticky w
 	$w._all state {!selected !alternate}
+	set target_names($w) {}
 	foreach name [lsort -dictionary -unique $users] {
 		set n [to_window_id $name]
+		lappend target_names($w) $name
 		grid [ttk::checkbutton $w.p$n -text $name] - - -sticky w
 		$w.p$n state {!selected !alternate}
 	}
@@ -15848,13 +15874,9 @@ proc itr_build_target_list {parent} {
 # to keep the timer targets to who is logged in. But that makes the dialog box behave
 # oddly if the peer list changes while we are editing the list.
 proc itr_toggle {w} {
-	global PeerList local_user
-
-	set users $PeerList
-	lappend users $local_user
-
+	global target_names
 	set toggle [$w._all instate selected]
-	foreach name $users {
+	foreach name $target_names($w) {
 		catch {
 			if {$toggle} {
 				$w.p[to_window_id $name] state selected
@@ -15866,13 +15888,10 @@ proc itr_toggle {w} {
 }
 
 proc itr_commit_t {parent} {
-	global PeerList local_user
-
-	set users $PeerList
-	lappend users $local_user
+	global target_names
 
 	set target_list {}
-	foreach name $users {
+	foreach name $target_names(${parent}_t) {
 		catch {
 			if {[${parent}_t.p[to_window_id $name] instate selected]} {
 				lappend target_list $name
@@ -16625,6 +16644,25 @@ proc EncodePresetDetails {p} {
 	}
 }
 
+# return the list of names this player is controlling, or {} if we don't know.
+proc my_map_names {} {
+	global local_user local_aka PC_IDs MOBid
+	
+	if {$local_aka ne {}} {
+		return $local_aka
+	}
+
+	if {[info exists PC_IDs($local_user)]} {
+		return [list $local_user]
+	}
+
+	if {[info exists MOBid($local_user)]} {
+		return [list $local_user]
+	}
+
+	return {}
+}
+
 # verify that we know who we are on the map and prompt the user to let us know if not.
 set suppress_aka false
 set suppress_var false
@@ -16710,6 +16748,8 @@ proc check_aka_commit {} {
 	::gmaproto::character_name $local_aka
 	destroy .akawindow
 }
+
+
 
 # dice_preset_data
 #	collapse,<tkey>,<piname> bool
