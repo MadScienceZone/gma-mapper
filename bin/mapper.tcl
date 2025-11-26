@@ -17,9 +17,9 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.34.1}     ;# @@##@@
+set GMAMapperVersion {4.35-alpha.0}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
-set GMAMapperProtocol {419}         ;# @@##@@
+set GMAMapperProtocol {420}         ;# @@##@@
 set CoreVersionNumber {6.36.1}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
@@ -398,6 +398,7 @@ set default_config    [file normalize [file join ~ .gma mapper mapper.conf]]
 set path_install_base [file normalize [file join ~ .gma mapper]]
 
 if {[catch {set local_user $::tcl_platform(user)}]} {set local_user __unknown__}
+set local_aka {}
 set ChatTranscript 	{}
 
 proc say {msg} {
@@ -516,6 +517,8 @@ set blur_pct 0
 set blur_all 0
 set DEBUG_level 0
 set GridEnable 1
+set no_char false
+set no_dice false
 
 
 # Objects are stored in these arrays:
@@ -1187,6 +1190,8 @@ proc create_main_menu {use_button} {
 		$mm.play.gridsnap add radiobutton -label $label -selectcolor $check_menu_color -variable CreatureGridSnap -value $value
 	}
 	$mm.play add command -command {ClearSelection} -label "Deselect All"
+	$mm.play add separator
+	$mm.play add command -command {selectAKA} -label "Specify What Character You're Playing..."
 	menu $mm.tools
 	$mm.tools add command -command {checkForUpdates} -label "Check for Updates..."
 	$mm.tools add separator
@@ -1502,7 +1507,7 @@ proc ApplyPreferences {data args} {
 	global ModuleID MasterClient SuppressChat ChatTranscript local_user
 	global OptPreload ButtonSize ChatHistoryLimit CURLpath CURLserver
 	global CURLproxy SCPproxy SERVER_MKDIRpath NCpath SCPpath SCPdest SCPserver
-	global SSHpath UpdateURL CurrentProfileName _preferences CURLinsecure
+	global SSHpath UpdateURL CurrentProfileName _preferences CURLinsecure suppress_aka no_dice
 
 	set _preferences $data
 	set majox 0
@@ -1536,10 +1541,21 @@ proc ApplyPreferences {data args} {
 		keep_tools   MasterClient \
 		preload      OptPreload \
 		profiles     servers \
-		current_profile cprof
+		current_profile cprof \
+		no_dice      prf_no_dice \
+		suppress_aka prf_suppress_aka
 
 	if {[lsearch -exact $args -override] < 0} {
 		set CurrentProfileName $cprof
+	}
+
+	#suppress aka prompts and die rolling based on prefs but don't override command-line option if one was given
+	if {$prf_suppress_aka} {
+		set suppress_aka true
+	}
+
+	if {$prf_no_dice} {
+		set no_dice true
 	}
 
 	if {$CurrentProfileName ne {}} {
@@ -1718,7 +1734,9 @@ proc usage {} {
 	puts $stderr {   -L, --list-profiles: Print available profiles you can use with --select}
 	puts $stderr {   -l, --preload:     Load all cached images at startup}
 	puts $stderr {   -M, --module:      Set module ID (SaF GM role only)}
+	puts $stderr {       --no-char:     	Disable prompts for what character you're playing}
 	puts $stderr {   -n, --no-chat:		Do not display incoming chat messages}
+	puts $stderr {       --no-dice:     	Disable die rolling (die roller will be read-only)}
 	puts $stderr {   -P, --password:    Password to log in to the map service}
 	puts $stderr {   -p, --port:        Port for initiative tracker [2323]}
 	puts $stderr {       --recursionlimit: set runtime recursion limit}
@@ -1851,6 +1869,8 @@ for {set argi 0} {$argi < $optc} {incr argi} {
 		-m - --master -
 		-k - --keep-tools { set MasterClient 1 }
 		-n - --no-chat    { set SuppressChat 1 }
+		--no-dice         { set no_dice true }
+		--no-char         { set suppress_aka true }
 		-S - --select     { 
 			set CurrentProfileName [getarg -S]
 			ApplyPreferences $PreferencesData -override
@@ -10184,8 +10204,9 @@ proc DoCommandCLR@ {d} {
 	unloadfile $cache_filename -nosend -force
 }
 
+# PeerList now includes AKA attribute
 proc DoCommandCONN {d} {
-	global local_user PeerList
+	global local_user PeerList local_aka
 	set PeerList {}
 
 	foreach peer [dict get $d PeerList] {
@@ -10203,6 +10224,7 @@ proc DoCommandCONN {d} {
 					DEBUG 3 "Peerlist=$PeerList"
 				} else {
 					DEBUG 2 "Excluding $peer (this is my username)"
+					::gmautil::dassigndef $peer AKA {local_aka {}}
 				}
 			} else {
 				DEBUG 2 "Excluding $peer (no username given)"
@@ -10219,9 +10241,35 @@ proc DoCommandCONN {d} {
 	}
 }
 
+proc DoCommandAKA {d} {
+	global PeerList local_aka local_user
+
+	::gmautil::dassigndef $d Names {names {}} User {user {}}
+	if {$user eq {}} {
+		return
+	}
+
+	if {$user eq $local_user} {
+		set local_aka $names
+	} else {
+		for {set i 0} {$i < [llength $PeerList]} {incr i} {
+			if {[dict get [set p [lindex $PeerList $i]] User] eq $user} {
+				set PeerList [lreplace $PeerList $i $i [dict replace $p AKA $names]]
+				DEBUG 1 "Replaced $user character names at position $i"
+			}
+		}
+	}
+
+	DEBUG 1 "New peer list is $PeerList"
+	DEBUG 1 "Local AKA is $local_aka"
+}
+
 proc DoCommandDD= {d} {
 	# define die-roll preset list (updates us from the server's stored presets)
-	global SuppressChat dice_preset_data local_user
+	global SuppressChat dice_preset_data local_user no_dice
+	if {$no_dice} {
+		return
+	}
 	
 	if {[set target [dict get $d For]] eq {}} {
 		set target $local_user
@@ -13546,7 +13594,7 @@ proc DisplayChatMessage {d for_user args} {
 	global icon_die16 icon_info20 icon_arrow_refresh check_menu_color
 	global icon_delete icon_add icon_open icon_save ChatTranscript icon_colorwheel
 	global last_known_size global_bg_color IThost
-	global _preferences colortheme dice_preset_data local_user
+	global _preferences colortheme dice_preset_data local_user local_aka no_dice
 
 	if {$d ne {}} {
 		::gmautil::dassign $d Sender from Recipients recipientlist Text message Sent date_sent Markup markup Pin pinned
@@ -13646,48 +13694,56 @@ proc DisplayChatMessage {d for_user args} {
 			ttk::labelframe $wc -text "Dice for $for_user"
 		}
 		ttk::labelframe $wpc -text "Pinned Messages"
-		ttk::labelframe $wrsf -text "Recent Rolls"
-		ttk::labelframe $wpsf -text "Preset Rolls"
-		pack [sframe new $wrsf.sf -anchor w] -side top -fill both -expand 1
-		pack [sframe new $wpsf.sf -anchor w] -side top -fill both -expand 1
-		set wr [sframe content $wrsf.sf]
-		set wp [sframe content $wpsf.sf]
-		bind $wrsf <Configure> "ResizeDieRoller $wr %w %h recent $for_user $tkey"
-		bind $wpsf <Configure> "ResizeDieRoller $wp %w %h preset $for_user $tkey"
+		if {!$no_dice} {
+			ttk::labelframe $wrsf -text "Recent Rolls"
+			ttk::labelframe $wpsf -text "Preset Rolls"
+			pack [sframe new $wrsf.sf -anchor w] -side top -fill both -expand 1
+			pack [sframe new $wpsf.sf -anchor w] -side top -fill both -expand 1
+			set wr [sframe content $wrsf.sf]
+			set wp [sframe content $wpsf.sf]
+			bind $wrsf <Configure> "ResizeDieRoller $wr %w %h recent $for_user $tkey"
+			bind $wpsf <Configure> "ResizeDieRoller $wp %w %h preset $for_user $tkey"
+		}
 
 		$w.p add $wpc
 		$w.p add $wc
-		$w.p add $wrsf
-		$w.p add $wpsf
+		if {!$no_dice} {
+			$w.p add $wrsf
+			$w.p add $wpsf
+		}
 		pack $w.p -side top -expand 1 -fill both 
 
-		for {set i 0} {$i < 10} {incr i} {
-			pack [frame $wr.$i] -side top -expand 0 -fill x
-			label $wr.$i.spec -anchor w
-			button $wr.$i.roll -state disabled -image $icon_die16 -command "Reroll $wr.$i $i $for_user $tkey"
-			entry $wr.$i.extra -width 3 -state disabled
-			label $wr.$i.plus -text +
-			set last_known_size($tkey,recent,$i) blank
-		}
-		pack [frame $wp.add] -side bottom -expand 0 -fill x
-		#pack [button $wp.add.add -image $icon_add -command AddDieRollPreset $for_user $tkey] -side left
-		#pack [label $wp.add.label -text "Add new die-roll preset" -anchor w] -side left -expand 1 -fill x
-		pack [button $wp.add.add -text "Edit presets..." -command [list EditDieRollPresets $for_user $tkey]] -side left
-		pack [button $wp.add.save -image $icon_save -command [list SaveDieRollPresets $w $for_user $tkey]] -side right
-		pack [button $wp.add.load -image $icon_open -command [list LoadDieRollPresets $w $for_user $tkey]] -side right
-		pack [button $wp.add.upd -image $icon_arrow_refresh -command [list RequestDicePresets $for_user]] -side right
+		if {!$no_dice} {
+			for {set i 0} {$i < 10} {incr i} {
+				pack [frame $wr.$i] -side top -expand 0 -fill x
+				label $wr.$i.spec -anchor w
+				button $wr.$i.roll -state disabled -image $icon_die16 -command "Reroll $wr.$i $i $for_user $tkey"
+				entry $wr.$i.extra -width 3 -state disabled
+				label $wr.$i.plus -text +
+				set last_known_size($tkey,recent,$i) blank
+			}
+			pack [frame $wp.add] -side bottom -expand 0 -fill x
+			#pack [button $wp.add.add -image $icon_add -command AddDieRollPreset $for_user $tkey] -side left
+			#pack [label $wp.add.label -text "Add new die-roll preset" -anchor w] -side left -expand 1 -fill x
+			pack [button $wp.add.add -text "Edit presets..." -command [list EditDieRollPresets $for_user $tkey]] -side left
+			pack [button $wp.add.save -image $icon_save -command [list SaveDieRollPresets $w $for_user $tkey]] -side right
+			pack [button $wp.add.load -image $icon_open -command [list LoadDieRollPresets $w $for_user $tkey]] -side right
+			pack [button $wp.add.upd -image $icon_arrow_refresh -command [list RequestDicePresets $for_user]] -side right
 
-		::tooltip::tooltip $wp.add.save "Export presets to disk file"
-		::tooltip::tooltip $wp.add.load "Import presets from disk file"
-		::tooltip::tooltip $wp.add.upd "Refresh preset list from server"
+			::tooltip::tooltip $wp.add.save "Export presets to disk file"
+			::tooltip::tooltip $wp.add.load "Import presets from disk file"
+			::tooltip::tooltip $wp.add.upd "Refresh preset list from server"
+		}
 
 		if {$for_user eq $local_user} {
 			pack [frame $wpc.1] -side top -expand 1 -fill both
 			pack [frame $wc.1] -side top -expand 1 -fill both
 		}
-		pack [frame $wc.2]\
-			 [frame $wc.3]\
-			-side top -expand 0 -fill x
+		if {!$no_dice} {
+			pack [frame $wc.2]\
+				 [frame $wc.3]\
+				-side top -expand 0 -fill x
+		}
 
 		if {$for_user eq $local_user} {
 			pack [text $wpc.1.text -yscrollcommand "$wpc.1.sb set" -height 10 -width 10 -state disabled] -side left -expand 1 -fill both
@@ -13695,49 +13751,51 @@ proc DisplayChatMessage {d for_user args} {
 			pack [text $wc.1.text -yscrollcommand "$wc.1.sb set" -height 10 -width 10 -state disabled] -side left -expand 1 -fill both
 			pack [scrollbar $wc.1.sb -orient vertical -command "$wc.1.text yview"] -side right -expand 0 -fill y
 		}
-		pack [button $wc.3.tc -image $icon_colorwheel \
-			-command [list EditColorBoxTitle "CHAT_dice,$tkey"]] -side left -padx 2
-		pack [label $wc.3.l -text Roll: -anchor nw] -side left -padx 2
+		if {!$no_dice} {
+			pack [button $wc.3.tc -image $icon_colorwheel \
+				-command [list EditColorBoxTitle "CHAT_dice,$tkey"]] -side left -padx 2
+			pack [label $wc.3.l -text Roll: -anchor nw] -side left -padx 2
 
-		pack [entry $wc.3.dice -textvariable dice_preset_data(CHAT_dice,$tkey) -relief sunken] -side left -fill x -expand 1
-		pack [button $wc.3.info -image $icon_info20 -command ShowDiceSyntax] -side right
-		::tooltip::tooltip $wc.3.info "Display help for how to write die rolls and use the chat window."
-		set dice_preset_data(CHAT_blind,$tkey) 0
-		set dice_preset_data(CHAT_markup_en,$tkey) [gmaproto::int_bool [dict get $_preferences markup_enabled]]
-		set dice_preset_data(CHAT_pinned_en,$tkey) 0
-		pack [ttk::checkbutton $wc.3.blind -text GM -variable dice_preset_data(CHAT_blind,$tkey)] -side right
-		::tooltip::tooltip $wc.3.blind "Send result of die roll ONLY to the GM."
-		#-selectcolor $check_select_color
-		#-indicatoron 1 
+			pack [entry $wc.3.dice -textvariable dice_preset_data(CHAT_dice,$tkey) -relief sunken] -side left -fill x -expand 1
+			pack [button $wc.3.info -image $icon_info20 -command ShowDiceSyntax] -side right
+			::tooltip::tooltip $wc.3.info "Display help for how to write die rolls and use the chat window."
+			set dice_preset_data(CHAT_blind,$tkey) 0
+			set dice_preset_data(CHAT_markup_en,$tkey) [gmaproto::int_bool [dict get $_preferences markup_enabled]]
+			set dice_preset_data(CHAT_pinned_en,$tkey) 0
+			pack [ttk::checkbutton $wc.3.blind -text GM -variable dice_preset_data(CHAT_blind,$tkey)] -side right
+			::tooltip::tooltip $wc.3.blind "Send result of die roll ONLY to the GM."
+			#-selectcolor $check_select_color
+			#-indicatoron 1 
 
-		menubutton $wc.2.to -menu $wc.2.to.menu -text To: -relief raised
-		menu $wc.2.to.menu -tearoff 0
-		$wc.2.to.menu add command -label (all) -command [list chat_to_all $for_user $tkey]
-		$wc.2.to.menu add checkbutton -label GM -onvalue 1 -offvalue 0 -variable dice_preset_data(CHAT_TO,$tkey,GM) -command [list update_chat_to $for_user $tkey] -selectcolor $check_menu_color
+			menubutton $wc.2.to -menu $wc.2.to.menu -text To: -relief raised
+			menu $wc.2.to.menu -tearoff 0
+			$wc.2.to.menu add command -label (all) -command [list chat_to_all $for_user $tkey]
+			$wc.2.to.menu add checkbutton -label GM -onvalue 1 -offvalue 0 -variable dice_preset_data(CHAT_TO,$tkey,GM) -command [list update_chat_to $for_user $tkey] -selectcolor $check_menu_color
 
-		set dice_preset_data(CHAT_text,$tkey) {}
-		global icon_star
+			set dice_preset_data(CHAT_text,$tkey) {}
+			global icon_star
 
-		pack $wc.2.to -side left 
-		pack [entry $wc.2.entry -relief sunken -textvariable dice_preset_data(CHAT_text,$tkey)] -side left -fill x -expand 1
-		pack [button $wc.2.send -command RefreshPeerList -image $icon_arrow_refresh] -side right
-		pack [ttk::checkbutton $wc.2.pinned -image $icon_star -variable dice_preset_data(CHAT_pinned_en,$tkey)] -side right	; #TODO
-		pack [ttk::checkbutton $wc.2.markup -text M -variable dice_preset_data(CHAT_markup_en,$tkey)] -side right
-		::tooltip::tooltip $wc.2.markup "Enable GMA markup formatting codes in chat messages."
-#		if {$for_user eq $local_user} {
-#			global icon_unlock
-#			pack [button $wc.2.lock -command [list ToggleChatLock $wc.2.lock $wc.1.text] -image $icon_unlock] -side right
-#			::tooltip::tooltip $wc.2.lock "Unlock the chat window for editing/copying text."
-#			set dice_preset_data(chat_lock) true
-#		}
-		::tooltip::tooltip $wc.2.send "Refresh the list of recipients for messages."
-		bind $wc.2.entry <Return> [list SendChatFromWindow $for_user $tkey]
-		bind $wc.3.dice <Return> [list SendDieRollFromWindow $w $wr $for_user $tkey]
+			pack $wc.2.to -side left 
+			pack [entry $wc.2.entry -relief sunken -textvariable dice_preset_data(CHAT_text,$tkey)] -side left -fill x -expand 1
+			pack [button $wc.2.send -command RefreshPeerList -image $icon_arrow_refresh] -side right
+			pack [ttk::checkbutton $wc.2.pinned -image $icon_star -variable dice_preset_data(CHAT_pinned_en,$tkey)] -side right	; #TODO
+			pack [ttk::checkbutton $wc.2.markup -text M -variable dice_preset_data(CHAT_markup_en,$tkey)] -side right
+			::tooltip::tooltip $wc.2.markup "Enable GMA markup formatting codes in chat messages."
+	#		if {$for_user eq $local_user} {
+	#			global icon_unlock
+	#			pack [button $wc.2.lock -command [list ToggleChatLock $wc.2.lock $wc.1.text] -image $icon_unlock] -side right
+	#			::tooltip::tooltip $wc.2.lock "Unlock the chat window for editing/copying text."
+	#			set dice_preset_data(chat_lock) true
+	#		}
+			::tooltip::tooltip $wc.2.send "Refresh the list of recipients for messages."
+			bind $wc.2.entry <Return> [list SendChatFromWindow $for_user $tkey]
+			bind $wc.3.dice <Return> [list SendDieRollFromWindow $w $wr $for_user $tkey]
 
-		set dice_preset_data(CHAT_TO,$tkey,GM) 0
-		update_chat_to $for_user $tkey
-		UpdatePeerList $for_user $tkey		;# set up what we may have already received
-		RefreshPeerList				;# ask for an update as well
+			set dice_preset_data(CHAT_TO,$tkey,GM) 0
+			update_chat_to $for_user $tkey
+			UpdatePeerList $for_user $tkey		;# set up what we may have already received
+			RefreshPeerList				;# ask for an update as well
+		}
 
 		if {$for_user eq $local_user} {
 			foreach tag {
@@ -13781,14 +13839,18 @@ proc DisplayChatMessage {d for_user args} {
 			}
 		}
 
-		RequestDicePresets $for_user
-		inhibit_resize_task 0 recent $for_user $tkey
-		inhibit_resize_task 0 preset $for_user $tkey
-
-		if {$for_user eq $local_user} {
-			LoadChatHistory
-		} else {
+		if {!$no_dice} {
 			RequestDicePresets $for_user
+			inhibit_resize_task 0 recent $for_user $tkey
+			inhibit_resize_task 0 preset $for_user $tkey
+
+			if {$for_user eq $local_user} {
+				LoadChatHistory
+			} else {
+				RequestDicePresets $for_user
+			}
+		} elseif {$for_user eq $local_user} {
+			LoadChatHistory
 		}
 	}
 
@@ -15203,6 +15265,7 @@ proc connectToServer {} {
 proc WaitForConnectToServer {} {
 	connectToServer
 	InitializeChatHistory
+	after 30000 check_aka
 }
 #
 #
@@ -16560,6 +16623,92 @@ proc EncodePresetDetails {p} {
 			return [dict get $p _raw]
 		}
 	}
+}
+
+# verify that we know who we are on the map and prompt the user to let us know if not.
+set suppress_aka false
+set suppress_var false
+proc selectAKA {} {
+	global local_user local_aka PeerList PC_IDs MOBid suppress_aka check_aka_vars suppress_var
+
+	catch {destroy .akawindow}
+	toplevel .akawindow 
+	wm title .akawindow "Who Are You?"
+	pack [label .akawindow.t2 -text "Please indicate which character(s) you're controlling in this session:"] -side top -anchor w
+	set fn 0
+	array unset check_aka_vars
+	set custom {}
+	foreach name [array names PC_IDs] {
+		set check_aka_vars($name) false
+	}
+	foreach name $local_aka {
+		if {[info exists PC_IDs($name)]} {
+			set check_aka_vars($name) true
+		} else {
+			set check_aka_vars($name) false
+			lappend custom $name
+		}
+	}
+
+	foreach name [lsort [array names PC_IDs]] {
+		pack [ttk::checkbutton .akawindow.$fn -onvalue true -offvalue false -text $name -variable check_aka_vars($name)] -anchor w -side top
+		incr fn
+	}
+	pack [frame .akawindow.custom] -anchor w -side top
+	pack [label .akawindow.custom.l -text "Custom: "] -anchor w -side left
+	pack [entry .akawindow.custom.e -width 20] -anchor w -side left
+	.akawindow.custom.e insert 0 $custom
+	
+	pack [button .akawindow.ok -command check_aka_commit -text OK] -side right
+	pack [button .akawindow.cancel -command [list destroy .akawindow] -text Cancel] -side left
+}
+
+proc check_aka {} {
+	global local_user local_aka PeerList PC_IDs MOBid suppress_aka check_aka_vars suppress_var
+
+	if {$local_aka ne {} || $suppress_aka} {
+		return
+	}
+
+	if {$local_user eq "GM" || [info exists PC_IDs($local_user)] || [info exists MOBid($local_user)]} {
+		return
+	}
+
+	catch {destroy .akawindow}
+	toplevel .akawindow 
+	wm title .akawindow "Who Are You?"
+	pack [label .akawindow.t1 -text "I don't see a character called \"$local_user\" on the map."] -side top -anchor w
+	pack [label .akawindow.t2 -text "Please indicate which character(s) you're controlling in this session:"] -side top -anchor w
+	set fn 0
+	array unset check_aka_vars
+	foreach name [lsort [array names PC_IDs]] {
+		set check_aka_vars($name) false
+		pack [ttk::checkbutton .akawindow.$fn -onvalue true -offvalue false -text $name -variable check_aka_vars($name)] -anchor w -side top
+		incr fn
+	}
+	pack [frame .akawindow.custom] -anchor w -side top
+	pack [label .akawindow.custom.l -text "Custom: "] -anchor w -side left
+	pack [entry .akawindow.custom.e -width 20] -anchor w -side left
+	
+	pack [ttk::checkbutton .akawindow.notagain -onvalue true -offvalue false -variable suppress_var -text "don't ask me again this session"] -anchor w -side top
+	pack [button .akawindow.ok -command check_aka_commit -text OK] -side right
+	pack [button .akawindow.cancel -command [list destroy .akawindow] -text Cancel] -side left
+}
+
+proc check_aka_commit {} {
+	global check_aka_vars local_aka suppress_aka suppress_var
+	set suppress_aka $suppress_var
+	set local_aka {}
+	foreach k [array names check_aka_vars] {
+		if {$check_aka_vars($k)} {
+			lappend local_aka $k
+		}
+	}
+	if {[set custom [.akawindow.custom.e get]] ne {}} {
+		lappend local_aka $custom
+	}
+	::gmaproto::character_name $local_aka
+	destroy .akawindow
 }
 
 # dice_preset_data
