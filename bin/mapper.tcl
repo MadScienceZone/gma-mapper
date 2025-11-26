@@ -17,7 +17,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.35-alpha.0}     ;# @@##@@
+set GMAMapperVersion {4.35-alpha.1}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {420}         ;# @@##@@
 set CoreVersionNumber {6.36.1}            ;# @@##@@
@@ -2522,9 +2522,74 @@ grid \
 	 [button .toolbar.exit -image $icon_exit -command exitchk] 
 
 grid [label   .toolbar2.clock -anchor w -font {Helvetica 18} -textvariable ClockDisplay]         -row 0 -column 1 -sticky we 
-grid [ttk::progressbar .toolbar2.progbar -orient horizontal -length 200 -variable ClockProgress] -row 0 -column 2 -sticky e
+grid [button .toolbar2.ondeck -relief flat] -row 0 -column 2 -sticky ew 
+set ondeck_bg [.toolbar2.ondeck cget -bg]
+grid [ttk::progressbar .toolbar2.progbar -orient horizontal -length 200 -variable ClockProgress] -row 0 -column 3 -sticky e
 grid columnconfigure .toolbar2 1 -weight 2
 grid forget .toolbar2.progbar
+
+set ondeck_slotlist {}
+set ondeck_current -1
+proc set_ondeck {place} {
+	global ondeck_bg
+	switch $place {
+		0 {.toolbar2.ondeck configure -fg white -bg green -text "YOUR TURN"; .toolbar2.ondeck flash}
+		1 {.toolbar2.ondeck configure -fg white -bg red   -text "ON DECK"; .toolbar2.ondeck flash}
+		2 {.toolbar2.ondeck configure -fg black -bg yellow -text "On deck in 1"; .toolbar2.ondeck flash}
+		default {.toolbar2.ondeck configure -bg $ondeck_bg -text ""}
+	}
+}
+
+proc update_ondeck_list {ilist} {
+	global ondeck_slotlist ondeck_current
+	set lastslot -1
+	set last_current [lindex $ondeck_slotlist $ondeck_current]
+	set ondeck_slotlist {}
+	foreach slotdesc $ilist {
+		::gmautil::dassigndef Slot {slot -1} Name {name {}}
+		if {$slot < 0 || $name eq {}} {
+			DEBUG 0 "Received invalid initiative slot value from server (slot $slot, name '$name'; ignored)"
+		} else {
+			if {$lastslot < $slot} {
+				DEBUG 0 "Received initiative slots out of order from server (that shouldn't happen! proceeding anyway but that's messed up!)"
+			}
+			if {$lastslot == $slot} {
+				DEBUG 0 "Received duplicate initiative slot numbers from server (that shouldn't happen! proceeding anyway but that's messed up!)"
+			}
+			set lastslot $slot
+			lappend ondeck_slotlist $name
+		}
+	}
+	if {$last_current eq {}} {
+		set ondeck_current -1
+	} else {
+		set ondeck_current [lsearch -exact $ondeck_slotlist $last_current]
+	}
+	ondeck_calc
+}
+
+proc ondeck_advance {d} {
+	global ondeck_current ondeck_slotlist
+	::gmautil::dassigndef $d ActorID {name {}}
+	set ondeck_current [lsearch -exact $ondeck_slotlist $name]
+	ondeck_calc
+}
+
+proc ondeck_calc {} {
+	global ondeck_current ondeck_slotlist
+	set score -1	
+	foreach my_name [my_map_names] {
+		set s [lsearch -exact $ondeck_slotlist $my_name]
+		if {$s >= 0} {
+			if {[set this_score [expr $s-$ondeck_current]] >=0} {
+				if {$score < 0 || $score > $this_score} {
+					set score $this_score
+				}
+			}
+		}
+	}
+	set_ondeck $score
+}
 
 proc configureChatCapability {} {
 	global icon_blank IThost
@@ -9831,6 +9896,7 @@ proc DoCommandIL {d} {
 	if {[::gmaclock::exists .initiative.clock]} {
 		::gmaclock::set_initiative_slots .initiative.clock [dict get $d InitiativeList]
 	}
+	update_ondeck_list [dict get $d InitiativeList]
 }
 
 # given a creature dict, enforce the new protocol specs in a backward-compatible way
@@ -10348,6 +10414,8 @@ proc DoCommandI {d} {
 	global MOB_COMBATMODE canvas MOB_BLINK NextMOBID MOBdata MOBid
 	global CombatantScrollEnabled is_GM
 	set ITlist {}
+
+	ondeck_advance $d
 
 	if {$MOB_COMBATMODE} {
 		UpdateRunClock $d
