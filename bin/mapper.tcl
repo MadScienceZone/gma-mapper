@@ -15678,20 +15678,31 @@ proc initiate_timer_request {} {
 	set w .tmrq_$this_request
 	toplevel $w -background $global_bg_color
 	wm title $w "New Timer Request"
-	grid [label $w.dl -text "Description:"]  -row 0 -column 0 -sticky w
-	grid [entry $w.de -width 64]         - - -row 0 -column 1 -sticky we
-	grid [label $w.el -text "Expires:"]      -row 1 -column 0 -sticky w
-	grid [entry $w.ee -width 64]         - - -row 1 -column 1 -sticky we
-	grid [label $w.tl -text "Targets:"]      -row 2 -column 0 -sticky w
-	grid [entry $w.te -width 64]             -row 2 -column 1 -sticky we
-	grid [button $w.tm -command "itr_personal_target $w" -text "ME"] -row 2 -column 2
-	grid [button $w.tb -command "itr_build_target_list $w" -text "..."] -row 2 -column 3
+	if {[set map_names [my_map_names]] eq {}} {
+		check_aka
+	}
+
+	if {$map_names eq {}} {
+		grid [label $w.ex -text "We don't know for sure which character you're controlling. If you designate that and start this request over, the \[ME\] and \[...\] buttons will work better." -fg red] - - - -row 0 -column 0 -sticky we
+	}
+
+	grid [label $w.dl -text "Description:"]  -row 1 -column 0 -sticky w
+	grid [entry $w.de -width 64]         - - -row 1 -column 1 -sticky we
+	grid [label $w.el -text "Expires:"]      -row 2 -column 0 -sticky w
+	grid [entry $w.ee -width 64]         - - -row 2 -column 1 -sticky we
+	grid [label $w.tl -text "Targets:"]      -row 3 -column 0 -sticky w
+	grid [entry $w.te -width 64]             -row 3 -column 1 -sticky we
+	grid [button $w.tm -command "itr_personal_target $w" -text "ME"] -row 3 -column 2
+	grid [button $w.tb -command "itr_build_target_list $w" -text "..."] -row 3 -column 3
 	grid x [ttk::checkbutton $w.rb -text "Running Now"] - - -sticky w
 	grid x [ttk::checkbutton $w.sb -text "Show to Players"] - - -sticky w
 	grid x [label $w.ml -text {}] - - -sticky we
-	grid [button $w.cancel -command "destroy $w" -text Cancel] -row 6 -column 0 -sticky w
-	grid [button $w.info -command "itr_info" -image $icon_info20] - -row 6 -column 1
-	grid [button $w.ok -command "itr_commit $w $this_request" -text Request] -row 6 -column 3 -sticky e
+	grid [button $w.cancel -command "destroy $w" -text Cancel] -row 7 -column 0 -sticky w
+	grid [button $w.info -command "itr_info" -image $icon_info20] - -row 7 -column 1
+	grid [button $w.ok -command "itr_commit $w $this_request" -text Request] -row 7 -column 3 -sticky e
+	if {$map_names eq {}} {
+		$w.tm configure -state disabled
+	}
 	$w.rb state {selected !alternate}
 	$w.sb state {selected !alternate}
 	::tooltip::tooltip $w.dl {Describe the new timer's purpose.}
