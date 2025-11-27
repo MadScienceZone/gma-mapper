@@ -150,6 +150,25 @@ proc begin_progress { id title max args } {
     return $id
 }
 
+# return the list of names this player is controlling, or {} if we don't know.
+proc my_map_names {} {
+	global local_user local_aka PC_IDs MOBid
+	
+	if {$local_aka ne {}} {
+		return $local_aka
+	}
+
+	if {[info exists PC_IDs($local_user)]} {
+		return [list $local_user]
+	}
+
+	if {[info exists MOBid($local_user)]} {
+		return [list $local_user]
+	}
+
+	return {}
+}
+
 proc TopLeftGridLabel {} {
 	lassign [ScreenXYToGridXY 0 0 -exact] x y
 	return "[LetterLabel $x]$y"
@@ -519,6 +538,7 @@ set DEBUG_level 0
 set GridEnable 1
 set no_char false
 set no_dice false
+set no_ondeck_audio false
 
 
 # Objects are stored in these arrays:
@@ -976,6 +996,7 @@ if {$tcl_platform(os) eq "Darwin"} {
 }
 
 set ICON_DIR [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end-1 end lib MadScienceZone GMA Mapper icons]]]
+set SOUND_DIR [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end-1 end lib MadScienceZone GMA Mapper sounds]]]
 set BIN_DIR [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end end]]]
 foreach module {scrolledframe ustar gmaclock gmacolors gmautil gmaprofile gmaproto gmafile gmazones progressbar minimarkup} {
 	source [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end end $module.tcl]]]
@@ -1507,7 +1528,7 @@ proc ApplyPreferences {data args} {
 	global ModuleID MasterClient SuppressChat ChatTranscript local_user
 	global OptPreload ButtonSize ChatHistoryLimit CURLpath CURLserver
 	global CURLproxy SCPproxy SERVER_MKDIRpath NCpath SCPpath SCPdest SCPserver
-	global SSHpath UpdateURL CurrentProfileName _preferences CURLinsecure suppress_aka no_dice
+	global SSHpath UpdateURL CurrentProfileName _preferences CURLinsecure suppress_aka no_dice no_ondeck_audio
 
 	set _preferences $data
 	set majox 0
@@ -1543,6 +1564,7 @@ proc ApplyPreferences {data args} {
 		profiles     servers \
 		current_profile cprof \
 		no_dice      prf_no_dice \
+		no_ondeck_audio prf_no_ondeck_audio\
 		suppress_aka prf_suppress_aka
 
 	if {[lsearch -exact $args -override] < 0} {
@@ -1556,6 +1578,10 @@ proc ApplyPreferences {data args} {
 
 	if {$prf_no_dice} {
 		set no_dice true
+	}
+
+	if {$prf_no_ondeck_audio} {
+		set no_ondeck_audio true
 	}
 
 	if {$CurrentProfileName ne {}} {
@@ -1871,6 +1897,7 @@ for {set argi 0} {$argi < $optc} {incr argi} {
 		-n - --no-chat    { set SuppressChat 1 }
 		--no-dice         { set no_dice true }
 		--no-char         { set suppress_aka true }
+		--no-ondeck-audio { set no_ondeck_audio true }
 		-S - --select     { 
 			set CurrentProfileName [getarg -S]
 			ApplyPreferences $PreferencesData -override
@@ -2528,15 +2555,30 @@ grid [ttk::progressbar .toolbar2.progbar -orient horizontal -length 200 -variabl
 grid columnconfigure .toolbar2 1 -weight 2
 grid forget .toolbar2.progbar
 
+
+#
+# set up ondeck audio prompts
+#
+if {! [catch {package require sound}]} {
+	foreach level {0 1 2} {
+		if {! [catch {snack::sound ondecksound$level -load $SOUND_DIR/ondeck$level.wav -channels Stereo}]} {
+			set SoundObj(ondeck$level) ondecksound$level
+		}
+	}
+}
 set ondeck_slotlist {}
 set ondeck_current -1
 proc set_ondeck {place} {
-	global ondeck_bg
+	global ondeck_bg SoundObj no_ondeck_audio
 	switch $place {
-		0 {.toolbar2.ondeck configure -fg white -bg green -text "YOUR TURN"; .toolbar2.ondeck flash}
-		1 {.toolbar2.ondeck configure -fg white -bg red   -text "ON DECK"; .toolbar2.ondeck flash}
-		2 {.toolbar2.ondeck configure -fg black -bg yellow -text "On deck in 1"; .toolbar2.ondeck flash}
-		default {.toolbar2.ondeck configure -bg $ondeck_bg -text ""}
+		0 {.toolbar2.ondeck configure -fg white -bg green -text "YOUR TURN"}
+		1 {.toolbar2.ondeck configure -fg white -bg red   -text "ON DECK"}
+		2 {.toolbar2.ondeck configure -fg black -bg yellow -text "On deck in 1"}
+		default {.toolbar2.ondeck configure -bg $ondeck_bg -text ""; return}
+	}
+	.toolbar2.ondeck flash
+	if {[info exists SoundObj(ondeck$place)] && !$no_ondeck_audio} {
+		$SoundObj(ondeck$place) play
 	}
 }
 
@@ -2546,11 +2588,11 @@ proc update_ondeck_list {ilist} {
 	set last_current [lindex $ondeck_slotlist $ondeck_current]
 	set ondeck_slotlist {}
 	foreach slotdesc $ilist {
-		::gmautil::dassigndef Slot {slot -1} Name {name {}}
+		::gmautil::dassigndef $slotdesc Slot {slot -1} Name {name {}}
 		if {$slot < 0 || $name eq {}} {
 			DEBUG 0 "Received invalid initiative slot value from server (slot $slot, name '$name'; ignored)"
 		} else {
-			if {$lastslot < $slot} {
+			if {$lastslot > $slot} {
 				DEBUG 0 "Received initiative slots out of order from server (that shouldn't happen! proceeding anyway but that's messed up!)"
 			}
 			if {$lastslot == $slot} {
@@ -2577,14 +2619,13 @@ proc ondeck_advance {d} {
 
 proc ondeck_calc {} {
 	global ondeck_current ondeck_slotlist
+	set l [concat [lrange $ondeck_slotlist $ondeck_current end] [lrange $ondeck_slotlist 0 $ondeck_current-1]]
 	set score -1	
 	foreach my_name [my_map_names] {
-		set s [lsearch -exact $ondeck_slotlist $my_name]
+		set s [lsearch -exact $l $my_name]
 		if {$s >= 0} {
-			if {[set this_score [expr $s-$ondeck_current]] >=0} {
-				if {$score < 0 || $score > $this_score} {
-					set score $this_score
-				}
+			if {$score < 0 || $score > $s} {
+				set score $s
 			}
 		}
 	}
@@ -16723,24 +16764,6 @@ proc EncodePresetDetails {p} {
 	}
 }
 
-# return the list of names this player is controlling, or {} if we don't know.
-proc my_map_names {} {
-	global local_user local_aka PC_IDs MOBid
-	
-	if {$local_aka ne {}} {
-		return $local_aka
-	}
-
-	if {[info exists PC_IDs($local_user)]} {
-		return [list $local_user]
-	}
-
-	if {[info exists MOBid($local_user)]} {
-		return [list $local_user]
-	}
-
-	return {}
-}
 
 # verify that we know who we are on the map and prompt the user to let us know if not.
 set suppress_aka false

@@ -70,6 +70,12 @@ Includes Paul Walton's scrollable frame code `sframe.tcl`, available at [http://
 
 Also uses a modified version of [Silk Icons](http://www.famfamfam.com/lab/icons/silk/).
 
+## Audio Cues
+
+On Deck prompts derived from `ding` sound clip by DRAGON-STUDIO.
+Your Turn prompt from `ding` sound clip by freesound`_`community.
+Both original clips obtained from, and used under the licensing terms of, Pixabay.com.
+
 ## Game System Neutral
 The GMA software and the gma-mapper client in this repository are intended to be game-system-neutral.
 They are not written specifically for, nor intended specifically for use with, the oldest fantasy role-playing game,

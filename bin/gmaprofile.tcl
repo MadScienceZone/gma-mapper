@@ -98,6 +98,7 @@ namespace eval ::gmaprofile {
 		scaling f
 		show_timers s
 		no_dice ?
+		no_ondeck_audio ?
 		suppress_aka ?
 		guide_lines {o {
 			major {o {
@@ -326,6 +327,7 @@ namespace eval ::gmaprofile {
 			styles       [default_styles]\
 			suppress_aka false\
 			no_dice      false\
+			no_ondeck_audio false\
 		]
 	}
 	proc _add_new_font {w} {
@@ -604,7 +606,7 @@ namespace eval ::gmaprofile {
 		global imgtext debug_level debug_proto curl_path curl_insecure profiles menu_button never_animate
 		global major_interval major_offset_x major_offset_y
 		global minor_interval minor_offset_x minor_offset_y flash_updates
-		global chat_timestamp prf_suppress_aka prf_no_dice
+		global chat_timestamp prf_suppress_aka prf_no_dice prf_no_ondeck_audio
 		variable _profile
 
 		set _profile [dict replace $_profile \
@@ -641,6 +643,7 @@ namespace eval ::gmaprofile {
 			never_animate $never_animate\
 			suppress_aka $prf_suppress_aka\
 			no_dice $prf_no_dice\
+			no_ondeck_audio $prf_no_ondeck_audio\
 			keep_tools $keep_tools \
 			preload $preload \
 			scaling $scaling \
@@ -795,7 +798,7 @@ namespace eval ::gmaprofile {
 		global major_interval major_offset_x major_offset_y
 		global minor_interval minor_offset_x minor_offset_y flash_updates
 		global s_hostname s_port s_user s_pass s_blur_hp
-		global prf_no_dice prf_suppress_aka
+		global prf_no_dice prf_suppress_aka prf_no_ondeck_audio
 		variable _profile
 		variable _profile_backup
 		variable currently_editing_index
@@ -828,7 +831,8 @@ namespace eval ::gmaprofile {
 			scaling scaling \
 			show_timers show_timers \
 			suppress_aka prf_suppress_aka \
-			no_dice prf_no_dice
+			no_dice prf_no_dice\
+			no_ondeck_audio prf_no_ondeck_audio
 
 		set animate [::gmaproto::int_bool $animate]
 		set flash_updates [::gmaproto::int_bool $flash_updates]
@@ -843,6 +847,7 @@ namespace eval ::gmaprofile {
 		set preload [::gmaproto::int_bool $preload]
 		set debug_proto [::gmaproto::int_bool $debug_proto]
 		set prf_no_dice [::gmaproto::int_bool $prf_no_dice]
+		set prf_no_ondeck_audio [::gmaproto::int_bool $prf_no_ondeck_audio]
 		set prf_suppress_aka [::gmaproto::int_bool $prf_suppress_aka]
 
 		set guides [dict merge [dict create \
@@ -1156,6 +1161,7 @@ namespace eval ::gmaprofile {
 		grid [ttk::label $w.n.a.title3 -text "PLAYER OPTIONS" -anchor center -foreground $sep_fg -background $sep_bg] - - - - - - -sticky we -pady 5
 		grid [ttk::checkbutton $w.n.a.nodice -text "Disable die rolling (die roller will be read-only)" -variable prf_no_dice] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.noaka -text "Never ask me what characters I'm playing" -variable prf_suppress_aka] - - - - - - -sticky w
+		grid [ttk::checkbutton $w.n.a.nooda -text "Disable audio cues for ondeck and my turns" -variable prf_no_ondeck_audio] - - - - - - -sticky w
 
 		grid [ttk::label $w.n.t.title -text "PATHS TO SUPPORT PROGRAMS" -anchor center -foreground $sep_fg -background $sep_bg] - -sticky we -pady 5
 		grid [ttk::label $w.n.t.curl_label -text "Curl program path:"] \
