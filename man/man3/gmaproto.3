@@ -1,7 +1,7 @@
 '\" t
 '\" <<bold-is-fixed>>
 '\" <<ital-is-var>>
-.TH GMAPROTO 3 "GMA-Mapper 4.34.1" 11-Nov-2025 "API Functions" \" @@mp@@
+.TH GMAPROTO 3 "GMA-Mapper 4.35" 27-Nov-2025 "API Functions" \" @@mp@@
 .SH NAME
 gmaproto \- GMA client/server communication functions
 .SH SYNOPSIS
@@ -21,6 +21,9 @@ gmaproto \- GMA client/server communication functions
 .B ::gmaproto::add_image
 .I name
 .I sizes
+.RI ? frames ?
+.RI ? speed ?
+.RI ? loops ?
 .LP
 .B ::gmaproto::add_obj_attributes
 .I id
@@ -30,17 +33,24 @@ gmaproto \- GMA client/server communication functions
 .B ::gmaproto::adjust_view
 .I x
 .I y
+.I grid_label
 .LP
 .B ::gmaproto::allow
 .I features
 .LP
 .B ::gmaproto::auth_response
 .I challenge
+.RI ? passes ?
 \[->]
 .I response
 .LP
 .B ::gmaproto::background_redial
 .I tries
+'\" <<New>>
+.LP
+.B ::gmaproto::character_name
+.I names
+'\" <</New>>
 .LP
 .B ::gmaproto::chat_message
 .I message
@@ -48,6 +58,8 @@ gmaproto \- GMA client/server communication functions
 .I recipients
 .I to_all
 .I to_gm
+.RI ? markup ?
+.RI ? pinned ?
 .LP
 .B ::gmaproto::clear
 .I id
@@ -87,6 +99,7 @@ gmaproto \- GMA client/server communication functions
 .LP
 .B ::gmaproto::filter_dice_presets
 .I regex
+.RI ? globals_only ?
 .LP
 .B ::gmaproto::from_enum
 .I key
@@ -194,6 +207,9 @@ gmaproto \- GMA client/server communication functions
 .I recipients
 .I to_all
 .I blind_to_gm
+.RI ? roll_id ?
+.RI ? targets ?
+.RI ? roll_type ?
 .LP
 .B ::gmaproto::set_debug
 .B cmd
@@ -249,7 +265,7 @@ low-level communications, legacy protocol translation, and dispatching incoming
 server commands to the mapper for execution.
 '\" <<list>>
 .TP 10
-.BI "::gmaproto::add_image " name " " sizes
+.BI "::gmaproto::add_image " name " " sizes " \fR?\fP" frames "\fR? ?\fP" speed "\fR? ?\fP" loops \fR?\fP
 Send image information to the server for the image with the given
 .I name
 (the messsage ID as referenced in map files and in the client).
@@ -258,6 +274,12 @@ The
 parameter is a Tcl list of dictionaries describing each instance of each zoomed size
 of that image as documented in
 .BR mapper (6).
+If given,
+.IR frames ,
+.IR speed ,
+and
+.I loops
+indicate how to animate the frames of an animated image.
 This sends the 
 .B AI
 protocol command.
@@ -274,7 +296,7 @@ This sends the
 .B OA+
 protocol command.
 .TP
-.BI "::gmaproto::adjust_view " x " " y
+.BI "::gmaproto::adjust_view " x " " y " " grid_label
 Tell other clients to ajust their scrollbars so that the
 distance scrolled is 
 .I x
@@ -286,6 +308,9 @@ and
 .I y
 are values between 0 and 1, which indicate the proportion of full range to move the
 scrollbars.
+If
+.I grid_label
+is nonempty, the view is adjusted so the grid with that label is in view.
 This sends the
 .B AV
 protocol command.
@@ -298,7 +323,7 @@ This sends the
 .B ALLOW
 protocol command.
 .TP
-.BI "::gmaproto::auth_response " challenge
+.BI "::gmaproto::auth_response " challenge " \fR?\fP" passes \fR?\fP
 .I "You should not normally need to invoke this procedure directly."
 Given a binary
 .I challenge
@@ -315,8 +340,17 @@ Attempts to reconnect to the server. If this fails, it schedules itself
 to run again in a few seconds, with the
 .I tries
 value incremented.
+'\" <<New>>
 .TP
-.BI "::gmaproto::chat_message " message " " sender " " recipients " " to_all " " to_gm
+.BI "::gmaproto::character_name " names
+Declare that the player is controling the character(s) whose names (as shown on the VTT map) are as listed in the list
+.I names
+instead of the name under which the player logged in to the 
+.B mapper 
+client.
+'\" <</New>>
+.TP
+.BI "::gmaproto::chat_message " message " " sender " " recipients " " to_all " " to_gm " \fR?\fP" markup "\fR? ?\fP" pinned \fR?\fP
 Sends a chat 
 .I message
 to other clients. Clients should not set the 
@@ -328,8 +362,13 @@ is true, the message will be sent only to the GM; otherwise, if
 is true, the message is sent to all clients; otherwise it is sent to the
 list of usernames in
 .IR recipients .
+If 
+.I markup
+is true, GMA markup syntax is honored in the chat message. If
+.I pinned
+is true, this message will be pinned for long-term display.
 This sends the
-.B To
+.B TO
 protocol command.
 .TP
 .BI "::gmaproto::clear " id
@@ -460,10 +499,13 @@ is the parameter dictionary, and
 is the error message received.
 .RE
 .TP
-.BI "::gmaproto::filter_dice_presets " regex
+.BI "::gmaproto::filter_dice_presets " regex " \fR?\fP" globals_only \fR?\fP
 Asks the server to remove all stored die-roll presets whose names match the
 regular expression
 .IR regex .
+If
+.I globals_only
+is true, this only applies to system-defined presets.
 This sends the
 .B DD/
 protocol command.
@@ -604,7 +646,7 @@ Try to reconnect using the parameters given with the initial
 command. 
 .I "You don't normally need to call this directly."
 .TP
-.BI "::gmaproto::roll_dice " spec " " recipients " " to_all " " blind_to_gm
+.BI "::gmaproto::roll_dice " spec " " recipients " " to_all " " blind_to_gm " \fR?\fP" roll_id "\fR? ?\fP" targets "\fR? ?\fP" roll_type \fR?\fP
 Ask the server to roll the dice indicated by
 .IR spec .
 If
@@ -614,6 +656,15 @@ is true, the results are visible only to the GM; otherwise, if
 is true, the results are sent to everyone; otherwise only to
 the list of user names in
 .IR recipients .
+If given,
+.I roll_id
+assigns an ID to the roll which is sent back with the results.
+If given,
+.I roll_type
+gives the type of die roll being made.
+The creature names being targeted is given, if applicable, by the
+.I targets
+list value.
 This sends the
 .B D
 protocol command.

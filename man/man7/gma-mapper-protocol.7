@@ -1,7 +1,7 @@
 '\" t
-'\" *** 419 ***
+'\" *** 420 ***
 '\" <<ital-is-var>>
-.TH GMA-MAPPER-PROTOCOL 7 "GMA-Mapper 4.34.1" 11-Nov-2025 "Protocols" \" @@mp@@
+.TH GMA-MAPPER-PROTOCOL 7 "GMA-Mapper 4.35" 27-Nov-2025 "Protocols" \" @@mp@@
 .SH NAME
 gma-mapper-protocol \- GMA client/server protocol specification
 .SH EXPERIMENTAL
@@ -79,7 +79,7 @@ be implemented to wait synchronously for a server
 response during the authentication negotiation stage.
 .LP
 '\" <</bold-is-fixed>>
-.B "This describes protocol version 419."
+.B "This describes protocol version 420."
 '\" <<bold-is-fixed>>
 These notes are intended to be 
 detailed enough to implement a client from and should be considered
@@ -187,6 +187,7 @@ since all communications are asynchronous.
 '\"  \z{/CONN}  &C$\rightarrow$S    &\z{CONN}   &no &none          &Request list of peer clients\\
 '\"  \z{ACCEPT} &C$\rightarrow$S    &---        &no &\acronym{JSON}&Subscribe to a set of messages\\
 '\"  \z{AC}     &C$\leftarrow$S     &---        &N/A&\acronym{JSON}&Add primary PC to party\\
+'\"  \z{AKA}    &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Declare character name for a player\\
 '\"  \z{ALLOW}  &C$\rightarrow$S    &---        &no &\acronym{JSON}&Indicate supported features\\
 '\"  \z{AUTH}   &C$\rightarrow$S    &\z{GRANTED}&no &\acronym{JSON}&Authenticate to server\\
 '\"  \z{AV}     &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Scroll clients' views\\
@@ -275,6 +276,7 @@ AdjustView	AV	C\[<>]S	\fR\(em\fP	no	JSON	Scroll clients' views
 Allow	ALLOW	C\[->]S	\fR\(em\fP	no	JSON	Indicate supported features
 Auth	AUTH	C\[->]S	GRANTED	no	JSON	Authenticate to server
 Challenge	OK	C\[<-]S	AUTH	N/A	JSON	Ask client to authenticate
+CharacterName	AKA	C\[<>]S	\fR\(em\fP	no	JSON	Declare character name for a player
 ChatMessage	TO	C\[<>]S	\fR\(em\fP	no	JSON	Send chat message
 Clear	CLR	C\[<>]S	\fR\(em\fP	no	JSON	Remove objects from client
 ClearChat	CC	C\[<>]S	\fR\(em\fP	no	JSON	Clear the chat history
@@ -658,6 +660,34 @@ the opposite is done: images whose names match
 will be removed.
 .RE
 '\" <</>>
+'\" <<New>>
+.TP
+.B AKA
+Declare that the logged-in user is controlling one or more characters
+on the VTT map. Normally, the mapper tool will assume that users are controlling
+creatures whose names (as known on the map) match the players' login usernames.
+If that is not the case for any given player,
+this command may be sent by that player's client
+to indicate what creature token(s) they are controlling, so the other map
+clients (and any other interested programs) can know who is who on the battlefield.
+The JSON payload has the following fields:
+'\" <<list>>
+.RS
+.TP
+'\" <</ital-is-var>>
+.BI Names " (list of strings)"
+The names of the creatures this player is controlling.
+.TP
+.B User
+The login name for the user's session. This field is not normally supplied
+as part of the request by the player's client. It will be filled in by the
+server when relaying the
+.B AKA
+message to all peer clients, using the requester's logged in user name in
+this field.
+'\" <</>>
+.RE
+'\" <</New>>
 .TP
 .B ALLOW
 The client MAY send this command to the server after logging in. This tells
@@ -666,7 +696,6 @@ JSON payload has the following field:
 .RS
 '\" <<list>>
 .TP
-'\" <</ital-is-var>>
 .BI Features " (list of strings)"
 '\" <<ital-is-var>>
 This is a list of feature names which the client wishes to enable.
@@ -1008,6 +1037,14 @@ command from the peer.
 .TP
 .BI IsAuthenticated " (bool)"
 If true, the client successfully negotiated the server's authentication process.
+'\" <<New>>
+.TP
+.BI AKA " (list of strings)"
+The list of creature names, if any, that the player is controlling instead of
+a creature matching the
+.B User
+field value.
+'\" <</New>>
 .TP
 .BI IsMe " (bool)"
 '\" <<ital-is-var>>
@@ -2175,11 +2212,71 @@ If true, this die-roll will be sent \*(lqblind\*(rq to the GM only.
 Not even the requester will see the result of the roll, only the GM will.
 .TP
 .BI RollSpec
-'\" <<ital-is-var>>
 The die-roll specification, like \*(lqd20+12\*(rq or \*(lq6d6 fire\*(rq.
 If this field is empty, the previous die-roll from this client is repeated,
 or \*(lq1d20\*(rq if there was no previous one.
 '\" <</>>
+'\" <<New>>
+.TP
+.BI Targets " (list of strings)"
+'\" <<ital-is-var>>
+The names of the creatures to whom this die roll is being specifically targeted.
+If the die-roll spec contains a
+.B |target
+option, that will override any value passed here and will be reflected in
+the
+.B Targets
+field of the results sent back from the server.
+.TP
+.B Type
+The type of die roll. Normally this is left out or blank, but it may be a string that describes
+the specific purpose for this roll. While any string value may be given (which allows client-specific
+usage of this field since the string will be sent back with the die-roll results), the following
+are defined with specific purposes:
+'\" <<list>>
+.RS
+.TP
+.B attack
+The die roll is assumed to be a combat attack roll checked against the 
+known AC of the target creature. This will cause the results to include a success or failure
+indicator. If there is no known AC for the creature, this has no effect.
+This will also force the same behavior as putting the 
+.RB \*(lq |c \*(rq
+option in the
+.B RollSpec
+string.
+.TP
+.B attack-ff
+As
+.BR attack ,
+but checks against the flat-footed AC. This is automatically assumed if the
+.B Type
+is 
+.B attack
+and the creature is known to be flat-footed.
+.TP
+.B attack-touch
+As
+.BR attack ,
+but checks against the touch AC.
+.TP
+.B attack-cmd
+As
+.BR attack ,
+but checks against the CMD value.
+.TP
+.B damage
+Doesn't affect the process of rolling the dice, but the
+.B gma
+program will deduct the result value from the target creature's hit point total upon receipt of the
+results.
+.LP
+Certain die-roll spec options may automatically imply the type value. In which case,
+the die-roll options take precedence and will be reflected in the results
+returned from the server.
+.RE
+'\" <</>>
+'\" <</New>>
 .RE
 .TP
 .B DD
@@ -3010,6 +3107,20 @@ The amount of lethal damage sustained.
 .TP
 .BI NonLethalDamage " (int)"
 The amount of non-lethal damage sustained.
+'\" <<New>>
+.TP
+.BI AC " (int)"
+Current armor class
+.TP
+.BI FlatFootedAC " (int)"
+Current flat-footed armor class
+.TP
+.BI TouchAC " (int)"
+Current touch armor class.
+.TP
+.BI CMD " (int)"
+Current combat maneuver defense.
+'\" <</New>>
 '\" <</>>
 .RE
 .TP
@@ -3094,9 +3205,19 @@ is an object with the following fields:
 .BI Slot " (int)"
 The slot number. As currently implemented this is a number in the range [0,59] which
 gives the \*(lqcount\*(rq (1/10th second) in the round where this creature may act.
+'\" <<Warning>>
 .TP
 .BI CurrentHP " (int)"
 The creature's current hit point total.
+'\" <</bold-is-fixed>>
+.B "This field is deprecated."
+'\" <<bold-is-fixed>>
+Clients MUST use the
+.B OA
+command to change a creature's health attribute when hit points change
+instead of sending the current hit points here. A future version will remove
+support for this field.
+'\" <</Warning>>
 .TP
 .BI Name
 The creature's name as displayed on the map.
@@ -3878,6 +3999,24 @@ the percentage by which to \*(lqblur\*(rq the hit points as seen by the
 players. For example, if
 .B HPBlur
 is 10, then hit points are displayed only in 10% increments.
+'\" <<New>>
+.TP
+.BI AC " (int)"
+The creature's current full armor class.
+.TP
+.BI FlatFootedAC " (int)"
+The creature's current flat-footed armor class. If this is not specified or is 0, it will be
+assumed to be the same value as
+.BR AC ,
+but that will not be reflected in this data structure, simply how consumers of the data are free
+to interpret it.
+.TP
+.BI TouchAC " (int)"
+The creature's current touch armor class.
+.TP
+.BI CMD " (int)"
+The creature's current combat maneuver defense.
+'\" <</New>>
 '\" <</>>
 .RE
 .TP
@@ -4128,7 +4267,7 @@ The name of the user who rolled the dice.
 '\" <</ital-is-var>>
 .BI Origin " (bool)"
 If present and true upon receipt of this message from the server, this indicates that the client receiving it was the same client who originated the
-die roll reqeust whose result is being reported here, as opposed to a client who is merely
+die roll request whose result is being reported here, as opposed to a client who is merely
 being given a copy of the results of another client's die roll.
 .TP
 .BI Replay " (bool)"
@@ -4142,6 +4281,22 @@ performing lookup table reports on it.
 The names of the people the message was explicitly addressed to. For
 global messages, this should be
 .BR null .
+'\" <<New>>
+.TP
+.BI Targets " (list of strings)"
+The names of the creatures this roll was targeted at. This is simply whatever list was sent in the
+.B D
+command's
+.B Targets
+field, if any.
+.TP
+.B Type
+The type of thing the result applies to. This is simply whatever string was sent in the
+.B D
+command's
+.B Type
+field, if any.
+'\" <</New>>
 .TP
 .BI MessageID " (int)"
 The unique number assigned by the server for this chat message. (Die roll
@@ -4664,8 +4819,13 @@ Steve Willoughby / steve@madscience.zone;
 John Mechalas (elevation and movement modes).
 .SH HISTORY
 .LP
-This document defines map protocol version 419,
-which adds support for pinned chat messages.
+This document defines map protocol version 420,
+which introduces targets to die rolls and armor class as a tracked creature health item. It also introduces the
+.B AKA
+command.
+.LP
+Version 419
+added support for pinned chat messages.
 .LP
 Version 418 
 added support for temporary hit point tracking and user requests for hit point changes.
