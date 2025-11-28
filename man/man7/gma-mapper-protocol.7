@@ -187,7 +187,7 @@ since all communications are asynchronous.
 '\"  \z{/CONN}  &C$\rightarrow$S    &\z{CONN}   &no &none          &Request list of peer clients\\
 '\"  \z{ACCEPT} &C$\rightarrow$S    &---        &no &\acronym{JSON}&Subscribe to a set of messages\\
 '\"  \z{AC}     &C$\leftarrow$S     &---        &N/A&\acronym{JSON}&Add primary PC to party\\
-'\"  \Z{AKA}    &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Declare character name for a player\\
+'\"  \z{AKA}    &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Declare character name for a player\\
 '\"  \z{ALLOW}  &C$\rightarrow$S    &---        &no &\acronym{JSON}&Indicate supported features\\
 '\"  \z{AUTH}   &C$\rightarrow$S    &\z{GRANTED}&no &\acronym{JSON}&Authenticate to server\\
 '\"  \z{AV}     &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Scroll clients' views\\
@@ -685,6 +685,7 @@ server when relaying the
 .B AKA
 message to all peer clients, using the requester's logged in user name in
 this field.
+'\" <</>>
 .RE
 '\" <</New>>
 .TP
