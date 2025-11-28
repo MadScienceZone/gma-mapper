@@ -1,7 +1,7 @@
 '\" t
 '\" <<ital-is-var>>
 '\" <<bold-is-fixed>>
-.TH GMA-MAPPER 6 "GMA-Mapper 4.34.1" 11-Nov-2025 "Games" \" @@mp@@
+.TH GMA-MAPPER 6 "GMA-Mapper 4.35" 27-Nov-2025 "Games" \" @@mp@@
 .SH NAME
 gma mapper \- GMA battle grid map
 .SH SYNOPSIS
@@ -76,6 +76,8 @@ gma mapper \- GMA battle grid map
 .IR path ]
 .RB [ \-\-no\-animate ]
 .RB [ \-\-no\-blur\-all ]
+.RB [ \-\-no\-char ]
+.RB [ \-\-no\-dice ]
 .RB [ \-\-preferences
 .IR path ]
 .RB [ \-\-scp\-dest
@@ -132,7 +134,9 @@ gma mapper \- GMA battle grid map
 .IR module ]
 .RB [ \-\-nc\-path
 .IR path ]
+.RB [ \-\-no\-char ]
 .RB [ \-\-no\-chat ]
+.RB [ \-\-no\-dice ]
 .RB [ \-\-password
 .IR pass ]
 .RB [ \-\-port
@@ -643,9 +647,23 @@ program which will be used when sending files
 .I to
 '\" <<ital-is-var>>
 the data server (authorized users only) through a SOCKS proxy server.
+'\" <<New>>
+.TP
+.B \-\-no\-char
+Don't prompt the user to say what character they're playing if they log in
+as a user name that doesn't match any known character on the map. This leaves
+no known mapping between the player and the characters, which may limit effective
+use of the mapper tools.
+'\" <</New>>
 .TP
 .BR \-n ", " \-\-no\-chat
 Suppress the display of incoming chat messages including die rolls.
+'\" <<New>>
+.TP
+.B \-\-no\-dice
+Disable the ability to send chat messages and roll dice. The mapper's
+die roller window will only receive those messages.
+'\" <</New>>
 .TP
 .BI "\-P\fR, \fP\-\-password " pass
 For servers which require authentication, this specifies the password to gain entry to that server.

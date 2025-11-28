@@ -3,20 +3,27 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.34.1          <!-- @@##@@ -->
- * Effective Date: 11-Nov-2025               <!-- @@##@@ -->
+ * This Package Version: 4.35          <!-- @@##@@ -->
+ * Effective Date: 27-Nov-2025               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.36.1 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.38 <!-- @@##@@ -->
  * GMA Mapper File Format: 23	     <!-- @@##@@ -->
- * GMA Mapper Protocol: 419        <!-- @@##@@ -->
- * GMA Mapper Preferences File Format: 9 <!-- @@##@@ -->
+ * GMA Mapper Protocol: 420        <!-- @@##@@ -->
+ * GMA Mapper Preferences File Format: 10 <!-- @@##@@ -->
 
 ## DEPRECATION NOTICE
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
+# 4.35
+## Enhancements
+ * Now supports protocol 420.
+ * Supports specifying explicitly what character(s) you are playing even if you log in with an arbitrary username that doesn't match any character name on the map. This also means you can indicate that you're playing multiple characters if you're covering for someone.
+ * Provides audio and visual cues when your turn in combat is coming up.
+ * Now allows you to start with the die roller in "read only" mode as a preferences setting or via `--no-dice` command-line option.
+ * New preferences options to opt in/out of new features.
 # 4.34.1
 ## Fixes
  * Corrected bug with modifier enable checkbuttons not tracking the internal state of the modifiers.

@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       ______      ___        __        #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \    /   )      /  \       #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \  / /) |      \/) )      #
-# | |      | || || || (___) | Assistant  / (_) (_       ___) / / (_) (_       | |      #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( (____   _)      | |      #
-# | | \_  )| |   | || (   ) |                ) (           ) \     ) (        | |      #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /     | |   _  __) (_     #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/      (_)  (_) \____/     #
+#  _______  _______  _______                ___       ______   _______                 #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \ (  ____ \                #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \| (    \/                #
+# | |      | || || || (___) | Assistant  / (_) (_       ___) /| (____                  #
+# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( (_____ \                 #
+# | | \_  )| |   | || (   ) |                ) (           ) \      ) )                #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  //\____) )                #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/ \______/                 #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -17,10 +17,10 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.34.1}     ;# @@##@@
+set GMAMapperVersion {4.35}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
-set GMAMapperProtocol {419}         ;# @@##@@
-set CoreVersionNumber {6.36.1}            ;# @@##@@
+set GMAMapperProtocol {420}         ;# @@##@@
+set CoreVersionNumber {6.38}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -148,6 +148,25 @@ proc begin_progress { id title max args } {
         DEBUG 0 "begin_progress $id: $err"
     }
     return $id
+}
+
+# return the list of names this player is controlling, or {} if we don't know.
+proc my_map_names {} {
+	global local_user local_aka PC_IDs MOBid
+	
+	if {$local_aka ne {}} {
+		return $local_aka
+	}
+
+	if {[info exists PC_IDs($local_user)]} {
+		return [list $local_user]
+	}
+
+	if {[info exists MOBid($local_user)]} {
+		return [list $local_user]
+	}
+
+	return {}
 }
 
 proc TopLeftGridLabel {} {
@@ -398,6 +417,7 @@ set default_config    [file normalize [file join ~ .gma mapper mapper.conf]]
 set path_install_base [file normalize [file join ~ .gma mapper]]
 
 if {[catch {set local_user $::tcl_platform(user)}]} {set local_user __unknown__}
+set local_aka {}
 set ChatTranscript 	{}
 
 proc say {msg} {
@@ -516,6 +536,9 @@ set blur_pct 0
 set blur_all 0
 set DEBUG_level 0
 set GridEnable 1
+set no_char false
+set no_dice false
+set no_ondeck_audio false
 
 
 # Objects are stored in these arrays:
@@ -973,6 +996,7 @@ if {$tcl_platform(os) eq "Darwin"} {
 }
 
 set ICON_DIR [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end-1 end lib MadScienceZone GMA Mapper icons]]]
+set SOUND_DIR [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end-1 end lib MadScienceZone GMA Mapper sounds]]]
 set BIN_DIR [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end end]]]
 foreach module {scrolledframe ustar gmaclock gmacolors gmautil gmaprofile gmaproto gmafile gmazones progressbar minimarkup} {
 	source [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end end $module.tcl]]]
@@ -1187,6 +1211,8 @@ proc create_main_menu {use_button} {
 		$mm.play.gridsnap add radiobutton -label $label -selectcolor $check_menu_color -variable CreatureGridSnap -value $value
 	}
 	$mm.play add command -command {ClearSelection} -label "Deselect All"
+	$mm.play add separator
+	$mm.play add command -command {selectAKA} -label "Specify What Character You're Playing..."
 	menu $mm.tools
 	$mm.tools add command -command {checkForUpdates} -label "Check for Updates..."
 	$mm.tools add separator
@@ -1502,7 +1528,7 @@ proc ApplyPreferences {data args} {
 	global ModuleID MasterClient SuppressChat ChatTranscript local_user
 	global OptPreload ButtonSize ChatHistoryLimit CURLpath CURLserver
 	global CURLproxy SCPproxy SERVER_MKDIRpath NCpath SCPpath SCPdest SCPserver
-	global SSHpath UpdateURL CurrentProfileName _preferences CURLinsecure
+	global SSHpath UpdateURL CurrentProfileName _preferences CURLinsecure suppress_aka no_dice no_ondeck_audio
 
 	set _preferences $data
 	set majox 0
@@ -1536,10 +1562,26 @@ proc ApplyPreferences {data args} {
 		keep_tools   MasterClient \
 		preload      OptPreload \
 		profiles     servers \
-		current_profile cprof
+		current_profile cprof \
+		no_dice      prf_no_dice \
+		no_ondeck_audio prf_no_ondeck_audio\
+		suppress_aka prf_suppress_aka
 
 	if {[lsearch -exact $args -override] < 0} {
 		set CurrentProfileName $cprof
+	}
+
+	#suppress aka prompts and die rolling based on prefs but don't override command-line option if one was given
+	if {$prf_suppress_aka} {
+		set suppress_aka true
+	}
+
+	if {$prf_no_dice} {
+		set no_dice true
+	}
+
+	if {$prf_no_ondeck_audio} {
+		set no_ondeck_audio true
 	}
 
 	if {$CurrentProfileName ne {}} {
@@ -1718,7 +1760,9 @@ proc usage {} {
 	puts $stderr {   -L, --list-profiles: Print available profiles you can use with --select}
 	puts $stderr {   -l, --preload:     Load all cached images at startup}
 	puts $stderr {   -M, --module:      Set module ID (SaF GM role only)}
+	puts $stderr {       --no-char:     	Disable prompts for what character you're playing}
 	puts $stderr {   -n, --no-chat:		Do not display incoming chat messages}
+	puts $stderr {       --no-dice:     	Disable die rolling (die roller will be read-only)}
 	puts $stderr {   -P, --password:    Password to log in to the map service}
 	puts $stderr {   -p, --port:        Port for initiative tracker [2323]}
 	puts $stderr {       --recursionlimit: set runtime recursion limit}
@@ -1851,6 +1895,9 @@ for {set argi 0} {$argi < $optc} {incr argi} {
 		-m - --master -
 		-k - --keep-tools { set MasterClient 1 }
 		-n - --no-chat    { set SuppressChat 1 }
+		--no-dice         { set no_dice true }
+		--no-char         { set suppress_aka true }
+		--no-ondeck-audio { set no_ondeck_audio true }
 		-S - --select     { 
 			set CurrentProfileName [getarg -S]
 			ApplyPreferences $PreferencesData -override
@@ -2502,9 +2549,88 @@ grid \
 	 [button .toolbar.exit -image $icon_exit -command exitchk] 
 
 grid [label   .toolbar2.clock -anchor w -font {Helvetica 18} -textvariable ClockDisplay]         -row 0 -column 1 -sticky we 
-grid [ttk::progressbar .toolbar2.progbar -orient horizontal -length 200 -variable ClockProgress] -row 0 -column 2 -sticky e
+grid [button .toolbar2.ondeck -relief flat] -row 0 -column 2 -sticky ew 
+set ondeck_bg [.toolbar2.ondeck cget -bg]
+grid [ttk::progressbar .toolbar2.progbar -orient horizontal -length 200 -variable ClockProgress] -row 0 -column 3 -sticky e
 grid columnconfigure .toolbar2 1 -weight 2
 grid forget .toolbar2.progbar
+
+
+#
+# set up ondeck audio prompts
+#
+if {! [catch {package require sound}]} {
+	foreach level {0 1 2} {
+		if {! [catch {snack::sound ondecksound$level -load $SOUND_DIR/ondeck$level.wav -channels Stereo}]} {
+			set SoundObj(ondeck$level) ondecksound$level
+		}
+	}
+}
+set ondeck_slotlist {}
+set ondeck_current -1
+proc set_ondeck {place} {
+	global ondeck_bg SoundObj no_ondeck_audio
+	switch $place {
+		0 {.toolbar2.ondeck configure -fg white -bg green -text "YOUR TURN"}
+		1 {.toolbar2.ondeck configure -fg white -bg red   -text "ON DECK"}
+		2 {.toolbar2.ondeck configure -fg black -bg yellow -text "On deck in 1"}
+		default {.toolbar2.ondeck configure -bg $ondeck_bg -text ""; return}
+	}
+	.toolbar2.ondeck flash
+	if {[info exists SoundObj(ondeck$place)] && !$no_ondeck_audio} {
+		$SoundObj(ondeck$place) play
+	}
+}
+
+proc update_ondeck_list {ilist} {
+	global ondeck_slotlist ondeck_current
+	set lastslot -1
+	set last_current [lindex $ondeck_slotlist $ondeck_current]
+	set ondeck_slotlist {}
+	foreach slotdesc $ilist {
+		::gmautil::dassigndef $slotdesc Slot {slot -1} Name {name {}}
+		if {$slot < 0 || $name eq {}} {
+			DEBUG 0 "Received invalid initiative slot value from server (slot $slot, name '$name'; ignored)"
+		} else {
+			if {$lastslot > $slot} {
+				DEBUG 0 "Received initiative slots out of order from server (that shouldn't happen! proceeding anyway but that's messed up!)"
+			}
+			if {$lastslot == $slot} {
+				DEBUG 0 "Received duplicate initiative slot numbers from server (that shouldn't happen! proceeding anyway but that's messed up!)"
+			}
+			set lastslot $slot
+			lappend ondeck_slotlist $name
+		}
+	}
+	if {$last_current eq {}} {
+		set ondeck_current -1
+	} else {
+		set ondeck_current [lsearch -exact $ondeck_slotlist $last_current]
+	}
+	ondeck_calc
+}
+
+proc ondeck_advance {d} {
+	global ondeck_current ondeck_slotlist
+	::gmautil::dassigndef $d ActorID {name {}}
+	set ondeck_current [lsearch -exact $ondeck_slotlist $name]
+	ondeck_calc
+}
+
+proc ondeck_calc {} {
+	global ondeck_current ondeck_slotlist
+	set l [concat [lrange $ondeck_slotlist $ondeck_current end] [lrange $ondeck_slotlist 0 $ondeck_current-1]]
+	set score -1	
+	foreach my_name [my_map_names] {
+		set s [lsearch -exact $l $my_name]
+		if {$s >= 0} {
+			if {$score < 0 || $score > $s} {
+				set score $s
+			}
+		}
+	}
+	set_ondeck $score
+}
 
 proc configureChatCapability {} {
 	global icon_blank IThost
@@ -9811,6 +9937,7 @@ proc DoCommandIL {d} {
 	if {[::gmaclock::exists .initiative.clock]} {
 		::gmaclock::set_initiative_slots .initiative.clock [dict get $d InitiativeList]
 	}
+	update_ondeck_list [dict get $d InitiativeList]
 }
 
 # given a creature dict, enforce the new protocol specs in a backward-compatible way
@@ -10184,9 +10311,11 @@ proc DoCommandCLR@ {d} {
 	unloadfile $cache_filename -nosend -force
 }
 
+# PeerList now includes AKA attribute
 proc DoCommandCONN {d} {
-	global local_user PeerList
+	global local_user PeerList local_aka PeerAKA
 	set PeerList {}
+	array unset PeerAKA
 
 	foreach peer [dict get $d PeerList] {
 		::gmautil::dassign $peer User peer_user
@@ -10200,9 +10329,13 @@ proc DoCommandCONN {d} {
 				# we check for "None" because of the behavior of the Python server (sigh)
 				if {$peer_user ne $local_user} {
 					lappend PeerList $peer_user
+					if {[dict exists $peer AKA]} {
+						set PeerAKA($peer_user) [dict get $peer AKA]
+					}
 					DEBUG 3 "Peerlist=$PeerList"
 				} else {
 					DEBUG 2 "Excluding $peer (this is my username)"
+					::gmautil::dassigndef $peer AKA {local_aka {}}
 				}
 			} else {
 				DEBUG 2 "Excluding $peer (no username given)"
@@ -10219,9 +10352,27 @@ proc DoCommandCONN {d} {
 	}
 }
 
+proc DoCommandAKA {d} {
+	global PeerList local_aka local_user PeerAKA
+
+	::gmautil::dassigndef $d Names {names {}} User {user {}}
+	if {$user eq {}} {
+		return
+	}
+
+	if {$user eq $local_user} {
+		set local_aka $names
+	} else {
+		set PeerAKA($user) $names
+	}
+}
+
 proc DoCommandDD= {d} {
 	# define die-roll preset list (updates us from the server's stored presets)
-	global SuppressChat dice_preset_data local_user
+	global SuppressChat dice_preset_data local_user no_dice
+	if {$no_dice} {
+		return
+	}
 	
 	if {[set target [dict get $d For]] eq {}} {
 		set target $local_user
@@ -10304,6 +10455,8 @@ proc DoCommandI {d} {
 	global MOB_COMBATMODE canvas MOB_BLINK NextMOBID MOBdata MOBid
 	global CombatantScrollEnabled is_GM
 	set ITlist {}
+
+	ondeck_advance $d
 
 	if {$MOB_COMBATMODE} {
 		UpdateRunClock $d
@@ -10422,9 +10575,18 @@ proc create_timer_widget {id} {
 		DEBUG 1 "Not showing timer $id because timer display is turned off."
 		return
 	}
-	if {$TimerScope eq "mine" && [lsearch -exact $timer_progress_data(targets:$id) $local_user] < 0} {
-		DEBUG 1 "Not showing timer $id because $local_user is not in $timer_progress_data(targets:$id)"
-		return
+	if {$TimerScope eq "mine"} {
+		set ok false
+		foreach my_name [my_map_names] {
+			if {[lsearch -exact $timer_progress_data(targets:$id) $my_name] >= 0} {
+				set ok true
+				break
+			}
+		}
+		if {!$ok} {
+			DEBUG 1 "Not showing timer $id because $local_user is not in $timer_progress_data(targets:$id)"
+			return
+		}
 	}
 
 	set wid [to_window_id $id]
@@ -13546,7 +13708,7 @@ proc DisplayChatMessage {d for_user args} {
 	global icon_die16 icon_info20 icon_arrow_refresh check_menu_color
 	global icon_delete icon_add icon_open icon_save ChatTranscript icon_colorwheel
 	global last_known_size global_bg_color IThost
-	global _preferences colortheme dice_preset_data local_user
+	global _preferences colortheme dice_preset_data local_user local_aka no_dice
 
 	if {$d ne {}} {
 		::gmautil::dassign $d Sender from Recipients recipientlist Text message Sent date_sent Markup markup Pin pinned
@@ -13646,48 +13808,56 @@ proc DisplayChatMessage {d for_user args} {
 			ttk::labelframe $wc -text "Dice for $for_user"
 		}
 		ttk::labelframe $wpc -text "Pinned Messages"
-		ttk::labelframe $wrsf -text "Recent Rolls"
-		ttk::labelframe $wpsf -text "Preset Rolls"
-		pack [sframe new $wrsf.sf -anchor w] -side top -fill both -expand 1
-		pack [sframe new $wpsf.sf -anchor w] -side top -fill both -expand 1
-		set wr [sframe content $wrsf.sf]
-		set wp [sframe content $wpsf.sf]
-		bind $wrsf <Configure> "ResizeDieRoller $wr %w %h recent $for_user $tkey"
-		bind $wpsf <Configure> "ResizeDieRoller $wp %w %h preset $for_user $tkey"
+		if {!$no_dice} {
+			ttk::labelframe $wrsf -text "Recent Rolls"
+			ttk::labelframe $wpsf -text "Preset Rolls"
+			pack [sframe new $wrsf.sf -anchor w] -side top -fill both -expand 1
+			pack [sframe new $wpsf.sf -anchor w] -side top -fill both -expand 1
+			set wr [sframe content $wrsf.sf]
+			set wp [sframe content $wpsf.sf]
+			bind $wrsf <Configure> "ResizeDieRoller $wr %w %h recent $for_user $tkey"
+			bind $wpsf <Configure> "ResizeDieRoller $wp %w %h preset $for_user $tkey"
+		}
 
 		$w.p add $wpc
 		$w.p add $wc
-		$w.p add $wrsf
-		$w.p add $wpsf
+		if {!$no_dice} {
+			$w.p add $wrsf
+			$w.p add $wpsf
+		}
 		pack $w.p -side top -expand 1 -fill both 
 
-		for {set i 0} {$i < 10} {incr i} {
-			pack [frame $wr.$i] -side top -expand 0 -fill x
-			label $wr.$i.spec -anchor w
-			button $wr.$i.roll -state disabled -image $icon_die16 -command "Reroll $wr.$i $i $for_user $tkey"
-			entry $wr.$i.extra -width 3 -state disabled
-			label $wr.$i.plus -text +
-			set last_known_size($tkey,recent,$i) blank
-		}
-		pack [frame $wp.add] -side bottom -expand 0 -fill x
-		#pack [button $wp.add.add -image $icon_add -command AddDieRollPreset $for_user $tkey] -side left
-		#pack [label $wp.add.label -text "Add new die-roll preset" -anchor w] -side left -expand 1 -fill x
-		pack [button $wp.add.add -text "Edit presets..." -command [list EditDieRollPresets $for_user $tkey]] -side left
-		pack [button $wp.add.save -image $icon_save -command [list SaveDieRollPresets $w $for_user $tkey]] -side right
-		pack [button $wp.add.load -image $icon_open -command [list LoadDieRollPresets $w $for_user $tkey]] -side right
-		pack [button $wp.add.upd -image $icon_arrow_refresh -command [list RequestDicePresets $for_user]] -side right
+		if {!$no_dice} {
+			for {set i 0} {$i < 10} {incr i} {
+				pack [frame $wr.$i] -side top -expand 0 -fill x
+				label $wr.$i.spec -anchor w
+				button $wr.$i.roll -state disabled -image $icon_die16 -command "Reroll $wr.$i $i $for_user $tkey"
+				entry $wr.$i.extra -width 3 -state disabled
+				label $wr.$i.plus -text +
+				set last_known_size($tkey,recent,$i) blank
+			}
+			pack [frame $wp.add] -side bottom -expand 0 -fill x
+			#pack [button $wp.add.add -image $icon_add -command AddDieRollPreset $for_user $tkey] -side left
+			#pack [label $wp.add.label -text "Add new die-roll preset" -anchor w] -side left -expand 1 -fill x
+			pack [button $wp.add.add -text "Edit presets..." -command [list EditDieRollPresets $for_user $tkey]] -side left
+			pack [button $wp.add.save -image $icon_save -command [list SaveDieRollPresets $w $for_user $tkey]] -side right
+			pack [button $wp.add.load -image $icon_open -command [list LoadDieRollPresets $w $for_user $tkey]] -side right
+			pack [button $wp.add.upd -image $icon_arrow_refresh -command [list RequestDicePresets $for_user]] -side right
 
-		::tooltip::tooltip $wp.add.save "Export presets to disk file"
-		::tooltip::tooltip $wp.add.load "Import presets from disk file"
-		::tooltip::tooltip $wp.add.upd "Refresh preset list from server"
+			::tooltip::tooltip $wp.add.save "Export presets to disk file"
+			::tooltip::tooltip $wp.add.load "Import presets from disk file"
+			::tooltip::tooltip $wp.add.upd "Refresh preset list from server"
+		}
 
 		if {$for_user eq $local_user} {
 			pack [frame $wpc.1] -side top -expand 1 -fill both
 			pack [frame $wc.1] -side top -expand 1 -fill both
 		}
-		pack [frame $wc.2]\
-			 [frame $wc.3]\
-			-side top -expand 0 -fill x
+		if {!$no_dice} {
+			pack [frame $wc.2]\
+				 [frame $wc.3]\
+				-side top -expand 0 -fill x
+		}
 
 		if {$for_user eq $local_user} {
 			pack [text $wpc.1.text -yscrollcommand "$wpc.1.sb set" -height 10 -width 10 -state disabled] -side left -expand 1 -fill both
@@ -13695,49 +13865,51 @@ proc DisplayChatMessage {d for_user args} {
 			pack [text $wc.1.text -yscrollcommand "$wc.1.sb set" -height 10 -width 10 -state disabled] -side left -expand 1 -fill both
 			pack [scrollbar $wc.1.sb -orient vertical -command "$wc.1.text yview"] -side right -expand 0 -fill y
 		}
-		pack [button $wc.3.tc -image $icon_colorwheel \
-			-command [list EditColorBoxTitle "CHAT_dice,$tkey"]] -side left -padx 2
-		pack [label $wc.3.l -text Roll: -anchor nw] -side left -padx 2
+		if {!$no_dice} {
+			pack [button $wc.3.tc -image $icon_colorwheel \
+				-command [list EditColorBoxTitle "CHAT_dice,$tkey"]] -side left -padx 2
+			pack [label $wc.3.l -text Roll: -anchor nw] -side left -padx 2
 
-		pack [entry $wc.3.dice -textvariable dice_preset_data(CHAT_dice,$tkey) -relief sunken] -side left -fill x -expand 1
-		pack [button $wc.3.info -image $icon_info20 -command ShowDiceSyntax] -side right
-		::tooltip::tooltip $wc.3.info "Display help for how to write die rolls and use the chat window."
-		set dice_preset_data(CHAT_blind,$tkey) 0
-		set dice_preset_data(CHAT_markup_en,$tkey) [gmaproto::int_bool [dict get $_preferences markup_enabled]]
-		set dice_preset_data(CHAT_pinned_en,$tkey) 0
-		pack [ttk::checkbutton $wc.3.blind -text GM -variable dice_preset_data(CHAT_blind,$tkey)] -side right
-		::tooltip::tooltip $wc.3.blind "Send result of die roll ONLY to the GM."
-		#-selectcolor $check_select_color
-		#-indicatoron 1 
+			pack [entry $wc.3.dice -textvariable dice_preset_data(CHAT_dice,$tkey) -relief sunken] -side left -fill x -expand 1
+			pack [button $wc.3.info -image $icon_info20 -command ShowDiceSyntax] -side right
+			::tooltip::tooltip $wc.3.info "Display help for how to write die rolls and use the chat window."
+			set dice_preset_data(CHAT_blind,$tkey) 0
+			set dice_preset_data(CHAT_markup_en,$tkey) [gmaproto::int_bool [dict get $_preferences markup_enabled]]
+			set dice_preset_data(CHAT_pinned_en,$tkey) 0
+			pack [ttk::checkbutton $wc.3.blind -text GM -variable dice_preset_data(CHAT_blind,$tkey)] -side right
+			::tooltip::tooltip $wc.3.blind "Send result of die roll ONLY to the GM."
+			#-selectcolor $check_select_color
+			#-indicatoron 1 
 
-		menubutton $wc.2.to -menu $wc.2.to.menu -text To: -relief raised
-		menu $wc.2.to.menu -tearoff 0
-		$wc.2.to.menu add command -label (all) -command [list chat_to_all $for_user $tkey]
-		$wc.2.to.menu add checkbutton -label GM -onvalue 1 -offvalue 0 -variable dice_preset_data(CHAT_TO,$tkey,GM) -command [list update_chat_to $for_user $tkey] -selectcolor $check_menu_color
+			menubutton $wc.2.to -menu $wc.2.to.menu -text To: -relief raised
+			menu $wc.2.to.menu -tearoff 0
+			$wc.2.to.menu add command -label (all) -command [list chat_to_all $for_user $tkey]
+			$wc.2.to.menu add checkbutton -label GM -onvalue 1 -offvalue 0 -variable dice_preset_data(CHAT_TO,$tkey,GM) -command [list update_chat_to $for_user $tkey] -selectcolor $check_menu_color
 
-		set dice_preset_data(CHAT_text,$tkey) {}
-		global icon_star
+			set dice_preset_data(CHAT_text,$tkey) {}
+			global icon_star
 
-		pack $wc.2.to -side left 
-		pack [entry $wc.2.entry -relief sunken -textvariable dice_preset_data(CHAT_text,$tkey)] -side left -fill x -expand 1
-		pack [button $wc.2.send -command RefreshPeerList -image $icon_arrow_refresh] -side right
-		pack [ttk::checkbutton $wc.2.pinned -image $icon_star -variable dice_preset_data(CHAT_pinned_en,$tkey)] -side right	; #TODO
-		pack [ttk::checkbutton $wc.2.markup -text M -variable dice_preset_data(CHAT_markup_en,$tkey)] -side right
-		::tooltip::tooltip $wc.2.markup "Enable GMA markup formatting codes in chat messages."
-#		if {$for_user eq $local_user} {
-#			global icon_unlock
-#			pack [button $wc.2.lock -command [list ToggleChatLock $wc.2.lock $wc.1.text] -image $icon_unlock] -side right
-#			::tooltip::tooltip $wc.2.lock "Unlock the chat window for editing/copying text."
-#			set dice_preset_data(chat_lock) true
-#		}
-		::tooltip::tooltip $wc.2.send "Refresh the list of recipients for messages."
-		bind $wc.2.entry <Return> [list SendChatFromWindow $for_user $tkey]
-		bind $wc.3.dice <Return> [list SendDieRollFromWindow $w $wr $for_user $tkey]
+			pack $wc.2.to -side left 
+			pack [entry $wc.2.entry -relief sunken -textvariable dice_preset_data(CHAT_text,$tkey)] -side left -fill x -expand 1
+			pack [button $wc.2.send -command RefreshPeerList -image $icon_arrow_refresh] -side right
+			pack [ttk::checkbutton $wc.2.pinned -image $icon_star -variable dice_preset_data(CHAT_pinned_en,$tkey)] -side right	; #TODO
+			pack [ttk::checkbutton $wc.2.markup -text M -variable dice_preset_data(CHAT_markup_en,$tkey)] -side right
+			::tooltip::tooltip $wc.2.markup "Enable GMA markup formatting codes in chat messages."
+	#		if {$for_user eq $local_user} {
+	#			global icon_unlock
+	#			pack [button $wc.2.lock -command [list ToggleChatLock $wc.2.lock $wc.1.text] -image $icon_unlock] -side right
+	#			::tooltip::tooltip $wc.2.lock "Unlock the chat window for editing/copying text."
+	#			set dice_preset_data(chat_lock) true
+	#		}
+			::tooltip::tooltip $wc.2.send "Refresh the list of recipients for messages."
+			bind $wc.2.entry <Return> [list SendChatFromWindow $for_user $tkey]
+			bind $wc.3.dice <Return> [list SendDieRollFromWindow $w $wr $for_user $tkey]
 
-		set dice_preset_data(CHAT_TO,$tkey,GM) 0
-		update_chat_to $for_user $tkey
-		UpdatePeerList $for_user $tkey		;# set up what we may have already received
-		RefreshPeerList				;# ask for an update as well
+			set dice_preset_data(CHAT_TO,$tkey,GM) 0
+			update_chat_to $for_user $tkey
+			UpdatePeerList $for_user $tkey		;# set up what we may have already received
+			RefreshPeerList				;# ask for an update as well
+		}
 
 		if {$for_user eq $local_user} {
 			foreach tag {
@@ -13781,14 +13953,18 @@ proc DisplayChatMessage {d for_user args} {
 			}
 		}
 
-		RequestDicePresets $for_user
-		inhibit_resize_task 0 recent $for_user $tkey
-		inhibit_resize_task 0 preset $for_user $tkey
-
-		if {$for_user eq $local_user} {
-			LoadChatHistory
-		} else {
+		if {!$no_dice} {
 			RequestDicePresets $for_user
+			inhibit_resize_task 0 recent $for_user $tkey
+			inhibit_resize_task 0 preset $for_user $tkey
+
+			if {$for_user eq $local_user} {
+				LoadChatHistory
+			} else {
+				RequestDicePresets $for_user
+			}
+		} elseif {$for_user eq $local_user} {
+			LoadChatHistory
 		}
 	}
 
@@ -14386,21 +14562,24 @@ proc ChatAttribution {w from recipientlist toall togm} {
 
 proc UpdatePeerList {for_user tkey} {
 	# Update chat window widgets from peer list
-	global PeerList LastKnownPeers check_menu_color dice_preset_data
+	global PeerList LastKnownPeers check_menu_color dice_preset_data no_dice
 
-	if {[catch {
-		set tomenu $dice_preset_data(cw,$tkey).p.chat.2.to.menu
-		$tomenu delete 2 end
-		foreach name [lsort -dictionary -unique $PeerList] {
-			if {$name ne {GM}} {
-				$tomenu add checkbutton -label $name -onvalue 1 -offvalue 0 -variable dice_preset_data(CHAT_TO,$tkey,$name) -command [list update_chat_to $for_user $tkey] -selectcolor $check_menu_color
-				if {![info exists dice_preset_data(CHAT_TO,$tkey,$name)]} {
-					set dice_preset_data(CHAT_TO,$tkey,$name) 0
+
+	if {!$no_dice} {
+		if {[catch {
+			set tomenu $dice_preset_data(cw,$tkey).p.chat.2.to.menu
+			$tomenu delete 2 end
+			foreach name [lsort -dictionary -unique $PeerList] {
+				if {$name ne {GM}} {
+					$tomenu add checkbutton -label $name -onvalue 1 -offvalue 0 -variable dice_preset_data(CHAT_TO,$tkey,$name) -command [list update_chat_to $for_user $tkey] -selectcolor $check_menu_color
+					if {![info exists dice_preset_data(CHAT_TO,$tkey,$name)]} {
+						set dice_preset_data(CHAT_TO,$tkey,$name) 0
+					}
 				}
 			}
+		} err]} {
+			DEBUG 1 "UpdatePeerList failed: $err"
 		}
-	} err]} {
-		DEBUG 1 "UpdatePeerList failed: $err"
 	}
 
 	global local_user
@@ -15203,6 +15382,7 @@ proc connectToServer {} {
 proc WaitForConnectToServer {} {
 	connectToServer
 	InitializeChatHistory
+	after 30000 check_aka
 }
 #
 #
@@ -15529,27 +15709,34 @@ proc initiate_hp_request {args} {
 		set tmp false
 	}
 
+	if {[set map_names [my_map_names]] eq {}} {
+		check_aka
+	}
+
 	toplevel $w -background $global_bg_color
 	wm title $w "New ${title} Request"
-	grid [label $w.dl -text "Description:"]  -row 0 -column 0 -sticky w
-	grid [entry $w.de -width 64]         - - -row 0 -column 1 -sticky we
+	if {$map_names eq {}} {
+		grid [label $w.ex -text "We don't know for sure which character you're controlling. If you designate that and start this request over, the \[ME\] and \[...\] buttons will work better." -fg red] - - - -row 0 -column 0 -sticky we
+	}
+	grid [label $w.dl -text "Description:"]  -row 1 -column 0 -sticky w
+	grid [entry $w.de -width 64]         - - -row 1 -column 1 -sticky we
 	if {$tmp} {
-		grid [label $w.el -text "Expires:"]      -row 1 -column 0 -sticky w
-		grid [entry $w.ee -width 64]         - - -row 1 -column 1 -sticky we
-		grid [label $w.tl -text "Targets (CHARACTER name):"]      -row 2 -column 0 -sticky w
-		grid [entry $w.te -width 64]             -row 2 -column 1 -sticky we
-		grid [button $w.tm -command "ihr_personal_target $w" -text "ME"] -row 2 -column 2
-		grid [button $w.tb -command "ihr_build_target_list $w" -text "..."] -row 2 -column 3
+		grid [label $w.el -text "Expires:"]      -row 2 -column 0 -sticky w
+		grid [entry $w.ee -width 64]         - - -row 2 -column 1 -sticky we
+		grid [label $w.tl -text "Targets (CHARACTER name):"]      -row 3 -column 0 -sticky w
+		grid [entry $w.te -width 64]             -row 3 -column 1 -sticky we
+		grid [button $w.tm -command "ihr_personal_target $w" -text "ME"] -row 3 -column 2
+		grid [button $w.tb -command "ihr_build_target_list $w" -text "..."] -row 3 -column 3
 		::tooltip::tooltip $w.el {Temporary HP expiration as "@[[[y-]m-]d] h:m[:s[.t]]", "[+-][d:]h:m[:s[.t]]", or "[+-]n units"}
 		::tooltip::tooltip $w.ee {Temporary HP expiration as "@[[[y-]m-]d] h:m[:s[.t]]", "[+-][d:]h:m[:s[.t]]", or "[+-]n units"}
 		::tooltip::tooltip $w.tl {Players who should receive temporary HP (space-separated)}
 		::tooltip::tooltip $w.te {Players who should receive temporary HP (space-separated)}
 		::tooltip::tooltip $w.tb {Build list of targets interactively}
 		::tooltip::tooltip $w.tm {Just give them to me}
-		grid [label $w.xl -text "Requested temporary HP allocation:"]  -row 3 -column 0 -sticky w
-		grid [entry $w.xe -width 4]                 -row 3 -column 1 -sticky w
-		grid [label $w.ll -text "Lethal damage already against it:"]   -row 4 -column 0 -sticky w
-		grid [entry $w.le -width 4]                 -row 4 -column 1 -sticky w
+		grid [label $w.xl -text "Requested temporary HP allocation:"]  -row 4 -column 0 -sticky w
+		grid [entry $w.xe -width 4]                 -row 4 -column 1 -sticky w
+		grid [label $w.ll -text "Lethal damage already against it:"]   -row 5 -column 0 -sticky w
+		grid [entry $w.le -width 4]                 -row 5 -column 1 -sticky w
 		::tooltip::tooltip $w.xl {How many additional temporary hit points you're asking for now.}
 		::tooltip::tooltip $w.xe {How many additional temporary hit points you're asking for now.}
 		::tooltip::tooltip $w.ll {How much, if any, damage was already taken against THIS request number of temporary hit points?}
@@ -15557,15 +15744,15 @@ proc initiate_hp_request {args} {
 		$w.le delete 0 end
 		$w.le insert 0 0
 	} else {
-		grid [label $w.tl -text "Target (CHARACTER name):"]      -row 1 -column 0 -sticky w
-		grid [entry $w.te -width 64]             -row 1 -column 1 -sticky we
-		grid [button $w.tm -command "ihr_personal_target $w" -text "ME"] -row 1 -column 2
-		grid [label $w.xl -text "Max HP:"]          -row 2 -column 0 -sticky w
-		grid [entry $w.xe -width 4]                 -row 2 -column 1 -sticky w
-		grid [label $w.ll -text "Lethal damage:"]   -row 3 -column 0 -sticky w
-		grid [entry $w.le -width 4]                 -row 3 -column 1 -sticky w
-		grid [label $w.nl -text "Nonlethal damage:"] -row 4 -column 0 -sticky w
-		grid [entry $w.ne -width 4]                 -row 4 -column 1 -sticky w
+		grid [label $w.tl -text "Target (CHARACTER name):"]      -row 2 -column 0 -sticky w
+		grid [entry $w.te -width 64]             -row 2 -column 1 -sticky we
+		grid [button $w.tm -command "ihr_personal_target $w" -text "ME"] -row 2 -column 2
+		grid [label $w.xl -text "Max HP:"]          -row 3 -column 0 -sticky w
+		grid [entry $w.xe -width 4]                 -row 3 -column 1 -sticky w
+		grid [label $w.ll -text "Lethal damage:"]   -row 4 -column 0 -sticky w
+		grid [entry $w.le -width 4]                 -row 4 -column 1 -sticky w
+		grid [label $w.nl -text "Nonlethal damage:"] -row 5 -column 0 -sticky w
+		grid [entry $w.ne -width 4]                 -row 5 -column 1 -sticky w
 		::tooltip::tooltip $w.xl {Your total maximum hit points (NOT including temporary HP).}
 		::tooltip::tooltip $w.xe {Your total maximum hit points (NOT including temporary HP).}
 		::tooltip::tooltip $w.ll {Total lethal damage currently suffered.}
@@ -15578,10 +15765,13 @@ proc initiate_hp_request {args} {
 		$w.ne insert 0 0
 	}
 
+	if {$map_names eq {}} {
+		$w.tm configure -state disabled
+	}
 	grid x [label $w.ml -text {}] - - -sticky we
-	grid [button $w.cancel -command "destroy $w" -text Cancel] -row 6 -column 0 -sticky w
-	grid [button $w.info -command "ihr_info" -image $icon_info20] - -row 6 -column 1
-	grid [button $w.ok -command "ihr_commit $w $tmp $this_request" -text Request] -row 6 -column 3 -sticky e
+	grid [button $w.cancel -command "destroy $w" -text Cancel] -row 7 -column 0 -sticky w
+	grid [button $w.info -command "ihr_info" -image $icon_info20] - -row 7 -column 1
+	grid [button $w.ok -command "ihr_commit $w $tmp $this_request" -text Request] -row 7 -column 3 -sticky e
 	::tooltip::tooltip $w.dl {Describe the nature of your request.}
 	::tooltip::tooltip $w.de {Describe the nature of your request.}
 	::tooltip::tooltip $w.cancel {Dismiss this dialog box without taking further action.}
@@ -15597,20 +15787,31 @@ proc initiate_timer_request {} {
 	set w .tmrq_$this_request
 	toplevel $w -background $global_bg_color
 	wm title $w "New Timer Request"
-	grid [label $w.dl -text "Description:"]  -row 0 -column 0 -sticky w
-	grid [entry $w.de -width 64]         - - -row 0 -column 1 -sticky we
-	grid [label $w.el -text "Expires:"]      -row 1 -column 0 -sticky w
-	grid [entry $w.ee -width 64]         - - -row 1 -column 1 -sticky we
-	grid [label $w.tl -text "Targets:"]      -row 2 -column 0 -sticky w
-	grid [entry $w.te -width 64]             -row 2 -column 1 -sticky we
-	grid [button $w.tm -command "itr_personal_target $w" -text "ME"] -row 2 -column 2
-	grid [button $w.tb -command "itr_build_target_list $w" -text "..."] -row 2 -column 3
+	if {[set map_names [my_map_names]] eq {}} {
+		check_aka
+	}
+
+	if {$map_names eq {}} {
+		grid [label $w.ex -text "We don't know for sure which character you're controlling. If you designate that and start this request over, the \[ME\] and \[...\] buttons will work better." -fg red] - - - -row 0 -column 0 -sticky we
+	}
+
+	grid [label $w.dl -text "Description:"]  -row 1 -column 0 -sticky w
+	grid [entry $w.de -width 64]         - - -row 1 -column 1 -sticky we
+	grid [label $w.el -text "Expires:"]      -row 2 -column 0 -sticky w
+	grid [entry $w.ee -width 64]         - - -row 2 -column 1 -sticky we
+	grid [label $w.tl -text "Targets:"]      -row 3 -column 0 -sticky w
+	grid [entry $w.te -width 64]             -row 3 -column 1 -sticky we
+	grid [button $w.tm -command "itr_personal_target $w" -text "ME"] -row 3 -column 2
+	grid [button $w.tb -command "itr_build_target_list $w" -text "..."] -row 3 -column 3
 	grid x [ttk::checkbutton $w.rb -text "Running Now"] - - -sticky w
 	grid x [ttk::checkbutton $w.sb -text "Show to Players"] - - -sticky w
 	grid x [label $w.ml -text {}] - - -sticky we
-	grid [button $w.cancel -command "destroy $w" -text Cancel] -row 6 -column 0 -sticky w
-	grid [button $w.info -command "itr_info" -image $icon_info20] - -row 6 -column 1
-	grid [button $w.ok -command "itr_commit $w $this_request" -text Request] -row 6 -column 3 -sticky e
+	grid [button $w.cancel -command "destroy $w" -text Cancel] -row 7 -column 0 -sticky w
+	grid [button $w.info -command "itr_info" -image $icon_info20] - -row 7 -column 1
+	grid [button $w.ok -command "itr_commit $w $this_request" -text Request] -row 7 -column 3 -sticky e
+	if {$map_names eq {}} {
+		$w.tm configure -state disabled
+	}
 	$w.rb state {selected !alternate}
 	$w.sb state {selected !alternate}
 	::tooltip::tooltip $w.dl {Describe the new timer's purpose.}
@@ -15753,7 +15954,7 @@ proc ihr_personal_target {w} {
 proc itr_personal_target {w} {
 	global local_user
 	$w.te delete 0 end
-	$w.te insert end [list $local_user]
+	$w.te insert end [my_map_names]
 }
 
 proc ihr_build_target_list {parent} {
@@ -15761,10 +15962,16 @@ proc ihr_build_target_list {parent} {
 }
 
 proc itr_build_target_list {parent} {
-	global global_bg_color PeerList local_user
+	global global_bg_color PeerList local_user PeerAKA PC_IDs MOBid target_names
 
-	set users $PeerList
-	lappend users $local_user
+	foreach peer $PeerList {
+		if {[info exists PeerAKA($peer)]} {
+			lappend users {*}$PeerAKA($peer)
+		} elseif {[info exists PC_IDs($peer)] || [info exists MOBid($peer)]} {
+			lappend users $peer
+		}
+	}
+	lappend users {*}[my_map_names]
 
 	set w ${parent}_t
 	catch {destroy $w}
@@ -15773,8 +15980,10 @@ proc itr_build_target_list {parent} {
 	grid columnconfigure $w 1 -weight 2
 	grid [ttk::checkbutton $w._all -text "Toggle All" -command "itr_toggle $w"] - - -sticky w
 	$w._all state {!selected !alternate}
+	set target_names($w) {}
 	foreach name [lsort -dictionary -unique $users] {
 		set n [to_window_id $name]
+		lappend target_names($w) $name
 		grid [ttk::checkbutton $w.p$n -text $name] - - -sticky w
 		$w.p$n state {!selected !alternate}
 	}
@@ -15785,13 +15994,9 @@ proc itr_build_target_list {parent} {
 # to keep the timer targets to who is logged in. But that makes the dialog box behave
 # oddly if the peer list changes while we are editing the list.
 proc itr_toggle {w} {
-	global PeerList local_user
-
-	set users $PeerList
-	lappend users $local_user
-
+	global target_names
 	set toggle [$w._all instate selected]
-	foreach name $users {
+	foreach name $target_names($w) {
 		catch {
 			if {$toggle} {
 				$w.p[to_window_id $name] state selected
@@ -15803,13 +16008,10 @@ proc itr_toggle {w} {
 }
 
 proc itr_commit_t {parent} {
-	global PeerList local_user
-
-	set users $PeerList
-	lappend users $local_user
+	global target_names
 
 	set target_list {}
-	foreach name $users {
+	foreach name $target_names(${parent}_t) {
 		catch {
 			if {[${parent}_t.p[to_window_id $name] instate selected]} {
 				lappend target_list $name
@@ -16562,6 +16764,95 @@ proc EncodePresetDetails {p} {
 	}
 }
 
+
+# verify that we know who we are on the map and prompt the user to let us know if not.
+set suppress_aka false
+set suppress_var false
+proc selectAKA {} {
+	global local_user local_aka PeerList PC_IDs MOBid suppress_aka check_aka_vars suppress_var
+
+	catch {destroy .akawindow}
+	toplevel .akawindow 
+	wm title .akawindow "Who Are You?"
+	pack [label .akawindow.t2 -text "Please indicate which character(s) you're controlling in this session:"] -side top -anchor w
+	set fn 0
+	array unset check_aka_vars
+	set custom {}
+	foreach name [array names PC_IDs] {
+		set check_aka_vars($name) false
+	}
+	foreach name $local_aka {
+		if {[info exists PC_IDs($name)]} {
+			set check_aka_vars($name) true
+		} else {
+			set check_aka_vars($name) false
+			lappend custom $name
+		}
+	}
+
+	foreach name [lsort [array names PC_IDs]] {
+		pack [ttk::checkbutton .akawindow.$fn -onvalue true -offvalue false -text $name -variable check_aka_vars($name)] -anchor w -side top
+		incr fn
+	}
+	pack [frame .akawindow.custom] -anchor w -side top
+	pack [label .akawindow.custom.l -text "Custom: "] -anchor w -side left
+	pack [entry .akawindow.custom.e -width 20] -anchor w -side left
+	.akawindow.custom.e insert 0 $custom
+	
+	pack [button .akawindow.ok -command check_aka_commit -text OK] -side right
+	pack [button .akawindow.cancel -command [list destroy .akawindow] -text Cancel] -side left
+}
+
+proc check_aka {} {
+	global local_user local_aka PeerList PC_IDs MOBid suppress_aka check_aka_vars suppress_var
+
+	if {$local_aka ne {} || $suppress_aka} {
+		return
+	}
+
+	if {$local_user eq "GM" || [info exists PC_IDs($local_user)] || [info exists MOBid($local_user)]} {
+		return
+	}
+
+	catch {destroy .akawindow}
+	toplevel .akawindow 
+	wm title .akawindow "Who Are You?"
+	pack [label .akawindow.t1 -text "I don't see a character called \"$local_user\" on the map."] -side top -anchor w
+	pack [label .akawindow.t2 -text "Please indicate which character(s) you're controlling in this session:"] -side top -anchor w
+	set fn 0
+	array unset check_aka_vars
+	foreach name [lsort [array names PC_IDs]] {
+		set check_aka_vars($name) false
+		pack [ttk::checkbutton .akawindow.$fn -onvalue true -offvalue false -text $name -variable check_aka_vars($name)] -anchor w -side top
+		incr fn
+	}
+	pack [frame .akawindow.custom] -anchor w -side top
+	pack [label .akawindow.custom.l -text "Custom: "] -anchor w -side left
+	pack [entry .akawindow.custom.e -width 20] -anchor w -side left
+	
+	pack [ttk::checkbutton .akawindow.notagain -onvalue true -offvalue false -variable suppress_var -text "don't ask me again this session"] -anchor w -side top
+	pack [button .akawindow.ok -command check_aka_commit -text OK] -side right
+	pack [button .akawindow.cancel -command [list destroy .akawindow] -text Cancel] -side left
+}
+
+proc check_aka_commit {} {
+	global check_aka_vars local_aka suppress_aka suppress_var
+	set suppress_aka $suppress_var
+	set local_aka {}
+	foreach k [array names check_aka_vars] {
+		if {$check_aka_vars($k)} {
+			lappend local_aka $k
+		}
+	}
+	if {[set custom [.akawindow.custom.e get]] ne {}} {
+		lappend local_aka $custom
+	}
+	::gmaproto::character_name $local_aka
+	destroy .akawindow
+}
+
+
+
 # dice_preset_data
 #	collapse,<tkey>,<piname> bool
 #	to_window_id {g|u}[Name]
@@ -16591,7 +16882,7 @@ proc EncodePresetDetails {p} {
 #
 #
 #
-# @[00]@| GMA-Mapper 4.34.1
+# @[00]@| GMA-Mapper 4.35
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2025 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
