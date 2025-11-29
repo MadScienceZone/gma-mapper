@@ -2561,19 +2561,27 @@ grid forget .toolbar2.progbar
 #
 set sound_api {}
 if {([info exists tcl_platform(os)]       && $tcl_platform(os) eq {Windows NT}) || 
-    ([info exists tcl_platform(platform)] && $tcl_platform(platform) eq {windows}} {
+    ([info exists tcl_platform(platform)] && $tcl_platform(platform) eq {windows})} {
+    #DEBUG 0 "On windows"
     if {! [catch {package require twapi}]} {
+    	#DEBUG 0 "Loaded twapi"
     	set sound_api twapi
     	foreach level {0 1 2} {
 		set SoundObj(ondeck$level) $SOUND_DIR/ondeck$level.wav
+		#DEBUG 0 "set SoundObj(ondeck$level) $SOUND_DIR/ondeck$level.wav"
 	}
     }
 } else {
+    #DEBUG 0 "not on windows"
     if {! [catch {package require sound}]} {
+    	#DEBUG 0 "loaded snack"
     	set sound_api snack
 	foreach level {0 1 2} {
-		if {! [catch {snack::sound ondecksound$level -load $SOUND_DIR/ondeck$level.wav -channels Stereo}]} {
+		if {! [catch {snack::sound ondecksound$level -load $SOUND_DIR/ondeck$level.wav -channels Stereo} err]} {
 			set SoundObj(ondeck$level) ondecksound$level
+			#DEBUG 0 "set SoundObj(ondeck$level) ondecksound$level"
+		} else {
+			DEBUG 0 "Failed to load SoundObj ondeck$level: $err"
 		}
 	}
     }
@@ -2581,6 +2589,7 @@ if {([info exists tcl_platform(os)]       && $tcl_platform(os) eq {Windows NT}) 
 
 proc play_sound {id} {
 	global sound_api SoundObj
+	#DEBUG 1 "play_sound $id on $sound_api"
 	if {[info exists SoundObj($id)] && $sound_api ne {}} {
 		if {$sound_api eq "twapi"} {
 			::twapi::play_sound $SoundObj($id) -async
@@ -2595,6 +2604,7 @@ proc play_sound {id} {
 set ondeck_slotlist {}
 set ondeck_current -1
 proc set_ondeck {place} {
+	#DEBUG 1 "set_ondeck $place"
 	global ondeck_bg SoundObj no_ondeck_audio
 	switch $place {
 		0 {.toolbar2.ondeck configure -fg white -bg green -text "YOUR TURN"}
