@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___       ______   _______                 #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \ (  ____ \                #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \| (    \/                #
-# | |      | || || || (___) | Assistant  / (_) (_       ___) /| (____                  #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( (_____ \                 #
-# | | \_  )| |   | || (   ) |                ) (           ) \      ) )                #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  //\____) )                #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/ \______/                 #
+#  _______  _______  _______                ___       ______   _______      __         #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \ (  ____ \    /  \        #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \| (    \/    \/) )       #
+# | |      | || || || (___) | Assistant  / (_) (_       ___) /| (____        | |       #
+# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( (_____ \       | |       #
+# | | \_  )| |   | || (   ) |                ) (           ) \      ) )      | |       #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  //\____) ) _  __) (_      #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/ \______/ (_) \____/      #
 #                                                                                      #
 ########################################################################################
 # Profile editor
@@ -28,7 +28,7 @@ namespace eval ::gmaprofile {
 	variable font_repository
 	variable _default_color_table
 	variable minimum_file_version 1
-	variable maximum_file_version 10
+	variable maximum_file_version 11
 	array set _default_color_table {
 		fg,light           #000000
 		normal_fg,light    #000000
@@ -99,6 +99,7 @@ namespace eval ::gmaprofile {
 		show_timers s
 		no_dice ?
 		no_ondeck_audio ?
+		no_sfx ?
 		suppress_aka ?
 		guide_lines {o {
 			major {o {
@@ -328,6 +329,7 @@ namespace eval ::gmaprofile {
 			suppress_aka false\
 			no_dice      false\
 			no_ondeck_audio false\
+			no_sfx false \
 		]
 	}
 	proc _add_new_font {w} {
@@ -606,7 +608,7 @@ namespace eval ::gmaprofile {
 		global imgtext debug_level debug_proto curl_path curl_insecure profiles menu_button never_animate
 		global major_interval major_offset_x major_offset_y
 		global minor_interval minor_offset_x minor_offset_y flash_updates
-		global chat_timestamp prf_suppress_aka prf_no_dice prf_no_ondeck_audio
+		global chat_timestamp prf_suppress_aka prf_no_dice prf_no_ondeck_audio prf_no_sfx
 		variable _profile
 
 		set _profile [dict replace $_profile \
@@ -644,6 +646,7 @@ namespace eval ::gmaprofile {
 			suppress_aka $prf_suppress_aka\
 			no_dice $prf_no_dice\
 			no_ondeck_audio $prf_no_ondeck_audio\
+			no_sfx $prf_no_sfx \
 			keep_tools $keep_tools \
 			preload $preload \
 			scaling $scaling \
@@ -798,7 +801,7 @@ namespace eval ::gmaprofile {
 		global major_interval major_offset_x major_offset_y
 		global minor_interval minor_offset_x minor_offset_y flash_updates
 		global s_hostname s_port s_user s_pass s_blur_hp
-		global prf_no_dice prf_suppress_aka prf_no_ondeck_audio
+		global prf_no_dice prf_suppress_aka prf_no_ondeck_audio prf_no_sfx
 		variable _profile
 		variable _profile_backup
 		variable currently_editing_index
@@ -832,7 +835,8 @@ namespace eval ::gmaprofile {
 			show_timers show_timers \
 			suppress_aka prf_suppress_aka \
 			no_dice prf_no_dice\
-			no_ondeck_audio prf_no_ondeck_audio
+			no_ondeck_audio prf_no_ondeck_audio\
+			no_sfx prf_no_sfx
 
 		set animate [::gmaproto::int_bool $animate]
 		set flash_updates [::gmaproto::int_bool $flash_updates]
@@ -848,6 +852,7 @@ namespace eval ::gmaprofile {
 		set debug_proto [::gmaproto::int_bool $debug_proto]
 		set prf_no_dice [::gmaproto::int_bool $prf_no_dice]
 		set prf_no_ondeck_audio [::gmaproto::int_bool $prf_no_ondeck_audio]
+		set prf_no_sfx [::gmaproto::int_bool $prf_no_sfx]
 		set prf_suppress_aka [::gmaproto::int_bool $prf_suppress_aka]
 
 		set guides [dict merge [dict create \

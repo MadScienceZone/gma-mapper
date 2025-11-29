@@ -3,19 +3,27 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.35          <!-- @@##@@ -->
- * Effective Date: 27-Nov-2025               <!-- @@##@@ -->
+ * This Package Version: 4.35.1          <!-- @@##@@ -->
+ * Effective Date: 29-Nov-2025               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.38 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.39 <!-- @@##@@ -->
  * GMA Mapper File Format: 23	     <!-- @@##@@ -->
- * GMA Mapper Protocol: 420        <!-- @@##@@ -->
- * GMA Mapper Preferences File Format: 10 <!-- @@##@@ -->
+ * GMA Mapper Protocol: 421        <!-- @@##@@ -->
+ * GMA Mapper Preferences File Format: 11 <!-- @@##@@ -->
 
 ## DEPRECATION NOTICE
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.35.1
+## Fixes
+ * The audio cues didn't work on Windows. This adds support for the Tcl Windows API Extension (twapi) which allows that to work on that platform now.
+ * Now supports protocol 421.
+ * Pre-emptively adds an option to the preferences file to disable non-UI sound effects, but we aren't using that yet since that feature is not yet implemented.
+ * Fixes ability to restart the mapper on Windows (and possibly other platforms)
+ * Start-up scripts added for MagicSplat Tcl on Windows.
 
 # 4.35
 ## Enhancements

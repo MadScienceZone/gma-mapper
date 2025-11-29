@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       ______   _______                 #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \ (  ____ \                #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \| (    \/                #
-# | |      | || || || (___) | Assistant  / (_) (_       ___) /| (____                  #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( (_____ \                 #
-# | | \_  )| |   | || (   ) |                ) (           ) \      ) )                #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  //\____) )                #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/ \______/                 #
+#  _______  _______  _______                ___       ______   _______      __         #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \ (  ____ \    /  \        #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \| (    \/    \/) )       #
+# | |      | || || || (___) | Assistant  / (_) (_       ___) /| (____        | |       #
+# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( (_____ \       | |       #
+# | | \_  )| |   | || (   ) |                ) (           ) \      ) )      | |       #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  //\____) ) _  __) (_      #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/ \______/ (_) \____/      #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -17,10 +17,10 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.35}     ;# @@##@@
+set GMAMapperVersion {4.35.1}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
-set GMAMapperProtocol {420}         ;# @@##@@
-set CoreVersionNumber {6.38}            ;# @@##@@
+set GMAMapperProtocol {421}         ;# @@##@@
+set CoreVersionNumber {6.39}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -2559,16 +2559,52 @@ grid forget .toolbar2.progbar
 #
 # set up ondeck audio prompts
 #
-if {! [catch {package require sound}]} {
+set sound_api {}
+if {([info exists tcl_platform(os)]       && $tcl_platform(os) eq {Windows NT}) || 
+    ([info exists tcl_platform(platform)] && $tcl_platform(platform) eq {windows})} {
+    #DEBUG 0 "On windows"
+    if {! [catch {package require twapi}]} {
+    	#DEBUG 0 "Loaded twapi"
+    	set sound_api twapi
+    	foreach level {0 1 2} {
+		set SoundObj(ondeck$level) $SOUND_DIR/ondeck$level.wav
+		#DEBUG 0 "set SoundObj(ondeck$level) $SOUND_DIR/ondeck$level.wav"
+	}
+    }
+} else {
+    #DEBUG 0 "not on windows"
+    if {! [catch {package require sound}]} {
+    	#DEBUG 0 "loaded snack"
+    	set sound_api snack
 	foreach level {0 1 2} {
-		if {! [catch {snack::sound ondecksound$level -load $SOUND_DIR/ondeck$level.wav -channels Stereo}]} {
+		if {! [catch {snack::sound ondecksound$level -load $SOUND_DIR/ondeck$level.wav -channels Stereo} err]} {
 			set SoundObj(ondeck$level) ondecksound$level
+			#DEBUG 0 "set SoundObj(ondeck$level) ondecksound$level"
+		} else {
+			DEBUG 0 "Failed to load SoundObj ondeck$level: $err"
+		}
+	}
+    }
+} 
+
+proc play_sound {id} {
+	global sound_api SoundObj
+	#DEBUG 1 "play_sound $id on $sound_api"
+	if {[info exists SoundObj($id)] && $sound_api ne {}} {
+		if {$sound_api eq "twapi"} {
+			::twapi::play_sound $SoundObj($id) -async
+		} elseif {$sound_api eq "snack"} {
+			$SoundObj($id) play
+		} else {
+			DEBUG 0 "Unknown sound API $sound_api"
 		}
 	}
 }
+
 set ondeck_slotlist {}
 set ondeck_current -1
 proc set_ondeck {place} {
+	#DEBUG 1 "set_ondeck $place"
 	global ondeck_bg SoundObj no_ondeck_audio
 	switch $place {
 		0 {.toolbar2.ondeck configure -fg white -bg green -text "YOUR TURN"}
@@ -2577,8 +2613,8 @@ proc set_ondeck {place} {
 		default {.toolbar2.ondeck configure -bg $ondeck_bg -text ""; return}
 	}
 	.toolbar2.ondeck flash
-	if {[info exists SoundObj(ondeck$place)] && !$no_ondeck_audio} {
-		$SoundObj(ondeck$place) play
+	if {!$no_ondeck_audio} {
+		play_sound ondeck$place
 	}
 }
 
@@ -10719,6 +10755,19 @@ proc DoCommandTO {d} {
 	ChatHistoryAppend [list TO $d [dict get $d MessageID]]
 }
 
+proc DoCommandAA {d} {
+	DEBUG 1 "AddAudio command $d not implemented yet"
+}
+
+proc DoCommandAA? {d} {
+	DEBUG 1 "QueryAudio command $d not implemented yet"
+}
+
+proc DoCommandSOUND {d} {
+	DEBUG 1 "PlayAudio command $d not implemented yet"
+}
+
+
 #
 # Hook for any post-login activities we need to do
 #
@@ -16882,7 +16931,7 @@ proc check_aka_commit {} {
 #
 #
 #
-# @[00]@| GMA-Mapper 4.35
+# @[00]@| GMA-Mapper 4.35.1
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2025 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

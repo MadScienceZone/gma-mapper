@@ -139,4 +139,29 @@ foreach {package minimum_version instructions} {
 	}
 }
 
+if {([info exists tcl_platform(os)]       && $tcl_platform(os) eq {Windows NT}) || 
+    ([info exists tcl_platform(platform)] && $tcl_platform(platform) eq {windows})} {
+    	if {[catch {set installed_version [package require twapi]}]} {
+		say "It appears you are on a Windows system but you do not have the TWAPI package"
+		say "installed.  This is not (yet) mandatory for the GMA Mapper VTT to function,"
+		say "but not all features will work without it. To obtain it, refer to"
+		say "https://twapi.magicsplat.com/ for further instructions to download and install"
+		say "it on your system.  You may also install the magicsplat.com Windows Tcl/Tk"
+		say "runtime system which includes twapi automatically."
+	} else {
+		say "Good. You have twapi version $installed_version installed."
+	}
+} else {
+	if {[catch {set installed_version [package require sound]}]} {
+		say "It appears you do not have the Snack Sound Toolkit installed.  This is not"
+		say "(yet) mandatory for the GMA Mapper VTT to function, but not all features will"
+		say "work without it. To obtain it, refer to https://www.speech.kth.se/snack/ for"
+		say "instructions on downloading and installation of that package on your system."
+		say "It may also be available for easy installation on Linux distributions as"
+		say "tcl-snack or snack."
+	} else {
+		say "Good. You have snack version $installed_version installed."
+	}
+}
+
 #destroy .
