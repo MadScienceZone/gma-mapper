@@ -17,6 +17,12 @@ The support for old server protocols (<400) and map file formats (<20) will be d
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
+# 4.35.1
+## Fixes
+ * The audio cues didn't work on Windows. This adds support for the Tcl Windows API Extension (twapi) which allows that to work on that platform now.
+ * Now supports protocol 421.
+ * Pre-emptively adds an option to the preferences file to disable non-UI sound effects, but we aren't using that yet since that feature is not yet implemented.
+
 # 4.35
 ## Enhancements
  * Now supports protocol 420.
