@@ -2559,13 +2559,39 @@ grid forget .toolbar2.progbar
 #
 # set up ondeck audio prompts
 #
-if {! [catch {package require sound}]} {
+set sound_api {}
+if {([info exists tcl_platform(os)]       && $tcl_platform(os) eq {Windows NT}) || 
+    ([info exists tcl_platform(platform)] && $tcl_platform(platform) eq {windows}} {
+    if {! [catch {package require twapi}]} {
+    	set sound_api twapi
+    	foreach level {0 1 2} {
+		set SoundObj(ondeck$level) $SOUND_DIR/ondeck$level.wav
+	}
+    }
+} else {
+    if {! [catch {package require sound}]} {
+    	set sound_api snack
 	foreach level {0 1 2} {
 		if {! [catch {snack::sound ondecksound$level -load $SOUND_DIR/ondeck$level.wav -channels Stereo}]} {
 			set SoundObj(ondeck$level) ondecksound$level
 		}
 	}
+    }
+} 
+
+proc play_sound {id} {
+	global sound_api SoundObj
+	if {[info exists SoundObj($id)] && $sound_api ne {}} {
+		if {$sound_api eq "twapi"} {
+			::twapi::play_sound $SoundObj($id) -async
+		} elseif {$sound_api eq "snack"} {
+			$SoundObj($id) play
+		} else {
+			DEBUG 0 "Unknown sound API $sound_api"
+		}
+	}
 }
+
 set ondeck_slotlist {}
 set ondeck_current -1
 proc set_ondeck {place} {
@@ -2577,8 +2603,8 @@ proc set_ondeck {place} {
 		default {.toolbar2.ondeck configure -bg $ondeck_bg -text ""; return}
 	}
 	.toolbar2.ondeck flash
-	if {[info exists SoundObj(ondeck$place)] && !$no_ondeck_audio} {
-		$SoundObj(ondeck$place) play
+	if {!$no_ondeck_audio} {
+		play_sound ondeck$place
 	}
 }
 
@@ -10718,6 +10744,19 @@ proc DoCommandTO {d} {
 	DisplayChatMessage $d {}
 	ChatHistoryAppend [list TO $d [dict get $d MessageID]]
 }
+
+proc DoCommandAA {d} {
+	DEBUG 1 "AddAudio command $d not implemented yet"
+}
+
+proc DoCommandAA? {d} {
+	DEBUG 1 "QueryAudio command $d not implemented yet"
+}
+
+proc DoCommandSOUND {d} {
+	DEBUG 1 "PlayAudio command $d not implemented yet"
+}
+
 
 #
 # Hook for any post-login activities we need to do

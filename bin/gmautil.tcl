@@ -607,3 +607,16 @@ proc ::gmautil::searchInPath {cmd} {
 	}
 	return ""
 }
+
+proc ::gmautil::my_platform {} {
+	set p {}
+	global tcl_platform
+	foreach pp {os osVersion machine} {
+		if {[info exists tcl_platform($pp)]} {
+			lappend p $tcl_platform($pp)
+		} else {
+			lappend p -
+		}
+	}
+	return $p
+}
