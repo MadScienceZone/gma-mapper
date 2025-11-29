@@ -4513,6 +4513,15 @@ If true, continue playing the sound in a repeating loop until stopped.
 .TP
 .BI Stop " (bool)"
 If true, stop playing the named sound.
+.TP
+.BI Addrs " (list of strings)"
+If non-empty, this is a list of client addresses (in the form reported by the
+.B Addr
+field in the
+.B CONN
+server message). This requests that only the clients listed play (or stop
+playing) the specified
+sound.
 .RE
 '\" <</>>
 '\" <</New>>

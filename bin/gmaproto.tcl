@@ -48,7 +48,7 @@
 # 	::report_progress message
 # 	::say message
 
-package provide gmaproto 1.3
+package provide gmaproto 1.4
 package require Tcl 8.5
 package require json 1.3.3
 package require json::write 1.0.3
@@ -56,9 +56,9 @@ package require base64 2.4.2
 package require uuid 1.0.1
 
 namespace eval ::gmaproto {
-	variable protocol 420
+	variable protocol 421
 	variable min_protocol 333
-	variable max_protocol 420
+	variable max_protocol 421
 	variable max_max_protocol 499
 	variable debug_f {}
 	variable legacy false
@@ -86,6 +86,7 @@ namespace eval ::gmaproto {
 
 	variable _message_map
 	array set _message_map {
+		add_audio                 AA
 		add_image                 AI
 		add_obj_attributes        OA+
 		adjust_view               AV
@@ -110,6 +111,7 @@ namespace eval ::gmaproto {
 		mark                      MARK
 		place_someone             PS
 		query_image               AI?
+		query_audio               AA?
 		remove_obj_attributes     OA-
 		roll_result               ROLL
 		toolbar                   TB
@@ -127,11 +129,13 @@ namespace eval ::gmaproto {
 	array set _message_payload {
 		AC      {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l PolyGM ? Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}}}
 		ACCEPT  {Messages l}
+		AA      {Name s Format s File s IsLocalFile ?}
+		AA?     {Name s}
 		AI      {Name s Sizes {a {File s ImageData b IsLocalFile ? Zoom f}} Animation {o {Frames i FrameSpeed i Loops i}}}
 		AI?	{Name s Sizes {a {Zoom f}}}
 		AKA	{Names l User s}
 		ALLOW   {Features l}
-		AUTH    {Client s Response b User s}
+		AUTH    {Client s Response b User s Platform s}
 		AV      {Grid s XView f YView f}
 		CC      {RequestedBy s DoSilently ? Target i MessageID i}
 		CLR     {ObjID s}
@@ -182,6 +186,7 @@ namespace eval ::gmaproto {
 		READY   {}
 		REDIRECT {Host s Port i Reason s}
 		ROLL    {Replay ? Sender s Recipients l MessageID i ToAll ? ToGM ? Title s Result {o {InvalidRequest ? ResultSuppressed ? Result i Details {a {Type s Value s}}}} RequestID s MoreResults ? Sent s Origin ? Targets l Type s}
+		SOUND   {Name s Loop ? Stop ? Addrs l}
 		SYNC    {}
 		SYNC-CHAT {Target i}
 		TB      {Enabled ?}
@@ -1446,6 +1451,10 @@ proc ::gmaproto::define_dice_delegates {for_user delegate_list} {
 	::gmaproto::_protocol_send DDD For $for_user Delegates $delegate_list
 }
 
+proc ::gmaproto::add_audio {name format file {is_local false}} {
+	::gmaproto::_protocol_send AA Name $name Format $format File $file IsLocalFile $is_local
+}
+
 proc ::gmaproto::add_image {name sizes {frames 0} {speed 0} {loops 0}} {
 	::gmaproto::_protocol_send AI Name $name Sizes $sizes Animation [dict create Frames $frames FrameSpeed $speed Loops $loops]
 }
@@ -1457,6 +1466,15 @@ proc ::gmaproto::query_image {name size} {
 		return
 	}
 	::gmaproto::_protocol_send AI? Name $name Sizes [list [dict create Zoom $size]]
+}
+
+proc ::gmaproto::query_audio {name} {
+	global ::forbidden_url
+	if {[info exists ::forbidden_url($name)]} {
+		::DEBUG 1 "Not asking again about $name"
+		return
+	}
+	::gmaproto::_protocol_send AA? Name $name
 }
 
 proc ::gmaproto::query_peers {} {
@@ -2073,7 +2091,7 @@ proc ::gmaproto::_login {} {
 					::gmaproto::DEBUG "Server requests authentication (challenge=[binary encode hex $challenge])"
 					::report_progress "Authenticating..."
 					set response [::gmaproto::auth_response $challenge $iterations]
-					::gmaproto::_protocol_send AUTH Response $response User $::gmaproto::username Client $::gmaproto::client
+					::gmaproto::_protocol_send AUTH Response $response User $::gmaproto::username Client $::gmaproto::client Platform [::gmautil::my_platform]
 					::report_progress "Authenticating... (awaiting server response)"
 					::gmaproto::DEBUG "Waiting for server's response"
 				} else {
