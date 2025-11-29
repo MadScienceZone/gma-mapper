@@ -3,14 +3,14 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.35          <!-- @@##@@ -->
- * Effective Date: 27-Nov-2025               <!-- @@##@@ -->
+ * This Package Version: 4.35.1          <!-- @@##@@ -->
+ * Effective Date: 29-Nov-2025               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.38 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.39 <!-- @@##@@ -->
  * GMA Mapper File Format: 23	     <!-- @@##@@ -->
- * GMA Mapper Protocol: 420        <!-- @@##@@ -->
- * GMA Mapper Preferences File Format: 10 <!-- @@##@@ -->
+ * GMA Mapper Protocol: 421        <!-- @@##@@ -->
+ * GMA Mapper Preferences File Format: 11 <!-- @@##@@ -->
 
 ## DEPRECATION NOTICE
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
