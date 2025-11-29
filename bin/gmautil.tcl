@@ -1,18 +1,18 @@
 ########################################################################################
-#  _______  _______  _______                ___       ______   _______                 #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \ (  ____ \                #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \| (    \/                #
-# | |      | || || || (___) | Assistant  / (_) (_       ___) /| (____                  #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( (_____ \                 #
-# | | \_  )| |   | || (   ) |                ) (           ) \      ) )                #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  //\____) )                #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/ \______/                 #
+#  _______  _______  _______                ___       ______   _______      __         #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \ (  ____ \    /  \        #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \| (    \/    \/) )       #
+# | |      | || || || (___) | Assistant  / (_) (_       ___) /| (____        | |       #
+# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( (_____ \       | |       #
+# | | \_  )| |   | || (   ) |                ) (           ) \      ) )      | |       #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  //\____) ) _  __) (_      #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/ \______/ (_) \____/      #
 #                                                                                      #
 ########################################################################################
 # version 1.0, 17 July 2020.
 # Steve Willoughby <steve@madscience.zone>
 #
-# @[00]@| GMA-Mapper 4.35
+# @[00]@| GMA-Mapper 4.35.1
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2025 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
@@ -606,4 +606,17 @@ proc ::gmautil::searchInPath {cmd} {
 		}
 	}
 	return ""
+}
+
+proc ::gmautil::my_platform {} {
+	set p {}
+	global tcl_platform
+	foreach pp {os osVersion machine} {
+		if {[info exists tcl_platform($pp)]} {
+			lappend p $tcl_platform($pp)
+		} else {
+			lappend p -
+		}
+	}
+	return $p
 }

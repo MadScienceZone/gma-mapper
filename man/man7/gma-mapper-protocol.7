@@ -1,7 +1,7 @@
 '\" t
-'\" *** 420 ***
+'\" *** 421 ***
 '\" <<ital-is-var>>
-.TH GMA-MAPPER-PROTOCOL 7 "GMA-Mapper 4.35" 27-Nov-2025 "Protocols" \" @@mp@@
+.TH GMA-MAPPER-PROTOCOL 7 "GMA-Mapper 4.35.1" 29-Nov-2025 "Protocols" \" @@mp@@
 .SH NAME
 gma-mapper-protocol \- GMA client/server protocol specification
 .SH EXPERIMENTAL
@@ -79,7 +79,7 @@ be implemented to wait synchronously for a server
 response during the authentication negotiation stage.
 .LP
 '\" <</bold-is-fixed>>
-.B "This describes protocol version 420."
+.B "This describes protocol version 421."
 '\" <<bold-is-fixed>>
 These notes are intended to be 
 detailed enough to implement a client from and should be considered
@@ -185,6 +185,9 @@ since all communications are asynchronous.
 '\"  {\bfseries Command}&{\bfseries C$\leftrightarrow$S}&{\bfseries Reply}&{\bfseries Priv}&{\bfseries Data}&{\bfseries Description}\\\midrule
 '\"  \z{//}     &C$\leftrightarrow$S&---        &no &any           &Human-readable comment\\
 '\"  \z{/CONN}  &C$\rightarrow$S    &\z{CONN}   &no &none          &Request list of peer clients\\
+'\"  \z{AA}     &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Add audio to client's known set\\
+'\"  \z{AA?}    &C$\leftrightarrow$S&\z{AA}     &no &\acronym{JSON}&Ask for definition of audio\\
+'\"  \z{AA/}    &C$\rightarrow$S    &---        &yes&\acronym{JSON}&Filter saved audio definitions\\
 '\"  \z{ACCEPT} &C$\rightarrow$S    &---        &no &\acronym{JSON}&Subscribe to a set of messages\\
 '\"  \z{AC}     &C$\leftarrow$S     &---        &N/A&\acronym{JSON}&Add primary PC to party\\
 '\"  \z{AKA}    &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Declare character name for a player\\
@@ -192,7 +195,7 @@ since all communications are asynchronous.
 '\"  \z{AUTH}   &C$\rightarrow$S    &\z{GRANTED}&no &\acronym{JSON}&Authenticate to server\\
 '\"  \z{AV}     &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Scroll clients' views\\
 '\"  \z{AI}     &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Add image to client's known set\\
-'\"  \z{AI?}    &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Ask for definition of image\\
+'\"  \z{AI?}    &C$\leftrightarrow$S&\z{AI}     &no &\acronym{JSON}&Ask for definition of image\\
 '\"  \z{AI/}    &C$\rightarrow$S    &---        &yes&\acronym{JSON}&Filter saved image definitions\\
 '\"  \z{CC}     &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Clear the chat history\\
 '\"  \z{CLR}    &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Remove objects from client\\
@@ -268,6 +271,7 @@ lB lB cB lB lB lB lB
 l lfC c lfC c c l.
 Message	Command	C\[<>]S	Reply	Priv	Payload	Description
 Accept	ACCEPT	C\[->]S	\fR\(em\fP	no	JSON	Subscribe to a set of messages
+AddAudio	AA	C\[<>]S	\fR\(em\fP	no	JSON	Add audio to client's known set
 AddCharacter	AC	C\[<-]S	\fR\(em\fP	N/A	JSON	Add primary PC to party
 AddDicePresets	DD+	C\[->]S	DD=	no	JSON	Add presets to user's set
 AddImage	AI	C\[<>]S	\fR\(em\fP	no	JSON	Add image to client's known set
@@ -288,6 +292,7 @@ DefineDiceDelegates	DDD	C\[->]S	DD=	maybe	JSON	Assign die-roll delegates
 Denied	DENIED	C\[<-]S	\fR\(em\fP	N/A	JSON	Server denies access
 Echo	ECHO	C\[<>]S	ECHO	no	JSON	Send data for server to echo back to client
 Failed	FAILED	C\[<>]S	\fR\(em\fP	yes	JSON	Request failed or denied by GM
+FilterAudio	AA/	C\[->S	\fR\(em\fP	yes	JSON	Filter saved audio definitions
 FilterCoreData	CORE/	C\[->]S	\fR\(em\fP	yes	JSON	Filter availability of the game database
 FilterDicePresets	DD/	C\[->]S	DD=	maybe	JSON	Remove some presets for user
 FilterImages	AI/	C\[->]S	\fR\(em\fP	yes	JSON	Filter saved image definitions
@@ -311,6 +316,7 @@ PlaceSomeone	PS	C\[<>]S	\fR\(em\fP	no	JSON	Place creature token
 Polo	POLO	C\[->]S	\fR\(em\fP	no	none	Acknowledge server's ping
 Priv	PRIV	C\[<-]S	\fR\(em\fP	N/A	JSON	Priveleged command denied
 Protocol	PROTOCOL	C\[<-]S	\fR\(em\fP	N/A	int	Signal protocol version in use
+QueryAudio	AA?	C\[<>]S	AA	no	JSON	Ask for definition of audio
 QueryCoreData	CORE	C\[->]S	CORE=	no	JSON	Query the core game database
 QueryCoreIndex	COREIDX	C\[->]S	COREIDX=	no	JSON	Query the core database index
 QueryDicePresets	DR	C\[->]S	DD=	maybe	JSON	Request user's presets
@@ -407,6 +413,88 @@ Servers which implement protocol versions 400 and later MUST send this message
 at the start of their conversations. Servers which implement older protocol versions
 SHOULD send it.
 .RE
+'\" <<New>>
+.TP
+.B AA
+Add an audio clip to the map.
+The payload is a JSON object with the following fields:
+'\" <<list>>
+.RS
+.TP
+'\" <</ital-is-var>>
+.BI Format
+The audio format in which the sound clip is encoded. Currently the only format
+supported is
+.RB \*(lq wav \*(rq
+but others may be supported in the future.
+.TP
+.B Name
+The name of the audio clip as known within the mapper.
+.TP
+.B File
+The filename or server ID by which the audio clip can be retrieved.
+.TP
+.BI IsLocalFile " (bool)"
+'\" <<ital-is-var>>
+If
+.BR true ,
+then
+.B File
+gives a local file pathname for the audio clip; otherwise it gives the
+server-specific ID which the client will use to retrieve the file
+from the server.
+'\" <</>>
+.LP
+The mapper VTT client caches and manages audio files in a manner analogous
+to the way it handles image files (see the description of the
+.B AI
+server message below).
+.RE
+.TP
+.B AA?
+Request for the named audio clip.
+Clients may send this if they need an audio clip of the given
+.I name
+(as described above for the
+.B AA
+command) but no such sound is defined yet in the client. This
+queries the server or connected peers to see if any of them know
+of the needed file. The client should continue to process tasks without
+waiting for a response (which is never guaranteed). If another peer knows
+of the requested file, it should respond with an
+.RB \*(lq AA \*(rq
+command.
+The payload is a JSON object with the following fields:
+'\" <<list>>
+.RS
+.TP
+.BI Name
+The audio clip name as known to the mapper.
+'\" <</>>
+.RE
+.TP
+.B AA/
+Filters (removes) all the saved audio clip definitions held in the server's database
+whose names match a regular expression.
+The payload is a JSON object with the following fields:
+'\" <<list>>
+.RS
+.TP
+.B Filter
+The regular expression used to select which audio clip names will be removed.
+.TP
+'\" <</ital-is-var>>
+.BI "KeepMatching " (bool)
+'\" <<ital-is-var>>
+If true, only those sounds whose names match the
+.B Filter
+expression will be kept; the others will be removed. Otherwise,
+the opposite is done: those whose names match
+.B Filter
+will be removed.
+.RE
+'\" <</>>
+'\" <</New>>
 .TP
 .B AC
 Add a character to the pop-up menu for map clients. This makes it easy to place important character tokens
@@ -754,6 +842,19 @@ The payload is a JSON object with the following parameters:
 .B Client
 This describes the client program. By convention, this value
 SHOULD include the version number (e.g., \*(lqmapper 4.0.1\*(rq).
+'\" <<New>>
+.TP
+.B Platform
+This describes the platform on which the client is running. It SHOULD
+have the format
+.RI \*(lq OS
+.I version
+.IR machine \*(rq
+(e.g., 
+.RB \*(lq FreeBSD 
+.B 14.3-RELEASE 
+.BR amd64 \*(rq).
+'\" <</New>>
 .TP
 '\" <</ital-is-var>>
 .BI Response " (base64-encoded bytes)"
@@ -4392,6 +4493,38 @@ The value for this part of the result (as a string).
 '\" <</>>
 '\" <<ital-is-var>>
 .RE
+'\" <<New>>
+.TP
+.B SOUND
+Play a sound clip. Clients SHOULD allow users to locally disable playing of sounds as a user preference.
+The payload is a JSON object with the following fields:
+'\" <<list>>
+.RS
+.TP
+.B Name
+The name of the sound to play. This is the name that was defined by a previous
+.B AA
+command (q.v.). This may be 
+.RB \*(lq * \*(rq
+to refer to all sounds (e.g., to stop all playing sounds).
+.TP
+.BI Loop " (bool)"
+If true, continue playing the sound in a repeating loop until stopped.
+.TP
+.BI Stop " (bool)"
+If true, stop playing the named sound.
+.TP
+.BI Addrs " (list of strings)"
+If non-empty, this is a list of client addresses (in the form reported by the
+.B Addr
+field in the
+.B CONN
+server message). This requests that only the clients listed play (or stop
+playing) the specified
+sound.
+.RE
+'\" <</>>
+'\" <</New>>
 .TP
 .B SYNC
 This command MUST be ignored if received by a client. A client sends this to the
@@ -4819,8 +4952,12 @@ Steve Willoughby / steve@madscience.zone;
 John Mechalas (elevation and movement modes).
 .SH HISTORY
 .LP
-This document defines map protocol version 420,
-which introduces targets to die rolls and armor class as a tracked creature health item. It also introduces the
+This document defines map protocol version 421,
+which adds client platform identification and sound support.
+.LP
+Historically, 
+protocol version 420
+introduced targets to die rolls and armor class as a tracked creature health item. It also introduces the
 .B AKA
 command.
 .LP
