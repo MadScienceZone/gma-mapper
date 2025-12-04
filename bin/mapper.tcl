@@ -1268,6 +1268,7 @@ proc create_main_menu {use_button} {
 		}
 	}
 	bind . <Key-g>		{toggleGridEnable}
+	bind . <Key-t>		{toggleCombatTargets %x %y}
 	bind . <Control-Key-plus>	{global zoom; zoomInBy 2; display_message "Zoomed in to $zoom"}
 	bind . <Control-Key-minus>	{global zoom; zoomInBy 0.5; display_message "Zoomed out to $zoom"}
 	bind . <Control-Key-0>	{global zoom; resetZoom; display_message "Reset zoom to $zoom"}
@@ -1275,6 +1276,42 @@ proc create_main_menu {use_button} {
 	bind . <Control-Key-r>	{refreshScreen; display_message "Display refreshed"}
 	bind . <Control-Key-a>	{aoetool; display_message "Selected area-of-effect tool \[Alt-1 shape, Alt-2 spread\]"}
 	bind . <Control-Key-d>	{rulertool; display_message "Selected ruler tool"}
+}
+
+proc mobsAtXY {x y} {
+	global MOB_X MOB_Y canvas MOBdata
+	set MOB_X $x
+	set MOB_Y $y
+
+	set mob_list [lsort -unique -command MobNameComparison [concat [ScreenXYToMOBID $canvas $x $y] [GetSelectionList]]]
+	DEBUG 3 "DoContext mob_list $mob_list from [ScreenXYToMOBID $canvas $x $y] + [GetSelectionList]"
+	return $mob_list
+}
+
+proc toggleCombatTargets {mousex mousey args} {
+	global canvas
+	set mob_list [mobsAtXY [expr $mousex-[winfo x $canvas]] [expr $mousey-[winfo y $canvas]]]
+	_setMyTargets $mob_list
+}
+
+proc _setMyTargets {tlist} {
+	check_aka
+	set me [my_map_names]	
+	if {[llength $me] == 0} {
+		tk_messageBox -type ok -icon error -title "Who goes there?" \
+			-message "You can't set targets if we don't know what character(s) you're even playing. Either log in with a username that matches the name of your character exactly, or use the \"Specify What Character You're Playing...\" item from the Play menu before trying to select your target(s)."
+		return
+	}
+	if {[llength $me] > 1} {
+		tk_messageBox -type ok -icon error -title "Specify targetting character" \
+			-message "You are controlling more than one character. Before selecting your target(s), select one of your PCs (using the context menu or by pressing shift-T with the mouse over that token) to select them as the source first, then select their target(s)."
+		return
+	}
+
+	SetObjectAttribute $me [dict create Targets $tlist]
+	::gmaproto::update_obj_attributes @$me [dict create Targets $tlist]
+	global MOBdata
+	DEBUG 0 "[dict get $MOBdata(PC84) Targets]"
 }
 
 proc ClearPinnedChats {} {
@@ -8557,75 +8594,100 @@ proc CreateReachSubMenu {args} {
 
 proc DoContext {x y} {
 	global MOB_X MOB_Y canvas MOBdata
-	set MOB_X $x
-	set MOB_Y $y
 	lassign [ScreenXYToGridXY $x $y -exact] Gx Gy
+	set mob_list [mobsAtXY $x $y]
+	DEBUG 0 "DoContext x=$x y=$y Gx=$Gx Gy=$Gy mob_list=$mob_list"
 
-	set mob_list [lsort -unique -command MobNameComparison [concat [ScreenXYToMOBID $canvas $x $y] [GetSelectionList]]]
-	DEBUG 3 "DoContext mob_list $mob_list from [ScreenXYToMOBID $canvas $x $y] + [GetSelectionList]"
+	# positions
+	set CTXtarg 0
+	set CTXremo 1
+	set CTXaddp 2
+	set CTXaddm 3
+	set CTXdead 4
+	set CTXreac 5
+	set CTXsaoe 6
+	set CTXpoly 7
+	set CTXsize 8
+	set CTXcond 9
+	set CTXtags 10
+	set CTXelev 11
+	set CTXmmod 12
+	set CTXSEP1 13
+	set CTXdgrd 14
+	set CTXdfrm 15
+	set CTXSEP2 16
+	set CTXtsel 17
+	set CTXdsel 18
+	set CTXSEP3 19
+	set CTX_pcs 20
 
-	.contextMenu delete 13
-	.contextMenu insert 13 command -command "DistanceFromGrid $x $y 0" -label "Distance from [LetterLabel $Gx]$Gy"
+	.contextMenu delete $CTXdgrd
+	.contextMenu insert $CTXdgrd command -command "DistanceFromGrid $x $y 0" -label "Distance from [LetterLabel $Gx]$Gy"
 
 	if {[llength $mob_list] == 0} {
-		.contextMenu delete 0
-		.contextMenu insert 0 command -command "" -label "Remove" -state disabled
-		.contextMenu delete 3
-		.contextMenu insert 3 command -command "" -label "Toggle Death" -state disabled
-		.contextMenu delete 4
-		.contextMenu insert 4 command -command "" -label "Set Reach" -state disabled
-		.contextMenu delete 5
-		.contextMenu insert 5 command -command "" -label "Toggle Spell Area" -state disabled
-		.contextMenu delete 6
-		.contextMenu insert 6 command -command "" -label "Polymorph" -state disabled
-		.contextMenu delete 7
-		.contextMenu insert 7 command -command "" -label "Change Size" -state disabled
-		.contextMenu delete 8
-		.contextMenu insert 8 command -command "" -label "Toggle Condition" -state disabled
-		.contextMenu delete 9
-		.contextMenu insert 9 command -command "" -label "Tag" -state disabled
-		.contextMenu delete 10
-		.contextMenu insert 10 command -command "" -label "Set Elevation" -state disabled
-		.contextMenu delete 11
-		.contextMenu insert 11 command -command "" -label "Set Movement Mode" -state disabled
-		.contextMenu delete 14
-		.contextMenu insert 14 command -command "" -label "Distance from..." -state disabled
-		.contextMenu delete 16
-		.contextMenu insert 16 command -command "" -label "Toggle Selection" -state disabled
+		.contextMenu delete $CTXtarg
+		.contextMenu insert $CTXtarg command -command "" -label "Target" -state disabled -accelerator T
+		.contextMenu delete $CTXremo
+		.contextMenu insert $CTXremo command -command "" -label "Remove" -state disabled
+		.contextMenu delete $CTXdead
+		.contextMenu insert $CTXdead command -command "" -label "Toggle Death" -state disabled
+		.contextMenu delete $CTXreac
+		.contextMenu insert $CTXreac command -command "" -label "Set Reach" -state disabled
+		.contextMenu delete $CTXsaoe
+		.contextMenu insert $CTXsaoe command -command "" -label "Toggle Spell Area" -state disabled
+		.contextMenu delete $CTXpoly
+		.contextMenu insert $CTXpoly command -command "" -label "Polymorph" -state disabled
+		.contextMenu delete $CTXsize
+		.contextMenu insert $CTXsize command -command "" -label "Change Size" -state disabled
+		.contextMenu delete $CTXcond
+		.contextMenu insert $CTXcond command -command "" -label "Toggle Condition" -state disabled
+		.contextMenu delete $CTXtags
+		.contextMenu insert $CTXtags command -command "" -label "Tag" -state disabled
+		.contextMenu delete $CTXelev
+		.contextMenu insert $CTXelev command -command "" -label "Set Elevation" -state disabled
+		.contextMenu delete $CTXmmod
+		.contextMenu insert $CTXmmod command -command "" -label "Set Movement Mode" -state disabled
+		.contextMenu delete $CTXdfrm
+		.contextMenu insert $CTXdfrm command -command "" -label "Distance from..." -state disabled
+		.contextMenu delete $CTXtsel
+		.contextMenu insert $CTXtsel command -command "" -label "Toggle Selection" -state disabled
 	} elseif {[llength $mob_list] == 1} {
 		set mob_id [lindex $mob_list 0]
 		set mob_name [dict get $MOBdata($mob_id) Name]
 		set mob_disp_name [::gmaclock::nameplate_text $mob_name]
-		.contextMenu delete 0
-		.contextMenu insert 0 command -command "RemovePerson $mob_id; ::gmaproto::clear $mob_id" -label "Remove [::gmaclock::nameplate_text [dict get $MOBdata($mob_id) Name]]"
-		.contextMenu delete 3
-		.contextMenu insert 3 command -command "KillPerson $mob_id" -label "Toggle Death for $mob_disp_name"
-		.contextMenu delete 4
-#		.contextMenu insert 4 command -command "ToggleReach $mob_id" -label "Cycle Reach for $mob_name"
-		.contextMenu insert 4 cascade -menu [CreateReachSubMenu -shallow $mob_id] -label "Set Reach for $mob_disp_name"
-		.contextMenu delete 5
-		.contextMenu insert 5 command -command "ToggleSpellArea $mob_id" -label "Toggle Spell Area for $mob_disp_name"
-		.contextMenu delete 6
+		.contextMenu delete $CTXtarg
+		.contextMenu insert $CTXtarg command -command "_setMyTargets $mob_id" -label "Target [::gmaclock::nameplate_text [dict get $MOBdata($mob_id) Name]]" -accelerator T
+		.contextMenu delete $CTXremo
+		.contextMenu insert $CTXremo command -command "RemovePerson $mob_id; ::gmaproto::clear $mob_id" -label "Remove [::gmaclock::nameplate_text [dict get $MOBdata($mob_id) Name]]"
+		.contextMenu delete $CTXdead
+		.contextMenu insert $CTXdead command -command "KillPerson $mob_id" -label "Toggle Death for $mob_disp_name"
+		.contextMenu delete $CTXreac
+#		.contextMenu insert $CTXreac command -command "ToggleReach $mob_id" -label "Cycle Reach for $mob_name"
+		.contextMenu insert $CTXreac cascade -menu [CreateReachSubMenu -shallow $mob_id] -label "Set Reach for $mob_disp_name"
+		.contextMenu delete $CTXsaoe
+		.contextMenu insert $CTXsaoe command -command "ToggleSpellArea $mob_id" -label "Toggle Spell Area for $mob_disp_name"
+		.contextMenu delete $CTXpoly
 		if {[AllowedToPolymorph $mob_id]} {
-			.contextMenu insert 6 cascade -menu [CreatePolySubMenu -shallow $mob_id] -label "Polymorph $mob_disp_name"
+			.contextMenu insert $CTXpoly cascade -menu [CreatePolySubMenu -shallow $mob_id] -label "Polymorph $mob_disp_name"
 		} else {
-			.contextMenu insert 6 command -state disabled -label "Polymorph $mob_disp_name"
+			.contextMenu insert $CTXpoly command -state disabled -label "Polymorph $mob_disp_name"
 		}
-		.contextMenu delete 7
-		.contextMenu insert 7 cascade -menu [CreateSizeSubMenu -shallow $mob_id] -label "Change Size of $mob_disp_name"
-		.contextMenu delete 8
-		.contextMenu insert 8 cascade -menu [CreateConditionSubMenu -shallow $mob_id] -label "Toggle Condition for $mob_disp_name"
-		.contextMenu delete 9
-		.contextMenu insert 9 cascade -menu [CreateTagSubMenu -shallow $mob_id] -label "Tag $mob_disp_name"
-		.contextMenu delete 10
-		.contextMenu insert 10 cascade -menu [CreateElevationSubMenu -shallow $mob_id] -label "Set Elevation for $mob_disp_name"
-		.contextMenu delete 11
-		.contextMenu insert 11 cascade -menu [CreateMovementModeSubMenu -shallow $mob_id] -label "Set Movement Mode for $mob_disp_name"
-		.contextMenu delete 14
-		.contextMenu insert 14 command -command "DistanceFromMob $mob_id" -label "Distance from $mob_disp_name..."
-		.contextMenu delete 16
-		.contextMenu insert 16 command -command "ToggleSelection $mob_id" -label "Toggle Selection for $mob_disp_name"
+		.contextMenu delete $CTXsize
+		.contextMenu insert $CTXsize cascade -menu [CreateSizeSubMenu -shallow $mob_id] -label "Change Size of $mob_disp_name"
+		.contextMenu delete $CTXcond
+		.contextMenu insert $CTXcond cascade -menu [CreateConditionSubMenu -shallow $mob_id] -label "Toggle Condition for $mob_disp_name"
+		.contextMenu delete $CTXtags
+		.contextMenu insert $CTXtags cascade -menu [CreateTagSubMenu -shallow $mob_id] -label "Tag $mob_disp_name"
+		.contextMenu delete $CTXelev
+		.contextMenu insert $CTXelev cascade -menu [CreateElevationSubMenu -shallow $mob_id] -label "Set Elevation for $mob_disp_name"
+		.contextMenu delete $CTXmmod
+		.contextMenu insert $CTXmmod cascade -menu [CreateMovementModeSubMenu -shallow $mob_id] -label "Set Movement Mode for $mob_disp_name"
+		.contextMenu delete $CTXdfrm
+		.contextMenu insert $CTXdfrm command -command "DistanceFromMob $mob_id" -label "Distance from $mob_disp_name..."
+		.contextMenu delete $CTXtsel
+		.contextMenu insert $CTXtsel command -command "ToggleSelection $mob_id" -label "Toggle Selection for $mob_disp_name"
 	} else {
+		.contextMenu.targ delete 0 end
 		.contextMenu.del delete 0 end
 		.contextMenu.kill delete 0 end
 		.contextMenu.reach delete 0 end
@@ -8642,6 +8704,7 @@ proc DoContext {x y} {
 		foreach mob_id $mob_list {
 			set mob_name [dict get $MOBdata($mob_id) Name]
 			set mob_disp_name [::gmaclock::nameplate_text $mob_name]
+			.contextMenu.targ add command -command "_setMyTargets $mob_id" -label $mob_disp_name
 			.contextMenu.del add command -command "RemovePerson $mob_id; ::gmaproto::clear $mob_id" -label $mob_disp_name
 			.contextMenu.kill add command -command "KillPerson $mob_id" -label $mob_disp_name
 #			.contextMenu.reach add command -command "ToggleReach $mob_id" -label $mob_name
@@ -8662,6 +8725,7 @@ proc DoContext {x y} {
 			.contextMenu.dist add command -command "DistanceFromMob $mob_id" -label $mob_disp_name
 			.contextMenu.tsel add command -command "ToggleSelection $mob_id" -label $mob_disp_name
 		}
+		.contextMenu.targ add command -command "_setMyTargets $mob_list" -label "(all of the above)"
 		.contextMenu.del add command -command "RemoveAll $mob_list" -label "(all of the above)"
 		.contextMenu.kill add command -command "KillAll $mob_list" -label "(all of the above)"
 		.contextMenu.reach add cascade -menu [CreateReachSubMenu -mass $mob_list] -label "(all of the above)"
@@ -8675,30 +8739,32 @@ proc DoContext {x y} {
 		.contextMenu.cond add cascade -menu [CreateConditionSubMenu -mass $mob_list] -label "(all of the above)"
 		.contextMenu.elev add cascade -menu [CreateElevationSubMenu -mass $mob_list] -label "(all of the above)"
 		.contextMenu.mmode add cascade -menu [CreateMovementModeSubMenu -mass $mob_list] -label "(all of the above)"
-		.contextMenu delete 0
-		.contextMenu insert 0 cascade -menu .contextMenu.del -label "Remove"
-		.contextMenu delete 3
-		.contextMenu insert 3 cascade -menu .contextMenu.kill -label "Toggle Death"
-		.contextMenu delete 4
-		.contextMenu insert 4 cascade -menu .contextMenu.reach -label "Set Reach"
-		.contextMenu delete 5
-		.contextMenu insert 5 cascade -menu .contextMenu.aoe -label "Toggle Spell Area"
-		.contextMenu delete 6
-		.contextMenu insert 6 cascade -menu .contextMenu.poly -label "Polymorph"
-		.contextMenu delete 7
-		.contextMenu insert 7 cascade -menu .contextMenu.size -label "Change Size"
-		.contextMenu delete 8
-		.contextMenu insert 8 cascade -menu .contextMenu.cond -label "Toggle Condition"
-		.contextMenu delete 9
-		.contextMenu insert 9 cascade -menu .contextMenu.tag -label "Tag"
-		.contextMenu delete 10
-		.contextMenu insert 10 cascade -menu .contextMenu.elev -label "Set Elevation"
-		.contextMenu delete 11
-		.contextMenu insert 11 cascade -menu .contextMenu.mmode -label "Set Movement Mode"
-		.contextMenu delete 14
-		.contextMenu insert 14 cascade -menu .contextMenu.dist -label "Distance From..."
-		.contextMenu delete 16
-		.contextMenu insert 16 cascade -menu .contextMenu.tsel -label "Toggle Selection for"
+		.contextMenu delete $CTXtarg
+		.contextMenu insert $CTXtarg cascade -menu .contextMenu.targ -label "Target" -accelerator T
+		.contextMenu delete $CTXremo
+		.contextMenu insert $CTXremo cascade -menu .contextMenu.del -label "Remove"
+		.contextMenu delete $CTXdead
+		.contextMenu insert $CTXdead cascade -menu .contextMenu.kill -label "Toggle Death"
+		.contextMenu delete $CTXreac
+		.contextMenu insert $CTXreac cascade -menu .contextMenu.reach -label "Set Reach"
+		.contextMenu delete $CTXsaoe
+		.contextMenu insert $CTXsaoe cascade -menu .contextMenu.aoe -label "Toggle Spell Area"
+		.contextMenu delete $CTXpoly
+		.contextMenu insert $CTXpoly cascade -menu .contextMenu.poly -label "Polymorph"
+		.contextMenu delete $CTXsize
+		.contextMenu insert $CTXsize cascade -menu .contextMenu.size -label "Change Size"
+		.contextMenu delete $CTXcond
+		.contextMenu insert $CTXcond cascade -menu .contextMenu.cond -label "Toggle Condition"
+		.contextMenu delete $CTXtags
+		.contextMenu insert $CTXtags cascade -menu .contextMenu.tag -label "Tag"
+		.contextMenu delete $CTXelev
+		.contextMenu insert $CTXelev cascade -menu .contextMenu.elev -label "Set Elevation"
+		.contextMenu delete $CTXmmod
+		.contextMenu insert $CTXmmod cascade -menu .contextMenu.mmode -label "Set Movement Mode"
+		.contextMenu delete $CTXdfrm
+		.contextMenu insert $CTXdfrm cascade -menu .contextMenu.dist -label "Distance From..."
+		.contextMenu delete $CTXtsel
+		.contextMenu insert $CTXtsel cascade -menu .contextMenu.tsel -label "Toggle Selection for"
 	}
 
 	set wx [expr [winfo rootx $canvas] + $x]
@@ -8714,6 +8780,7 @@ proc MobNameComparison {a b} {
 
 report_progress "Setting up UI: context menu"
 menu .contextMenu -tearoff 0
+menu .contextMenu.targ -tearoff 0
 menu .contextMenu.del -tearoff 0
 menu .contextMenu.kill -tearoff 0
 menu .contextMenu.reach -tearoff 0
@@ -8727,29 +8794,26 @@ menu .contextMenu.mmode -tearoff 0
 menu .contextMenu.dist -tearoff 0
 menu .contextMenu.tsel -tearoff 0
 #menu .addPlayerMenu
-.contextMenu add command -command "" -label Remove -state disabled					;# 0
-.contextMenu add command -command {AddPlayerMenu player} -label {Add Player...}				;# 1
-.contextMenu add command -command {AddPlayerMenu monster} -label {Add Monster...}			;# 2
-.contextMenu add command -command "" -label {Toggle Death} -state disabled				;# 3
-.contextMenu add command -command "" -label {Set Reach} -state disabled				;# 4
-.contextMenu add command -command "" -label {Toggle Spell Area} -state disabled				;# 5
-.contextMenu add command -command "" -label {Polymorph} -state disabled					;# 6
-.contextMenu add command -command "" -label {Change Size} -state disabled				;# 7
-.contextMenu add command -command "" -label {Toggle Condition} -state disabled				;# 8 
-.contextMenu add command -command "" -label {Tag} -state disabled					;# 9 
-.contextMenu add command -command "" -label {Elevation} -state disabled					;# 10
-.contextMenu add command -command "" -label {Movement Mode} -state disabled				;# 11
-.contextMenu add separator										;# 12
-.contextMenu add command -command "" -label {Distance from...} -state disabled		 		;# 13 
-.contextMenu add command -command "" -label {Distance from...} -state disabled				;# 14 
-.contextMenu add separator										;# 15 
-.contextMenu add command -command "" -label {Toggle Selection} -state disabled				;# 16 
-.contextMenu add command -command "ClearSelection" -label {Deselect All} -state disabled		;# 17
-#.contextMenu add command -command "FindNearby" -label {Scroll to Visible Objects}			;# 18 REMOVED
-#.contextMenu add command -command "SyncView" -label {Scroll Others' Views to Match Mine}		;# 19 REMOVED
-#.contextMenu add command -command "refreshScreen" -label {Refresh Display}				;# 20 REMOVED
-#.contextMenu add command -command "aboutMapper" -label {About Mapper...}				;# 21 REMOVED
-.contextMenu add separator										;# 18; was 22
+.contextMenu add command -command "" -label Target -state disabled -accelerator T			;# 0
+.contextMenu add command -command "" -label Remove -state disabled					;# 1
+.contextMenu add command -command {AddPlayerMenu player} -label {Add Player...}				;# 2
+.contextMenu add command -command {AddPlayerMenu monster} -label {Add Monster...}			;# 3
+.contextMenu add command -command "" -label {Toggle Death} -state disabled				;# 4
+.contextMenu add command -command "" -label {Set Reach} -state disabled					;# 5
+.contextMenu add command -command "" -label {Toggle Spell Area} -state disabled				;# 6
+.contextMenu add command -command "" -label {Polymorph} -state disabled					;# 7
+.contextMenu add command -command "" -label {Change Size} -state disabled				;# 8
+.contextMenu add command -command "" -label {Toggle Condition} -state disabled				;# 9 
+.contextMenu add command -command "" -label {Tag} -state disabled					;# 10 
+.contextMenu add command -command "" -label {Elevation} -state disabled					;# 11
+.contextMenu add command -command "" -label {Movement Mode} -state disabled				;# 12
+.contextMenu add separator										;# 13
+.contextMenu add command -command "" -label {Distance from...} -state disabled		 		;# 14 
+.contextMenu add command -command "" -label {Distance from...} -state disabled				;# 15 
+.contextMenu add separator										;# 16 
+.contextMenu add command -command "" -label {Toggle Selection} -state disabled				;# 17 
+.contextMenu add command -command "ClearSelection" -label {Deselect All} -state disabled		;# 18
+.contextMenu add separator										;# 19
 
 # AddPlayer name color ?area? ?size? ?id?  defaults to 1x1, generated ID
 #

@@ -564,6 +564,7 @@ proc ::gmaproto::_attribute_encode {k v} {
 
 		SkinSize   { return [::json::write array {*}$v] }
 		StatusList { return [::json::write array {*}[lmap s $v {json::write string $s}]] }
+		Targets    { return [::json::write array {*}[lmap s $v {json::write string $s}]] }
 
 		Font   -
 		CustomReach -
