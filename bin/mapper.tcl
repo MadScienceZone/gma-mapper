@@ -6436,6 +6436,27 @@ proc CreatureStatusMarker {w id x y s calc_condition} {
 	}
 }
 
+# RenderTarget canvas x y width height tags
+#   Draws targets with tags provided (so you can delete them by tags when no longer needed)
+proc RenderTarget {w x0 y0 x1 y1 tags} {
+	set hx [expr $x0+(($x1-$x0)/2.0)]
+	set hy [expr $y0+(($y1-$y0)/2.0)]
+	set ticklen [expr ($x1-$x0)/10.0]
+	set tickoff_x [expr $hx-($ticklen/2.0)]
+	set tick_x [expr $hx-($ticklen/2.0)]
+	set tick_y [expr $hy-($ticklen/2.0)]
+	$w create rect $x0 $y0 $x1 $y1 -outline red -width 3 -dash - -tags $tags
+	$w create line $x0 $hy $x1 $hy -fill red -width 3 -tags $tags
+	$w create line $hx $y0 $hx $y1 -fill red -width 3 -tags $tags
+	for {set i 1} {$i < 8} {incr i} {
+		if {$i==4} continue
+		set yy [expr $y0+((($y1-$y0)/8.0)*$i)]
+		set xx [expr $x0+((($x1-$x0)/8.0)*$i)]
+		$w create line $tick_x $yy [expr $tick_x+$ticklen] $yy -fill red -width 2 -tags $tags
+		$w create line $xx $tick_y $xx [expr $tick_y+$ticklen] -fill red -width 2 -tags $tags
+	}
+}
+
 proc RenderSomeone {w id {norecurse false}} {
 	DEBUG 3 "RenderSomeone $w $id"
 	global MOBdata ThreatLineWidth iscale SelectLineWidth ThreatLineHatchWidth ReachLineColor
@@ -6764,6 +6785,7 @@ proc RenderSomeone {w id {norecurse false}} {
 			-fill [dict get $MOBdata($id) Color] -width 7 -tags "mob MF#$id M#$id MN#$id allMOB"
 	}
 		
+	RenderTarget $w [expr $x*$iscale] [expr $y*$iscale] [expr ($x+$mob_size)*$iscale] [expr ($y+$mob_size)*$iscale] "mob MF#$id M#$id allMOB MTARG#$id"
 	#
 	# Bind mouseover events for the token
 	#
