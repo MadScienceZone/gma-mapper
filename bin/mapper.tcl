@@ -11797,31 +11797,41 @@ proc _render_die_roller {w width height type for_user tkey args} {
 					if {$scope eq "g"} {
 						pack [ttk::checkbutton $wpi.enabled -variable dice_preset_data(en,$tkey,$piname) \
 							-command [list DRPScheckVarEn "en,$tkey,$piname" g$id $for_user $tkey u]\
+							-onvalue true -offvalue false\
 							-text "\[system\] $t"] -side left
 						# ^^hack
 					} {
 						pack [ttk::checkbutton $wpi.enabled -variable dice_preset_data(en,$tkey,$piname) \
 							-command [list DRPScheckVarEn "en,$tkey,$piname" u$id $for_user $tkey $scope]\
+							-onvalue true -offvalue false\
 							-text $t] -side left
 					}
+					if {![info exists dice_preset_data(en,$tkey,$piname)]} {
+						set dice_preset_data(en,$tkey,$piname) [::gmaproto::json_bool [dict get $preset Enabled]]
+						#DEBUG 0 "QQ init en,$tkey,$piname=$dice_preset_data(en,$tkey,$piname)"
+					} 
 				} else {
 					if {$scope eq "g"} {
-						pack [ttk::checkbutton $wpi.enabled -variable dice_preset_data(en,$tkey,$piname) \
-							-command [list DRPScheckVarEn "en,$tkey,$piname" $id $for_user $tkey $scope]\
+						pack [ttk::checkbutton $wpi.enabled -variable dice_preset_data(sys,gvar_on,$id) \
+							-command [list DRPScheckVarEn "sys,gvar_on,$id" $id $for_user $tkey $scope]\
 							-text "\[system\] [dict get $preset DisplayName] (as \$\$\{$id\}): [dict get $preset DieRollSpec]"\
+							-onvalue true -offvalue false\
 						] -side left
+						if {![info exists dice_preset_data(sys,gvar_on,$id)]} {
+							set dice_preset_data(sys,gvar_on,$id) [::gmaproto::json_bool [dict get $preset Enabled]]
+							#DEBUG 0 "QQ init sys,gvar_on,$id=$dice_preset_data(sys,gvar_on,$id)"
+						} 
 					} {
-						pack [ttk::checkbutton $wpi.enabled -variable dice_preset_data(en,$tkey,$piname) \
-							-command [list DRPScheckVarEn "en,$tkey,$piname" $id $for_user $tkey $scope]\
+						pack [ttk::checkbutton $wpi.enabled -variable dice_preset_data(en,$tkey,v:$id) \
+							-command [list DRPScheckVarEn "en,$tkey,v:$id" "v:$id" $for_user $tkey $scope]\
 							-text "[dict get $preset DisplayName] (as \$\{$id\}): [dict get $preset DieRollSpec]"\
+							-onvalue true -offvalue false\
 						] -side left
+						if {![info exists dice_preset_data(en,$tkey,v:$id)]} {
+							set dice_preset_data(en,$tkey,v:$id) [::gmaproto::json_bool [dict get $preset Enabled]]
+							#DEBUG 0 "QQ init en,$tkey,v:$id=$dice_preset_data(en,$tkey,v:$id)"
+						} 
 					}
-				}
-				if {![info exists dice_preset_data(en,$tkey,$piname)]} {
-					#trace add variable dice_preset_data(en,$tkey,$piname) {array read write unset} TRACEvar
-					set dice_preset_data(en,$tkey,$piname) [::gmaproto::int_bool [dict get $preset Enabled]]
-				} else {
-					#TRACE "variable dice_preset_data(en,$tkey,$piname) already exists with value $dice_preset_data(en,$tkey,$piname)"
 				}
 				::tooltip::tooltip $wpi.enabled "* [dict get $preset Description]"
 				incr i
@@ -11988,8 +11998,10 @@ proc DRPScheckVarEn {key id for_user tkey {scope u}} {
 
 	if {$scope eq "g"} {
 		set DieRollPresetState(sys,gvar_on,$id) [::gmaproto::json_bool $dice_preset_data($key)]
+		#DEBUG 0 "QQ update DRPS sys,gvar_on,$id=$DieRollPresetState(sys,gvar_on,$id)"
 	} else {
 		set DieRollPresetState($tkey,on,$id) [::gmaproto::json_bool $dice_preset_data($key)]
+		#DEBUG 0 "QQ update DRPS $tkey,on,$id=$DieRollPresetState($tkey,on,$id)"
 	}
 }
 
@@ -13509,12 +13521,13 @@ proc PresetLists {arrayname tkey args} {
 					([string length $varname] == 1 ||
 					[string is alnum -strict [string range $varname 1 end]])} {
 						set DieRollPresetState($tkey,var,$varname) [dict get $d DieRollSpec]
-						if {[info exists dice_preset_data(en,$tkey,$varname)]} {
-							set DieRollPresetState($tkey,on,$varname) $dice_preset_data(en,$tkey,$varname)
+						if {[info exists dice_preset_data(en,$tkey,v:$varname)]} {
+							set DieRollPresetState($tkey,on,v:$varname) $dice_preset_data(en,$tkey,v:$varname)
 						} else {
-							set DieRollPresetState($tkey,on,$varname) [dict get $d Enabled]
+							set DieRollPresetState($tkey,on,v:$varname) [::gmaproto::json_bool [dict get $d Enabled]]
 						}
 						set DieRollPresetState($tkey,g,$varname) false
+						#DEBUG 0 "QQ export DRPS $tkey,on,v:$varname=$DieRollPresetState($tkey,on,v:$varname)"
 						#trace add variable DieRollPresetState($tkey,on,$varname) {array read write unset} TRACEvar
 						#trace add variable DieRollPresetState($tkey,var,$varname) {array read write unset} TRACEvar
 						#trace add variable DieRollPresetState($tkey,g,$varname) {array read write unset} TRACEvar
@@ -13671,8 +13684,8 @@ proc PresetLists {arrayname tkey args} {
 					([string length $varname] == 1 ||
 					[string is alnum -strict [string range $varname 1 end]])} {
 						set DieRollPresetState(sys,gvar,$varname) [dict get $d DieRollSpec]
-						if {[info exists dice_preset_data(sys,gvar_on,$g_piname)]} {
-							set DieRollPresetState(sys,gvar_on,$varname) $dice_preset_data(sys,gvar_on,$g_piname)
+						if {[info exists dice_preset_data(sys,gvar_on,$varname)]} {
+							set DieRollPresetState(sys,gvar_on,$varname) $dice_preset_data(sys,gvar_on,$varname)
 						} else {
 							set DieRollPresetState(sys,gvar_on,$varname) [dict get $d Enabled]
 						}
@@ -14797,7 +14810,7 @@ proc _apply_die_roll_variables {rollspec for_user tkey} {
 			set onkey "sys,gvar_on,$varname"
 		} else {
 			set vkey "$tkey,var,$varname"
-			set onkey "$tkey,on,$varname"
+			set onkey "$tkey,on,v:$varname"
 		}
 		if {[info exists DieRollPresetState($vkey)]} {
 			if {$DieRollPresetState($onkey)} {
@@ -16928,6 +16941,20 @@ proc check_aka_commit {} {
 # 	<tkey>,on,<seq>		en?			==>
 # 	<tkey>,g,<seq>		glob?
 # 	<tkey>,apply_order	{<seq>,...}
+#
+# variables
+#   piname=windowid({u|g}{preset-name})
+#   [] dice_preset_data(en,<tkey>,<piname>) cmd DRPScheckVarEn en,<tkey>,<piname> <id> <for_user> <tkey> <scope=g> 	$$var
+#   [] dice_preset_data(en,<tkey>,<piname>) cmd DRPScheckVarEn en,<tkey>,<piname> <id> <for_user> <tkey> <scope=u> 	$var
+#   dice_preset_data(en,<tkey>,<piname>) <- Enabled field from preset dict if not already set
+#
+# dpd				DRPS
+# en,<tkey>,v:<varname>		<tkey>,on,v:<varname>	<tkey>,var,<varname>	<tkey>,g,<varname>=false
+# en,<tkey>,<u_piname>		<tkey>,on,u<id>					<tkey>,g,u<id>		<tkey>,apply_order
+# sys,gvar_on,<g_piname>	sys,gvar_on,<varname>	sys,gvar,<varname>
+#             ^^^^^^^^^^<varname>
+# en,<tkey>,<g_piname>		<tkey>,on,g<id>					<tkey>,g,g<id>		<tkey>,apply_order
+# 			
 #
 #
 #
