@@ -5008,6 +5008,52 @@ proc DrawAoeZone {w id coords} {
 }
 
 set AoeZoneLast {}
+proc _AnimateAoeZone {w id} {
+	global AnimateAoeZoneCache
+	set hashes {}
+	set magnitude 1
+
+	if {[catch {set hashes [$w find withtag AoEZoneCrossHatch$id]} err] || [llength $hashes] == 0} {
+		array unset AnimateAoeZoneCache $id
+		DEBUG 1 "Stopped background animation routine for AOE zone $id (len=[llength $hashes], err=$err)"
+		return
+	}
+
+	set translation [expr int(rand() * 8)]
+	#DEBUG 1 "animate $id, hashes=$hashes"
+	foreach hid $hashes {
+		set new_coords {}
+		set coords [$w coords $hid]
+		#DEBUG 1 "hid=$hid, coords=$coords"
+		if {! [info exists AnimateAoeZoneCache($id,$hid)]} {
+			set AnimateAoeZoneCache($id,$hid) $coords
+			#DEBUG 1 "this is a new hash mark, storing it as the new baseline"
+		} else {
+			set coords $AnimateAoeZoneCache($id,$hid)
+			#DEBUG 1 "using $coords instead, since that's the baseline we had for this one"
+		}
+		
+		foreach {x y} $coords {
+			switch $translation {
+				0 { lappend new_coords [expr $x+$magnitude] $y }
+				1 { lappend new_coords [expr $x-$magnitude] $y }
+				2 { lappend new_coords $x [expr $y+$magnitude] }
+				3 { lappend new_coords $x [expr $y-$magnitude] }
+				4 { lappend new_coords [expr $x+$magnitude] [expr $y+$magnitude] }
+				5 { lappend new_coords [expr $x-$magnitude] [expr $y+$magnitude] }
+				6 { lappend new_coords [expr $x-$magnitude] [expr $y-$magnitude] }
+				7 { lappend new_coords [expr $x+$magnitude] [expr $y-$magnitude] }
+			}
+		}
+		#DEBUG 1 "translated -> $new_coords"
+		if {[catch {$w coords $hid $new_coords} err]} {
+			DEBUG 1 "$w coords $hid coords $new_coords: $err"
+		}
+	}
+
+	after 500 _AnimateAoeZone $w $id
+}
+
 proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags} {
 	global PI iscale AOE_SPREAD AoeZoneLast
 
@@ -5243,6 +5289,7 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags} {
 		}
 	}
 	$w delete REF$id
+	_AnimateAoeZone $w $id
 }
 
 #
@@ -11490,6 +11537,11 @@ proc SetTableColors {row fgvar bgvar} {
 proc _render_die_roller {w width height type for_user tkey args} {
 	global dice_preset_data last_known_size icon_delete icon_die16 icon_die16g
 	global dark_mode _preferences colortheme icon_blank
+	global DieRollPresetState
+	puts "RDR::start dice_preset_data=[array get dice_preset_data en,*]"
+	puts "RDR::start dice_preset_data=[array get dice_preset_data sys,gvar_on,*]"
+	puts "RDR::start DieRollPresetState=[array get DieRollPresetState *,*on,*]"
+	puts "RDR::start DieRollPresetState=[array get DieRollPresetState *,apply_order]"
 
 	assert_last_known_size $tkey
 	if {$width <= 0} {
@@ -16928,6 +16980,28 @@ proc check_aka_commit {} {
 # 	<tkey>,on,<seq>		en?			==>
 # 	<tkey>,g,<seq>		glob?
 # 	<tkey>,apply_order	{<seq>,...}
+#
+#
+#
+# PresetLists ... -export
+#   <u_piname> ::= [to_window_id u[dict get $d Name]]
+#   <g_piname> ::= [to_window_id g[dict get $d Name]]
+#   <id> ::= typically display sequence
+#
+#   dice_preset_data(preset,<tkey>,<name>)=<dict>		-> DieRollPresetState(<tkey>,var,<varname>)=<value>
+#                                       (or, if global)   	-> DieRollPresetState(sys,gvar,<varname>)=<value>
+#   dice_preset_data(en,<tkey>,<varname>)=<bool>??<dict>	-> DieRollPresetState(<tkey>,on,<varname)=<bool>
+#   dice_preset_data(sys,gvar_on,<g_piname>)=<bool>??<dict>	-> DieRollPresetState(sys,gvar_on,<varname)=<bool>
+#   dice_preset_data(en,<tkey>,<u_piname>)=<bool>??<dict>	-> DieRollPresetState(<tkey>,on,u<id>)
+#   								-> DieRollPresetState(<tkey>,apply_order)={u<id> ...}
+#								-> DieRollPresetState(<tkey>,g,u<id>)=<bool>	is global?
+#								-> DieRollPresetState(<tkey>,global,u<id>)=<spec>
+#   dice_preset_data(sys,preset,<name)=<dict)			-> DieRollPresetState(sys,gvar,<varname>)=<value>
+#   dice_preset_data(sys,gvar_on,<g_piname>)=<bool>??<dict>	-> DieRollPresetState(sys,gvar_on,<varname>)=<bool>
+#								-> DieRollPresetState(<tkey>,global,g<id>)=<spec>
+#   dice_preset_dat(en,<tkey>,<g_piname)=<bool>??<dict>		-> DieRollPresetState(<tkey>,on,g<id>)=<bool>
+#								-> DieRollPresetState(<tkey>,g,g<id>)=<bool>	is global?
+#   								-> DieRollPresetState(<tkey>,apply_order)={g<id> ...}
 #
 #
 #

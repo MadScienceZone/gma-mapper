@@ -11,7 +11,7 @@
 ########################################################################################
 # Profile editor
 
-package provide gmaprofile 1.5
+package provide gmaprofile 1.6
 package require gmacolors
 package require json 1.3.3
 package require json::write 1.0.3
@@ -1166,7 +1166,8 @@ namespace eval ::gmaprofile {
 		grid [ttk::label $w.n.a.title3 -text "PLAYER OPTIONS" -anchor center -foreground $sep_fg -background $sep_bg] - - - - - - -sticky we -pady 5
 		grid [ttk::checkbutton $w.n.a.nodice -text "Disable die rolling (die roller will be read-only)" -variable prf_no_dice] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.noaka -text "Never ask me what characters I'm playing" -variable prf_suppress_aka] - - - - - - -sticky w
-		grid [ttk::checkbutton $w.n.a.nooda -text "Disable audio cues for ondeck and my turns" -variable prf_no_ondeck_audio] - - - - - - -sticky w
+		grid [ttk::checkbutton $w.n.a.nooda -text "Mute audio cues for ondeck and my turns" -variable prf_no_ondeck_audio] - - - - - - -sticky w
+		grid [ttk::checkbutton $w.n.a.nosfx -text "Mute audio sound effects for game play" -variable prf_no_sfx -state disabled] - - - - - - -sticky w
 
 		grid [ttk::label $w.n.t.title -text "PATHS TO SUPPORT PROGRAMS" -anchor center -foreground $sep_fg -background $sep_bg] - -sticky we -pady 5
 		grid [ttk::label $w.n.t.curl_label -text "Curl program path:"] \
