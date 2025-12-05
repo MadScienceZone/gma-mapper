@@ -6506,7 +6506,7 @@ proc RefreshTargets {{current_actor {}}} {
 			::gmautil::dassign [dict get $MOBdata($tid)] Gx gx Gy gy Hidden h
 			set sz [_mob_size $tid]
 			if {!$h} {
-				$canvas create rect [expr $gx*$iscale] [expr $gy*$iscale] [expr ($gx+$sz)*$iscale] [expr ($gy+$sz)*$iscale] -outline green -width 4 -tags SRCTARG -dash -
+				$canvas create rect [expr $gx*$iscale] [expr $gy*$iscale] [expr ($gx+$sz)*$iscale] [expr ($gy+$sz)*$iscale] -outline green -width 4 -tags SRCTARG -dash .
 			}
 		}
 	} err]} {
@@ -6618,7 +6618,7 @@ proc RenderTarget {w x0 y0 x1 y1 tags basetag} {
 	set ltags $tags
 	lappend rtags ${basetag}RECT
 	lappend ltags ${basetag}LINE
-	$w create rect $x0 $y0 $x1 $y1 -outline red -width 5 -dash - -tags $rtags 
+	$w create rect $x0 $y0 $x1 $y1 -outline red -width 5 -dash . -tags $rtags 
 	$w create line $x0 $hy $x1 $hy -fill red -width 4 -tags $ltags
 	$w create line $hx $y0 $hx $y1 -fill red -width 4 -tags $ltags
 	for {set i 1} {$i < 8} {incr i} {
