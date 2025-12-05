@@ -1269,6 +1269,7 @@ proc create_main_menu {use_button} {
 	}
 	bind . <Key-g>		{toggleGridEnable}
 	bind . <Key-t>		{toggleCombatTargets %x %y}
+	bind . <Shift-Key-t>	{toggleCombatSource %x %y}
 	bind . <Control-Key-plus>	{global zoom; zoomInBy 2; display_message "Zoomed in to $zoom"}
 	bind . <Control-Key-minus>	{global zoom; zoomInBy 0.5; display_message "Zoomed out to $zoom"}
 	bind . <Control-Key-0>	{global zoom; resetZoom; display_message "Reset zoom to $zoom"}
@@ -1276,6 +1277,20 @@ proc create_main_menu {use_button} {
 	bind . <Control-Key-r>	{refreshScreen; display_message "Display refreshed"}
 	bind . <Control-Key-a>	{aoetool; display_message "Selected area-of-effect tool \[Alt-1 shape, Alt-2 spread\]"}
 	bind . <Control-Key-d>	{rulertool; display_message "Selected ruler tool"}
+}
+
+proc mobIDsToNames {idlist} {
+	global MOBdata
+
+	set names {}
+	foreach id $idlist {
+		if {[info exists MOBdata($id)] && [dict exists $MOBdata($id) Name]} {
+			lappend names [dict get $MOBdata($id) Name]
+		} else {
+			DEBUG 0 "Can't find name for monster with ID $id"
+		}
+	}
+	return $names
 }
 
 proc mobsAtXY {x y} {
@@ -1288,9 +1303,16 @@ proc mobsAtXY {x y} {
 	return $mob_list
 }
 
+# somewhat misnamed but this allows you to select the source of the targeted attack
+# if you control more than one character
+proc toggleCombatSource {mousex mousey args} {
+}
+
+# somewhat mistaned but this allows you to change the target(s) of your attacks to a new
+# list of creatures
 proc toggleCombatTargets {mousex mousey args} {
 	global canvas
-	set mob_list [mobsAtXY [expr $mousex-[winfo x $canvas]] [expr $mousey-[winfo y $canvas]]]
+	set mob_list [mobIDsToNames [mobsAtXY [expr $mousex-[winfo x $canvas]] [expr $mousey-[winfo y $canvas]]]]
 	_setMyTargets $mob_list
 }
 
@@ -6436,24 +6458,140 @@ proc CreatureStatusMarker {w id x y s calc_condition} {
 	}
 }
 
+#
+# RefreshTargets ?current_actor?
+# 	Redraw the current player's targets and the current actor's (if any).		MYTARG#id
+#	The current actor's are animated (color-cycled) while the current player's are	
+#	drawn in red.									MATARG#id
+#
+proc _mob_size {id} {
+	if {[set sz [FullCreatureAreaInfo $id]] eq {}} {
+		DEBUG 0 "Can't get creature area info for creature $id"
+		return 0
+	} 
+	return [lindex $sz 0]
+}
+
+set ActiveTargetList {}
+proc RefreshTargets {{current_actor {}}} {
+	DEBUG 0 "RefreshTargets $current_actor"
+	global MOBdata MOBid canvas iscale ActiveTargetList
+	set me [my_map_names]
+
+	$canvas delete MYTARG
+	set ActiveTargetList {}
+	foreach my_source $me {
+	    if {[catch {
+		if {[info exists MOBid($my_source)] && [info exists MOBdata([set tid $MOBid($my_source)])] && [dict exists [set d $MOBdata($tid)] Targets]} {
+			if {[llength $me] == 1 || $my_source eq $current_actor} {
+				set ActiveTargetList [dict get $d Targets]
+			} 
+
+			if {$my_source ne $current_actor} {
+				::gmautil::dassign $d Gx agx Gy agy Hidden ahidden
+				set actor_mob_size [_mob_size $tid]
+				if {$ahidden} continue
+
+				foreach target [dict get $d Targets] {
+					if {[info exists MOBid($target)]} {
+						set ttid $MOBid($target)
+						if {[info exists MOBdata($ttid)]} {
+							::gmautil::dassign $MOBdata($ttid) Gx gx Gy gy Hidden hidden
+							if {$hidden} continue
+							set mob_size [_mob_size $ttid]
+							RenderTarget $canvas [expr $gx*$iscale] [expr $gy*$iscale] [expr ($gx+$mob_size)*$iscale] [expr ($gy+$mob_size)*$iscale] [list MYTARG MYTARG#$tid] MYTARG
+							$canvas create line [expr ($agx+($actor_mob_size/2.0))*$iscale] [expr ($agy+($actor_mob_size/2.0))*$iscale] [expr ($gx+($mob_size/2.0))*$iscale] [expr ($gy+($mob_size/2.0))*$iscale] -fill red -width 3 -tags [list MYTARG MYTARG#$tid MYTARGLINE] -dash - -arrow last
+						}
+					}
+				}
+			}
+			# TODO this creature named $my_source with obj id $tid I control targets [dict get $d Targets]
+		}
+	    } err]} {
+	        DEBUG 1 "Unable to draw target for $my_source: $err"
+	    }
+	}
+
+	$canvas delete MATARG
+	set start false
+	if {$current_actor ne {} && [info exists MOBid($current_actor)] && [info exists MOBdata([set tid $MOBid($current_actor)])] && [dict exists [set d $MOBdata($tid)] Targets]} {
+	    if {[catch {
+		::gmautil::dassign $d Gx agx Gy agy Hidden ahidden
+		if {$ahidden} continue
+		set actor_mob_size [_mob_size $tid]
+
+		foreach target [dict get $d Targets] {
+			if {[info exists MOBid($target)] && [info exists MOBdata([set ttid $MOBid($target)])]} {
+				::gmautil::dassign $MOBid($target) Gx gx Gy gy Hidden hidden
+				if {$hidden} continue
+				set mob_size [_mob_size $ttid]
+				RenderTarget $canvas [expr $gx*$iscale] [expr $gy*$iscale] [expr ($gx+$mob_size)*$iscale] [expr ($gy+$mob_size)*$iscale] [list MATARG MATARG#$tid] MATARG
+				$canvas create line [expr $agx*$iscale+($actor_mob_size/2.0)] [expr $agy*$iscale+($actor_mob_size/2.0)] [expr $gx*$iscale+($mob_size/2.0)] [expr $gy*$iscale+($mob_size/2.0)] -fill red -width 3 -tags [list MATARG MATARG#$tid MATARG MATARGLINE] -dash - -arrow last
+				set start true
+			}
+		}
+	#RenderTarget $w [expr $x*$iscale] [expr $y*$iscale] [expr ($x+$mob_size)*$iscale] [expr ($y+$mob_size)*$iscale] "mob MF#$id M#$id allMOB MTARG#$id"
+		# TODO the current actor named $current_actor with obj id $tid targets [dict get $d Targets]
+		# TODO set global var which can be sent with die rolls
+	    } err]} {
+	    	DEBUG 1 "Unable to draw targets for $current_actor: $err"
+	    }
+	}
+	# DispSize Size Skin SkinSize Gx Gy Hidden
+	if {$start} {
+		AnimateTargetArrows
+	}
+	global _ata_running
+}
+
+set _color_wheel {#ff0000 #ff8800 #ffff00 #88ff00 #00ff00 #00ff88 #00ffff #0088ff #0000ff #8800ff #ff00ff #ff0088}
+set _color_wheel_cur 0
+set _ata_running false
+
+proc AnimateTargetArrows {} {
+	global _ata_running
+	if {!$_ata_running} {
+		set _ata_running true
+		_AnimateTargetArrows
+	}
+}
+proc _AnimateTargetArrows {} {
+	global canvas _color_wheel _color_wheel_cur _ata_running
+
+	if {[$canvas gettags MATARGLINE] eq {}} {
+		# no highlighted items currently, so stop this
+		set _ata_running false
+		return
+	}
+	$canvas itemconfigure MATARGLINE -fill [lindex $_color_wheel $_color_wheel_cur]
+	$canvas itemconfigure MATARGRECT -outline [lindex $_color_wheel $_color_wheel_cur]
+	set _color_wheel_cur [expr ($_color_wheel_cur+1) % [llength $_color_wheel]]
+
+	after 100 _AnimateTargetArrows
+}
+
 # RenderTarget canvas x y width height tags
 #   Draws targets with tags provided (so you can delete them by tags when no longer needed)
-proc RenderTarget {w x0 y0 x1 y1 tags} {
+proc RenderTarget {w x0 y0 x1 y1 tags basetag} {
 	set hx [expr $x0+(($x1-$x0)/2.0)]
 	set hy [expr $y0+(($y1-$y0)/2.0)]
 	set ticklen [expr ($x1-$x0)/10.0]
 	set tickoff_x [expr $hx-($ticklen/2.0)]
 	set tick_x [expr $hx-($ticklen/2.0)]
 	set tick_y [expr $hy-($ticklen/2.0)]
-	$w create rect $x0 $y0 $x1 $y1 -outline red -width 3 -dash - -tags $tags
-	$w create line $x0 $hy $x1 $hy -fill red -width 3 -tags $tags
-	$w create line $hx $y0 $hx $y1 -fill red -width 3 -tags $tags
+	set rtags $tags
+	set ltags $tags
+	lappend rtags ${basetag}RECT
+	lappend ltags ${basetag}LINE
+	$w create rect $x0 $y0 $x1 $y1 -outline red -width 3 -dash - -tags $rtags 
+	$w create line $x0 $hy $x1 $hy -fill red -width 3 -tags $ltags
+	$w create line $hx $y0 $hx $y1 -fill red -width 3 -tags $ltags
 	for {set i 1} {$i < 8} {incr i} {
 		if {$i==4} continue
 		set yy [expr $y0+((($y1-$y0)/8.0)*$i)]
 		set xx [expr $x0+((($x1-$x0)/8.0)*$i)]
-		$w create line $tick_x $yy [expr $tick_x+$ticklen] $yy -fill red -width 2 -tags $tags
-		$w create line $xx $tick_y $xx [expr $tick_y+$ticklen] -fill red -width 2 -tags $tags
+		$w create line $tick_x $yy [expr $tick_x+$ticklen] $yy -fill red -width 2 -tags $ltags
+		$w create line $xx $tick_y $xx [expr $tick_y+$ticklen] -fill red -width 2 -tags $ltags
 	}
 }
 
@@ -6785,7 +6923,6 @@ proc RenderSomeone {w id {norecurse false}} {
 			-fill [dict get $MOBdata($id) Color] -width 7 -tags "mob MF#$id M#$id MN#$id allMOB"
 	}
 		
-	RenderTarget $w [expr $x*$iscale] [expr $y*$iscale] [expr ($x+$mob_size)*$iscale] [expr ($y+$mob_size)*$iscale] "mob MF#$id M#$id allMOB MTARG#$id"
 	#
 	# Bind mouseover events for the token
 	#
@@ -7176,6 +7313,7 @@ proc RenderSomeone {w id {norecurse false}} {
 			RenderSomeone $w $neighbor true
 		}
 	}
+	RefreshTargets
 }
 
 # returns the MOB id associated with a map element or empty string
@@ -10107,6 +10245,7 @@ proc DoCommandIL {d} {
 		::gmaclock::set_initiative_slots .initiative.clock [dict get $d InitiativeList]
 	}
 	update_ondeck_list [dict get $d InitiativeList]
+	RefreshTargets
 }
 
 # given a creature dict, enforce the new protocol specs in a backward-compatible way
@@ -10671,6 +10810,7 @@ proc DoCommandI {d} {
  	foreach id $ITlist {
  		PopSomeoneToFront $canvas $id
  	}
+	RefreshTargets
 }
 
 proc DoCommandL {d} {
@@ -14790,6 +14930,7 @@ proc UpdatePeerList {for_user tkey} {
 
 proc SendDieRoll {recipients dice blind_p for_user tkey} {
 	global dice_preset_data
+	global ActiveTargetList
 	set d [ParseRecipientList $recipients TO ToGM $blind_p]
 	# Special case: table lookups are introduced by die-rolls that look like
 	# [title=] #tablename [...]
@@ -14814,9 +14955,9 @@ proc SendDieRoll {recipients dice blind_p for_user tkey} {
 			set flags {}
 		}
 
-		::gmaproto::roll_dice "$title [dict get $tbl dieroll] $rest" [dict get $d Recipients] [dict get $d ToAll] [dict get $d ToGM] "#$globmark$tablename;$tkey;$flags;[new_id]"
+		::gmaproto::roll_dice "$title [dict get $tbl dieroll] $rest" [dict get $d Recipients] [dict get $d ToAll] [dict get $d ToGM] "#$globmark$tablename;$tkey;$flags;[new_id]" $ActiveTargetList
 	} else {
-		::gmaproto::roll_dice $dice [dict get $d Recipients] [dict get $d ToAll] [dict get $d ToGM] [new_id]
+		::gmaproto::roll_dice $dice [dict get $d Recipients] [dict get $d ToAll] [dict get $d ToGM] [new_id] $ActiveTargetList
 	}
 }
 proc UpdateDicePresets {deflist for_user {system false}} {::gmaproto::define_dice_presets $deflist false $for_user $system}
@@ -17090,6 +17231,15 @@ proc check_aka_commit {} {
 #   								-> DieRollPresetState(<tkey>,apply_order)={g<id> ...}
 #
 #
+# RefreshTargets
+#   MOBdata(id) -> dict
+#   MOBid(mapname) -> id
+#	mob Targets {a b c}	this creature targets a, b, c
+#   
+#  In combat mode draw current actor's targets with animated color targets and arrows
+#  Always draw current player's targets with red targets and arrows
+#
+#  called when rendering somone or advancing the initiative turn or updating target attribute
 #
 # @[00]@| GMA-Mapper 4.35.1
 # @[01]@|
