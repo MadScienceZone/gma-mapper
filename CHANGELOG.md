@@ -3,8 +3,8 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.35.1          <!-- @@##@@ -->
- * Effective Date: 29-Nov-2025               <!-- @@##@@ -->
+ * This Package Version: 4.35.2-alpha.0          <!-- @@##@@ -->
+ * Effective Date: 05-Dec-2025               <!-- @@##@@ -->
 
 ## Compatibility
  * GMA Core API Library Version: 6.39 <!-- @@##@@ -->
@@ -16,6 +16,12 @@
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.35.2 (unreleased)
+## Fixes
+ * Changes "disable audio" preferences wording to "mute"
+ * Makes spell area of effect zones easier to see when they overlap each other by making them randomly shift position slightly so they'll expose underlying spells (and the visual appearance of the animated areas helps make it apparent they're not part of the static landscape as well).
+ * Corrects a bug in the die-roller modifiers which caused stored variables to be forgotten when the server refreshed the state of the preset list (e.g., when editing the presets), so that variables which had been enabled (and still showed as checked on the display) acted as though they weren't.
 
 # 4.35.1
 ## Fixes
