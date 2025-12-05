@@ -1269,7 +1269,7 @@ proc create_main_menu {use_button} {
 	}
 	bind . <Key-g>		{toggleGridEnable}
 	bind . <Key-t>		{toggleCombatTargets %x %y}
-	bind . <Shift-Key-t>	{toggleCombatSource %x %y}
+	bind . <Key-T>	{toggleCombatSource %x %y}
 	bind . <Control-Key-plus>	{global zoom; zoomInBy 2; display_message "Zoomed in to $zoom"}
 	bind . <Control-Key-minus>	{global zoom; zoomInBy 0.5; display_message "Zoomed out to $zoom"}
 	bind . <Control-Key-0>	{global zoom; resetZoom; display_message "Reset zoom to $zoom"}
@@ -1293,19 +1293,34 @@ proc mobIDsToNames {idlist} {
 	return $names
 }
 
-proc mobsAtXY {x y} {
+# mobsAtXY x y ?-noselection? -> list of all mobs under cursor and possibly also selected 
+proc mobsAtXY {x y args} {
 	global MOB_X MOB_Y canvas MOBdata
 	set MOB_X $x
 	set MOB_Y $y
-
-	set mob_list [lsort -unique -command MobNameComparison [concat [ScreenXYToMOBID $canvas $x $y] [GetSelectionList]]]
-	DEBUG 3 "DoContext mob_list $mob_list from [ScreenXYToMOBID $canvas $x $y] + [GetSelectionList]"
+	set l [ScreenXYToMOBID $canvas $x $y]
+	if {[lsearch -exact $args -noselection] < 0} {
+		lappend l {*}[GetSelectionList]
+	}
+	set mob_list [lsort -unique -command MobNameComparison $l]
+	DEBUG 3 "mobsAtXY $x $y $args -> mob_list $mob_list from $l"
 	return $mob_list
 }
 
 # somewhat misnamed but this allows you to select the source of the targeted attack
 # if you control more than one character
 proc toggleCombatSource {mousex mousey args} {
+	global canvas ActiveTargetSource
+	DEBUG 0 "tcs $mousex $mousey $args"
+	set mob_list [mobIDsToNames [mobsAtXY [expr $mousex-[winfo x $canvas]] [expr $mousey-[winfo y $canvas]] -noselection]] 
+	DEBUG 0 "$mob_list"
+	if {[llength $mob_list] > 1} {
+		tk_messageBox -type ok -icon error -title "Ambiguous Source" \
+			-message "Too many creatures under cursor ($mob_list). We can't tell which you're trying to select as the target source."
+		return
+	}
+	set ActiveTargetSource $mob_list
+	RefreshTargets
 }
 
 # somewhat mistaned but this allows you to change the target(s) of your attacks to a new
@@ -1317,6 +1332,7 @@ proc toggleCombatTargets {mousex mousey args} {
 }
 
 proc _setMyTargets {tlist} {
+	global ActiveTargetSource
 	check_aka
 	set me [my_map_names]	
 	if {[llength $me] == 0} {
@@ -1325,9 +1341,13 @@ proc _setMyTargets {tlist} {
 		return
 	}
 	if {[llength $me] > 1} {
-		tk_messageBox -type ok -icon error -title "Specify targetting character" \
-			-message "You are controlling more than one character. Before selecting your target(s), select one of your PCs (using the context menu or by pressing shift-T with the mouse over that token) to select them as the source first, then select their target(s)."
-		return
+		if {$ActiveTargetSource ne {}} {
+			set me $ActiveTargetSource
+		} else {
+			tk_messageBox -type ok -icon error -title "Specify targetting character" \
+				-message "You are controlling more than one character. Before selecting your target(s), select one of your PCs (using the context menu or by pressing shift-T with the mouse over that token) to select them as the source first, then select their target(s)."
+			return
+		}
 	}
 
 	SetObjectAttribute $me [dict create Targets $tlist]
@@ -6473,10 +6493,25 @@ proc _mob_size {id} {
 }
 
 set ActiveTargetList {}
+set ActiveTargetSource {}
 proc RefreshTargets {{current_actor {}}} {
 	DEBUG 0 "RefreshTargets $current_actor"
-	global MOBdata MOBid canvas iscale ActiveTargetList
+	global MOBdata MOBid canvas iscale ActiveTargetList ActiveTargetSource
 	set me [my_map_names]
+
+	$canvas delete SRCTARG
+	if {[catch {
+		if {$ActiveTargetSource ne {} && [info exists MOBid($ActiveTargetSource)] && [info exists MOBdata([set tid $MOBid($ActiveTargetSource)])]} {
+			DEBUG 0 "src id $tid -> [dict get $MOBdata($tid)]"
+			::gmautil::dassign [dict get $MOBdata($tid)] Gx gx Gy gy Hidden h
+			set sz [_mob_size $tid]
+			if {!$h} {
+				$canvas create rect [expr $gx*$iscale] [expr $gy*$iscale] [expr ($gx+$sz)*$iscale] [expr ($gy+$sz)*$iscale] -outline green -width 4 -tags SRCTARG -dash -
+			}
+		}
+	} err]} {
+		DEBUG 0 "Unable to draw target source: $err"
+	}
 
 	$canvas delete MYTARG
 	set ActiveTargetList {}
@@ -6583,15 +6618,15 @@ proc RenderTarget {w x0 y0 x1 y1 tags basetag} {
 	set ltags $tags
 	lappend rtags ${basetag}RECT
 	lappend ltags ${basetag}LINE
-	$w create rect $x0 $y0 $x1 $y1 -outline red -width 3 -dash - -tags $rtags 
-	$w create line $x0 $hy $x1 $hy -fill red -width 3 -tags $ltags
-	$w create line $hx $y0 $hx $y1 -fill red -width 3 -tags $ltags
+	$w create rect $x0 $y0 $x1 $y1 -outline red -width 5 -dash - -tags $rtags 
+	$w create line $x0 $hy $x1 $hy -fill red -width 4 -tags $ltags
+	$w create line $hx $y0 $hx $y1 -fill red -width 4 -tags $ltags
 	for {set i 1} {$i < 8} {incr i} {
 		if {$i==4} continue
 		set yy [expr $y0+((($y1-$y0)/8.0)*$i)]
 		set xx [expr $x0+((($x1-$x0)/8.0)*$i)]
-		$w create line $tick_x $yy [expr $tick_x+$ticklen] $yy -fill red -width 2 -tags $ltags
-		$w create line $xx $tick_y $xx [expr $tick_y+$ticklen] -fill red -width 2 -tags $ltags
+		$w create line $tick_x $yy [expr $tick_x+$ticklen] $yy -fill red -width 3 -tags $ltags
+		$w create line $xx $tick_y $xx [expr $tick_y+$ticklen] -fill red -width 3 -tags $ltags
 	}
 }
 
