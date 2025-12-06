@@ -1121,7 +1121,7 @@ proc exists {w} {
 
 }
 #
-# @[00]@| GMA-Mapper 4.35.2-alpha.0
+# @[00]@| GMA-Mapper 4.35.2-alpha.1
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2025 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
