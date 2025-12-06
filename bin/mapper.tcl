@@ -17,7 +17,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.35.2-alpha.0}     ;# @@##@@
+set GMAMapperVersion {4.35.2-alpha.1}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {421}         ;# @@##@@
 set CoreVersionNumber {6.39}            ;# @@##@@
@@ -115,6 +115,8 @@ set is_GM false
 set LastDisplayedChatDate {}
 set CombatantSelected {}
 set CreatureGridSnap nil
+set suppress_aka false
+set suppress_var false
 proc begin_progress { id title max args } {
     if {[catch {
         DEBUG 1 "begin_progress [list $id $title $max $args]"
@@ -1174,7 +1176,7 @@ proc create_main_menu {use_button} {
 	$mm.view add command -command {FindNearby} -label "Scroll to Visible Objects" -accelerator Alt-V
 	$mm.view add command -command {SyncView} -label "Scroll Others' Views to Match Mine"
 	$mm.view add checkbutton -onvalue true -offvalue false -selectcolor $check_menu_color -variable CombatantScrollEnabled -label "Scroll to Follow Combatants"
-	$mm.view add command -command {GoToGridCoords} -label "Go to Map Location..."
+	$mm.view add command -command {GoToGridCoords} -label "Go to Map Location..." -accelerator "^G"
 	$mm.view add separator
 	$mm.view add command -command {refreshScreen} -label "Refresh Display" -accelerator "^R"
 	$mm.view add separator
@@ -1185,7 +1187,7 @@ proc create_main_menu {use_button} {
 	$mm.play add checkbutton -onvalue 1 -offvalue 0 -selectcolor $check_menu_color -variable MOB_COMBATMODE -label "Combat Mode" -command setcombatfrommenu
 	$mm.play add command -command {aoetool} -label "Indicate Area of Effect" -accelerator "^A"
 	$mm.play add command -command {rulertool} -label "Measure Distance Along Line(s)" -accelerator "^D"
-	$mm.play add command -command {DisplayChatMessage {} {}} -label "Show Chat/Die-roll Window"
+	$mm.play add command -command {DisplayChatMessage {} {}} -label "Show Chat/Die-roll Window" -accelerator Alt-D
 	$mm.play add separator
 	$mm.play add cascade -menu $mm.play.delegatemenu -state disabled -label "Access Die Rolls For..."
 	$mm.play add command -command {EditDelegateList} -label "Manage Die-Roll Preset Delegates..."
@@ -1193,7 +1195,7 @@ proc create_main_menu {use_button} {
 	$mm.play add command -command EditRootDieRollPresets -label "Edit Die Roll Presets for $local_user"
 	$mm.play add command -command EditSystemDieRollPresets -label "Edit System Die Roll Presets" -state $privcmdstate
 	$mm.play add separator
-	$mm.play add command -command {display_initiative_clock} -label "Show Initiative Clock"
+	$mm.play add command -command {display_initiative_clock} -label "Show Initiative Clock" -accelerator Alt-C
 	$mm.play add separator
 	$mm.play add command -command {initiate_timer_request} -label "Request a New Timer..."
 	$mm.play add command -command {initiate_hp_request -tmp} -label "Request Temporary Hit Points..."
@@ -1210,7 +1212,7 @@ proc create_main_menu {use_button} {
 	} {
 		$mm.play.gridsnap add radiobutton -label $label -selectcolor $check_menu_color -variable CreatureGridSnap -value $value
 	}
-	$mm.play add command -command {ClearSelection} -label "Deselect All"
+	$mm.play add command -command {ClearSelection} -label "Deselect All" -accelerator "^\u21e7A"
 	$mm.play add separator
 	$mm.play add command -command {selectAKA} -label "Specify What Character You're Playing..."
 	menu $mm.tools
@@ -1236,17 +1238,22 @@ proc create_main_menu {use_button} {
 	$mm.tools.rch add command -command {ResetChatHistory 0} -label "...and load all"
 
 	menu $mm.help
-	$mm.help add command -command {aboutMapper} -label "About Mapper..."
-	$mm.help add command -command {ShowDiceSyntax} -label "Die roller syntax ..."
-	$mm.help add command -command {gma::minimarkup::ShowMarkupSyntax} -label "Text markup syntax ..."
+	$mm.help add command -command {aboutMapper} -label "About Mapper..." -accelerator F1
+	$mm.help add command -command {ShowDiceSyntax} -label "Die roller syntax ..." -accelerator ?
+	$mm.help add command -command {gma::minimarkup::ShowMarkupSyntax} -label "Text markup syntax ..." -accelerator Alt-?
 
 	#
 	# set up key bindings
 	#
+	bind . <Key-F1>		aboutMapper
+	bind . <Key-question>		ShowDiceSyntax
+	bind . <Alt-Key-question>	gma::minimarkup::ShowMarkupSyntax
 	bind . <Control-Key-o> 	{display_message "loading map file..."; loadfile {}}
 	bind . <Alt-Key-o> 	{display_message "merging map file..."; loadfile {} -merge}
 	bind . <Control-Key-s>	{display_message "saving map..."; savefile}
 	bind . <Control-Alt-Key-o> {display_message "unloading objects from file..."; unloadfile {}}
+	bind . <Alt-Key-d>	{DisplayChatMessage {} {}}
+	bind . <Alt-Key-c>	display_initiative_clock
 	bind . <Alt-Key-n>	{playtool; display_message "Selected normal play mode"}
 	bind . <Alt-Key-l>	{linetool; display_message "Selected line tool \[Alt-1 arrows, ALt-3 dashes\]"}
 	bind . <Alt-Key-r>	{recttool; display_message "Selected rectangle tool \[Alt-3 dashes\]"}
@@ -1256,7 +1263,9 @@ proc create_main_menu {use_button} {
 	bind . <Alt-Key-t>	{texttool; display_message "Selected text tool \[Alt-1 font, Alt-2 anchor\]"}
 	bind . <Alt-Key-x>	{killtool; display_message "Selected kill tool"}
 	bind . <Alt-Key-m>	{movetool; display_message "Selected move tool"}
+	bind . <Control-Key-g>	GoToGridCoords
 	bind . <Alt-Key-s>	{stamptool; display_message "Selected stamp tool"}
+	bind . <Control-Shift-Key-A>	{ClearSelection; display_message "Selection cleared"}
 	bind . <Control-Key-t>	{
 		global ForceElementsToTop 
 		if {$ForceElementsToTop} {
@@ -16880,8 +16889,6 @@ proc EncodePresetDetails {p} {
 
 
 # verify that we know who we are on the map and prompt the user to let us know if not.
-set suppress_aka false
-set suppress_var false
 proc selectAKA {} {
 	global local_user local_aka PeerList PC_IDs MOBid suppress_aka check_aka_vars suppress_var
 
@@ -17032,7 +17039,7 @@ proc check_aka_commit {} {
 #
 #
 #
-# @[00]@| GMA-Mapper 4.35.2-alpha.0
+# @[00]@| GMA-Mapper 4.35.2-alpha.1
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2025 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

@@ -3,7 +3,7 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.35.2-alpha.0          <!-- @@##@@ -->
+ * This Package Version: 4.35.2-alpha.1          <!-- @@##@@ -->
  * Effective Date: 05-Dec-2025               <!-- @@##@@ -->
 
 ## Compatibility
@@ -22,6 +22,8 @@ versions.
  * Changes "disable audio" preferences wording to "mute"
  * Makes spell area of effect zones easier to see when they overlap each other by making them randomly shift position slightly so they'll expose underlying spells (and the visual appearance of the animated areas helps make it apparent they're not part of the static landscape as well).
  * Corrects a bug in the die-roller modifiers which caused stored variables to be forgotten when the server refreshed the state of the preset list (e.g., when editing the presets), so that variables which had been enabled (and still showed as checked on the display) acted as though they weren't.
+ * Adds keybindings to more menu items.
+ * Fixes error with prompting for which characters you control.
 
 # 4.35.1
 ## Fixes
