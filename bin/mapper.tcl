@@ -10425,9 +10425,10 @@ proc DoCommandCLR@ {d} {
 
 # PeerList now includes AKA attribute
 proc DoCommandCONN {d} {
-	global local_user PeerList local_aka PeerAKA
+	global local_user PeerList local_aka PeerAKA PeerNotPlaying
 	set PeerList {}
 	array unset PeerAKA
+	array unset PeerNotPlaying
 
 	foreach peer [dict get $d PeerList] {
 		::gmautil::dassign $peer User peer_user
@@ -10443,6 +10444,7 @@ proc DoCommandCONN {d} {
 					lappend PeerList $peer_user
 					if {[dict exists $peer AKA]} {
 						set PeerAKA($peer_user) [dict get $peer AKA]
+						set PeerNotPlaying($peer_user) [dict get $peer NotPlaying]
 					}
 					DEBUG 3 "Peerlist=$PeerList"
 				} else {
@@ -10465,9 +10467,9 @@ proc DoCommandCONN {d} {
 }
 
 proc DoCommandAKA {d} {
-	global PeerList local_aka local_user PeerAKA
+	global PeerList local_aka local_user PeerAKA PeerNotPlaying
 
-	::gmautil::dassigndef $d Names {names {}} User {user {}}
+	::gmautil::dassigndef $d Names {names {}} User {user {}} NotPlaying {notplaying false}
 	if {$user eq {}} {
 		return
 	}
@@ -10476,6 +10478,7 @@ proc DoCommandAKA {d} {
 		set local_aka $names
 	} else {
 		set PeerAKA($user) $names
+		set PeerNotPlaying($user) $notplaying
 	}
 }
 
@@ -16105,16 +16108,20 @@ proc ihr_build_target_list {parent} {
 }
 
 proc itr_build_target_list {parent} {
-	global global_bg_color PeerList local_user PeerAKA PC_IDs MOBid target_names
+	global global_bg_color PeerList local_user PeerAKA PC_IDs MOBid target_names PeerNotPlaying
 
 	foreach peer $PeerList {
+		if {[info exists PeerNotPlaying($peer)] && $PeerNotPlaying($peer)} {
+			continue
+		}
 		if {[info exists PeerAKA($peer)]} {
 			lappend users {*}$PeerAKA($peer)
 		} elseif {[info exists PC_IDs($peer)] || [info exists MOBid($peer)]} {
 			lappend users $peer
 		}
 	}
-	lappend users {*}[my_map_names]
+	lappend users {*}[my_map_names]			; # always include all my aliases/login name
+	lappend users {*}[array names PC_IDs]		; # and all defined party members even if not logged in now
 
 	set w ${parent}_t
 	catch {destroy $w}
