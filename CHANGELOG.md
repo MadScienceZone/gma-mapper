@@ -3,8 +3,8 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.35.2-alpha.1          <!-- @@##@@ -->
- * Effective Date: 05-Dec-2025               <!-- @@##@@ -->
+ * This Package Version: 4.35.2-alpha.2          <!-- @@##@@ -->
+ * Effective Date: 08-Dec-2025               <!-- @@##@@ -->
 
 ## Compatibility
  * GMA Core API Library Version: 6.39 <!-- @@##@@ -->
@@ -24,6 +24,8 @@ versions.
  * Corrects a bug in the die-roller modifiers which caused stored variables to be forgotten when the server refreshed the state of the preset list (e.g., when editing the presets), so that variables which had been enabled (and still showed as checked on the display) acted as though they weren't.
  * Adds keybindings to more menu items.
  * Fixes error with prompting for which characters you control.
+ * Explicitly allows user to specify they're not playing a character via `--not-playing` option and preferences option, and checkbox when prompted.
+ * Fixes behavior of AKA dialogs.
 
 # 4.35.1
 ## Fixes

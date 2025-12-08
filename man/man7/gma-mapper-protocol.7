@@ -1,7 +1,7 @@
 '\" t
 '\" *** 421 ***
 '\" <<ital-is-var>>
-.TH GMA-MAPPER-PROTOCOL 7 "GMA-Mapper 4.35.2-alpha.1" 05-Dec-2025 "Protocols" \" @@mp@@
+.TH GMA-MAPPER-PROTOCOL 7 "GMA-Mapper 4.35.2-alpha.2" 08-Dec-2025 "Protocols" \" @@mp@@
 .SH NAME
 gma-mapper-protocol \- GMA client/server protocol specification
 .SH EXPERIMENTAL
@@ -765,6 +765,22 @@ The JSON payload has the following fields:
 '\" <</ital-is-var>>
 .BI Names " (list of strings)"
 The names of the creatures this player is controlling.
+.RS
+.LP
+Note that the default assumption that the player's character matches their login
+name is in effect if no
+.B AKA
+message is ever received. Once an
+.B AKA
+message arrives, the client takes the
+.B Names
+value as the list of all characters being controlled by this user. If that will
+be the login name, it needs to be explicitly included in the
+.B Names
+list. If the list is empty, that means this user is not playing
+any characters at all. This will remove the username from dialogs and
+other UI elements which list character names to choose from.
+.RE
 .TP
 .B User
 The login name for the user's session. This field is not normally supplied

@@ -11,7 +11,7 @@
 ########################################################################################
 # Profile editor
 
-package provide gmaprofile 1.6
+package provide gmaprofile 1.6.1
 package require gmacolors
 package require json 1.3.3
 package require json::write 1.0.3
@@ -28,7 +28,7 @@ namespace eval ::gmaprofile {
 	variable font_repository
 	variable _default_color_table
 	variable minimum_file_version 1
-	variable maximum_file_version 11
+	variable maximum_file_version 12
 	array set _default_color_table {
 		fg,light           #000000
 		normal_fg,light    #000000
@@ -101,6 +101,7 @@ namespace eval ::gmaprofile {
 		no_ondeck_audio ?
 		no_sfx ?
 		suppress_aka ?
+		not_playing ?
 		guide_lines {o {
 			major {o {
 				interval i
@@ -327,6 +328,7 @@ namespace eval ::gmaprofile {
 			show_timers  mine\
 			styles       [default_styles]\
 			suppress_aka false\
+			not_playing  false\
 			no_dice      false\
 			no_ondeck_audio false\
 			no_sfx false \
@@ -537,7 +539,7 @@ namespace eval ::gmaprofile {
 
 		json::write indented true
 		json::write aligned true
-		dict set data GMA_Mapper_preferences_version 10
+		dict set data GMA_Mapper_preferences_version 12
 		set f [open $filename w]
 		puts $f [::gmaproto::_encode_payload $data $_file_format]
 		close $f
@@ -608,7 +610,7 @@ namespace eval ::gmaprofile {
 		global imgtext debug_level debug_proto curl_path curl_insecure profiles menu_button never_animate
 		global major_interval major_offset_x major_offset_y
 		global minor_interval minor_offset_x minor_offset_y flash_updates
-		global chat_timestamp prf_suppress_aka prf_no_dice prf_no_ondeck_audio prf_no_sfx
+		global chat_timestamp prf_suppress_aka not_playing prf_no_dice prf_no_ondeck_audio prf_no_sfx
 		variable _profile
 
 		set _profile [dict replace $_profile \
@@ -644,6 +646,7 @@ namespace eval ::gmaprofile {
 			menu_button $menu_button\
 			never_animate $never_animate\
 			suppress_aka $prf_suppress_aka\
+			not_playing $not_playing\
 			no_dice $prf_no_dice\
 			no_ondeck_audio $prf_no_ondeck_audio\
 			no_sfx $prf_no_sfx \
@@ -801,7 +804,7 @@ namespace eval ::gmaprofile {
 		global major_interval major_offset_x major_offset_y
 		global minor_interval minor_offset_x minor_offset_y flash_updates
 		global s_hostname s_port s_user s_pass s_blur_hp
-		global prf_no_dice prf_suppress_aka prf_no_ondeck_audio prf_no_sfx
+		global prf_no_dice prf_suppress_aka prf_no_ondeck_audio prf_no_sfx not_playing im_not_playing
 		variable _profile
 		variable _profile_backup
 		variable currently_editing_index
@@ -834,6 +837,7 @@ namespace eval ::gmaprofile {
 			scaling scaling \
 			show_timers show_timers \
 			suppress_aka prf_suppress_aka \
+			not_playing not_playing\
 			no_dice prf_no_dice\
 			no_ondeck_audio prf_no_ondeck_audio\
 			no_sfx prf_no_sfx
@@ -854,6 +858,7 @@ namespace eval ::gmaprofile {
 		set prf_no_ondeck_audio [::gmaproto::int_bool $prf_no_ondeck_audio]
 		set prf_no_sfx [::gmaproto::int_bool $prf_no_sfx]
 		set prf_suppress_aka [::gmaproto::int_bool $prf_suppress_aka]
+		set not_playing [::gmaproto::int_bool $not_playing]
 
 		set guides [dict merge [dict create \
 			major [dict create \
@@ -1166,6 +1171,7 @@ namespace eval ::gmaprofile {
 		grid [ttk::label $w.n.a.title3 -text "PLAYER OPTIONS" -anchor center -foreground $sep_fg -background $sep_bg] - - - - - - -sticky we -pady 5
 		grid [ttk::checkbutton $w.n.a.nodice -text "Disable die rolling (die roller will be read-only)" -variable prf_no_dice] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.noaka -text "Never ask me what characters I'm playing" -variable prf_suppress_aka] - - - - - - -sticky w
+		grid [ttk::checkbutton $w.n.a.noply -text "I'm not playing any character from this username" -variable not_playing] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.nooda -text "Mute audio cues for ondeck and my turns" -variable prf_no_ondeck_audio] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.nosfx -text "Mute audio sound effects for game play" -variable prf_no_sfx -state disabled] - - - - - - -sticky w
 
