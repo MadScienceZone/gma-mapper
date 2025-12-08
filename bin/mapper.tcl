@@ -6548,8 +6548,9 @@ proc RefreshTargets {{current_actor {}}} {
 	}
 
 	$canvas delete MATARG
+	global MOB_COMBATMODE
 	set start false
-	if {$current_actor ne {} && [info exists MOBid($current_actor)] && [info exists MOBdata([set tid $MOBid($current_actor)])] && [dict exists [set d $MOBdata($tid)] Targets]} {
+	if {$MOB_COMBATMODE && $current_actor ne {} && [info exists MOBid($current_actor)] && [info exists MOBdata([set tid $MOBid($current_actor)])] && [dict exists [set d $MOBdata($tid)] Targets]} {
 	    if {[catch {
 		::gmautil::dassign $d Gx agx Gy agy Hidden ahidden
 		if {$ahidden} continue
