@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       ______   _______      __         #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \ (  ____ \    /  \        #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \| (    \/    \/) )       #
-# | |      | || || || (___) | Assistant  / (_) (_       ___) /| (____        | |       #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( (_____ \       | |       #
-# | | \_  )| |   | || (   ) |                ) (           ) \      ) )      | |       #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  //\____) ) _  __) (_      #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/ \______/ (_) \____/      #
+#  _______  _______  _______                ___       ______   _______     _______     #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \ (  ____ \   / ___   )    #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \| (    \/   \/   )  |    #
+# | |      | || || || (___) | Assistant  / (_) (_       ___) /| (____         /   ) __ #
+# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( (_____ \      _/   / (__ #
+# | | \_  )| |   | || (   ) |                ) (           ) \      ) )    /   _/      #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  //\____) ) _ (   (__/\    #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/ \______/ (_)\_______/    #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -17,7 +17,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.35.1}     ;# @@##@@
+set GMAMapperVersion {4.35.2-alpha.2}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {421}         ;# @@##@@
 set CoreVersionNumber {6.39}            ;# @@##@@
@@ -115,6 +115,9 @@ set is_GM false
 set LastDisplayedChatDate {}
 set CombatantSelected {}
 set CreatureGridSnap nil
+set suppress_aka false
+set suppress_var false
+set im_not_playing false
 proc begin_progress { id title max args } {
     if {[catch {
         DEBUG 1 "begin_progress [list $id $title $max $args]"
@@ -152,8 +155,12 @@ proc begin_progress { id title max args } {
 
 # return the list of names this player is controlling, or {} if we don't know.
 proc my_map_names {} {
-	global local_user local_aka PC_IDs MOBid
+	global local_user local_aka PC_IDs MOBid im_not_playing
 	
+	if {$im_not_playing} {
+		return {}
+	}
+
 	if {$local_aka ne {}} {
 		return $local_aka
 	}
@@ -1174,7 +1181,7 @@ proc create_main_menu {use_button} {
 	$mm.view add command -command {FindNearby} -label "Scroll to Visible Objects" -accelerator Alt-V
 	$mm.view add command -command {SyncView} -label "Scroll Others' Views to Match Mine"
 	$mm.view add checkbutton -onvalue true -offvalue false -selectcolor $check_menu_color -variable CombatantScrollEnabled -label "Scroll to Follow Combatants"
-	$mm.view add command -command {GoToGridCoords} -label "Go to Map Location..."
+	$mm.view add command -command {GoToGridCoords} -label "Go to Map Location..." -accelerator "^G"
 	$mm.view add separator
 	$mm.view add command -command {refreshScreen} -label "Refresh Display" -accelerator "^R"
 	$mm.view add separator
@@ -1185,7 +1192,7 @@ proc create_main_menu {use_button} {
 	$mm.play add checkbutton -onvalue 1 -offvalue 0 -selectcolor $check_menu_color -variable MOB_COMBATMODE -label "Combat Mode" -command setcombatfrommenu
 	$mm.play add command -command {aoetool} -label "Indicate Area of Effect" -accelerator "^A"
 	$mm.play add command -command {rulertool} -label "Measure Distance Along Line(s)" -accelerator "^D"
-	$mm.play add command -command {DisplayChatMessage {} {}} -label "Show Chat/Die-roll Window"
+	$mm.play add command -command {DisplayChatMessage {} {}} -label "Show Chat/Die-roll Window" -accelerator Alt-D
 	$mm.play add separator
 	$mm.play add cascade -menu $mm.play.delegatemenu -state disabled -label "Access Die Rolls For..."
 	$mm.play add command -command {EditDelegateList} -label "Manage Die-Roll Preset Delegates..."
@@ -1193,7 +1200,7 @@ proc create_main_menu {use_button} {
 	$mm.play add command -command EditRootDieRollPresets -label "Edit Die Roll Presets for $local_user"
 	$mm.play add command -command EditSystemDieRollPresets -label "Edit System Die Roll Presets" -state $privcmdstate
 	$mm.play add separator
-	$mm.play add command -command {display_initiative_clock} -label "Show Initiative Clock"
+	$mm.play add command -command {display_initiative_clock} -label "Show Initiative Clock" -accelerator Alt-C
 	$mm.play add separator
 	$mm.play add command -command {initiate_timer_request} -label "Request a New Timer..."
 	$mm.play add command -command {initiate_hp_request -tmp} -label "Request Temporary Hit Points..."
@@ -1210,7 +1217,7 @@ proc create_main_menu {use_button} {
 	} {
 		$mm.play.gridsnap add radiobutton -label $label -selectcolor $check_menu_color -variable CreatureGridSnap -value $value
 	}
-	$mm.play add command -command {ClearSelection} -label "Deselect All"
+	$mm.play add command -command {ClearSelection} -label "Deselect All" -accelerator "^\u21e7A"
 	$mm.play add separator
 	$mm.play add command -command {selectAKA} -label "Specify What Character You're Playing..."
 	menu $mm.tools
@@ -1236,17 +1243,22 @@ proc create_main_menu {use_button} {
 	$mm.tools.rch add command -command {ResetChatHistory 0} -label "...and load all"
 
 	menu $mm.help
-	$mm.help add command -command {aboutMapper} -label "About Mapper..."
-	$mm.help add command -command {ShowDiceSyntax} -label "Die roller syntax ..."
-	$mm.help add command -command {gma::minimarkup::ShowMarkupSyntax} -label "Text markup syntax ..."
+	$mm.help add command -command {aboutMapper} -label "About Mapper..." -accelerator F1
+	$mm.help add command -command {ShowDiceSyntax} -label "Die roller syntax ..." -accelerator ?
+	$mm.help add command -command {gma::minimarkup::ShowMarkupSyntax} -label "Text markup syntax ..." -accelerator Alt-?
 
 	#
 	# set up key bindings
 	#
+	bind . <Key-F1>		aboutMapper
+	bind . <Key-question>		ShowDiceSyntax
+	bind . <Alt-Key-question>	gma::minimarkup::ShowMarkupSyntax
 	bind . <Control-Key-o> 	{display_message "loading map file..."; loadfile {}}
 	bind . <Alt-Key-o> 	{display_message "merging map file..."; loadfile {} -merge}
 	bind . <Control-Key-s>	{display_message "saving map..."; savefile}
 	bind . <Control-Alt-Key-o> {display_message "unloading objects from file..."; unloadfile {}}
+	bind . <Alt-Key-d>	{DisplayChatMessage {} {}}
+	bind . <Alt-Key-c>	display_initiative_clock
 	bind . <Alt-Key-n>	{playtool; display_message "Selected normal play mode"}
 	bind . <Alt-Key-l>	{linetool; display_message "Selected line tool \[Alt-1 arrows, ALt-3 dashes\]"}
 	bind . <Alt-Key-r>	{recttool; display_message "Selected rectangle tool \[Alt-3 dashes\]"}
@@ -1256,7 +1268,9 @@ proc create_main_menu {use_button} {
 	bind . <Alt-Key-t>	{texttool; display_message "Selected text tool \[Alt-1 font, Alt-2 anchor\]"}
 	bind . <Alt-Key-x>	{killtool; display_message "Selected kill tool"}
 	bind . <Alt-Key-m>	{movetool; display_message "Selected move tool"}
+	bind . <Control-Key-g>	GoToGridCoords
 	bind . <Alt-Key-s>	{stamptool; display_message "Selected stamp tool"}
+	bind . <Control-Shift-Key-A>	{ClearSelection; display_message "Selection cleared"}
 	bind . <Control-Key-t>	{
 		global ForceElementsToTop 
 		if {$ForceElementsToTop} {
@@ -1608,6 +1622,7 @@ proc ApplyPreferences {data args} {
 	global OptPreload ButtonSize ChatHistoryLimit CURLpath CURLserver
 	global CURLproxy SCPproxy SERVER_MKDIRpath NCpath SCPpath SCPdest SCPserver
 	global SSHpath UpdateURL CurrentProfileName _preferences CURLinsecure suppress_aka no_dice no_ondeck_audio
+	global im_not_playing
 
 	set _preferences $data
 	set majox 0
@@ -1644,7 +1659,8 @@ proc ApplyPreferences {data args} {
 		current_profile cprof \
 		no_dice      prf_no_dice \
 		no_ondeck_audio prf_no_ondeck_audio\
-		suppress_aka prf_suppress_aka
+		suppress_aka prf_suppress_aka\
+		not_playing  not_playing
 
 	if {[lsearch -exact $args -override] < 0} {
 		set CurrentProfileName $cprof
@@ -1653,6 +1669,10 @@ proc ApplyPreferences {data args} {
 	#suppress aka prompts and die rolling based on prefs but don't override command-line option if one was given
 	if {$prf_suppress_aka} {
 		set suppress_aka true
+	}
+
+	if {$not_playing} {
+		set im_not_playing true
 	}
 
 	if {$prf_no_dice} {
@@ -1808,60 +1828,62 @@ proc usage {} {
 	global stderr
 	global ChatHistoryLimit
 
-	puts $stderr "This is mapper, version $GMAMapperVersion"
-	puts $stderr "Usage: $argv0 \[-display name\] \[-geometry value\] \[other wish options...\] -- \[--help]"
-	puts $stderr {        [-A] [-a] [-B] [-b pct] [-C file] [-D] [-d] [-f fmt]}
-	puts $stderr {        [-G n[+x[:y]]] [-g n[+x[:y]]] [-h hostname] [-k] [-l] [-M moduleID]}
-	puts $stderr {        [-n] [-P pass] [-p port] [-S profile] [-t transcriptfile] [-u name]}
-	puts $stderr {        [-x proxyurl] [-X proxyhost] [--button-size size] [--chat-history n]}
-	puts $stderr {        [--curl-path path] [--curl-url-base url] [--dark] [--debug-protocol]}
-	puts $stderr {        [--mkdir-path path] [--nc-path path] [--no-animate] [--no-blur-all]}
-	puts $stderr {        [--preferences path] [--scp-dest dir]}
-	puts $stderr {        [--scp-path path] [--scp-server hostname] [--ssh-path path] [--update-url url]}
-	puts $stderr {        [--recursionlimit n]}
-	puts $stderr {Each option and its argument must appear in separate CLI parameters (words).}
-	puts $stderr {   -A, --animate:     Enable animation of drawing onto the map}
-	puts $stderr {   -a, --no-animate:  Suppress animation of drawing onto the map}
-	puts $stderr {   -B, --blur-all:    Apply --blur-hp to all creatures, not just monsters}
-	puts $stderr {       --no-blur-all: Cancel the effect of --blur-all [default]}
-	puts $stderr {   -b, --blur-hp:     Change imprecision factor for health bar displays (0 for full precision) [0]}
-	puts $stderr {       --button-size: Set button size to "small" (default), "medium", or "large"}
-	puts $stderr {   -C, --config:      Read options from specified file (subsequent options further modify)}
-	puts $stderr {   -d, --dark:        Adjust colors for dark mode}
-	puts $stderr {   -D, --debug:       Increase debug output level}
-	puts $stderr {       --debug-protocol: Show a transcript of network I/O data in debug window}
-	puts $stderr {   -f, --image-format: Image format for map graphics (png or gif)}
-	puts $stderr {   -G, --major:       Set major grid guidlines every n (offset by x and/or y)}
-	puts $stderr {   -g, --guide:       Set minor grid guidlines every n (offset by x and/or y)}
-	puts $stderr {       --help:        Print this information and exit}
-	puts $stderr {   -h, --host:        Hostname for initiative tracker [none]}
-	puts $stderr {   -k, --keep-tools:  Don't allow remote disabling of the toolbar}
-	puts $stderr {   -L, --list-profiles: Print available profiles you can use with --select}
-	puts $stderr {   -l, --preload:     Load all cached images at startup}
-	puts $stderr {   -M, --module:      Set module ID (SaF GM role only)}
-	puts $stderr {       --no-char:     	Disable prompts for what character you're playing}
-	puts $stderr {   -n, --no-chat:		Do not display incoming chat messages}
-	puts $stderr {       --no-dice:     	Disable die rolling (die roller will be read-only)}
-	puts $stderr {   -P, --password:    Password to log in to the map service}
-	puts $stderr {   -p, --port:        Port for initiative tracker [2323]}
-	puts $stderr {       --recursionlimit: set runtime recursion limit}
-	puts $stderr {   -S, --select:      Select server profile (but don't make it the default)}
-	puts $stderr {   -t, --transcript:  Specify file to record a transcript of chat messages and die rolls.}
-	puts $stderr {   -u, --username:    Set the name you go by on your game server}
-	puts $stderr {   -x, --proxy-url:   Proxy url for retrieving image data (usually like -x http://proxy.example.com:8080)}
-	puts $stderr {   -X, --proxy-host:  SOCKS 5 proxy host and port for SSH/SCP (usually like -X proxy.example.com:8080)}
-	global CURLpath CURLserver SCPpath SSHpath SCPdest SCPserver NCpath SERVER_MKDIRpath
-	puts $stderr "   --chat-history:   number of chat messages to retain between sessions \[$ChatHistoryLimit\]"
-	puts $stderr "   --curl-path:      pathname of curl command to invoke \[$CURLpath\]"
-	puts $stderr "   --curl-url-base:  base URL for stored data \[$CURLserver\]"
-	puts $stderr "   --mkdir-path:     pathname of server-side mkdir command \[$SERVER_MKDIRpath\]"
-	puts $stderr "   --nc-path:        pathname of nc command to invoke \[$NCpath\]"
-	puts $stderr "   --preferences:    pathname of alternative preferences.json file (may NOT be in a config file)"
-	puts $stderr "   --scp-dest:       server-side top-level storage directory \[$SCPdest\]"
-	puts $stderr "   --scp-path:       pathname of scp command to invoke \[$SCPpath\]"
-	puts $stderr "   --scp-server:     storage server hostname \[$SCPserver\]"
-	puts $stderr "   --ssh-path:       pathname of ssh command to invoke \[$SSHpath\]"
-	puts $stderr "   --update-url:     base URL to automatically download software updates from."
+        puts $stderr "This is mapper, version $GMAMapperVersion"
+        puts $stderr "Usage: $argv0 \[-display name\] \[-geometry value\] \[other wish options...\] -- \[--help]"
+        puts $stderr {        [-A] [-a] [-B] [-b pct] [-C file] [-D] [-d] [-f fmt]}
+        puts $stderr {        [-G n[+x[:y]]] [-g n[+x[:y]]] [-h hostname] [-k] [-l] [-M moduleID]}
+        puts $stderr {        [-n] [-P pass] [-p port] [-S profile] [-t transcriptfile] [-u name]}
+        puts $stderr {        [-x proxyurl] [-X proxyhost] [--button-size size] [--chat-history n]}
+        puts $stderr {        [--curl-path path] [--curl-url-base url] [--dark] [--debug-protocol]}
+        puts $stderr {        [--mkdir-path path] [--nc-path path] [--no-animate] [--no-blur-all]}
+	puts $stderr {        [--no-char] [--no-chat] [--no-dice] [--not-playing]}
+        puts $stderr {        [--preferences path] [--scp-dest dir]}
+        puts $stderr {        [--scp-path path] [--scp-server hostname] [--ssh-path path] [--update-url url]}
+        puts $stderr {        [--recursionlimit n]}
+        puts $stderr {Each option and its argument must appear in separate CLI parameters (words).}
+        puts $stderr {   -A, --animate:        Enable animation of drawing onto the map}
+        puts $stderr {   -a, --no-animate:     Suppress animation of drawing onto the map}
+        puts $stderr {   -B, --blur-all:       Apply --blur-hp to all creatures, not just monsters}
+        puts $stderr {       --no-blur-all:    Cancel the effect of --blur-all [default]}
+        puts $stderr {   -b, --blur-hp:        Change imprecision factor for health bar displays (0 for full precision) [0]}
+        puts $stderr {       --button-size:    Set button size to "small" (default), "medium", or "large"}
+        puts $stderr {   -C, --config:         Read options from specified file (subsequent options further modify)}
+        puts $stderr {   -d, --dark:           Adjust colors for dark mode}
+        puts $stderr {   -D, --debug:          Increase debug output level}
+        puts $stderr {       --debug-protocol: Show a transcript of network I/O data in debug window}
+        puts $stderr {   -f, --image-format:   Image format for map graphics (png or gif)}
+        puts $stderr {   -G, --major:          Set major grid guidlines every n (offset by x and/or y)}
+        puts $stderr {   -g, --guide:          Set minor grid guidlines every n (offset by x and/or y)}
+        puts $stderr {       --help:           Print this information and exit}
+        puts $stderr {   -h, --host:           Hostname for initiative tracker [none]}
+        puts $stderr {   -k, --keep-tools:     Don't allow remote disabling of the toolbar}
+        puts $stderr {   -L, --list-profiles:  Print available profiles you can use with --select}
+        puts $stderr {   -l, --preload:        Load all cached images at startup}
+        puts $stderr {   -M, --module:         Set module ID (SaF GM role only)}
+        puts $stderr {       --no-char:        Disable prompts for what character you're playing}
+        puts $stderr {   -n, --no-chat:        Do not display incoming chat messages}
+        puts $stderr {       --no-dice:        Disable die rolling (die roller will be read-only)}
+        puts $stderr {       --not-playing:    Not actually playing any character from this username}
+        puts $stderr {   -P, --password:       Password to log in to the map service}
+        puts $stderr {   -p, --port:           Port for initiative tracker [2323]}
+        puts $stderr {       --recursionlimit: set runtime recursion limit}
+        puts $stderr {   -S, --select:         Select server profile (but don't make it the default)}
+        puts $stderr {   -t, --transcript:     Specify file to record a transcript of chat messages and die rolls.}
+        puts $stderr {   -u, --username:       Set the name you go by on your game server}
+        puts $stderr {   -x, --proxy-url:      Proxy url for retrieving image data (usually like -x http://proxy.example.com:8080)}
+        puts $stderr {   -X, --proxy-host:     SOCKS 5 proxy host and port for SSH/SCP (usually like -X proxy.example.com:8080)}
+        global CURLpath CURLserver SCPpath SSHpath SCPdest SCPserver NCpath SERVER_MKDIRpath
+        puts $stderr "   --chat-history:      number of chat messages to retain between sessions \[$ChatHistoryLimit\]"
+        puts $stderr "   --curl-path:         pathname of curl command to invoke \[$CURLpath\]"
+        puts $stderr "   --curl-url-base:     base URL for stored data \[$CURLserver\]"
+        puts $stderr "   --mkdir-path:        pathname of server-side mkdir command \[$SERVER_MKDIRpath\]"
+        puts $stderr "   --nc-path:           pathname of nc command to invoke \[$NCpath\]"
+        puts $stderr "   --preferences:       pathname of alternative preferences.json file (may NOT be in a config file)"
+        puts $stderr "   --scp-dest:          server-side top-level storage directory \[$SCPdest\]"
+        puts $stderr "   --scp-path:          pathname of scp command to invoke \[$SCPpath\]"
+        puts $stderr "   --scp-server:        storage server hostname \[$SCPserver\]"
+        puts $stderr "   --ssh-path:          pathname of ssh command to invoke \[$SSHpath\]"
+        puts $stderr "   --update-url:        base URL to automatically download software updates from."
 	exit 1
 }
 
@@ -1977,6 +1999,7 @@ for {set argi 0} {$argi < $optc} {incr argi} {
 		--no-dice         { set no_dice true }
 		--no-char         { set suppress_aka true }
 		--no-ondeck-audio { set no_ondeck_audio true }
+		--not-playing     { set im_not_playing true }
 		-S - --select     { 
 			set CurrentProfileName [getarg -S]
 			ApplyPreferences $PreferencesData -override
@@ -2684,7 +2707,12 @@ set ondeck_slotlist {}
 set ondeck_current -1
 proc set_ondeck {place} {
 	#DEBUG 1 "set_ondeck $place"
-	global ondeck_bg SoundObj no_ondeck_audio
+	global ondeck_bg SoundObj no_ondeck_audio MOB_COMBATMODE
+	if {!$MOB_COMBATMODE} {
+		.toolbar2.ondeck configure -fg $ondeck_bg -text ""
+		return
+	}
+
 	switch $place {
 		0 {.toolbar2.ondeck configure -fg white -bg green -text "YOUR TURN"}
 		1 {.toolbar2.ondeck configure -fg white -bg red   -text "ON DECK"}
@@ -3179,6 +3207,7 @@ proc setCombatMode {mode} {
 #	global MobTurnID
 #	set MobTurnID 0
 	RefreshMOBs
+	ondeck_calc
 }
 
 #
@@ -10660,9 +10689,10 @@ proc DoCommandCLR@ {d} {
 
 # PeerList now includes AKA attribute
 proc DoCommandCONN {d} {
-	global local_user PeerList local_aka PeerAKA
+	global local_user PeerList local_aka PeerAKA PeerNotPlaying
 	set PeerList {}
 	array unset PeerAKA
+	array unset PeerNotPlaying
 
 	foreach peer [dict get $d PeerList] {
 		::gmautil::dassign $peer User peer_user
@@ -10678,6 +10708,7 @@ proc DoCommandCONN {d} {
 					lappend PeerList $peer_user
 					if {[dict exists $peer AKA]} {
 						set PeerAKA($peer_user) [dict get $peer AKA]
+						set PeerNotPlaying($peer_user) [dict get $peer NotPlaying]
 					}
 					DEBUG 3 "Peerlist=$PeerList"
 				} else {
@@ -10700,9 +10731,9 @@ proc DoCommandCONN {d} {
 }
 
 proc DoCommandAKA {d} {
-	global PeerList local_aka local_user PeerAKA
+	global PeerList local_aka local_user PeerAKA PeerNotPlaying
 
-	::gmautil::dassigndef $d Names {names {}} User {user {}}
+	::gmautil::dassigndef $d Names {names {}} User {user {}} NotPlaying {notplaying false}
 	if {$user eq {}} {
 		return
 	}
@@ -10711,6 +10742,7 @@ proc DoCommandAKA {d} {
 		set local_aka $names
 	} else {
 		set PeerAKA($user) $names
+		set PeerNotPlaying($user) $notplaying
 	}
 }
 
@@ -12114,31 +12146,41 @@ proc _render_die_roller {w width height type for_user tkey args} {
 					if {$scope eq "g"} {
 						pack [ttk::checkbutton $wpi.enabled -variable dice_preset_data(en,$tkey,$piname) \
 							-command [list DRPScheckVarEn "en,$tkey,$piname" g$id $for_user $tkey u]\
+							-onvalue true -offvalue false\
 							-text "\[system\] $t"] -side left
 						# ^^hack
 					} {
 						pack [ttk::checkbutton $wpi.enabled -variable dice_preset_data(en,$tkey,$piname) \
 							-command [list DRPScheckVarEn "en,$tkey,$piname" u$id $for_user $tkey $scope]\
+							-onvalue true -offvalue false\
 							-text $t] -side left
 					}
+					if {![info exists dice_preset_data(en,$tkey,$piname)]} {
+						set dice_preset_data(en,$tkey,$piname) [::gmaproto::json_bool [dict get $preset Enabled]]
+						#DEBUG 0 "QQ init en,$tkey,$piname=$dice_preset_data(en,$tkey,$piname)"
+					} 
 				} else {
 					if {$scope eq "g"} {
-						pack [ttk::checkbutton $wpi.enabled -variable dice_preset_data(en,$tkey,$piname) \
-							-command [list DRPScheckVarEn "en,$tkey,$piname" $id $for_user $tkey $scope]\
+						pack [ttk::checkbutton $wpi.enabled -variable dice_preset_data(sys,gvar_on,$id) \
+							-command [list DRPScheckVarEn "sys,gvar_on,$id" $id $for_user $tkey $scope]\
 							-text "\[system\] [dict get $preset DisplayName] (as \$\$\{$id\}): [dict get $preset DieRollSpec]"\
+							-onvalue true -offvalue false\
 						] -side left
+						if {![info exists dice_preset_data(sys,gvar_on,$id)]} {
+							set dice_preset_data(sys,gvar_on,$id) [::gmaproto::json_bool [dict get $preset Enabled]]
+							#DEBUG 0 "QQ init sys,gvar_on,$id=$dice_preset_data(sys,gvar_on,$id)"
+						} 
 					} {
-						pack [ttk::checkbutton $wpi.enabled -variable dice_preset_data(en,$tkey,$piname) \
-							-command [list DRPScheckVarEn "en,$tkey,$piname" $id $for_user $tkey $scope]\
+						pack [ttk::checkbutton $wpi.enabled -variable dice_preset_data(en,$tkey,v:$id) \
+							-command [list DRPScheckVarEn "en,$tkey,v:$id" "v:$id" $for_user $tkey $scope]\
 							-text "[dict get $preset DisplayName] (as \$\{$id\}): [dict get $preset DieRollSpec]"\
+							-onvalue true -offvalue false\
 						] -side left
+						if {![info exists dice_preset_data(en,$tkey,v:$id)]} {
+							set dice_preset_data(en,$tkey,v:$id) [::gmaproto::json_bool [dict get $preset Enabled]]
+							#DEBUG 0 "QQ init en,$tkey,v:$id=$dice_preset_data(en,$tkey,v:$id)"
+						} 
 					}
-				}
-				if {![info exists dice_preset_data(en,$tkey,$piname)]} {
-					#trace add variable dice_preset_data(en,$tkey,$piname) {array read write unset} TRACEvar
-					set dice_preset_data(en,$tkey,$piname) [::gmaproto::int_bool [dict get $preset Enabled]]
-				} else {
-					#TRACE "variable dice_preset_data(en,$tkey,$piname) already exists with value $dice_preset_data(en,$tkey,$piname)"
 				}
 				::tooltip::tooltip $wpi.enabled "* [dict get $preset Description]"
 				incr i
@@ -12305,8 +12347,10 @@ proc DRPScheckVarEn {key id for_user tkey {scope u}} {
 
 	if {$scope eq "g"} {
 		set DieRollPresetState(sys,gvar_on,$id) [::gmaproto::json_bool $dice_preset_data($key)]
+		#DEBUG 0 "QQ update DRPS sys,gvar_on,$id=$DieRollPresetState(sys,gvar_on,$id)"
 	} else {
 		set DieRollPresetState($tkey,on,$id) [::gmaproto::json_bool $dice_preset_data($key)]
+		#DEBUG 0 "QQ update DRPS $tkey,on,$id=$DieRollPresetState($tkey,on,$id)"
 	}
 }
 
@@ -13826,12 +13870,13 @@ proc PresetLists {arrayname tkey args} {
 					([string length $varname] == 1 ||
 					[string is alnum -strict [string range $varname 1 end]])} {
 						set DieRollPresetState($tkey,var,$varname) [dict get $d DieRollSpec]
-						if {[info exists dice_preset_data(en,$tkey,$varname)]} {
-							set DieRollPresetState($tkey,on,$varname) $dice_preset_data(en,$tkey,$varname)
+						if {[info exists dice_preset_data(en,$tkey,v:$varname)]} {
+							set DieRollPresetState($tkey,on,v:$varname) $dice_preset_data(en,$tkey,v:$varname)
 						} else {
-							set DieRollPresetState($tkey,on,$varname) [dict get $d Enabled]
+							set DieRollPresetState($tkey,on,v:$varname) [::gmaproto::json_bool [dict get $d Enabled]]
 						}
 						set DieRollPresetState($tkey,g,$varname) false
+						#DEBUG 0 "QQ export DRPS $tkey,on,v:$varname=$DieRollPresetState($tkey,on,v:$varname)"
 						#trace add variable DieRollPresetState($tkey,on,$varname) {array read write unset} TRACEvar
 						#trace add variable DieRollPresetState($tkey,var,$varname) {array read write unset} TRACEvar
 						#trace add variable DieRollPresetState($tkey,g,$varname) {array read write unset} TRACEvar
@@ -13988,8 +14033,8 @@ proc PresetLists {arrayname tkey args} {
 					([string length $varname] == 1 ||
 					[string is alnum -strict [string range $varname 1 end]])} {
 						set DieRollPresetState(sys,gvar,$varname) [dict get $d DieRollSpec]
-						if {[info exists dice_preset_data(sys,gvar_on,$g_piname)]} {
-							set DieRollPresetState(sys,gvar_on,$varname) $dice_preset_data(sys,gvar_on,$g_piname)
+						if {[info exists dice_preset_data(sys,gvar_on,$varname)]} {
+							set DieRollPresetState(sys,gvar_on,$varname) $dice_preset_data(sys,gvar_on,$varname)
 						} else {
 							set DieRollPresetState(sys,gvar_on,$varname) [dict get $d Enabled]
 						}
@@ -15115,7 +15160,7 @@ proc _apply_die_roll_variables {rollspec for_user tkey} {
 			set onkey "sys,gvar_on,$varname"
 		} else {
 			set vkey "$tkey,var,$varname"
-			set onkey "$tkey,on,$varname"
+			set onkey "$tkey,on,v:$varname"
 		}
 		if {[info exists DieRollPresetState($vkey)]} {
 			if {$DieRollPresetState($onkey)} {
@@ -16329,16 +16374,20 @@ proc ihr_build_target_list {parent} {
 }
 
 proc itr_build_target_list {parent} {
-	global global_bg_color PeerList local_user PeerAKA PC_IDs MOBid target_names
+	global global_bg_color PeerList local_user PeerAKA PC_IDs MOBid target_names PeerNotPlaying
 
 	foreach peer $PeerList {
+		if {[info exists PeerNotPlaying($peer)] && $PeerNotPlaying($peer)} {
+			continue
+		}
 		if {[info exists PeerAKA($peer)]} {
 			lappend users {*}$PeerAKA($peer)
 		} elseif {[info exists PC_IDs($peer)] || [info exists MOBid($peer)]} {
 			lappend users $peer
 		}
 	}
-	lappend users {*}[my_map_names]
+	lappend users {*}[my_map_names]			; # always include all my aliases/login name
+	lappend users {*}[array names PC_IDs]		; # and all defined party members even if not logged in now
 
 	set w ${parent}_t
 	catch {destroy $w}
@@ -17133,10 +17182,9 @@ proc EncodePresetDetails {p} {
 
 
 # verify that we know who we are on the map and prompt the user to let us know if not.
-set suppress_aka false
-set suppress_var false
 proc selectAKA {} {
-	global local_user local_aka PeerList PC_IDs MOBid suppress_aka check_aka_vars suppress_var
+	global local_user local_aka PeerList PC_IDs MOBid suppress_aka check_aka_vars suppress_var check_aka_none
+	global im_not_playing
 
 	catch {destroy .akawindow}
 	toplevel .akawindow 
@@ -17165,15 +17213,37 @@ proc selectAKA {} {
 	pack [label .akawindow.custom.l -text "Custom: "] -anchor w -side left
 	pack [entry .akawindow.custom.e -width 20] -anchor w -side left
 	.akawindow.custom.e insert 0 $custom
-	
+
+	pack [ttk::checkbutton .akawindow.none -onvalue true -offvalue false -variable check_aka_none -text "I am not playing any character from the username $local_user." -command [list select_aka_toggle_none .akawindow $fn]] -anchor w -side top
 	pack [button .akawindow.ok -command check_aka_commit -text OK] -side right
 	pack [button .akawindow.cancel -command [list destroy .akawindow] -text Cancel] -side left
+	if {$im_not_playing} {
+		set check_aka_none true
+		select_aka_toggle_none .akawindow $fn
+	} else {
+		set check_aka_none false
+	}
+}
+
+proc select_aka_toggle_none {w fn} {
+	global check_aka_none check_aka_vars
+	if {$check_aka_none} {
+		for {set fi 0} {$fi < $fn} {incr fi} {
+			$w.$fi configure -state disabled
+		}	
+		$w.custom.e configure -state disabled
+	} else {
+		for {set fi 0} {$fi < $fn} {incr fi} {
+			$w.$fi configure -state !disabled
+		}	
+		$w.custom.e configure -state normal
+	}
 }
 
 proc check_aka {} {
-	global local_user local_aka PeerList PC_IDs MOBid suppress_aka check_aka_vars suppress_var
+	global local_user local_aka PeerList PC_IDs MOBid suppress_aka check_aka_vars suppress_var im_not_playing check_aka_none
 
-	if {$local_aka ne {} || $suppress_aka} {
+	if {$local_aka ne {} || $suppress_aka || $im_not_playing} {
 		return
 	}
 
@@ -17197,22 +17267,36 @@ proc check_aka {} {
 	pack [label .akawindow.custom.l -text "Custom: "] -anchor w -side left
 	pack [entry .akawindow.custom.e -width 20] -anchor w -side left
 	
+	pack [ttk::checkbutton .akawindow.none -onvalue true -offvalue false -variable check_aka_none -text "I am not playing any character from the username $local_user." -command [list select_aka_toggle_none .akawindow $fn]] -anchor w -side top
 	pack [ttk::checkbutton .akawindow.notagain -onvalue true -offvalue false -variable suppress_var -text "don't ask me again this session"] -anchor w -side top
 	pack [button .akawindow.ok -command check_aka_commit -text OK] -side right
 	pack [button .akawindow.cancel -command [list destroy .akawindow] -text Cancel] -side left
+
+	if {$im_not_playing} {
+		set check_aka_none true
+		select_aka_toggle_none .akawindow $fn
+	} else {
+		set check_aka_none false
+	}
 }
 
 proc check_aka_commit {} {
-	global check_aka_vars local_aka suppress_aka suppress_var
+	global check_aka_vars local_aka suppress_aka suppress_var im_not_playing check_aka_none
 	set suppress_aka $suppress_var
 	set local_aka {}
-	foreach k [array names check_aka_vars] {
-		if {$check_aka_vars($k)} {
-			lappend local_aka $k
+	if {$check_aka_none} {
+		set local_aka {}
+		set im_not_playing true
+	} else {
+		foreach k [array names check_aka_vars] {
+			if {$check_aka_vars($k)} {
+				lappend local_aka $k
+			}
 		}
-	}
-	if {[set custom [.akawindow.custom.e get]] ne {}} {
-		lappend local_aka $custom
+		if {[set custom [.akawindow.custom.e get]] ne {}} {
+			lappend local_aka $custom
+		}
+		set im_not_playing false
 	}
 	::gmaproto::character_name $local_aka
 	destroy .akawindow
@@ -17247,6 +17331,20 @@ proc check_aka_commit {} {
 # 	<tkey>,g,<seq>		glob?
 # 	<tkey>,apply_order	{<seq>,...}
 #
+# variables
+#   piname=windowid({u|g}{preset-name})
+#   [] dice_preset_data(en,<tkey>,<piname>) cmd DRPScheckVarEn en,<tkey>,<piname> <id> <for_user> <tkey> <scope=g> 	$$var
+#   [] dice_preset_data(en,<tkey>,<piname>) cmd DRPScheckVarEn en,<tkey>,<piname> <id> <for_user> <tkey> <scope=u> 	$var
+#   dice_preset_data(en,<tkey>,<piname>) <- Enabled field from preset dict if not already set
+#
+# dpd				DRPS
+# en,<tkey>,v:<varname>		<tkey>,on,v:<varname>	<tkey>,var,<varname>	<tkey>,g,<varname>=false
+# en,<tkey>,<u_piname>		<tkey>,on,u<id>					<tkey>,g,u<id>		<tkey>,apply_order
+# sys,gvar_on,<g_piname>	sys,gvar_on,<varname>	sys,gvar,<varname>
+#             ^^^^^^^^^^<varname>
+# en,<tkey>,<g_piname>		<tkey>,on,g<id>					<tkey>,g,g<id>		<tkey>,apply_order
+# 			
+#
 #
 #
 # PresetLists ... -export
@@ -17280,7 +17378,7 @@ proc check_aka_commit {} {
 #
 #  called when rendering somone or advancing the initiative turn or updating target attribute
 #
-# @[00]@| GMA-Mapper 4.35.1
+# @[00]@| GMA-Mapper 4.35.2-alpha.2
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2025 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

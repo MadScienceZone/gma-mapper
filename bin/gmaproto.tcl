@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___       ______   _______      __         #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \ (  ____ \    /  \        #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \| (    \/    \/) )       #
-# | |      | || || || (___) | Assistant  / (_) (_       ___) /| (____        | |       #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( (_____ \       | |       #
-# | | \_  )| |   | || (   ) |                ) (           ) \      ) )      | |       #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  //\____) ) _  __) (_      #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/ \______/ (_) \____/      #
+#  _______  _______  _______                ___       ______   _______     _______     #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \ (  ____ \   / ___   )    #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \| (    \/   \/   )  |    #
+# | |      | || || || (___) | Assistant  / (_) (_       ___) /| (____         /   ) __ #
+# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( (_____ \      _/   / (__ #
+# | | \_  )| |   | || (   ) |                ) (           ) \      ) )    /   _/      #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  //\____) ) _ (   (__/\    #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/ \______/ (_)\_______/    #
 #                                                                                      #
 ########################################################################################
 #
@@ -48,7 +48,7 @@
 # 	::report_progress message
 # 	::say message
 
-package provide gmaproto 1.4
+package provide gmaproto 1.4.1
 package require Tcl 8.5
 package require json 1.3.3
 package require json::write 1.0.3
@@ -56,9 +56,9 @@ package require base64 2.4.2
 package require uuid 1.0.1
 
 namespace eval ::gmaproto {
-	variable protocol 421
+	variable protocol 422
 	variable min_protocol 333
-	variable max_protocol 421
+	variable max_protocol 422
 	variable max_max_protocol 499
 	variable debug_f {}
 	variable legacy false
@@ -133,7 +133,7 @@ namespace eval ::gmaproto {
 		AA?     {Name s}
 		AI      {Name s Sizes {a {File s ImageData b IsLocalFile ? Zoom f}} Animation {o {Frames i FrameSpeed i Loops i}}}
 		AI?	{Name s Sizes {a {Zoom f}}}
-		AKA	{Names l User s}
+		AKA	{Names l User s NotPlaying ?}
 		ALLOW   {Features l}
 		AUTH    {Client s Response b User s Platform s}
 		AV      {Grid s XView f YView f}
@@ -146,7 +146,7 @@ namespace eval ::gmaproto {
 		CORE/	{Filter s Type s IsHidden ? InvertSelection ?}
 		COREIDX {Type s CodeRegex s NameRegex s Since s RequestID s}
 		COREIDX= {RequestID s Type s IsDone ? N i Of i Name s Code s}
-		CONN    {PeerList {a {Addr s User s Client s LastPolo f IsAuthenticated ? IsMe ? AKA l}}}
+		CONN    {PeerList {a {Addr s User s Client s LastPolo f IsAuthenticated ? IsMe ? AKA l NotPlaying ?}}}
 		CS      {Absolute f Relative f Running ?}
 		D       {Recipients l ToAll ? ToGM ? RollSpec s RequestID s Targets l Type s}
 		DD      {Global ? For s Presets {a {Name s Description s DieRollSpec s}}}
@@ -1228,7 +1228,7 @@ proc ::gmaproto::json_from_dict {command d} {
 #   a     array of values; this is followed by a nested type list
 #   o     object; this is followed by a nested type list
 #   d     dictionary of name:value values
-#   l     list of strings
+#   l     list of strings; value of "null" translates to empty list
 #
 proc ::gmaproto::json_bool {b} {
 	if $b {
@@ -1387,8 +1387,8 @@ proc ::gmaproto::adjust_view {x y grid_label} {
 	::gmaproto::_protocol_send AV Grid $grid_label XView $x YView $y
 }
 
-proc ::gmaproto::character_name {names} {
-	::gmaproto::_protocol_send AKA Names $names
+proc ::gmaproto::character_name {names {not_playing false}} {
+	::gmaproto::_protocol_send AKA Names $names NotPlaying $not_playing
 }
 
 proc ::gmaproto::chat_message {message sender recipients to_all to_gm {markup false} {pinned false}} {
@@ -2358,7 +2358,7 @@ proc ::gmaproto::normalize_dict {cmd d} {
 	return [::gmaproto::new_dict_from_json $cmd [::gmaproto::json_from_dict $cmd $d]]
 }
 
-# @[00]@| GMA-Mapper 4.35.1
+# @[00]@| GMA-Mapper 4.35.2-alpha.2
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2025 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
