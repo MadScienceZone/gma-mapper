@@ -1,7 +1,7 @@
 '\" t
-'\" *** 421 ***
+'\" *** 422 ***
 '\" <<ital-is-var>>
-.TH GMA-MAPPER-PROTOCOL 7 "GMA-Mapper 4.35.1" 29-Nov-2025 "Protocols" \" @@mp@@
+.TH GMA-MAPPER-PROTOCOL 7 "GMA-Mapper 4.35.2-alpha.2" 08-Dec-2025 "Protocols" \" @@mp@@
 .SH NAME
 gma-mapper-protocol \- GMA client/server protocol specification
 .SH EXPERIMENTAL
@@ -79,7 +79,7 @@ be implemented to wait synchronously for a server
 response during the authentication negotiation stage.
 .LP
 '\" <</bold-is-fixed>>
-.B "This describes protocol version 421."
+.B "This describes protocol version 422."
 '\" <<bold-is-fixed>>
 These notes are intended to be 
 detailed enough to implement a client from and should be considered
@@ -766,6 +766,11 @@ The JSON payload has the following fields:
 .BI Names " (list of strings)"
 The names of the creatures this player is controlling.
 .TP
+.BI NotPlaying " (bool)"
+If true, this user (all clients logged in with the same username) is not
+playing any characters and should not be included in any UI dialogs or other features
+which select or list active characters.
+.TP
 .B User
 The login name for the user's session. This field is not normally supplied
 as part of the request by the player's client. It will be filled in by the
@@ -1145,6 +1150,11 @@ The list of creature names, if any, that the player is controlling instead of
 a creature matching the
 .B User
 field value.
+.TP
+.BI NotPlaying " (bool)"
+If true, this user is not playing any characters at all. In this case the
+.B AKA
+value should be empty and MUST be ignored at any rate.
 '\" <</New>>
 .TP
 .BI IsMe " (bool)"
@@ -4952,11 +4962,17 @@ Steve Willoughby / steve@madscience.zone;
 John Mechalas (elevation and movement modes).
 .SH HISTORY
 .LP
-This document defines map protocol version 421,
-which adds client platform identification and sound support.
+This document defines map protocol version 422,
+which adds the explicit
+.B NotPlaying
+flags to indicate if a user should not be considered
+as controlling any characters.
 .LP
-Historically, 
-protocol version 420
+Historically,
+protocol version 421
+adds client platform identification and sound support.
+.LP
+Version 420
 introduced targets to die rolls and armor class as a tracked creature health item. It also introduces the
 .B AKA
 command.
