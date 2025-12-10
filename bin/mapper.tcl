@@ -6498,6 +6498,9 @@ proc RefreshTargets {{current_actor {}}} {
 	DEBUG 0 "RefreshTargets $current_actor"
 	global MOBdata MOBid canvas iscale ActiveTargetList ActiveTargetSource
 	set me [my_map_names]
+	if {[llength $current_actor] > 1} {
+		set current_actor [lindex $current_actor 0]
+	}
 
 	$canvas delete SRCTARG
 	if {[catch {
@@ -10846,7 +10849,7 @@ proc DoCommandI {d} {
  	foreach id $ITlist {
  		PopSomeoneToFront $canvas $id
  	}
-	RefreshTargets
+	RefreshTargets $ITlist
 }
 
 proc DoCommandL {d} {
