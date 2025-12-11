@@ -19,7 +19,7 @@
 # Auto-configure values
 set GMAMapperVersion {4.35.2-alpha.2}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
-set GMAMapperProtocol {421}         ;# @@##@@
+set GMAMapperProtocol {422}         ;# @@##@@
 set CoreVersionNumber {6.39}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
@@ -72,6 +72,7 @@ set NCpath /usr/bin/nc
 set SERVER_MKDIRpath /bin/mkdir
 set ModuleID {}
 set UpgradeNotice false
+set CurrentCombatants {}
 #
 # Cache files newer than this many days are used without any further
 # checks. Otherwise, we check with the server to see if there's a newer
@@ -2709,7 +2710,7 @@ proc set_ondeck {place} {
 	#DEBUG 1 "set_ondeck $place"
 	global ondeck_bg SoundObj no_ondeck_audio MOB_COMBATMODE
 	if {!$MOB_COMBATMODE} {
-		.toolbar2.ondeck configure -fg $ondeck_bg -text ""
+		.toolbar2.ondeck configure -fg black -bg $ondeck_bg -text ""
 		return
 	}
 
@@ -6508,7 +6509,7 @@ proc CreatureStatusMarker {w id x y s calc_condition} {
 }
 
 #
-# RefreshTargets ?current_actor?
+# RefreshTargets 
 # 	Redraw the current player's targets and the current actor's (if any).		MYTARG#id
 #	The current actor's are animated (color-cycled) while the current player's are	
 #	drawn in red.									MATARG#id
@@ -6523,10 +6524,11 @@ proc _mob_size {id} {
 
 set ActiveTargetList {}
 set ActiveTargetSource {}
-proc RefreshTargets {{current_actor {}}} {
-	DEBUG 0 "RefreshTargets $current_actor"
-	global MOBdata MOBid canvas iscale ActiveTargetList ActiveTargetSource
+proc RefreshTargets {} {
+	DEBUG 0 "RefreshTargets"
+	global MOBdata MOBid canvas iscale ActiveTargetList ActiveTargetSource CurrentCombatants
 	set me [my_map_names]
+	set current_actor $CurrentCombatants
 	if {[llength $current_actor] > 1} {
 		set current_actor [lindex $current_actor 0]
 	}
@@ -6582,34 +6584,34 @@ proc RefreshTargets {{current_actor {}}} {
 	$canvas delete MATARG
 	global MOB_COMBATMODE
 	set start false
-	if {$MOB_COMBATMODE && $current_actor ne {} && [info exists MOBid($current_actor)] && [info exists MOBdata([set tid $MOBid($current_actor)])] && [dict exists [set d $MOBdata($tid)] Targets]} {
-	    if {[catch {
-		::gmautil::dassign $d Gx agx Gy agy Hidden ahidden
-		if {$ahidden} continue
-		set actor_mob_size [_mob_size $tid]
+	if {$MOB_COMBATMODE && $current_actor ne {}} {
+		if {[info exists MOBid([set tid $current_actor])]} {
+			set tid $MOBid($current_actor)
+		}
+		if {[info exists MOBdata($tid)] && [dict exists [set d $MOBdata($tid)] Targets]} {
+			if {[catch {
+				::gmautil::dassign $d Gx agx Gy agy Hidden ahidden
+				if {$ahidden} continue
+				set actor_mob_size [_mob_size $tid]
 
-		foreach target [dict get $d Targets] {
-			if {[info exists MOBid($target)] && [info exists MOBdata([set ttid $MOBid($target)])]} {
-				::gmautil::dassign $MOBid($target) Gx gx Gy gy Hidden hidden
-				if {$hidden} continue
-				set mob_size [_mob_size $ttid]
-				RenderTarget $canvas [expr $gx*$iscale] [expr $gy*$iscale] [expr ($gx+$mob_size)*$iscale] [expr ($gy+$mob_size)*$iscale] [list MATARG MATARG#$tid] MATARG
-				$canvas create line [expr $agx*$iscale+($actor_mob_size/2.0)] [expr $agy*$iscale+($actor_mob_size/2.0)] [expr $gx*$iscale+($mob_size/2.0)] [expr $gy*$iscale+($mob_size/2.0)] -fill red -width 3 -tags [list MATARG MATARG#$tid MATARG MATARGLINE] -dash - -arrow last
-				set start true
+				foreach target [dict get $d Targets] {
+					if {[info exists MOBid($target)] && [info exists MOBdata([set ttid $MOBid($target)])]} {
+						::gmautil::dassign $MOBdata($ttid) Gx gx Gy gy Hidden hidden
+						if {$hidden} continue
+						set mob_size [_mob_size $ttid]
+						RenderTarget $canvas [expr $gx*$iscale] [expr $gy*$iscale] [expr ($gx+$mob_size)*$iscale] [expr ($gy+$mob_size)*$iscale] [list MATARG MATARG#$tid] MATARG
+						$canvas create line [expr ($agx+($actor_mob_size/2.0))*$iscale] [expr ($agy+($actor_mob_size/2.0))*$iscale] [expr ($gx+($mob_size/2.0))*$iscale] [expr ($gy+($mob_size/2.0))*$iscale] -fill red -width 3 -tags [list MATARG MATARG#$tid MATARG MATARGLINE] -dash - -arrow last
+						set start true
+					}
+				}
+			} err]} {
+				DEBUG 0 "Unable to draw targets for $current_actor: $err"
 			}
 		}
-	#RenderTarget $w [expr $x*$iscale] [expr $y*$iscale] [expr ($x+$mob_size)*$iscale] [expr ($y+$mob_size)*$iscale] "mob MF#$id M#$id allMOB MTARG#$id"
-		# TODO the current actor named $current_actor with obj id $tid targets [dict get $d Targets]
-		# TODO set global var which can be sent with die rolls
-	    } err]} {
-	    	DEBUG 1 "Unable to draw targets for $current_actor: $err"
-	    }
 	}
-	# DispSize Size Skin SkinSize Gx Gy Hidden
 	if {$start} {
 		AnimateTargetArrows
 	}
-	global _ata_running
 }
 
 set _color_wheel {#ff0000 #ff8800 #ffff00 #88ff00 #00ff00 #00ff88 #00ffff #0088ff #0000ff #8800ff #ff00ff #ff0088}
@@ -10881,7 +10883,9 @@ proc DoCommandI {d} {
  	foreach id $ITlist {
  		PopSomeoneToFront $canvas $id
  	}
-	RefreshTargets $ITlist
+	global CurrentCombatants
+	set CurrentCombatants $ITlist
+	RefreshTargets 
 }
 
 proc DoCommandL {d} {
