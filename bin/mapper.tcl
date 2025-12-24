@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       ______   _______     _______     #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \ (  ____ \   / ___   )    #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \| (    \/   \/   )  |    #
-# | |      | || || || (___) | Assistant  / (_) (_       ___) /| (____         /   ) __ #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( (_____ \      _/   / (__ #
-# | | \_  )| |   | || (   ) |                ) (           ) \      ) )    /   _/      #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  //\____) ) _ (   (__/\    #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/ \______/ (_)\_______/    #
+#  _______  _______  _______                ___       ______   _______     ______      #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \ (  ____ \   / ___  \     #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \| (    \/   \/   \  \    #
+# | |      | || || || (___) | Assistant  / (_) (_       ___) /| (____        ___) /    #
+# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( (_____ \      (___ (     #
+# | | \_  )| |   | || (   ) |                ) (           ) \      ) )         ) \    #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  //\____) ) _ /\___/  /    #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/ \______/ (_)\______/     #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -17,10 +17,10 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.35.2-alpha.2}     ;# @@##@@
+set GMAMapperVersion {4.35.3}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {422}         ;# @@##@@
-set CoreVersionNumber {6.39}            ;# @@##@@
+set CoreVersionNumber {6.39.1}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -1283,10 +1283,6 @@ proc create_main_menu {use_button} {
 		}
 	}
 	bind . <Key-g>		{toggleGridEnable}
-	bind . <Key-t>		{toggleCombatTargets %x %y}
-	bind . <Key-T>	{toggleCombatSource %x %y}
-	bind . <Control-Key-plus>	{global zoom; zoomInBy 2; display_message "Zoomed in to $zoom"}
-	bind . <Control-Key-minus>	{global zoom; zoomInBy 0.5; display_message "Zoomed out to $zoom"}
 	bind . <Control-Key-0>	{global zoom; resetZoom; display_message "Reset zoom to $zoom"}
 	bind . <Alt-Key-v>	{FindNearby; display_message "Scrolled to visible objects"}
 	bind . <Control-Key-r>	{refreshScreen; display_message "Display refreshed"}
