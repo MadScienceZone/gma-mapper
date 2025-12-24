@@ -1,7 +1,7 @@
 '\" t
 '\" *** 422 ***
 '\" <<ital-is-var>>
-.TH GMA-MAPPER-PROTOCOL 7 "GMA-Mapper 4.35.2-alpha.2" 08-Dec-2025 "Protocols" \" @@mp@@
+.TH GMA-MAPPER-PROTOCOL 7 "GMA-Mapper 4.35.2" 24-Dec-2025 "Protocols" \" @@mp@@
 .SH NAME
 gma-mapper-protocol \- GMA client/server protocol specification
 .SH EXPERIMENTAL
@@ -292,7 +292,7 @@ DefineDiceDelegates	DDD	C\[->]S	DD=	maybe	JSON	Assign die-roll delegates
 Denied	DENIED	C\[<-]S	\fR\(em\fP	N/A	JSON	Server denies access
 Echo	ECHO	C\[<>]S	ECHO	no	JSON	Send data for server to echo back to client
 Failed	FAILED	C\[<>]S	\fR\(em\fP	yes	JSON	Request failed or denied by GM
-FilterAudio	AA/	C\[->S	\fR\(em\fP	yes	JSON	Filter saved audio definitions
+FilterAudio	AA/	C\[->]S	\fR\(em\fP	yes	JSON	Filter saved audio definitions
 FilterCoreData	CORE/	C\[->]S	\fR\(em\fP	yes	JSON	Filter availability of the game database
 FilterDicePresets	DD/	C\[->]S	DD=	maybe	JSON	Remove some presets for user
 FilterImages	AI/	C\[->]S	\fR\(em\fP	yes	JSON	Filter saved image definitions
