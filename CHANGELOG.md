@@ -3,7 +3,7 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.35.2          <!-- @@##@@ -->
+ * This Package Version: 4.35.3          <!-- @@##@@ -->
  * Effective Date: 24-Dec-2025               <!-- @@##@@ -->
 
 ## Compatibility
@@ -16,6 +16,10 @@
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.35.3
+## Fixes
+ * Accidentally overwrote the `mapper.tcl` file when releasing 4.35.2.
 
 # 4.35.2
 ## Fixes
