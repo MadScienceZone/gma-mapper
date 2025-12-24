@@ -3,21 +3,21 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.35.2-alpha.2          <!-- @@##@@ -->
- * Effective Date: 08-Dec-2025               <!-- @@##@@ -->
+ * This Package Version: 4.35.2          <!-- @@##@@ -->
+ * Effective Date: 24-Dec-2025               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.39 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.39.1 <!-- @@##@@ -->
  * GMA Mapper File Format: 23	     <!-- @@##@@ -->
- * GMA Mapper Protocol: 421        <!-- @@##@@ -->
- * GMA Mapper Preferences File Format: 11 <!-- @@##@@ -->
+ * GMA Mapper Protocol: 422        <!-- @@##@@ -->
+ * GMA Mapper Preferences File Format: 12 <!-- @@##@@ -->
 
 ## DEPRECATION NOTICE
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
-# 4.35.2 (unreleased)
+# 4.35.2
 ## Fixes
  * Changes "disable audio" preferences wording to "mute"
  * Makes spell area of effect zones easier to see when they overlap each other by making them randomly shift position slightly so they'll expose underlying spells (and the visual appearance of the animated areas helps make it apparent they're not part of the static landscape as well).
