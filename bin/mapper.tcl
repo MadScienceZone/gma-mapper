@@ -2535,6 +2535,15 @@ proc display_message {msg} {
 	catch {update}
 }
 
+proc display_only {msg} {
+	global ClockDisplay
+
+	catch {set ClockDisplay $msg}
+	catch {update}
+}
+
+proc clear_message {} {display_only {}}
+
 proc LetterLabel {x} {
 	set l [string index ABCDEFGHIJKLMNOPQRSTUVWXYZ [expr $x % 26]]
 	set x [expr $x/26]
@@ -5064,28 +5073,31 @@ proc ObjAoeDrag {w x y} {
 
 		$w coords obj_locator$OBJ_CURRENT "$x0 $y0 $xx $yy"
 		set DistanceLabelText [format "%d feet" $radius_feet]
+		display_only [format "Spell area distance: %d square%s / %s" $radius_grids [expr $radius_grids==1 ? {{}} : {{s}}] $DistanceLabelText]
 		
-		switch [::gmaproto::from_enum AoEShape [dict get $OBJdata($OBJ_CURRENT) AoEShape]] {
-			radius {
-				$w coords obj_locator_radius$OBJ_CURRENT "[expr $x0-$r] [expr $y0-$r] [expr $x0+$r] [expr $y0+$r]"
-			}
-			cone {
-				if {$r > 0} {
-					set theta0  [expr atan2($y0 - $yy, $xx - $x0)]
-					#set theta1	[expr $theta0 + ($PI / 4)]
-					set theta2	[expr $theta0 - ($PI / 4)]
-					#set x1	[expr $x0 + ($r * cos($theta1))]
-					#set y1	[expr $y0 - ($r * sin($theta1))]
-					#set x2	[expr $x0 + ($r * cos($theta2))]
-					#set y2	[expr $y0 - ($r * sin($theta2))]
-					#$w coords obj_locator_cone1_$OBJ_CURRENT "$x0 $y0 $x1 $y1"
-					#$w coords obj_locator_cone2_$OBJ_CURRENT "$x0 $y0 $x2 $y2"
-					$w coords obj_locator_cone3_$OBJ_CURRENT "[expr $x0-$r] [expr $y0-$r] [expr $x0+$r] [expr $y0+$r]"
-					$w itemconfigure obj_locator_cone3_$OBJ_CURRENT -start [expr ($theta2 / $PI) * 180.0]
+		if {$OBJ_CURRENT != 0} {
+			switch [::gmaproto::from_enum AoEShape [dict get $OBJdata($OBJ_CURRENT) AoEShape]] {
+				radius {
+					$w coords obj_locator_radius$OBJ_CURRENT "[expr $x0-$r] [expr $y0-$r] [expr $x0+$r] [expr $y0+$r]"
+				}
+				cone {
+					if {$r > 0} {
+						set theta0  [expr atan2($y0 - $yy, $xx - $x0)]
+						#set theta1	[expr $theta0 + ($PI / 4)]
+						set theta2	[expr $theta0 - ($PI / 4)]
+						#set x1	[expr $x0 + ($r * cos($theta1))]
+						#set y1	[expr $y0 - ($r * sin($theta1))]
+						#set x2	[expr $x0 + ($r * cos($theta2))]
+						#set y2	[expr $y0 - ($r * sin($theta2))]
+						#$w coords obj_locator_cone1_$OBJ_CURRENT "$x0 $y0 $x1 $y1"
+						#$w coords obj_locator_cone2_$OBJ_CURRENT "$x0 $y0 $x2 $y2"
+						$w coords obj_locator_cone3_$OBJ_CURRENT "[expr $x0-$r] [expr $y0-$r] [expr $x0+$r] [expr $y0+$r]"
+						$w itemconfigure obj_locator_cone3_$OBJ_CURRENT -start [expr ($theta2 / $PI) * 180.0]
+					}
 				}
 			}
 		}
-		DrawAoeZone $w $OBJ_CURRENT "$x0 $y0 $xx $yy"
+#		DrawAoeZone $w $OBJ_CURRENT "$x0 $y0 $xx $yy"
 		update
 	}
 }
@@ -5615,7 +5627,7 @@ proc LastPoint {w x y} {
 }
 
 proc LastAoePoint {w x y} {
-	global OBJdata OBJ_CURRENT OBJ_SNAP canvas zoom
+	global OBJdata OBJ_CURRENT OBJ_SNAP canvas zoom AOE_START
 	set x [$canvas canvasx $x]
 	set y [$canvas canvasy $y]
 	set xx [SnapCoordAlways $x]
@@ -5628,7 +5640,27 @@ proc LastAoePoint {w x y} {
 	$canvas create oval [expr $xx-10] [expr $yy-10] [expr $xx+10] [expr $yy+10] -width 3 -outline [dict get $OBJdata($OBJ_CURRENT) Fill] -tags [list obj$OBJ_CURRENT]
 	$canvas create line [expr $xx-5] [expr $yy-5] [expr $xx+5] [expr $yy+5] -width 3 -fill [dict get $OBJdata($OBJ_CURRENT) Fill] -tags [list obj$OBJ_CURRENT]
 	$canvas create line [expr $xx-5] [expr $yy+5] [expr $xx+5] [expr $yy-5] -width 3 -fill [dict get $OBJdata($OBJ_CURRENT) Fill] -tags [list obj$OBJ_CURRENT]
+
+	::gmautil::dassign $OBJdata($OBJ_CURRENT) X X Y Y Points _Points
+	global zoom 
+	catch {unset Points}
+	if {$zoom != 1} {
+		set X [expr $X * $zoom]
+		set Y [expr $Y * $zoom]
+		foreach x ${_Points} {
+			lappend Points [expr [dict get $x X] * $zoom]
+			lappend Points [expr [dict get $x Y] * $zoom]
+		}
+	} else {
+		foreach x ${_Points} {
+			lappend Points [dict get $x X]
+			lappend Points [dict get $x Y]
+		}
+	}
+	DrawAoeZone $canvas $OBJ_CURRENT "$X $Y $Points"
+	
 	EndObj $w 
+	clear_message
 }
 	
 proc LastArcPoint {w x y} {
@@ -9323,6 +9355,7 @@ proc CompleteMOBAoE {id w x y} {
 	canceltool
 	$w delete AoElocator#$id
 	SendMobChanges $id AoE
+	clear_message
 }
 
 proc DragMOBAoE {id w x y} {
@@ -9333,6 +9366,7 @@ proc DragMOBAoE {id w x y} {
 	set gx [CanvasToGrid $xx]
 	set gy [CanvasToGrid $yy]
 	set r  [GridDistance [dict get $MOBdata($id) Gx] [dict get $MOBdata($id) Gy] $gx $gy]
+	display_only [format "Spell radius %d square%s / %d feet" $r [expr $r==1 ? {{}} : {{s}}] [expr $r * 5]]
 	dict set MOBdata($id) AoE [dict create Radius $r Color $OBJ_COLOR(fill)]
 	RenderSomeone $w $id
 	$w create line [expr [dict get $MOBdata($id) Gx] * $iscale] [expr [dict get $MOBdata($id) Gy] * $iscale] \

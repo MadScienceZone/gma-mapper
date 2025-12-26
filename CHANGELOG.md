@@ -17,6 +17,10 @@ The support for old server protocols (<400) and map file formats (<20) will be d
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
+# 4.35.4 (unreleased)
+## Fixes
+ * Makes it easier to see the size of spell areas of effect as you draw them.
+
 # 4.35.3
 ## Fixes
  * Accidentally overwrote the `mapper.tcl` file when releasing 4.35.2.
