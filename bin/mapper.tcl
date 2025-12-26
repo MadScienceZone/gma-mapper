@@ -1282,7 +1282,11 @@ proc create_main_menu {use_button} {
 			display_message "Forcing elements to top to stack"
 		}
 	}
+	bind . <Key-t> 		{toggleCombatTargets %x %y; display_message "Setting combat target(s)"}
+	bind . <Shift-Key-T> 	{toggleCombatSource %x %y; display_message "Setting combat source"}
 	bind . <Key-g>		{toggleGridEnable}
+	bind . <Control-Key-plus>       {global zoom; zoomInBy 2; display_message "Zoomed in to $zoom"}
+        bind . <Control-Key-minus>      {global zoom; zoomInBy 0.5; display_message "Zoomed out to $zoom"}
 	bind . <Control-Key-0>	{global zoom; resetZoom; display_message "Reset zoom to $zoom"}
 	bind . <Alt-Key-v>	{FindNearby; display_message "Scrolled to visible objects"}
 	bind . <Control-Key-r>	{refreshScreen; display_message "Display refreshed"}
@@ -1290,7 +1294,7 @@ proc create_main_menu {use_button} {
 	bind . <Control-Key-d>	{rulertool; display_message "Selected ruler tool"}
 }
 
-proc mobIDsToNames {idlist} {
+proc mobIDsToNames {idlist args} {
 	global MOBdata
 
 	set names {}
@@ -1298,7 +1302,11 @@ proc mobIDsToNames {idlist} {
 		if {[info exists MOBdata($id)] && [dict exists $MOBdata($id) Name]} {
 			lappend names [dict get $MOBdata($id) Name]
 		} else {
-			DEBUG 0 "Can't find name for monster with ID $id"
+			if {[lsearch -exact $args -permissive] >= 0} {
+				lappend names $id
+			} else {
+				DEBUG 0 "Can't find name for monster with ID $id"
+			}
 		}
 	}
 	return $names
@@ -1322,9 +1330,7 @@ proc mobsAtXY {x y args} {
 # if you control more than one character
 proc toggleCombatSource {mousex mousey args} {
 	global canvas ActiveTargetSource
-	DEBUG 0 "tcs $mousex $mousey $args"
 	set mob_list [mobIDsToNames [mobsAtXY [expr $mousex-[winfo x $canvas]] [expr $mousey-[winfo y $canvas]] -noselection]] 
-	DEBUG 0 "$mob_list"
 	if {[llength $mob_list] > 1} {
 		tk_messageBox -type ok -icon error -title "Ambiguous Source" \
 			-message "Too many creatures under cursor ($mob_list). We can't tell which you're trying to select as the target source."
@@ -1361,10 +1367,9 @@ proc _setMyTargets {tlist} {
 		}
 	}
 
-	SetObjectAttribute $me [dict create Targets $tlist]
-	::gmaproto::update_obj_attributes @$me [dict create Targets $tlist]
+	SetObjectAttribute $me [set tdict [dict create Targets [mobIDsToNames $tlist -permissive]]]
+	::gmaproto::update_obj_attributes @$me $tdict
 	global MOBdata
-	DEBUG 0 "[dict get $MOBdata(PC84) Targets]"
 }
 
 proc ClearPinnedChats {} {
@@ -3027,6 +3032,10 @@ proc CreateHealthStatsToolTip {mob_id {extra_condition {}}} {
 	# get the list of applied conditions
 	set conditions {}
 	set has_health_info false
+	set targets {}
+	if {[dict exists $MOBdata($mob_id) Targets] && [set targ [dict get $MOBdata($mob_id) Targets]] ne {}} {
+		set targets [format "\nCurrently targeting %s." [join $targ ", "]]
+	}
 	set dead [dict get $MOBdata($mob_id) Killed]
 
 	if {[dict exists $MOBdata($mob_id) Health] && [dict get $MOBdata($mob_id) Health] ne {}} {
@@ -3159,6 +3168,10 @@ proc CreateHealthStatsToolTip {mob_id {extra_condition {}}} {
 		default {
 			append tiptext [format " (%s)" $movemode]
 		}
+	}
+
+	if {$targets ne {}} {
+		append tiptext $targets
 	}
 
 	# add conditions
@@ -5075,7 +5088,7 @@ proc ObjAoeDrag {w x y} {
 		set DistanceLabelText [format "%d feet" $radius_feet]
 		display_only [format "Spell area distance: %d square%s / %s" $radius_grids [expr $radius_grids==1 ? {{}} : {{s}}] $DistanceLabelText]
 		
-		if {$OBJ_CURRENT != 0} {
+		catch {
 			switch [::gmaproto::from_enum AoEShape [dict get $OBJdata($OBJ_CURRENT) AoEShape]] {
 				radius {
 					$w coords obj_locator_radius$OBJ_CURRENT "[expr $x0-$r] [expr $y0-$r] [expr $x0+$r] [expr $y0+$r]"
@@ -6537,6 +6550,39 @@ proc CreatureStatusMarker {w id x y s calc_condition} {
 }
 
 #
+# compare two identifiers which could be map names (with or without leading @ signs)
+# or map object ID numbers and return true if they refer to the same creature.
+#
+proc isMobIdentity {a b} {
+	set x [GetBaseMobID $a]
+	set y [GetBaseMobID $b]
+	return [expr {$x eq $y}]
+}
+
+proc GetBaseMobID {name} {
+	global MOBid PC_IDs MOBdata
+
+	if {[info exists MOBdata($name)]} {
+		return $name
+	}
+
+	if {[string range $name 0 0] eq "@"} {
+		set name [string range $name 1 end]
+	}
+
+	if {[info exists PC_IDs($name)]} {
+		return $PC_IDs($name)
+	}
+
+	if {[info exists MOBid($name)]} {
+		return $MOBid($name)
+	}
+
+	return $name
+}
+
+
+#
 # RefreshTargets 
 # 	Redraw the current player's targets and the current actor's (if any).		MYTARG#id
 #	The current actor's are animated (color-cycled) while the current player's are	
@@ -6552,9 +6598,10 @@ proc _mob_size {id} {
 
 set ActiveTargetList {}
 set ActiveTargetSource {}
+set TargetColor blue
 proc RefreshTargets {} {
-	DEBUG 0 "RefreshTargets"
-	global MOBdata MOBid canvas iscale ActiveTargetList ActiveTargetSource CurrentCombatants
+#	DEBUG 0 "RefreshTargets"
+	global MOBdata MOBid canvas iscale ActiveTargetList ActiveTargetSource CurrentCombatants TargetColor
 	set me [my_map_names]
 	set current_actor $CurrentCombatants
 	if {[llength $current_actor] > 1} {
@@ -6564,7 +6611,7 @@ proc RefreshTargets {} {
 	$canvas delete SRCTARG
 	if {[catch {
 		if {$ActiveTargetSource ne {} && [info exists MOBid($ActiveTargetSource)] && [info exists MOBdata([set tid $MOBid($ActiveTargetSource)])]} {
-			DEBUG 0 "src id $tid -> [dict get $MOBdata($tid)]"
+#			DEBUG 0 "src id $tid -> [dict get $MOBdata($tid)]"
 			::gmautil::dassign [dict get $MOBdata($tid)] Gx gx Gy gy Hidden h
 			set sz [_mob_size $tid]
 			if {!$h} {
@@ -6578,13 +6625,18 @@ proc RefreshTargets {} {
 	$canvas delete MYTARG
 	set ActiveTargetList {}
 	foreach my_source $me {
+#		DEBUG 0 "looking in $me ($my_source), current actor is $current_actor in $CurrentCombatants ([isMobIdentity $current_actor $my_source])"
 	    if {[catch {
+#		if {[info exists MOBid($my_source)]} {DEBUG 0 "MOBid($my_source)=$MOBid($my_source)"}
+#		if {[info exists MOBid($my_source)] && [info exists MOBdata([set tid $MOBid($my_source)])]} {DEBUG 0 "MOBdata($tid)=$MOBdata($tid)"}
+#		if {[info exists MOBid($my_source)] && [info exists MOBdata([set tid $MOBid($my_source)])] && [dict exists [set d $MOBdata($tid)] Targets]} {DEBUG 0 "Targets $d"}
 		if {[info exists MOBid($my_source)] && [info exists MOBdata([set tid $MOBid($my_source)])] && [dict exists [set d $MOBdata($tid)] Targets]} {
-			if {[llength $me] == 1 || $my_source eq $current_actor} {
+			if {[llength $me] == 1 || [isMobIdentity $my_source $current_actor]} {
 				set ActiveTargetList [dict get $d Targets]
+#				DEBUG 0 "ActiveTargetList $ActiveTargetList"
 			} 
 
-			if {$my_source ne $current_actor} {
+			if {![isMobIdentity $my_source $current_actor]} {
 				::gmautil::dassign $d Gx agx Gy agy Hidden ahidden
 				set actor_mob_size [_mob_size $tid]
 				if {$ahidden} continue
@@ -6597,7 +6649,7 @@ proc RefreshTargets {} {
 							if {$hidden} continue
 							set mob_size [_mob_size $ttid]
 							RenderTarget $canvas [expr $gx*$iscale] [expr $gy*$iscale] [expr ($gx+$mob_size)*$iscale] [expr ($gy+$mob_size)*$iscale] [list MYTARG MYTARG#$tid] MYTARG
-							$canvas create line [expr ($agx+($actor_mob_size/2.0))*$iscale] [expr ($agy+($actor_mob_size/2.0))*$iscale] [expr ($gx+($mob_size/2.0))*$iscale] [expr ($gy+($mob_size/2.0))*$iscale] -fill red -width 3 -tags [list MYTARG MYTARG#$tid MYTARGLINE] -dash - -arrow last
+							$canvas create line [expr ($agx+($actor_mob_size/2.0))*$iscale] [expr ($agy+($actor_mob_size/2.0))*$iscale] [expr ($gx+($mob_size/2.0))*$iscale] [expr ($gy+($mob_size/2.0))*$iscale] -fill $TargetColor -width 3 -tags [list MYTARG MYTARG#$tid MYTARGLINE] -dash - -arrow last
 						}
 					}
 				}
@@ -6628,7 +6680,7 @@ proc RefreshTargets {} {
 						if {$hidden} continue
 						set mob_size [_mob_size $ttid]
 						RenderTarget $canvas [expr $gx*$iscale] [expr $gy*$iscale] [expr ($gx+$mob_size)*$iscale] [expr ($gy+$mob_size)*$iscale] [list MATARG MATARG#$tid] MATARG
-						$canvas create line [expr ($agx+($actor_mob_size/2.0))*$iscale] [expr ($agy+($actor_mob_size/2.0))*$iscale] [expr ($gx+($mob_size/2.0))*$iscale] [expr ($gy+($mob_size/2.0))*$iscale] -fill red -width 3 -tags [list MATARG MATARG#$tid MATARG MATARGLINE] -dash - -arrow last
+						$canvas create line [expr ($agx+($actor_mob_size/2.0))*$iscale] [expr ($agy+($actor_mob_size/2.0))*$iscale] [expr ($gx+($mob_size/2.0))*$iscale] [expr ($gy+($mob_size/2.0))*$iscale] -fill $TargetColor -width 3 -tags [list MATARG MATARG#$tid MATARG MATARGLINE] -dash - -arrow last
 						set start true
 					}
 				}
@@ -6671,6 +6723,7 @@ proc _AnimateTargetArrows {} {
 # RenderTarget canvas x y width height tags
 #   Draws targets with tags provided (so you can delete them by tags when no longer needed)
 proc RenderTarget {w x0 y0 x1 y1 tags basetag} {
+	global TargetColor
 	set hx [expr $x0+(($x1-$x0)/2.0)]
 	set hy [expr $y0+(($y1-$y0)/2.0)]
 	set ticklen [expr ($x1-$x0)/10.0]
@@ -6681,15 +6734,15 @@ proc RenderTarget {w x0 y0 x1 y1 tags basetag} {
 	set ltags $tags
 	lappend rtags ${basetag}RECT
 	lappend ltags ${basetag}LINE
-	$w create rect $x0 $y0 $x1 $y1 -outline red -width 5 -dash . -tags $rtags 
-	$w create line $x0 $hy $x1 $hy -fill red -width 4 -tags $ltags
-	$w create line $hx $y0 $hx $y1 -fill red -width 4 -tags $ltags
+	$w create rect $x0 $y0 $x1 $y1 -outline $TargetColor -width 5 -dash . -tags $rtags 
+	$w create line $x0 $hy $x1 $hy -fill $TargetColor -width 4 -tags $ltags
+	$w create line $hx $y0 $hx $y1 -fill $TargetColor -width 4 -tags $ltags
 	for {set i 1} {$i < 8} {incr i} {
 		if {$i==4} continue
 		set yy [expr $y0+((($y1-$y0)/8.0)*$i)]
 		set xx [expr $x0+((($x1-$x0)/8.0)*$i)]
-		$w create line $tick_x $yy [expr $tick_x+$ticklen] $yy -fill red -width 3 -tags $ltags
-		$w create line $xx $tick_y $xx [expr $tick_y+$ticklen] -fill red -width 3 -tags $ltags
+		$w create line $tick_x $yy [expr $tick_x+$ticklen] $yy -fill $TargetColor -width 3 -tags $ltags
+		$w create line $xx $tick_y $xx [expr $tick_y+$ticklen] -fill $TargetColor -width 3 -tags $ltags
 	}
 }
 
@@ -8850,11 +8903,15 @@ proc CreateReachSubMenu {args} {
 	return $mid
 }
 
+proc _setSomeTargets {x y} {
+	_setMyTargets [mobsAtXY $x $y]
+}
+
 proc DoContext {x y} {
 	global MOB_X MOB_Y canvas MOBdata
 	lassign [ScreenXYToGridXY $x $y -exact] Gx Gy
 	set mob_list [mobsAtXY $x $y]
-	DEBUG 0 "DoContext x=$x y=$y Gx=$Gx Gy=$Gy mob_list=$mob_list"
+#	DEBUG 0 "DoContext x=$x y=$y Gx=$Gx Gy=$Gy mob_list=$mob_list"
 
 	# positions
 	set CTXtarg 0
@@ -8983,7 +9040,7 @@ proc DoContext {x y} {
 			.contextMenu.dist add command -command "DistanceFromMob $mob_id" -label $mob_disp_name
 			.contextMenu.tsel add command -command "ToggleSelection $mob_id" -label $mob_disp_name
 		}
-		.contextMenu.targ add command -command "_setMyTargets $mob_list" -label "(all of the above)"
+		.contextMenu.targ add command -command "_setMyTargets [list $mob_list]" -label "(all of the above)"
 		.contextMenu.del add command -command "RemoveAll $mob_list" -label "(all of the above)"
 		.contextMenu.kill add command -command "KillAll $mob_list" -label "(all of the above)"
 		.contextMenu.reach add cascade -menu [CreateReachSubMenu -mass $mob_list] -label "(all of the above)"
@@ -9052,7 +9109,7 @@ menu .contextMenu.mmode -tearoff 0
 menu .contextMenu.dist -tearoff 0
 menu .contextMenu.tsel -tearoff 0
 #menu .addPlayerMenu
-.contextMenu add command -command "" -label Target -state disabled -accelerator T			;# 0
+.contextMenu add command -command "" -label Target -state disabled               			;# 0
 .contextMenu add command -command "" -label Remove -state disabled					;# 1
 .contextMenu add command -command {AddPlayerMenu player} -label {Add Player...}				;# 2
 .contextMenu add command -command {AddPlayerMenu monster} -label {Add Monster...}			;# 3
@@ -15343,7 +15400,7 @@ proc aboutMapper {} {
 
 
 	tk_messageBox -parent . -type ok -icon info -title "About Mapper" \
-		-message "GMA Mapper Client, Version $GMAMapperVersion, for GMA $CoreVersionNumber.\n\nCopyright \u00A9 Steve Willoughby, Aloha, Oregon, USA. All Rights Reserved. Distributed under the terms and conditions of the 3-Clause BSD License.\n\nThis client supports file format $GMAMapperFileFormat and server protocol $GMAMapperProtocol." -detail $connection_info
+		-message "GMA VTT Mapper Client, Version $GMAMapperVersion, for GMA $CoreVersionNumber.\n\nCopyright \u00A9 Steve Willoughby, Aloha, Oregon, USA. All Rights Reserved. Distributed under the terms and conditions of the 3-Clause BSD License.\n\nThis client supports file format $GMAMapperFileFormat and server protocol $GMAMapperProtocol." -detail $connection_info
 }
 
 proc SyncAllClientsToMe {} {
