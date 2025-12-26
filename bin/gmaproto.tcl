@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___       ______   _______     ______      #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \ (  ____ \   / ___  \     #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \| (    \/   \/   \  \    #
-# | |      | || || || (___) | Assistant  / (_) (_       ___) /| (____        ___) /    #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( (_____ \      (___ (     #
-# | | \_  )| |   | || (   ) |                ) (           ) \      ) )         ) \    #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  //\____) ) _ /\___/  /    #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/ \______/ (_)\______/     #
+#  _______  _______  _______                ___       ______    ______                 #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ____ \                #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \( (    \/                #
+# | |      | || || || (___) | Assistant  / (_) (_       ___) /| (____                  #
+# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( |  ___ \                 #
+# | | \_  )| |   | || (   ) | VTT            ) (           ) \| (   ) )                #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /( (___) )                #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/  \_____/                 #
 #                                                                                      #
 ########################################################################################
 #
@@ -564,6 +564,7 @@ proc ::gmaproto::_attribute_encode {k v} {
 
 		SkinSize   { return [::json::write array {*}$v] }
 		StatusList { return [::json::write array {*}[lmap s $v {json::write string $s}]] }
+		Targets    { return [::json::write array {*}[lmap s $v {json::write string $s}]] }
 
 		Font   -
 		CustomReach -
@@ -2357,7 +2358,7 @@ proc ::gmaproto::normalize_dict {cmd d} {
 	return [::gmaproto::new_dict_from_json $cmd [::gmaproto::json_from_dict $cmd $d]]
 }
 
-# @[00]@| GMA-Mapper 4.35.3
+# @[00]@| GMA-Mapper 4.36
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2025 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

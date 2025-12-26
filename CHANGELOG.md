@@ -3,8 +3,8 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.35.3          <!-- @@##@@ -->
- * Effective Date: 24-Dec-2025               <!-- @@##@@ -->
+ * This Package Version: 4.36          <!-- @@##@@ -->
+ * Effective Date: 26-Dec-2025               <!-- @@##@@ -->
 
 ## Compatibility
  * GMA Core API Library Version: 6.39.1 <!-- @@##@@ -->
@@ -17,9 +17,11 @@ The support for old server protocols (<400) and map file formats (<20) will be d
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
-# 4.35.4 (unreleased)
+# 4.36
 ## Fixes
  * Makes it easier to see the size of spell areas of effect as you draw them.
+### Enhancements
+ * Adds targets for characters. You can now designate the target(s) of your attacks by right-clicking on a creature token (or having multiple selected), or pressing the T key. If you are playing more than one character, first press shhift-T to designate which character's targets are being selected. Your die rolls will then be associated with that (those) target(s) from then on, making it easier for the GM to resolve combat damage.
 
 # 4.35.3
 ## Fixes

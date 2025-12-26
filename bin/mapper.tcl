@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       ______   _______     ______      #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \ (  ____ \   / ___  \     #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \| (    \/   \/   \  \    #
-# | |      | || || || (___) | Assistant  / (_) (_       ___) /| (____        ___) /    #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( (_____ \      (___ (     #
-# | | \_  )| |   | || (   ) |                ) (           ) \      ) )         ) \    #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  //\____) ) _ /\___/  /    #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/ \______/ (_)\______/     #
+#  _______  _______  _______                ___       ______    ______                 #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ____ \                #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \( (    \/                #
+# | |      | || || || (___) | Assistant  / (_) (_       ___) /| (____                  #
+# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( |  ___ \                 #
+# | | \_  )| |   | || (   ) | VTT            ) (           ) \| (   ) )                #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /( (___) )                #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/  \_____/                 #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -17,7 +17,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.35.3}     ;# @@##@@
+set GMAMapperVersion {4.36}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {422}         ;# @@##@@
 set CoreVersionNumber {6.39.1}            ;# @@##@@
@@ -72,6 +72,7 @@ set NCpath /usr/bin/nc
 set SERVER_MKDIRpath /bin/mkdir
 set ModuleID {}
 set UpgradeNotice false
+set CurrentCombatants {}
 #
 # Cache files newer than this many days are used without any further
 # checks. Otherwise, we check with the server to see if there's a newer
@@ -1281,14 +1282,94 @@ proc create_main_menu {use_button} {
 			display_message "Forcing elements to top to stack"
 		}
 	}
+	bind . <Key-t> 		{toggleCombatTargets %x %y; display_message "Setting combat target(s)"}
+	bind . <Shift-Key-T> 	{toggleCombatSource %x %y; display_message "Setting combat source"}
 	bind . <Key-g>		{toggleGridEnable}
-	bind . <Control-Key-plus>	{global zoom; zoomInBy 2; display_message "Zoomed in to $zoom"}
-	bind . <Control-Key-minus>	{global zoom; zoomInBy 0.5; display_message "Zoomed out to $zoom"}
+	bind . <Control-Key-plus>       {global zoom; zoomInBy 2; display_message "Zoomed in to $zoom"}
+        bind . <Control-Key-minus>      {global zoom; zoomInBy 0.5; display_message "Zoomed out to $zoom"}
 	bind . <Control-Key-0>	{global zoom; resetZoom; display_message "Reset zoom to $zoom"}
 	bind . <Alt-Key-v>	{FindNearby; display_message "Scrolled to visible objects"}
 	bind . <Control-Key-r>	{refreshScreen; display_message "Display refreshed"}
 	bind . <Control-Key-a>	{aoetool; display_message "Selected area-of-effect tool \[Alt-1 shape, Alt-2 spread\]"}
 	bind . <Control-Key-d>	{rulertool; display_message "Selected ruler tool"}
+}
+
+proc mobIDsToNames {idlist args} {
+	global MOBdata
+
+	set names {}
+	foreach id $idlist {
+		if {[info exists MOBdata($id)] && [dict exists $MOBdata($id) Name]} {
+			lappend names [dict get $MOBdata($id) Name]
+		} else {
+			if {[lsearch -exact $args -permissive] >= 0} {
+				lappend names $id
+			} else {
+				DEBUG 0 "Can't find name for monster with ID $id"
+			}
+		}
+	}
+	return $names
+}
+
+# mobsAtXY x y ?-noselection? -> list of all mobs under cursor and possibly also selected 
+proc mobsAtXY {x y args} {
+	global MOB_X MOB_Y canvas MOBdata
+	set MOB_X $x
+	set MOB_Y $y
+	set l [ScreenXYToMOBID $canvas $x $y]
+	if {[lsearch -exact $args -noselection] < 0} {
+		lappend l {*}[GetSelectionList]
+	}
+	set mob_list [lsort -unique -command MobNameComparison $l]
+	DEBUG 3 "mobsAtXY $x $y $args -> mob_list $mob_list from $l"
+	return $mob_list
+}
+
+# somewhat misnamed but this allows you to select the source of the targeted attack
+# if you control more than one character
+proc toggleCombatSource {mousex mousey args} {
+	global canvas ActiveTargetSource
+	set mob_list [mobIDsToNames [mobsAtXY [expr $mousex-[winfo x $canvas]] [expr $mousey-[winfo y $canvas]] -noselection]] 
+	if {[llength $mob_list] > 1} {
+		tk_messageBox -type ok -icon error -title "Ambiguous Source" \
+			-message "Too many creatures under cursor ($mob_list). We can't tell which you're trying to select as the target source."
+		return
+	}
+	set ActiveTargetSource $mob_list
+	RefreshTargets
+}
+
+# somewhat mistaned but this allows you to change the target(s) of your attacks to a new
+# list of creatures
+proc toggleCombatTargets {mousex mousey args} {
+	global canvas
+	set mob_list [mobIDsToNames [mobsAtXY [expr $mousex-[winfo x $canvas]] [expr $mousey-[winfo y $canvas]]]]
+	_setMyTargets $mob_list
+}
+
+proc _setMyTargets {tlist} {
+	global ActiveTargetSource
+	check_aka
+	set me [my_map_names]	
+	if {[llength $me] == 0} {
+		tk_messageBox -type ok -icon error -title "Who goes there?" \
+			-message "You can't set targets if we don't know what character(s) you're even playing. Either log in with a username that matches the name of your character exactly, or use the \"Specify What Character You're Playing...\" item from the Play menu before trying to select your target(s)."
+		return
+	}
+	if {[llength $me] > 1} {
+		if {$ActiveTargetSource ne {}} {
+			set me $ActiveTargetSource
+		} else {
+			tk_messageBox -type ok -icon error -title "Specify targetting character" \
+				-message "You are controlling more than one character. Before selecting your target(s), select one of your PCs (using the context menu or by pressing shift-T with the mouse over that token) to select them as the source first, then select their target(s)."
+			return
+		}
+	}
+
+	SetObjectAttribute $me [set tdict [dict create Targets [mobIDsToNames $tlist -permissive]]]
+	::gmaproto::update_obj_attributes @$me $tdict
+	global MOBdata
 }
 
 proc ClearPinnedChats {} {
@@ -2639,7 +2720,7 @@ proc set_ondeck {place} {
 	#DEBUG 1 "set_ondeck $place"
 	global ondeck_bg SoundObj no_ondeck_audio MOB_COMBATMODE
 	if {!$MOB_COMBATMODE} {
-		.toolbar2.ondeck configure -fg $ondeck_bg -text ""
+		.toolbar2.ondeck configure -fg black -bg $ondeck_bg -text ""
 		return
 	}
 
@@ -2951,6 +3032,10 @@ proc CreateHealthStatsToolTip {mob_id {extra_condition {}}} {
 	# get the list of applied conditions
 	set conditions {}
 	set has_health_info false
+	set targets {}
+	if {[dict exists $MOBdata($mob_id) Targets] && [set targ [dict get $MOBdata($mob_id) Targets]] ne {}} {
+		set targets [format "\nCurrently targeting %s." [join $targ ", "]]
+	}
 	set dead [dict get $MOBdata($mob_id) Killed]
 
 	if {[dict exists $MOBdata($mob_id) Health] && [dict get $MOBdata($mob_id) Health] ne {}} {
@@ -3083,6 +3168,10 @@ proc CreateHealthStatsToolTip {mob_id {extra_condition {}}} {
 		default {
 			append tiptext [format " (%s)" $movemode]
 		}
+	}
+
+	if {$targets ne {}} {
+		append tiptext $targets
 	}
 
 	# add conditions
@@ -4999,7 +5088,7 @@ proc ObjAoeDrag {w x y} {
 		set DistanceLabelText [format "%d feet" $radius_feet]
 		display_only [format "Spell area distance: %d square%s / %s" $radius_grids [expr $radius_grids==1 ? {{}} : {{s}}] $DistanceLabelText]
 		
-		if {$OBJ_CURRENT != 0} {
+		catch {
 			switch [::gmaproto::from_enum AoEShape [dict get $OBJdata($OBJ_CURRENT) AoEShape]] {
 				radius {
 					$w coords obj_locator_radius$OBJ_CURRENT "[expr $x0-$r] [expr $y0-$r] [expr $x0+$r] [expr $y0+$r]"
@@ -6460,6 +6549,203 @@ proc CreatureStatusMarker {w id x y s calc_condition} {
 	}
 }
 
+#
+# compare two identifiers which could be map names (with or without leading @ signs)
+# or map object ID numbers and return true if they refer to the same creature.
+#
+proc isMobIdentity {a b} {
+	set x [GetBaseMobID $a]
+	set y [GetBaseMobID $b]
+	return [expr {$x eq $y}]
+}
+
+proc GetBaseMobID {name} {
+	global MOBid PC_IDs MOBdata
+
+	if {[info exists MOBdata($name)]} {
+		return $name
+	}
+
+	if {[string range $name 0 0] eq "@"} {
+		set name [string range $name 1 end]
+	}
+
+	if {[info exists PC_IDs($name)]} {
+		return $PC_IDs($name)
+	}
+
+	if {[info exists MOBid($name)]} {
+		return $MOBid($name)
+	}
+
+	return $name
+}
+
+
+#
+# RefreshTargets 
+# 	Redraw the current player's targets and the current actor's (if any).		MYTARG#id
+#	The current actor's are animated (color-cycled) while the current player's are	
+#	drawn in red.									MATARG#id
+#
+proc _mob_size {id} {
+	if {[set sz [FullCreatureAreaInfo $id]] eq {}} {
+		DEBUG 0 "Can't get creature area info for creature $id"
+		return 0
+	} 
+	return [lindex $sz 0]
+}
+
+set ActiveTargetList {}
+set ActiveTargetSource {}
+set TargetColor blue
+proc RefreshTargets {} {
+#	DEBUG 0 "RefreshTargets"
+	global MOBdata MOBid canvas iscale ActiveTargetList ActiveTargetSource CurrentCombatants TargetColor
+	set me [my_map_names]
+	set current_actor $CurrentCombatants
+	if {[llength $current_actor] > 1} {
+		set current_actor [lindex $current_actor 0]
+	}
+
+	$canvas delete SRCTARG
+	if {[catch {
+		if {$ActiveTargetSource ne {} && [info exists MOBid($ActiveTargetSource)] && [info exists MOBdata([set tid $MOBid($ActiveTargetSource)])]} {
+#			DEBUG 0 "src id $tid -> [dict get $MOBdata($tid)]"
+			::gmautil::dassign [dict get $MOBdata($tid)] Gx gx Gy gy Hidden h
+			set sz [_mob_size $tid]
+			if {!$h} {
+				$canvas create rect [expr $gx*$iscale] [expr $gy*$iscale] [expr ($gx+$sz)*$iscale] [expr ($gy+$sz)*$iscale] -outline green -width 4 -tags SRCTARG -dash .
+			}
+		}
+	} err]} {
+		DEBUG 0 "Unable to draw target source: $err"
+	}
+
+	$canvas delete MYTARG
+	set ActiveTargetList {}
+	foreach my_source $me {
+#		DEBUG 0 "looking in $me ($my_source), current actor is $current_actor in $CurrentCombatants ([isMobIdentity $current_actor $my_source])"
+	    if {[catch {
+#		if {[info exists MOBid($my_source)]} {DEBUG 0 "MOBid($my_source)=$MOBid($my_source)"}
+#		if {[info exists MOBid($my_source)] && [info exists MOBdata([set tid $MOBid($my_source)])]} {DEBUG 0 "MOBdata($tid)=$MOBdata($tid)"}
+#		if {[info exists MOBid($my_source)] && [info exists MOBdata([set tid $MOBid($my_source)])] && [dict exists [set d $MOBdata($tid)] Targets]} {DEBUG 0 "Targets $d"}
+		if {[info exists MOBid($my_source)] && [info exists MOBdata([set tid $MOBid($my_source)])] && [dict exists [set d $MOBdata($tid)] Targets]} {
+			if {[llength $me] == 1 || [isMobIdentity $my_source $current_actor]} {
+				set ActiveTargetList [dict get $d Targets]
+#				DEBUG 0 "ActiveTargetList $ActiveTargetList"
+			} 
+
+			if {![isMobIdentity $my_source $current_actor]} {
+				::gmautil::dassign $d Gx agx Gy agy Hidden ahidden
+				set actor_mob_size [_mob_size $tid]
+				if {$ahidden} continue
+
+				foreach target [dict get $d Targets] {
+					if {[info exists MOBid($target)]} {
+						set ttid $MOBid($target)
+						if {[info exists MOBdata($ttid)]} {
+							::gmautil::dassign $MOBdata($ttid) Gx gx Gy gy Hidden hidden
+							if {$hidden} continue
+							set mob_size [_mob_size $ttid]
+							RenderTarget $canvas [expr $gx*$iscale] [expr $gy*$iscale] [expr ($gx+$mob_size)*$iscale] [expr ($gy+$mob_size)*$iscale] [list MYTARG MYTARG#$tid] MYTARG
+							$canvas create line [expr ($agx+($actor_mob_size/2.0))*$iscale] [expr ($agy+($actor_mob_size/2.0))*$iscale] [expr ($gx+($mob_size/2.0))*$iscale] [expr ($gy+($mob_size/2.0))*$iscale] -fill $TargetColor -width 3 -tags [list MYTARG MYTARG#$tid MYTARGLINE] -dash - -arrow last
+						}
+					}
+				}
+			}
+			# TODO this creature named $my_source with obj id $tid I control targets [dict get $d Targets]
+		}
+	    } err]} {
+	        DEBUG 1 "Unable to draw target for $my_source: $err"
+	    }
+	}
+
+	$canvas delete MATARG
+	global MOB_COMBATMODE
+	set start false
+	if {$MOB_COMBATMODE && $current_actor ne {}} {
+		if {[info exists MOBid([set tid $current_actor])]} {
+			set tid $MOBid($current_actor)
+		}
+		if {[info exists MOBdata($tid)] && [dict exists [set d $MOBdata($tid)] Targets]} {
+			if {[catch {
+				::gmautil::dassign $d Gx agx Gy agy Hidden ahidden
+				if {$ahidden} continue
+				set actor_mob_size [_mob_size $tid]
+
+				foreach target [dict get $d Targets] {
+					if {[info exists MOBid($target)] && [info exists MOBdata([set ttid $MOBid($target)])]} {
+						::gmautil::dassign $MOBdata($ttid) Gx gx Gy gy Hidden hidden
+						if {$hidden} continue
+						set mob_size [_mob_size $ttid]
+						RenderTarget $canvas [expr $gx*$iscale] [expr $gy*$iscale] [expr ($gx+$mob_size)*$iscale] [expr ($gy+$mob_size)*$iscale] [list MATARG MATARG#$tid] MATARG
+						$canvas create line [expr ($agx+($actor_mob_size/2.0))*$iscale] [expr ($agy+($actor_mob_size/2.0))*$iscale] [expr ($gx+($mob_size/2.0))*$iscale] [expr ($gy+($mob_size/2.0))*$iscale] -fill $TargetColor -width 3 -tags [list MATARG MATARG#$tid MATARG MATARGLINE] -dash - -arrow last
+						set start true
+					}
+				}
+			} err]} {
+				DEBUG 0 "Unable to draw targets for $current_actor: $err"
+			}
+		}
+	}
+	if {$start} {
+		AnimateTargetArrows
+	}
+}
+
+set _color_wheel {#ff0000 #ff8800 #ffff00 #88ff00 #00ff00 #00ff88 #00ffff #0088ff #0000ff #8800ff #ff00ff #ff0088}
+set _color_wheel_cur 0
+set _ata_running false
+
+proc AnimateTargetArrows {} {
+	global _ata_running
+	if {!$_ata_running} {
+		set _ata_running true
+		_AnimateTargetArrows
+	}
+}
+proc _AnimateTargetArrows {} {
+	global canvas _color_wheel _color_wheel_cur _ata_running
+
+	if {[$canvas gettags MATARGLINE] eq {}} {
+		# no highlighted items currently, so stop this
+		set _ata_running false
+		return
+	}
+	$canvas itemconfigure MATARGLINE -fill [lindex $_color_wheel $_color_wheel_cur]
+	$canvas itemconfigure MATARGRECT -outline [lindex $_color_wheel $_color_wheel_cur]
+	set _color_wheel_cur [expr ($_color_wheel_cur+1) % [llength $_color_wheel]]
+
+	after 100 _AnimateTargetArrows
+}
+
+# RenderTarget canvas x y width height tags
+#   Draws targets with tags provided (so you can delete them by tags when no longer needed)
+proc RenderTarget {w x0 y0 x1 y1 tags basetag} {
+	global TargetColor
+	set hx [expr $x0+(($x1-$x0)/2.0)]
+	set hy [expr $y0+(($y1-$y0)/2.0)]
+	set ticklen [expr ($x1-$x0)/10.0]
+	set tickoff_x [expr $hx-($ticklen/2.0)]
+	set tick_x [expr $hx-($ticklen/2.0)]
+	set tick_y [expr $hy-($ticklen/2.0)]
+	set rtags $tags
+	set ltags $tags
+	lappend rtags ${basetag}RECT
+	lappend ltags ${basetag}LINE
+	$w create rect $x0 $y0 $x1 $y1 -outline $TargetColor -width 5 -dash . -tags $rtags 
+	$w create line $x0 $hy $x1 $hy -fill $TargetColor -width 4 -tags $ltags
+	$w create line $hx $y0 $hx $y1 -fill $TargetColor -width 4 -tags $ltags
+	for {set i 1} {$i < 8} {incr i} {
+		if {$i==4} continue
+		set yy [expr $y0+((($y1-$y0)/8.0)*$i)]
+		set xx [expr $x0+((($x1-$x0)/8.0)*$i)]
+		$w create line $tick_x $yy [expr $tick_x+$ticklen] $yy -fill $TargetColor -width 3 -tags $ltags
+		$w create line $xx $tick_y $xx [expr $tick_y+$ticklen] -fill $TargetColor -width 3 -tags $ltags
+	}
+}
+
 proc RenderSomeone {w id {norecurse false}} {
 	DEBUG 3 "RenderSomeone $w $id"
 	global MOBdata ThreatLineWidth iscale SelectLineWidth ThreatLineHatchWidth ReachLineColor
@@ -7178,6 +7464,7 @@ proc RenderSomeone {w id {norecurse false}} {
 			RenderSomeone $w $neighbor true
 		}
 	}
+	RefreshTargets
 }
 
 # returns the MOB id associated with a map element or empty string
@@ -8616,77 +8903,106 @@ proc CreateReachSubMenu {args} {
 	return $mid
 }
 
+proc _setSomeTargets {x y} {
+	_setMyTargets [mobsAtXY $x $y]
+}
+
 proc DoContext {x y} {
 	global MOB_X MOB_Y canvas MOBdata
-	set MOB_X $x
-	set MOB_Y $y
 	lassign [ScreenXYToGridXY $x $y -exact] Gx Gy
+	set mob_list [mobsAtXY $x $y]
+#	DEBUG 0 "DoContext x=$x y=$y Gx=$Gx Gy=$Gy mob_list=$mob_list"
 
-	set mob_list [lsort -unique -command MobNameComparison [concat [ScreenXYToMOBID $canvas $x $y] [GetSelectionList]]]
-	DEBUG 3 "DoContext mob_list $mob_list from [ScreenXYToMOBID $canvas $x $y] + [GetSelectionList]"
+	# positions
+	set CTXtarg 0
+	set CTXremo 1
+	set CTXaddp 2
+	set CTXaddm 3
+	set CTXdead 4
+	set CTXreac 5
+	set CTXsaoe 6
+	set CTXpoly 7
+	set CTXsize 8
+	set CTXcond 9
+	set CTXtags 10
+	set CTXelev 11
+	set CTXmmod 12
+	set CTXSEP1 13
+	set CTXdgrd 14
+	set CTXdfrm 15
+	set CTXSEP2 16
+	set CTXtsel 17
+	set CTXdsel 18
+	set CTXSEP3 19
+	set CTX_pcs 20
 
-	.contextMenu delete 13
-	.contextMenu insert 13 command -command "DistanceFromGrid $x $y 0" -label "Distance from [LetterLabel $Gx]$Gy"
+	.contextMenu delete $CTXdgrd
+	.contextMenu insert $CTXdgrd command -command "DistanceFromGrid $x $y 0" -label "Distance from [LetterLabel $Gx]$Gy"
 
 	if {[llength $mob_list] == 0} {
-		.contextMenu delete 0
-		.contextMenu insert 0 command -command "" -label "Remove" -state disabled
-		.contextMenu delete 3
-		.contextMenu insert 3 command -command "" -label "Toggle Death" -state disabled
-		.contextMenu delete 4
-		.contextMenu insert 4 command -command "" -label "Set Reach" -state disabled
-		.contextMenu delete 5
-		.contextMenu insert 5 command -command "" -label "Toggle Spell Area" -state disabled
-		.contextMenu delete 6
-		.contextMenu insert 6 command -command "" -label "Polymorph" -state disabled
-		.contextMenu delete 7
-		.contextMenu insert 7 command -command "" -label "Change Size" -state disabled
-		.contextMenu delete 8
-		.contextMenu insert 8 command -command "" -label "Toggle Condition" -state disabled
-		.contextMenu delete 9
-		.contextMenu insert 9 command -command "" -label "Tag" -state disabled
-		.contextMenu delete 10
-		.contextMenu insert 10 command -command "" -label "Set Elevation" -state disabled
-		.contextMenu delete 11
-		.contextMenu insert 11 command -command "" -label "Set Movement Mode" -state disabled
-		.contextMenu delete 14
-		.contextMenu insert 14 command -command "" -label "Distance from..." -state disabled
-		.contextMenu delete 16
-		.contextMenu insert 16 command -command "" -label "Toggle Selection" -state disabled
+		.contextMenu delete $CTXtarg
+		.contextMenu insert $CTXtarg command -command "" -label "Target" -state disabled -accelerator T
+		.contextMenu delete $CTXremo
+		.contextMenu insert $CTXremo command -command "" -label "Remove" -state disabled
+		.contextMenu delete $CTXdead
+		.contextMenu insert $CTXdead command -command "" -label "Toggle Death" -state disabled
+		.contextMenu delete $CTXreac
+		.contextMenu insert $CTXreac command -command "" -label "Set Reach" -state disabled
+		.contextMenu delete $CTXsaoe
+		.contextMenu insert $CTXsaoe command -command "" -label "Toggle Spell Area" -state disabled
+		.contextMenu delete $CTXpoly
+		.contextMenu insert $CTXpoly command -command "" -label "Polymorph" -state disabled
+		.contextMenu delete $CTXsize
+		.contextMenu insert $CTXsize command -command "" -label "Change Size" -state disabled
+		.contextMenu delete $CTXcond
+		.contextMenu insert $CTXcond command -command "" -label "Toggle Condition" -state disabled
+		.contextMenu delete $CTXtags
+		.contextMenu insert $CTXtags command -command "" -label "Tag" -state disabled
+		.contextMenu delete $CTXelev
+		.contextMenu insert $CTXelev command -command "" -label "Set Elevation" -state disabled
+		.contextMenu delete $CTXmmod
+		.contextMenu insert $CTXmmod command -command "" -label "Set Movement Mode" -state disabled
+		.contextMenu delete $CTXdfrm
+		.contextMenu insert $CTXdfrm command -command "" -label "Distance from..." -state disabled
+		.contextMenu delete $CTXtsel
+		.contextMenu insert $CTXtsel command -command "" -label "Toggle Selection" -state disabled
 	} elseif {[llength $mob_list] == 1} {
 		set mob_id [lindex $mob_list 0]
 		set mob_name [dict get $MOBdata($mob_id) Name]
 		set mob_disp_name [::gmaclock::nameplate_text $mob_name]
-		.contextMenu delete 0
-		.contextMenu insert 0 command -command "RemovePerson $mob_id; ::gmaproto::clear $mob_id" -label "Remove [::gmaclock::nameplate_text [dict get $MOBdata($mob_id) Name]]"
-		.contextMenu delete 3
-		.contextMenu insert 3 command -command "KillPerson $mob_id" -label "Toggle Death for $mob_disp_name"
-		.contextMenu delete 4
-#		.contextMenu insert 4 command -command "ToggleReach $mob_id" -label "Cycle Reach for $mob_name"
-		.contextMenu insert 4 cascade -menu [CreateReachSubMenu -shallow $mob_id] -label "Set Reach for $mob_disp_name"
-		.contextMenu delete 5
-		.contextMenu insert 5 command -command "ToggleSpellArea $mob_id" -label "Toggle Spell Area for $mob_disp_name"
-		.contextMenu delete 6
+		.contextMenu delete $CTXtarg
+		.contextMenu insert $CTXtarg command -command "_setMyTargets $mob_id" -label "Target [::gmaclock::nameplate_text [dict get $MOBdata($mob_id) Name]]" -accelerator T
+		.contextMenu delete $CTXremo
+		.contextMenu insert $CTXremo command -command "RemovePerson $mob_id; ::gmaproto::clear $mob_id" -label "Remove [::gmaclock::nameplate_text [dict get $MOBdata($mob_id) Name]]"
+		.contextMenu delete $CTXdead
+		.contextMenu insert $CTXdead command -command "KillPerson $mob_id" -label "Toggle Death for $mob_disp_name"
+		.contextMenu delete $CTXreac
+#		.contextMenu insert $CTXreac command -command "ToggleReach $mob_id" -label "Cycle Reach for $mob_name"
+		.contextMenu insert $CTXreac cascade -menu [CreateReachSubMenu -shallow $mob_id] -label "Set Reach for $mob_disp_name"
+		.contextMenu delete $CTXsaoe
+		.contextMenu insert $CTXsaoe command -command "ToggleSpellArea $mob_id" -label "Toggle Spell Area for $mob_disp_name"
+		.contextMenu delete $CTXpoly
 		if {[AllowedToPolymorph $mob_id]} {
-			.contextMenu insert 6 cascade -menu [CreatePolySubMenu -shallow $mob_id] -label "Polymorph $mob_disp_name"
+			.contextMenu insert $CTXpoly cascade -menu [CreatePolySubMenu -shallow $mob_id] -label "Polymorph $mob_disp_name"
 		} else {
-			.contextMenu insert 6 command -state disabled -label "Polymorph $mob_disp_name"
+			.contextMenu insert $CTXpoly command -state disabled -label "Polymorph $mob_disp_name"
 		}
-		.contextMenu delete 7
-		.contextMenu insert 7 cascade -menu [CreateSizeSubMenu -shallow $mob_id] -label "Change Size of $mob_disp_name"
-		.contextMenu delete 8
-		.contextMenu insert 8 cascade -menu [CreateConditionSubMenu -shallow $mob_id] -label "Toggle Condition for $mob_disp_name"
-		.contextMenu delete 9
-		.contextMenu insert 9 cascade -menu [CreateTagSubMenu -shallow $mob_id] -label "Tag $mob_disp_name"
-		.contextMenu delete 10
-		.contextMenu insert 10 cascade -menu [CreateElevationSubMenu -shallow $mob_id] -label "Set Elevation for $mob_disp_name"
-		.contextMenu delete 11
-		.contextMenu insert 11 cascade -menu [CreateMovementModeSubMenu -shallow $mob_id] -label "Set Movement Mode for $mob_disp_name"
-		.contextMenu delete 14
-		.contextMenu insert 14 command -command "DistanceFromMob $mob_id" -label "Distance from $mob_disp_name..."
-		.contextMenu delete 16
-		.contextMenu insert 16 command -command "ToggleSelection $mob_id" -label "Toggle Selection for $mob_disp_name"
+		.contextMenu delete $CTXsize
+		.contextMenu insert $CTXsize cascade -menu [CreateSizeSubMenu -shallow $mob_id] -label "Change Size of $mob_disp_name"
+		.contextMenu delete $CTXcond
+		.contextMenu insert $CTXcond cascade -menu [CreateConditionSubMenu -shallow $mob_id] -label "Toggle Condition for $mob_disp_name"
+		.contextMenu delete $CTXtags
+		.contextMenu insert $CTXtags cascade -menu [CreateTagSubMenu -shallow $mob_id] -label "Tag $mob_disp_name"
+		.contextMenu delete $CTXelev
+		.contextMenu insert $CTXelev cascade -menu [CreateElevationSubMenu -shallow $mob_id] -label "Set Elevation for $mob_disp_name"
+		.contextMenu delete $CTXmmod
+		.contextMenu insert $CTXmmod cascade -menu [CreateMovementModeSubMenu -shallow $mob_id] -label "Set Movement Mode for $mob_disp_name"
+		.contextMenu delete $CTXdfrm
+		.contextMenu insert $CTXdfrm command -command "DistanceFromMob $mob_id" -label "Distance from $mob_disp_name..."
+		.contextMenu delete $CTXtsel
+		.contextMenu insert $CTXtsel command -command "ToggleSelection $mob_id" -label "Toggle Selection for $mob_disp_name"
 	} else {
+		.contextMenu.targ delete 0 end
 		.contextMenu.del delete 0 end
 		.contextMenu.kill delete 0 end
 		.contextMenu.reach delete 0 end
@@ -8703,6 +9019,7 @@ proc DoContext {x y} {
 		foreach mob_id $mob_list {
 			set mob_name [dict get $MOBdata($mob_id) Name]
 			set mob_disp_name [::gmaclock::nameplate_text $mob_name]
+			.contextMenu.targ add command -command "_setMyTargets $mob_id" -label $mob_disp_name
 			.contextMenu.del add command -command "RemovePerson $mob_id; ::gmaproto::clear $mob_id" -label $mob_disp_name
 			.contextMenu.kill add command -command "KillPerson $mob_id" -label $mob_disp_name
 #			.contextMenu.reach add command -command "ToggleReach $mob_id" -label $mob_name
@@ -8723,6 +9040,7 @@ proc DoContext {x y} {
 			.contextMenu.dist add command -command "DistanceFromMob $mob_id" -label $mob_disp_name
 			.contextMenu.tsel add command -command "ToggleSelection $mob_id" -label $mob_disp_name
 		}
+		.contextMenu.targ add command -command "_setMyTargets [list $mob_list]" -label "(all of the above)"
 		.contextMenu.del add command -command "RemoveAll $mob_list" -label "(all of the above)"
 		.contextMenu.kill add command -command "KillAll $mob_list" -label "(all of the above)"
 		.contextMenu.reach add cascade -menu [CreateReachSubMenu -mass $mob_list] -label "(all of the above)"
@@ -8736,30 +9054,32 @@ proc DoContext {x y} {
 		.contextMenu.cond add cascade -menu [CreateConditionSubMenu -mass $mob_list] -label "(all of the above)"
 		.contextMenu.elev add cascade -menu [CreateElevationSubMenu -mass $mob_list] -label "(all of the above)"
 		.contextMenu.mmode add cascade -menu [CreateMovementModeSubMenu -mass $mob_list] -label "(all of the above)"
-		.contextMenu delete 0
-		.contextMenu insert 0 cascade -menu .contextMenu.del -label "Remove"
-		.contextMenu delete 3
-		.contextMenu insert 3 cascade -menu .contextMenu.kill -label "Toggle Death"
-		.contextMenu delete 4
-		.contextMenu insert 4 cascade -menu .contextMenu.reach -label "Set Reach"
-		.contextMenu delete 5
-		.contextMenu insert 5 cascade -menu .contextMenu.aoe -label "Toggle Spell Area"
-		.contextMenu delete 6
-		.contextMenu insert 6 cascade -menu .contextMenu.poly -label "Polymorph"
-		.contextMenu delete 7
-		.contextMenu insert 7 cascade -menu .contextMenu.size -label "Change Size"
-		.contextMenu delete 8
-		.contextMenu insert 8 cascade -menu .contextMenu.cond -label "Toggle Condition"
-		.contextMenu delete 9
-		.contextMenu insert 9 cascade -menu .contextMenu.tag -label "Tag"
-		.contextMenu delete 10
-		.contextMenu insert 10 cascade -menu .contextMenu.elev -label "Set Elevation"
-		.contextMenu delete 11
-		.contextMenu insert 11 cascade -menu .contextMenu.mmode -label "Set Movement Mode"
-		.contextMenu delete 14
-		.contextMenu insert 14 cascade -menu .contextMenu.dist -label "Distance From..."
-		.contextMenu delete 16
-		.contextMenu insert 16 cascade -menu .contextMenu.tsel -label "Toggle Selection for"
+		.contextMenu delete $CTXtarg
+		.contextMenu insert $CTXtarg cascade -menu .contextMenu.targ -label "Target" -accelerator T
+		.contextMenu delete $CTXremo
+		.contextMenu insert $CTXremo cascade -menu .contextMenu.del -label "Remove"
+		.contextMenu delete $CTXdead
+		.contextMenu insert $CTXdead cascade -menu .contextMenu.kill -label "Toggle Death"
+		.contextMenu delete $CTXreac
+		.contextMenu insert $CTXreac cascade -menu .contextMenu.reach -label "Set Reach"
+		.contextMenu delete $CTXsaoe
+		.contextMenu insert $CTXsaoe cascade -menu .contextMenu.aoe -label "Toggle Spell Area"
+		.contextMenu delete $CTXpoly
+		.contextMenu insert $CTXpoly cascade -menu .contextMenu.poly -label "Polymorph"
+		.contextMenu delete $CTXsize
+		.contextMenu insert $CTXsize cascade -menu .contextMenu.size -label "Change Size"
+		.contextMenu delete $CTXcond
+		.contextMenu insert $CTXcond cascade -menu .contextMenu.cond -label "Toggle Condition"
+		.contextMenu delete $CTXtags
+		.contextMenu insert $CTXtags cascade -menu .contextMenu.tag -label "Tag"
+		.contextMenu delete $CTXelev
+		.contextMenu insert $CTXelev cascade -menu .contextMenu.elev -label "Set Elevation"
+		.contextMenu delete $CTXmmod
+		.contextMenu insert $CTXmmod cascade -menu .contextMenu.mmode -label "Set Movement Mode"
+		.contextMenu delete $CTXdfrm
+		.contextMenu insert $CTXdfrm cascade -menu .contextMenu.dist -label "Distance From..."
+		.contextMenu delete $CTXtsel
+		.contextMenu insert $CTXtsel cascade -menu .contextMenu.tsel -label "Toggle Selection for"
 	}
 
 	set wx [expr [winfo rootx $canvas] + $x]
@@ -8775,6 +9095,7 @@ proc MobNameComparison {a b} {
 
 report_progress "Setting up UI: context menu"
 menu .contextMenu -tearoff 0
+menu .contextMenu.targ -tearoff 0
 menu .contextMenu.del -tearoff 0
 menu .contextMenu.kill -tearoff 0
 menu .contextMenu.reach -tearoff 0
@@ -8788,29 +9109,26 @@ menu .contextMenu.mmode -tearoff 0
 menu .contextMenu.dist -tearoff 0
 menu .contextMenu.tsel -tearoff 0
 #menu .addPlayerMenu
-.contextMenu add command -command "" -label Remove -state disabled					;# 0
-.contextMenu add command -command {AddPlayerMenu player} -label {Add Player...}				;# 1
-.contextMenu add command -command {AddPlayerMenu monster} -label {Add Monster...}			;# 2
-.contextMenu add command -command "" -label {Toggle Death} -state disabled				;# 3
-.contextMenu add command -command "" -label {Set Reach} -state disabled				;# 4
-.contextMenu add command -command "" -label {Toggle Spell Area} -state disabled				;# 5
-.contextMenu add command -command "" -label {Polymorph} -state disabled					;# 6
-.contextMenu add command -command "" -label {Change Size} -state disabled				;# 7
-.contextMenu add command -command "" -label {Toggle Condition} -state disabled				;# 8 
-.contextMenu add command -command "" -label {Tag} -state disabled					;# 9 
-.contextMenu add command -command "" -label {Elevation} -state disabled					;# 10
-.contextMenu add command -command "" -label {Movement Mode} -state disabled				;# 11
-.contextMenu add separator										;# 12
-.contextMenu add command -command "" -label {Distance from...} -state disabled		 		;# 13 
-.contextMenu add command -command "" -label {Distance from...} -state disabled				;# 14 
-.contextMenu add separator										;# 15 
-.contextMenu add command -command "" -label {Toggle Selection} -state disabled				;# 16 
-.contextMenu add command -command "ClearSelection" -label {Deselect All} -state disabled		;# 17
-#.contextMenu add command -command "FindNearby" -label {Scroll to Visible Objects}			;# 18 REMOVED
-#.contextMenu add command -command "SyncView" -label {Scroll Others' Views to Match Mine}		;# 19 REMOVED
-#.contextMenu add command -command "refreshScreen" -label {Refresh Display}				;# 20 REMOVED
-#.contextMenu add command -command "aboutMapper" -label {About Mapper...}				;# 21 REMOVED
-.contextMenu add separator										;# 18; was 22
+.contextMenu add command -command "" -label Target -state disabled               			;# 0
+.contextMenu add command -command "" -label Remove -state disabled					;# 1
+.contextMenu add command -command {AddPlayerMenu player} -label {Add Player...}				;# 2
+.contextMenu add command -command {AddPlayerMenu monster} -label {Add Monster...}			;# 3
+.contextMenu add command -command "" -label {Toggle Death} -state disabled				;# 4
+.contextMenu add command -command "" -label {Set Reach} -state disabled					;# 5
+.contextMenu add command -command "" -label {Toggle Spell Area} -state disabled				;# 6
+.contextMenu add command -command "" -label {Polymorph} -state disabled					;# 7
+.contextMenu add command -command "" -label {Change Size} -state disabled				;# 8
+.contextMenu add command -command "" -label {Toggle Condition} -state disabled				;# 9 
+.contextMenu add command -command "" -label {Tag} -state disabled					;# 10 
+.contextMenu add command -command "" -label {Elevation} -state disabled					;# 11
+.contextMenu add command -command "" -label {Movement Mode} -state disabled				;# 12
+.contextMenu add separator										;# 13
+.contextMenu add command -command "" -label {Distance from...} -state disabled		 		;# 14 
+.contextMenu add command -command "" -label {Distance from...} -state disabled				;# 15 
+.contextMenu add separator										;# 16 
+.contextMenu add command -command "" -label {Toggle Selection} -state disabled				;# 17 
+.contextMenu add command -command "ClearSelection" -label {Deselect All} -state disabled		;# 18
+.contextMenu add separator										;# 19
 
 # AddPlayer name color ?area? ?size? ?id?  defaults to 1x1, generated ID
 #
@@ -10084,6 +10402,7 @@ proc DoCommandIL {d} {
 		::gmaclock::set_initiative_slots .initiative.clock [dict get $d InitiativeList]
 	}
 	update_ondeck_list [dict get $d InitiativeList]
+	RefreshTargets
 }
 
 # given a creature dict, enforce the new protocol specs in a backward-compatible way
@@ -10651,6 +10970,9 @@ proc DoCommandI {d} {
  	foreach id $ITlist {
  		PopSomeoneToFront $canvas $id
  	}
+	global CurrentCombatants
+	set CurrentCombatants $ITlist
+	RefreshTargets 
 }
 
 proc DoCommandL {d} {
@@ -14783,6 +15105,7 @@ proc UpdatePeerList {for_user tkey} {
 
 proc SendDieRoll {recipients dice blind_p for_user tkey} {
 	global dice_preset_data
+	global ActiveTargetList
 	set d [ParseRecipientList $recipients TO ToGM $blind_p]
 	# Special case: table lookups are introduced by die-rolls that look like
 	# [title=] #tablename [...]
@@ -14807,9 +15130,9 @@ proc SendDieRoll {recipients dice blind_p for_user tkey} {
 			set flags {}
 		}
 
-		::gmaproto::roll_dice "$title [dict get $tbl dieroll] $rest" [dict get $d Recipients] [dict get $d ToAll] [dict get $d ToGM] "#$globmark$tablename;$tkey;$flags;[new_id]"
+		::gmaproto::roll_dice "$title [dict get $tbl dieroll] $rest" [dict get $d Recipients] [dict get $d ToAll] [dict get $d ToGM] "#$globmark$tablename;$tkey;$flags;[new_id]" $ActiveTargetList
 	} else {
-		::gmaproto::roll_dice $dice [dict get $d Recipients] [dict get $d ToAll] [dict get $d ToGM] [new_id]
+		::gmaproto::roll_dice $dice [dict get $d Recipients] [dict get $d ToAll] [dict get $d ToGM] [new_id] $ActiveTargetList
 	}
 }
 proc UpdateDicePresets {deflist for_user {system false}} {::gmaproto::define_dice_presets $deflist false $for_user $system}
@@ -15077,7 +15400,7 @@ proc aboutMapper {} {
 
 
 	tk_messageBox -parent . -type ok -icon info -title "About Mapper" \
-		-message "GMA Mapper Client, Version $GMAMapperVersion, for GMA $CoreVersionNumber.\n\nCopyright \u00A9 Steve Willoughby, Aloha, Oregon, USA. All Rights Reserved. Distributed under the terms and conditions of the 3-Clause BSD License.\n\nThis client supports file format $GMAMapperFileFormat and server protocol $GMAMapperProtocol." -detail $connection_info
+		-message "GMA VTT Mapper Client, Version $GMAMapperVersion, for GMA $CoreVersionNumber.\n\nCopyright \u00A9 Steve Willoughby, Aloha, Oregon, USA. All Rights Reserved. Distributed under the terms and conditions of the 3-Clause BSD License.\n\nThis client supports file format $GMAMapperFileFormat and server protocol $GMAMapperProtocol." -detail $connection_info
 }
 
 proc SyncAllClientsToMe {} {
@@ -17136,8 +17459,17 @@ proc check_aka_commit {} {
 #   								-> DieRollPresetState(<tkey>,apply_order)={g<id> ...}
 #
 #
+# RefreshTargets
+#   MOBdata(id) -> dict
+#   MOBid(mapname) -> id
+#	mob Targets {a b c}	this creature targets a, b, c
+#   
+#  In combat mode draw current actor's targets with animated color targets and arrows
+#  Always draw current player's targets with red targets and arrows
 #
-# @[00]@| GMA-Mapper 4.35.3
+#  called when rendering somone or advancing the initiative turn or updating target attribute
+#
+# @[00]@| GMA-Mapper 4.36
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2025 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
