@@ -1389,7 +1389,7 @@ proc _setMyTargets {tlist args} {
 			set tlist [lindex $tlist 0]
 		}
 	}
-	display_only "Selected $tlist"
+	display_only "Selected random creature"
 
 	set tagname "@[lindex $me 0]"
 	SetObjectAttribute $tagname [set tdict [dict create Targets [mobIDsToNames $tlist -permissive]]]
@@ -17452,7 +17452,9 @@ proc check_aka_commit {} {
 			}
 		}
 		if {[set custom [.akawindow.custom.e get]] ne {}} {
-			lappend local_aka $custom
+			foreach custom_character $custom {
+				lappend local_aka $custom_character
+			}
 		}
 		set im_not_playing false
 	}
