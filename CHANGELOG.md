@@ -3,7 +3,7 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.36          <!-- @@##@@ -->
+ * This Package Version: 4.36.1          <!-- @@##@@ -->
  * Effective Date: 26-Dec-2025               <!-- @@##@@ -->
 
 ## Compatibility
@@ -16,6 +16,12 @@
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.36.1
+## Fixes
+ * Minor fixes to targeting system.
+ * GM-side targeting for monsters now supported.
+ * Allows random selection between multiple targets.
 
 # 4.36
 ## Fixes
