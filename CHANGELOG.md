@@ -17,6 +17,10 @@ The support for old server protocols (<400) and map file formats (<20) will be d
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
+# 4.36.2 (unreleased)
+## Fixes
+ * Fixed "playing as" dialog so "custom" entry feild can take multiple names
+
 # 4.36.1
 ## Fixes
  * Minor fixes to targeting system.
