@@ -17,6 +17,12 @@ The support for old server protocols (<400) and map file formats (<20) will be d
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
+# 4.36.1
+## Fixes
+ * Minor fixes to targeting system.
+ * GM-side targeting for monsters now supported.
+ * Allows random selection between multiple targets.
+
 # 4.36
 ## Fixes
  * Makes it easier to see the size of spell areas of effect as you draw them.

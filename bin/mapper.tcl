@@ -1052,6 +1052,7 @@ proc update_main_menu {} {
 		set privcmdstate disabled
 	}
 	$MAIN_MENU.play entryconfigure "Edit System Die Roll Presets" -state $privcmdstate
+	$MAIN_MENU.view entryconfigure "Show All Combat Targets" -state $privcmdstate
 }
 
 proc create_main_menu {use_button} {
@@ -1169,6 +1170,7 @@ proc create_main_menu {use_button} {
 	$mm.view add checkbutton -command {toolBarState -1} -label "Show Toolbar" -onvalue 1 -offvalue 0 -selectcolor $check_menu_color -variable ShowToolBar
 	$mm.view add checkbutton -command {setGridEnable} -label "Show Map Grid" -onvalue 1 -offvalue 0 -selectcolor $check_menu_color -variable ShowMapGrid -accelerator G
 	$mm.view add checkbutton -command {RefreshMOBs} -label "Show Health Stats" -onvalue 1 -offvalue 0 -selectcolor $check_menu_color -variable ShowHealthStats
+	$mm.view add checkbutton -command {toggle_view_all_targets} -label "Show All Combat Targets" -onvalue 1 -offvalue 0 -selectcolor $check_menu_color -variable show_all_targets -state disabled
 	menu $mm.view.timers
 	$mm.view add cascade -menu $mm.view.timers -label "Show Timers"
 	$mm.view.timers add radiobutton -label "none" -selectcolor $check_menu_color -variable TimerScope -value none -command populate_timer_widgets
@@ -1283,6 +1285,7 @@ proc create_main_menu {use_button} {
 		}
 	}
 	bind . <Key-t> 		{toggleCombatTargets %x %y; display_message "Setting combat target(s)"}
+	bind . <Shift-Control-Key-T>	{display_message "Setting random combat target"; toggleCombatTargets %x %y -random }
 	bind . <Shift-Key-T> 	{toggleCombatSource %x %y; display_message "Setting combat source"}
 	bind . <Key-g>		{toggleGridEnable}
 	bind . <Control-Key-plus>       {global zoom; zoomInBy 2; display_message "Zoomed in to $zoom"}
@@ -1340,36 +1343,57 @@ proc toggleCombatSource {mousex mousey args} {
 	RefreshTargets
 }
 
-# somewhat mistaned but this allows you to change the target(s) of your attacks to a new
+# somewhat mistamed but this allows you to change the target(s) of your attacks to a new
 # list of creatures
 proc toggleCombatTargets {mousex mousey args} {
 	global canvas
 	set mob_list [mobIDsToNames [mobsAtXY [expr $mousex-[winfo x $canvas]] [expr $mousey-[winfo y $canvas]]]]
-	_setMyTargets $mob_list
+	_setMyTargets $mob_list $args
 }
 
-proc _setMyTargets {tlist} {
-	global ActiveTargetSource
-	check_aka
-	set me [my_map_names]	
-	if {[llength $me] == 0} {
-		tk_messageBox -type ok -icon error -title "Who goes there?" \
-			-message "You can't set targets if we don't know what character(s) you're even playing. Either log in with a username that matches the name of your character exactly, or use the \"Specify What Character You're Playing...\" item from the Play menu before trying to select your target(s)."
-		return
-	}
-	if {[llength $me] > 1} {
+proc _setMyTargets {tlist args} {
+	global ActiveTargetSource is_GM
+	
+	if {$is_GM} {
 		if {$ActiveTargetSource ne {}} {
+			# The GM can set the target of the creature whose turn it is now
 			set me $ActiveTargetSource
 		} else {
 			tk_messageBox -type ok -icon error -title "Specify targetting character" \
-				-message "You are controlling more than one character. Before selecting your target(s), select one of your PCs (using the context menu or by pressing shift-T with the mouse over that token) to select them as the source first, then select their target(s)."
+				-message "There isn't a current combatant. You need to select one first by pressing shift-T with the mouse over that creature's token."
 			return
+		}
+	} else {
+		check_aka
+		set me [my_map_names]	
+		if {[llength $me] == 0} {
+			tk_messageBox -type ok -icon error -title "Who goes there?" \
+				-message "You can't set targets if we don't know what character(s) you're even playing. Either log in with a username that matches the name of your character exactly, or use the \"Specify What Character You're Playing...\" item from the Play menu before trying to select your target(s)."
+			return
+		}
+		if {[llength $me] > 1} {
+			if {$ActiveTargetSource ne {}} {
+				set me $ActiveTargetSource
+			} else {
+				tk_messageBox -type ok -icon error -title "Specify targetting character" \
+					-message "You are controlling more than one character. Before selecting your target(s), select one of your PCs (using the context menu or by pressing shift-T with the mouse over that token) to select them as the source first, then select their target(s)."
+				return
+			}
 		}
 	}
 
-	SetObjectAttribute $me [set tdict [dict create Targets [mobIDsToNames $tlist -permissive]]]
-	::gmaproto::update_obj_attributes @$me $tdict
-	global MOBdata
+	if {[llength $tlist] > 0 && [lsearch -exact $args -random] >= 0} {
+		if {[catch {
+			set tlist [lindex $list [expr int(rand()*[llength $tlist])]]
+		}]} {
+			set tlist [lindex $tlist 0]
+		}
+	}
+	display_only "Selected $tlist"
+
+	set tagname "@[lindex $me 0]"
+	SetObjectAttribute $tagname [set tdict [dict create Targets [mobIDsToNames $tlist -permissive]]]
+	::gmaproto::update_obj_attributes $tagname $tdict
 }
 
 proc ClearPinnedChats {} {
@@ -2972,6 +2996,7 @@ proc cycleStipple {{newStipple -cycle}} {
 
 
 set ShowHealthStats 0
+set show_all_targets 0
 
 proc toggleShowHealthStats {} {
 	global ShowHealthStats
@@ -3816,6 +3841,9 @@ proc resetZoom {} {
 }
 
 set ShowMapGrid 1
+proc toggle_view_all_targets {} {
+	RefreshTargets
+}
 proc setGridEnable {} {
 	global GridEnable ShowMapGrid
 	set GridEnable $ShowMapGrid
@@ -6602,6 +6630,8 @@ set TargetColor blue
 proc RefreshTargets {} {
 #	DEBUG 0 "RefreshTargets"
 	global MOBdata MOBid canvas iscale ActiveTargetList ActiveTargetSource CurrentCombatants TargetColor
+	global is_GM show_all_targets
+
 	set me [my_map_names]
 	set current_actor $CurrentCombatants
 	if {[llength $current_actor] > 1} {
@@ -6622,43 +6652,72 @@ proc RefreshTargets {} {
 		DEBUG 0 "Unable to draw target source: $err"
 	}
 
-	$canvas delete MYTARG
-	set ActiveTargetList {}
-	foreach my_source $me {
-#		DEBUG 0 "looking in $me ($my_source), current actor is $current_actor in $CurrentCombatants ([isMobIdentity $current_actor $my_source])"
-	    if {[catch {
-#		if {[info exists MOBid($my_source)]} {DEBUG 0 "MOBid($my_source)=$MOBid($my_source)"}
-#		if {[info exists MOBid($my_source)] && [info exists MOBdata([set tid $MOBid($my_source)])]} {DEBUG 0 "MOBdata($tid)=$MOBdata($tid)"}
-#		if {[info exists MOBid($my_source)] && [info exists MOBdata([set tid $MOBid($my_source)])] && [dict exists [set d $MOBdata($tid)] Targets]} {DEBUG 0 "Targets $d"}
-		if {[info exists MOBid($my_source)] && [info exists MOBdata([set tid $MOBid($my_source)])] && [dict exists [set d $MOBdata($tid)] Targets]} {
-			if {[llength $me] == 1 || [isMobIdentity $my_source $current_actor]} {
-				set ActiveTargetList [dict get $d Targets]
-#				DEBUG 0 "ActiveTargetList $ActiveTargetList"
-			} 
-
-			if {![isMobIdentity $my_source $current_actor]} {
-				::gmautil::dassign $d Gx agx Gy agy Hidden ahidden
-				set actor_mob_size [_mob_size $tid]
-				if {$ahidden} continue
-
-				foreach target [dict get $d Targets] {
-					if {[info exists MOBid($target)]} {
-						set ttid $MOBid($target)
-						if {[info exists MOBdata($ttid)]} {
-							::gmautil::dassign $MOBdata($ttid) Gx gx Gy gy Hidden hidden
-							if {$hidden} continue
-							set mob_size [_mob_size $ttid]
-							RenderTarget $canvas [expr $gx*$iscale] [expr $gy*$iscale] [expr ($gx+$mob_size)*$iscale] [expr ($gy+$mob_size)*$iscale] [list MYTARG MYTARG#$tid] MYTARG
-							$canvas create line [expr ($agx+($actor_mob_size/2.0))*$iscale] [expr ($agy+($actor_mob_size/2.0))*$iscale] [expr ($gx+($mob_size/2.0))*$iscale] [expr ($gy+($mob_size/2.0))*$iscale] -fill $TargetColor -width 3 -tags [list MYTARG MYTARG#$tid MYTARGLINE] -dash - -arrow last
-						}
+	$canvas delete GMTARG
+	if {$is_GM && $show_all_targets} {
+		foreach mid [array names MOBdata] {
+			::gmautil::dassigndef $MOBdata($mid) Gx attacker_x Gy attacker_y Targets {attacker_targets {}} Hidden {attacker_hidden false}
+			if {$attacker_hidden} continue
+			set attacker_mob_size [_mob_size $mid]
+			foreach target $attacker_targets {
+				if {[info exists MOBid($target)]} {
+					set ttid $MOBid($target)
+					if {[info exists MOBdata($ttid)]} {
+						::gmautil::dassigndef $MOBdata($ttid) Gx target_x Gy target_y Hidden target_hidden
+						if {$target_hidden} continue
+						set target_size [_mob_size $ttid]
+						RenderTarget $canvas [expr $target_x*$iscale] [expr $target_y*$iscale] [expr ($target_x+$target_size)*$iscale] [expr ($target_y+$target_size)*$iscale] [list GMTARG GMTARG#$ttid] GMTARG
+						$canvas create line [expr ($attacker_x+($attacker_mob_size/2.0))*$iscale] [expr ($attacker_y+($attacker_mob_size/2.0))*$iscale] [expr ($target_x+($target_size/2.0))*$iscale] [expr ($target_y+($target_size/2.0))*$iscale] -fill $TargetColor -width 3 -tags [list GMTARG GMTARG#$ttid GMTARGLINE] -dash - -arrow last
 					}
 				}
 			}
-			# TODO this creature named $my_source with obj id $tid I control targets [dict get $d Targets]
 		}
-	    } err]} {
-	        DEBUG 1 "Unable to draw target for $my_source: $err"
-	    }
+	}
+
+	# if this is the GM's client, and they're rolling dice for the monster currently in play, use that monster as the source
+	# of damage being dealt
+	set ActiveTargetList {}
+	if {$is_GM} {
+		if {$current_actor ne {} && [info exists MOBdata([set tid [GetBaseMobID $current_actor]])] && [dict exists [set d $MOBdata($tid)] Targets]} {
+			set ActiveTargetList [dict get $d Targets]
+		}
+	} else {
+		$canvas delete MYTARG
+		foreach my_source $me {
+	#		DEBUG 0 "looking in $me ($my_source), current actor is $current_actor in $CurrentCombatants ([isMobIdentity $current_actor $my_source])"
+		    if {[catch {
+	#		if {[info exists MOBid($my_source)]} {DEBUG 0 "MOBid($my_source)=$MOBid($my_source)"}
+	#		if {[info exists MOBid($my_source)] && [info exists MOBdata([set tid $MOBid($my_source)])]} {DEBUG 0 "MOBdata($tid)=$MOBdata($tid)"}
+	#		if {[info exists MOBid($my_source)] && [info exists MOBdata([set tid $MOBid($my_source)])] && [dict exists [set d $MOBdata($tid)] Targets]} {DEBUG 0 "Targets $d"}
+			if {[info exists MOBid($my_source)] && [info exists MOBdata([set tid $MOBid($my_source)])] && [dict exists [set d $MOBdata($tid)] Targets]} {
+				if {[llength $me] == 1 || [isMobIdentity $my_source $current_actor]} {
+					set ActiveTargetList [dict get $d Targets]
+	#				DEBUG 0 "ActiveTargetList $ActiveTargetList"
+				} 
+
+				if {![isMobIdentity $my_source $current_actor]} {
+					::gmautil::dassign $d Gx agx Gy agy Hidden ahidden
+					set actor_mob_size [_mob_size $tid]
+					if {$ahidden} continue
+
+					foreach target [dict get $d Targets] {
+						if {[info exists MOBid($target)]} {
+							set ttid $MOBid($target)
+							if {[info exists MOBdata($ttid)]} {
+								::gmautil::dassign $MOBdata($ttid) Gx gx Gy gy Hidden hidden
+								if {$hidden} continue
+								set mob_size [_mob_size $ttid]
+								RenderTarget $canvas [expr $gx*$iscale] [expr $gy*$iscale] [expr ($gx+$mob_size)*$iscale] [expr ($gy+$mob_size)*$iscale] [list MYTARG MYTARG#$tid] MYTARG
+								$canvas create line [expr ($agx+($actor_mob_size/2.0))*$iscale] [expr ($agy+($actor_mob_size/2.0))*$iscale] [expr ($gx+($mob_size/2.0))*$iscale] [expr ($gy+($mob_size/2.0))*$iscale] -fill $TargetColor -width 3 -tags [list MYTARG MYTARG#$tid MYTARGLINE] -dash - -arrow last
+							}
+						}
+					}
+				}
+				# TODO this creature named $my_source with obj id $tid I control targets [dict get $d Targets]
+			}
+		    } err]} {
+			DEBUG 1 "Unable to draw target for $my_source: $err"
+		    }
+		}
 	}
 
 	$canvas delete MATARG
@@ -8915,26 +8974,27 @@ proc DoContext {x y} {
 
 	# positions
 	set CTXtarg 0
-	set CTXremo 1
-	set CTXaddp 2
-	set CTXaddm 3
-	set CTXdead 4
-	set CTXreac 5
-	set CTXsaoe 6
-	set CTXpoly 7
-	set CTXsize 8
-	set CTXcond 9
-	set CTXtags 10
-	set CTXelev 11
-	set CTXmmod 12
-	set CTXSEP1 13
-	set CTXdgrd 14
-	set CTXdfrm 15
-	set CTXSEP2 16
-	set CTXtsel 17
-	set CTXdsel 18
-	set CTXSEP3 19
-	set CTX_pcs 20
+	set CTXrtar 1
+	set CTXremo 2
+	set CTXaddp 3
+	set CTXaddm 4
+	set CTXdead 5
+	set CTXreac 6
+	set CTXsaoe 7
+	set CTXpoly 8
+	set CTXsize 9
+	set CTXcond 10
+	set CTXtags 11
+	set CTXelev 12
+	set CTXmmod 13
+	set CTXSEP1 14
+	set CTXdgrd 15
+	set CTXdfrm 16
+	set CTXSEP2 17
+	set CTXtsel 18
+	set CTXdsel 19
+	set CTXSEP3 20
+	set CTX_pcs 21
 
 	.contextMenu delete $CTXdgrd
 	.contextMenu insert $CTXdgrd command -command "DistanceFromGrid $x $y 0" -label "Distance from [LetterLabel $Gx]$Gy"
@@ -8942,6 +9002,8 @@ proc DoContext {x y} {
 	if {[llength $mob_list] == 0} {
 		.contextMenu delete $CTXtarg
 		.contextMenu insert $CTXtarg command -command "" -label "Target" -state disabled -accelerator T
+		.contextMenu delete $CTXrtar
+		.contextMenu insert $CTXrtar command -command "" -label "Randomly Target" -state disabled -accelerator "^\u21e7T"
 		.contextMenu delete $CTXremo
 		.contextMenu insert $CTXremo command -command "" -label "Remove" -state disabled
 		.contextMenu delete $CTXdead
@@ -8972,6 +9034,8 @@ proc DoContext {x y} {
 		set mob_disp_name [::gmaclock::nameplate_text $mob_name]
 		.contextMenu delete $CTXtarg
 		.contextMenu insert $CTXtarg command -command "_setMyTargets $mob_id" -label "Target [::gmaclock::nameplate_text [dict get $MOBdata($mob_id) Name]]" -accelerator T
+		.contextMenu delete $CTXrtar
+		.contextMenu insert $CTXrtar command -command "" -label "Randomly Target" -state disabled -accelerator "^\u21e7T"
 		.contextMenu delete $CTXremo
 		.contextMenu insert $CTXremo command -command "RemovePerson $mob_id; ::gmaproto::clear $mob_id" -label "Remove [::gmaclock::nameplate_text [dict get $MOBdata($mob_id) Name]]"
 		.contextMenu delete $CTXdead
@@ -9040,7 +9104,7 @@ proc DoContext {x y} {
 			.contextMenu.dist add command -command "DistanceFromMob $mob_id" -label $mob_disp_name
 			.contextMenu.tsel add command -command "ToggleSelection $mob_id" -label $mob_disp_name
 		}
-		.contextMenu.targ add command -command "_setMyTargets [list $mob_list]" -label "(all of the above)"
+		.contextMenu.targ add command -command "_setMyTargets [list $mob_list]" -label "(all of the above)" -accelerator T
 		.contextMenu.del add command -command "RemoveAll $mob_list" -label "(all of the above)"
 		.contextMenu.kill add command -command "KillAll $mob_list" -label "(all of the above)"
 		.contextMenu.reach add cascade -menu [CreateReachSubMenu -mass $mob_list] -label "(all of the above)"
@@ -9056,6 +9120,8 @@ proc DoContext {x y} {
 		.contextMenu.mmode add cascade -menu [CreateMovementModeSubMenu -mass $mob_list] -label "(all of the above)"
 		.contextMenu delete $CTXtarg
 		.contextMenu insert $CTXtarg cascade -menu .contextMenu.targ -label "Target" -accelerator T
+		.contextMenu delete $CTXrtar
+		.contextMenu insert $CTXrtar command -command "_setMyTargets $mob_list -random" -label "Randomly Target (1 of [llength $mob_list)] creatures)" -accelerator  "^\u21e7T"
 		.contextMenu delete $CTXremo
 		.contextMenu insert $CTXremo cascade -menu .contextMenu.del -label "Remove"
 		.contextMenu delete $CTXdead
@@ -9110,6 +9176,7 @@ menu .contextMenu.dist -tearoff 0
 menu .contextMenu.tsel -tearoff 0
 #menu .addPlayerMenu
 .contextMenu add command -command "" -label Target -state disabled               			;# 0
+.contextMenu add command -command "" -label {Randomly Target} -state disabled              		;# 0
 .contextMenu add command -command "" -label Remove -state disabled					;# 1
 .contextMenu add command -command {AddPlayerMenu player} -label {Add Player...}				;# 2
 .contextMenu add command -command {AddPlayerMenu monster} -label {Add Monster...}			;# 3
