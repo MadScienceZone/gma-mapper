@@ -1361,7 +1361,7 @@ proc EnsureTargetSourceFirst {} {
 		} else {
 			tk_messageBox -type ok -icon error -title "Specify targetting character" \
 				-message "There isn't a current combatant. You need to select one first by pressing shift-T with the mouse over that creature's token."
-			return
+			return {}
 		}
 	} else {
 		check_aka
@@ -1369,7 +1369,7 @@ proc EnsureTargetSourceFirst {} {
 		if {[llength $me] == 0} {
 			tk_messageBox -type ok -icon error -title "Who goes there?" \
 				-message "You can't set targets if we don't know what character(s) you're even playing. Either log in with a username that matches the name of your character exactly, or use the \"Specify What Character You're Playing...\" item from the Play menu before trying to select your target(s)."
-			return
+			return {}
 		}
 		if {[llength $me] > 1} {
 			if {$ActiveTargetSource ne {}} {
@@ -1377,7 +1377,7 @@ proc EnsureTargetSourceFirst {} {
 			} else {
 				tk_messageBox -type ok -icon error -title "Specify targetting character" \
 					-message "You are controlling more than one character. Before selecting your target(s), select one of your PCs (using the context menu or by pressing shift-T with the mouse over that token) to select them as the source first, then select their target(s)."
-				return
+				return {}
 			}
 		}
 	}
