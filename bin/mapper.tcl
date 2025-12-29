@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       ______    ______      __         #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ____ \    /  \        #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \( (    \/    \/) )       #
-# | |      | || || || (___) | Assistant  / (_) (_       ___) /| (____        | |       #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( |  ___ \       | |       #
-# | | \_  )| |   | || (   ) | VTT            ) (           ) \| (   ) )      | |       #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /( (___) ) _  __) (_      #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/  \_____/ (_) \____/      #
+#  _______  _______  _______                ___       ______    ______     _______     #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ____ \   / ___   )    #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \( (    \/   \/   )  |    #
+# | |      | || || || (___) | Assistant  / (_) (_       ___) /| (____         /   )    #
+# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( |  ___ \      _/   /     #
+# | | \_  )| |   | || (   ) | VTT            ) (           ) \| (   ) )    /   _/      #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /( (___) ) _ (   (__/\    #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/  \_____/ (_)\_______/    #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -17,7 +17,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.36.1}     ;# @@##@@
+set GMAMapperVersion {4.36.2}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {422}         ;# @@##@@
 set CoreVersionNumber {6.39.1}            ;# @@##@@
@@ -1343,7 +1343,7 @@ proc toggleCombatSource {mousex mousey args} {
 	RefreshTargets
 }
 
-# somewhat mistamed but this allows you to change the target(s) of your attacks to a new
+# somewhat misnamed but this allows you to change the target(s) of your attacks to a new
 # list of creatures
 proc toggleCombatTargets {mousex mousey args} {
 	global canvas
@@ -1351,7 +1351,7 @@ proc toggleCombatTargets {mousex mousey args} {
 	_setMyTargets $mob_list $args
 }
 
-proc _setMyTargets {tlist args} {
+proc EnsureTargetSourceFirst {} {
 	global ActiveTargetSource is_GM
 	
 	if {$is_GM} {
@@ -1380,6 +1380,15 @@ proc _setMyTargets {tlist args} {
 				return
 			}
 		}
+	}
+
+	return $me
+}
+
+proc _setMyTargets {tlist args} {
+	global ActiveTargetSource is_GM
+	if {[set me [EnsureTargetSourceFirst]] eq {}} {
+		return
 	}
 
 	if {[llength $tlist] > 0 && [lsearch -exact $args -random] >= 0} {
@@ -4857,6 +4866,8 @@ proc StartObj {w x y} {
 		set OBJ_CURRENT AOE_GLOBAL_BOUND
 		$w delete obj$OBJ_CURRENT
 		RemoveObject $OBJ_CURRENT
+	} elseif {($OBJ_MODE == "aoe" || $OBJ_MODE == "saoe") && [EnsureTargetSourceFirst] eq {}} {
+		return
 	} elseif {$OBJ_MODE == "ruler"} {
 		set OBJ_CURRENT RULER_GLOBAL
 		$w delete obj$OBJ_CURRENT
@@ -5699,6 +5710,7 @@ proc LastAoePoint {w x y} {
 		}
 	}
 	DrawAoeZone $canvas $OBJ_CURRENT "$X $Y $Points"
+	aoe_target_prompt [GetAreaZoneTargets $OBJ_CURRENT]
 	
 	EndObj $w 
 	clear_message
@@ -9476,6 +9488,7 @@ proc ToggleSpellArea id {
 }
 
 proc CompleteMOBAoE {id w x y} {
+	aoe_target_prompt [GetAreaZoneTargets $id -mob]
 	canceltool
 	$w delete AoElocator#$id
 	SendMobChanges $id AoE
@@ -17398,6 +17411,133 @@ proc select_aka_toggle_none {w fn} {
 	}
 }
 
+# zoneid
+# mobid -mob
+set aoe_target_prompt_source {}
+proc GetAreaZoneTargets {zone_obj_id args} {
+#	DEBUG 0 "GetAreaZoneTargets $zone_obj_id $args"
+	global canvas
+	global MOBdata
+	global aoe_target_prompt_source
+	global MOBdata
+
+	if {[lsearch -exact $args -mob] >= 0} {
+		set tag "MA#$zone_obj_id"
+		if {[catch {set aoe_target_prompt_source [list [dict get $MOBdata([GetBaseMobID $zone_obj_id]) Name]]} err]} {
+			DEBUG 0 $err
+		}
+	} else {
+		set tag "AoEZoneCrossHatch$zone_obj_id"
+		set aoe_target_prompt_source {}
+#		DEBUG 0 "Looking for $tag"
+	}
+	
+	foreach zh [$canvas find withtag $tag] {
+		set zhbbox [$canvas bbox $zh]
+#		DEBUG 0 "zone hatch $zh, bounding box $bbox"
+		foreach t [$canvas find overlapping {*}$zhbbox] {
+			foreach tt [$canvas gettags $t] {
+				if {[string range $tt 0 2] eq {MT#}} {
+					set targets([string range $tt 3 end]) 1
+				}
+			}
+		}
+	}
+
+	set target_list {}
+	foreach t [array names targets] {
+		set id [GetBaseMobID $t]
+		if {[info exists MOBdata($id)] && [dict exists $MOBdata($id) Name]} {
+			lappend target_list [dict get $MOBdata($id) Name]
+		}
+	}
+
+	return $target_list
+}
+
+proc aoe_target_prompt {targets} {
+	global aoe_target_prompt_targets 
+	global aoe_targ_all
+	global aoe_targ_living
+	global aoe_targ_party
+
+	set aoe_targ_all false
+	set aoe_targ_living false
+	set aoe_targ_party false
+
+	update
+	catch {destroy .aoetargwindow}
+	toplevel [set w .aoetargwindow]
+	wm title $w "Area of Effect Targets"
+
+	pack [label $w.t1 -text "If your area effect will do targeted damage, please select the creatures affected."] -side top -anchor w
+	pack [ttk::checkbutton $w.all -onvalue true -offvalue false -variable aoe_targ_all -text "All creatures in area" -command aoe_target_prompt_toggle_all] -anchor w -side top
+	pack [ttk::checkbutton $w.living -onvalue true -offvalue false -variable aoe_targ_living -text "All living creatures in area" -command aoe_target_prompt_toggle_living] -anchor w -side top
+	pack [ttk::checkbutton $w.party -onvalue true -offvalue false -variable aoe_targ_party -text "Party members in area" -command aoe_target_prompt_toggle_party] -anchor w -side top
+	set fn 0
+	array unset aoe_target_prompt_targets
+	foreach name [lsort $targets] {
+		set aoe_target_prompt_targets($name) false
+		pack [ttk::checkbutton $w.target$fn -onvalue true -offvalue false -variable aoe_target_prompt_targets($name) -text $name] -anchor w -side top
+		incr fn
+	}
+	pack [button $w.ok -command aoe_target_prompt_commit -text OK] -side right
+	pack [button $w.cancel -command "destroy $w" -text Cancel] -side left
+}
+
+proc aoe_target_prompt_toggle_all {} {
+	global aoe_targ_all
+	global aoe_target_prompt_targets
+
+	foreach t [array names aoe_target_prompt_targets] {
+		set aoe_target_prompt_targets($t) $aoe_targ_all
+	}
+}
+proc aoe_target_prompt_toggle_living {} {
+	global aoe_targ_living
+	global aoe_target_prompt_targets
+	global MOBid MOBdata
+
+	foreach t [array names aoe_target_prompt_targets] {
+		if {[info exists MOBid($t)] && [info exists MOBdata([set mid $MOBid($t)])] && [dict exists $MOBdata($mid) Killed] && ![dict get $MOBdata($mid) Killed]} {
+			set aoe_target_prompt_targets($t) $aoe_targ_living
+		}
+	}
+}
+proc aoe_target_prompt_toggle_party {} {
+	global aoe_targ_party
+	global aoe_target_prompt_targets
+	global MOBid MOBdata PC_IDs
+
+	foreach t [array names aoe_target_prompt_targets] {
+		if {[info exists PC_IDs($t)]} {
+			set aoe_target_prompt_targets($t) $aoe_targ_party
+		}
+	}
+}
+
+proc aoe_target_prompt_commit {} {
+	global aoe_target_prompt_targets
+	global aoe_target_prompt_source
+	set targets {}
+	foreach t [array names aoe_target_prompt_targets] {
+		if {$aoe_target_prompt_targets($t)} {
+			lappend targets $t
+		}
+	}
+	if {$aoe_target_prompt_source ne {}} {
+		global ActiveTargetSource
+		set old_source $ActiveTargetSource
+		set ActiveTargetSource $aoe_target_prompt_source
+		_setMyTargets $targets
+		set ActiveTargetSource $old_source
+	} else {
+		_setMyTargets $targets
+	}
+	array unset aoe_target_prompt_targets
+	destroy .aoetargwindow
+}
+
 proc check_aka {} {
 	global local_user local_aka PeerList PC_IDs MOBid suppress_aka check_aka_vars suppress_var im_not_playing check_aka_none
 
@@ -17538,7 +17678,7 @@ proc check_aka_commit {} {
 #
 #  called when rendering somone or advancing the initiative turn or updating target attribute
 #
-# @[00]@| GMA-Mapper 4.36.1
+# @[00]@| GMA-Mapper 4.36.2
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2025 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

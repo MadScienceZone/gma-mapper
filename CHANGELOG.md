@@ -3,8 +3,8 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.36.1          <!-- @@##@@ -->
- * Effective Date: 26-Dec-2025               <!-- @@##@@ -->
+ * This Package Version: 4.36.2          <!-- @@##@@ -->
+ * Effective Date: 29-Dec-2025               <!-- @@##@@ -->
 
 ## Compatibility
  * GMA Core API Library Version: 6.39.1 <!-- @@##@@ -->
@@ -17,9 +17,11 @@ The support for old server protocols (<400) and map file formats (<20) will be d
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
-# 4.36.2 (unreleased)
+# 4.36.2
 ## Fixes
  * Fixed "playing as" dialog so "custom" entry feild can take multiple names
+ * Corrected missing execute permission bit on mapper.tcl file
+ * Expanded targetting to include spell areas of effect, so when you trigger a spell area you now indicate the affected creatures as targets of the spellcaster (if the spell does damage) so the damage dice rolled will be allocated to those targets automatically. This also happens when you toggle on the spell area from an individual creature.
 
 # 4.36.1
 ## Fixes
