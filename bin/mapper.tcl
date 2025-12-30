@@ -5617,7 +5617,12 @@ proc NeighborsOf {c1 r1} {
 
 proc DrawAoeGrid {w x1 y1 x2 y2 color id tags} {
 	global AoeHatchWidth
-	#DEBUG 0 "DrawAoEGrid $w $x1 $y1 $x2 $y2 $color $id"
+	global RawAoeGrids
+	#DEBUG 0 "DrawAoEGrid $w $x1=[CanvasToGrid $x1] $y1=[CanvasToGrid $y1] $x2=[CanvasToGrid $x2] $y2=[CanvasToGrid $y2] $color $id $tags"
+
+	set GX [CanvasToGrid $x1]
+	set GY [CanvasToGrid $y1]
+	set RawAoeGrids($id:$GX:$GY) [list $GX $GY]
 
 	for {set x $x1; set y $y2} {$x < $x2} {set x [expr $x + ($x2-$x1)/4.0]; set y [expr $y - ($y2-$y1)/4.0]} {
 		$w create line $x $y1 $x2 $y -fill $color -width $AoeHatchWidth -tags $tags
@@ -5680,6 +5685,7 @@ proc LastPoint {w x y} {
 
 proc LastAoePoint {w x y} {
 	global OBJdata OBJ_CURRENT OBJ_SNAP canvas zoom AOE_START
+	global RawAoeGrids
 	set x [$canvas canvasx $x]
 	set y [$canvas canvasy $y]
 	set xx [SnapCoordAlways $x]
@@ -5694,6 +5700,8 @@ proc LastAoePoint {w x y} {
 	$canvas create line [expr $xx-5] [expr $yy+5] [expr $xx+5] [expr $yy-5] -width 3 -fill [dict get $OBJdata($OBJ_CURRENT) Fill] -tags [list obj$OBJ_CURRENT]
 
 	::gmautil::dassign $OBJdata($OBJ_CURRENT) X X Y Y Points _Points
+	set gridX [CanvasToGrid $X]
+	set gridY [CanvasToGrid $Y]
 	global zoom 
 	catch {unset Points}
 	if {$zoom != 1} {
@@ -5710,10 +5718,26 @@ proc LastAoePoint {w x y} {
 		}
 	}
 	DrawAoeZone $canvas $OBJ_CURRENT "$X $Y $Points"
+	puts "**********************"
+	parray RawAoeGrids
+	dict set OBJdata($OBJ_CURRENT) AoEGrids [DigestRawGridList $gridX $gridY $OBJ_CURRENT]
+	puts "AoEGrids $OBJ_CURRENT [dict get $OBJdata($OBJ_CURRENT) AoEGrids]"
 	aoe_target_prompt [GetAreaZoneTargets $OBJ_CURRENT]
 	
 	EndObj $w 
 	clear_message
+}
+
+# this used to compute deltas from (x,y) but we decided to use absolute coordinates
+# instead so this really just collects the values from the hash table now.
+proc DigestRawGridList {x y id} {
+	global RawAoeGrids
+	set deltas {}
+	foreach point [array names RawAoeGrids $id:*] {
+		lappend deltas $RawAoeGrids($point)
+	}
+	array unset RawAoeGrids $id:*
+	return $deltas
 }
 	
 proc LastArcPoint {w x y} {
@@ -7090,11 +7114,11 @@ proc RenderSomeone {w id {norecurse false}} {
 	|| [info exists TILE_ANIMATION($mob_token_tile_id,frames)]} {
 		DEBUG 3 "$image_pfx:$disp_zoom"
 		if {!$is_transparent} {
-			$w create oval [expr $x*$iscale] [expr $y*$iscale] [expr ($x+$mob_size)*$iscale] [expr ($y+$mob_size)*$iscale] -fill $fillcolor -tags "mob MF#$id M#$id MN#$id allMOB MB#$id"
+			$w create oval [expr $x*$iscale] [expr $y*$iscale] [expr ($x+$mob_size)*$iscale] [expr ($y+$mob_size)*$iscale] -fill $fillcolor -tags "mob MO#$id MF#$id M#$id MN#$id allMOB MB#$id"
 		}
 
 		if {[info exists TILE_SET($mob_token_tile_id)]} {
-			$w create image [expr $x*$iscale] [expr $y*$iscale] -anchor nw -image $TILE_SET([tile_id $image_pfx $disp_zoom]) -tags "mob M#$id MN#$id allMOB"
+			$w create image [expr $x*$iscale] [expr $y*$iscale] -anchor nw -image $TILE_SET([tile_id $image_pfx $disp_zoom]) -tags "mob M#$id MN#$id MO#$id allMOB"
 		} else {
 			animation_create $w [expr $x*$iscale] [expr $y*$iscale] $mob_token_tile_id $id -start
 		}
@@ -7134,7 +7158,7 @@ proc RenderSomeone {w id {norecurse false}} {
 	} else {
 		set mob_name [::gmaclock::nameplate_text $mob_name]
 		DEBUG 3 "No $image_pfx:$disp_zoom found in TILE_SET"
-		$w create oval [expr $x*$iscale] [expr $y*$iscale] [expr ($x+$mob_size)*$iscale] [expr ($y+$mob_size)*$iscale] -fill $fillcolor -tags "mob MF#$id M#$id MN#$id MB#id allMOB"
+		$w create oval [expr $x*$iscale] [expr $y*$iscale] [expr ($x+$mob_size)*$iscale] [expr ($y+$mob_size)*$iscale] -fill $fillcolor -tags "mob MO#$id MF#$id M#$id MN#$id MB#id allMOB"
 		$w create text [expr ($x+(.5*$mob_size))*$iscale] [expr ($y+(.5*$mob_size))*$iscale] -fill $textcolor \
 			-font [FontBySize [CreatureDisplayedSize $id]] -text $mob_name -tags "M#$id MF#$id MN#$id MT#$id allMOB"
 	}
@@ -17411,44 +17435,66 @@ proc select_aka_toggle_none {w fn} {
 	}
 }
 
+
+proc IsMobOccupyingGrid {x y id} {
+	global MOBdata
+	if {[info exists MOBdata($id)]} {
+		::gmautil::dassign $MOBdata($id) Gx Gx Gy Gy 
+		set sz [_mob_size $id]
+	}
+	for {set i 0} {$i < $sz} {incr i} {
+		for {set j 0} {$j < $sz} {incr j} {
+			puts "--mob size $sz ([expr $Gx+$i],[expr $Gy+$j])==($x,$y)?"
+			if {[expr $Gx + $i] == $x && [expr $Gy + $j] == $y} {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 # zoneid
 # mobid -mob
 set aoe_target_prompt_source {}
 proc GetAreaZoneTargets {zone_obj_id args} {
-#	DEBUG 0 "GetAreaZoneTargets $zone_obj_id $args"
-	global canvas
+	DEBUG 0 "GetAreaZoneTargets $zone_obj_id $args"
+#	global canvas
+#	global MOBdata
+#	global aoe_target_prompt_source
+#	global MOBdata
+	global OBJdata
 	global MOBdata
-	global aoe_target_prompt_source
-	global MOBdata
-
+	set target_list {}
+#
+#	update
 	if {[lsearch -exact $args -mob] >= 0} {
-		set tag "MA#$zone_obj_id"
-		if {[catch {set aoe_target_prompt_source [list [dict get $MOBdata([GetBaseMobID $zone_obj_id]) Name]]} err]} {
-			DEBUG 0 $err
-		}
 	} else {
-		set tag "AoEZoneCrossHatch$zone_obj_id"
-		set aoe_target_prompt_source {}
-#		DEBUG 0 "Looking for $tag"
+		# search in an AoE zone object's grid list
+		if {[info exists OBJdata($zone_obj_id)] && [dict exists $OBJdata($zone_obj_id) AoEGrids]} {
+			set grids [dict get $OBJdata($zone_obj_id) AoEGrids]
+#			::gmautil::dassign $OBJdata($zone_obj_id) X X Y Y AoEGrids grids
+#			set zx0 [CanvasToGrid $X]
+#			set zy0 [CanvasToGrid $Y]
+#			puts "aoe obj ($X,$Y) -> grid ($zx0,$zy0)"
+		} else {
+			DEBUG 0 "Unable to determine where the area of effect zone is, so we'll ignore the affected creatures. You're on your own to figure that out."
+			return {}
+		}
+	}
+
+	foreach mob_id [array names MOBdata] {
+		set candidates($mob_id) {}
 	}
 	
-	foreach zh [$canvas find withtag $tag] {
-		set zhbbox [$canvas bbox $zh]
-#		DEBUG 0 "zone hatch $zh, bounding box $bbox"
-		foreach t [$canvas find overlapping {*}$zhbbox] {
-			foreach tt [$canvas gettags $t] {
-				if {[string range $tt 0 2] eq {MT#}} {
-					set targets([string range $tt 3 end]) 1
-				}
-			}
-		}
-	}
+	foreach grid $grids {
+		lassign $grid zx zy
 
-	set target_list {}
-	foreach t [array names targets] {
-		set id [GetBaseMobID $t]
-		if {[info exists MOBdata($id)] && [dict exists $MOBdata($id) Name]} {
-			lappend target_list [dict get $MOBdata($id) Name]
+		foreach mob_id [array names candidates] {
+			puts "Checking for occupancy in ($zx,$zy), $mob_id"
+			if {[IsMobOccupyingGrid $zx $zy $mob_id]} {
+				lappend target_list $mob_id
+				array unset candidates $mob_id
+			}
 		}
 	}
 
