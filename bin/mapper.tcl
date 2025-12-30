@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       ______    ______     _______     #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ____ \   / ___   )    #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \( (    \/   \/   )  |    #
-# | |      | || || || (___) | Assistant  / (_) (_       ___) /| (____         /   )    #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( |  ___ \      _/   /     #
-# | | \_  )| |   | || (   ) | VTT            ) (           ) \| (   ) )    /   _/      #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /( (___) ) _ (   (__/\    #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/  \_____/ (_)\_______/    #
+#  _______  _______  _______                ___       ______    ______     ______      #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ____ \   / ___  \     #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \( (    \/   \/   \  \    #
+# | |      | || || || (___) | Assistant  / (_) (_       ___) /| (____        ___) /    #
+# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( |  ___ \      (___ (     #
+# | | \_  )| |   | || (   ) | VTT            ) (           ) \| (   ) )         ) \    #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /( (___) ) _ /\___/  /    #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/  \_____/ (_)\______/     #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -17,7 +17,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.36.2}     ;# @@##@@
+set GMAMapperVersion {4.36.3}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {422}         ;# @@##@@
 set CoreVersionNumber {6.39.1}            ;# @@##@@
@@ -5156,7 +5156,7 @@ proc ObjAoeDrag {w x y} {
 
 # DrawAoeZone canvas AOEobjID {x1 y1 x2 y2}
 # coordinates are assumed to already be scaled and snapped to the grid
-proc DrawAoeZone {w id coords} {
+proc DrawAoeZone {w id coords args} {
 	global OBJdata iscale PI
 	
 	if {[llength $coords] != 4} {
@@ -5173,7 +5173,7 @@ proc DrawAoeZone {w id coords} {
 
 	_DrawAoeZone $w $id $gx0 $gy0 $gxx $gyy $r [dict get $OBJdata($id) Fill] \
 		[::gmaproto::from_enum AoEShape [dict get $OBJdata($id) AoEShape]] \
-		[list AoEZoneCrossHatch$id obj$id allOBJ]
+		[list AoEZoneCrossHatch$id obj$id allOBJ] {*}$args
 }
 
 set AoeZoneLast {}
@@ -5223,14 +5223,14 @@ proc _AnimateAoeZone {w id} {
 	after 500 _AnimateAoeZone $w $id
 }
 
-proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags} {
+proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags args} {
 	global PI iscale AOE_SPREAD AoeZoneLast
 
 	# prevent re-drawing the same area repeatedly while the mouse is moved 
 	# through the area
-	if {$AoeZoneLast == "$gx0:$gy0:$r"} {
-		return
-	}
+#	if {$AoeZoneLast == "$gx0:$gy0:$r"} {
+#		return
+#	}
 	set AoeZoneLast "$gx0:$gy0:$r"
 	set x0 [expr $gx0 * $iscale]
 	set y0 [expr $gy0 * $iscale]
@@ -5238,6 +5238,12 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags} {
 	set yy [expr $gyy * $iscale]
 	set deltax [expr $xx - $x0];	# dx, dy have the usual "math" orientation
 	set deltay [expr $y0 - $yy];	# with y increasing UP
+	
+	if {[lsearch -exact $args -grids] >= 0} {
+		set record_grids true
+	} else {
+		set record_grids false
+	}
 
 	$w delete AoEZoneCrossHatch$id
 	$w delete REF$id
@@ -5269,34 +5275,34 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags} {
 							# I
 							DrawAoeGrid $w [expr $x0 + $is] [expr $y0 - $js] \
 							               [expr $x0 + $is1] [expr $y0 - $js1] \
-										   $color $id $tags
+										   $color $id $tags $record_grids
 							DrawAoeGrid $w [expr $x0 + $js - $iscale] [expr $y0 - $is - $iscale] \
 										   [expr $x0 + $js] [expr $y0 - $is] \
-										   $color $id $tags
+										   $color $id $tags $record_grids
 
 							# IV
 							DrawAoeGrid $w [expr $x0 + $is] [expr $y0 + $js1] \
 							               [expr $x0 + $is1] [expr $y0 + $js] \
-										   $color $id $tags
+										   $color $id $tags $record_grids
 							DrawAoeGrid $w [expr $x0 + $js - $iscale] [expr $y0 + $is] \
 										   [expr $x0 + $js] [expr $y0 + $is + $iscale] \
-										   $color $id $tags
+										   $color $id $tags $record_grids
 
 							# II
 							DrawAoeGrid $w [expr $x0 - $is1] [expr $y0 - $js] \
 										   [expr $x0 - $is] [expr $y0 - $js1] \
-										   $color $id $tags
+										   $color $id $tags $record_grids
 							DrawAoeGrid $w [expr $x0 - $js] [expr $y0 - $is - $iscale] \
 										   [expr $x0 - $js + $iscale] [expr $y0 - $is] \
-										   $color $id $tags
+										   $color $id $tags $record_grids
 
 							# III
 							DrawAoeGrid $w [expr $x0 - $is1] [expr $y0 + $js1] \
 										[expr $x0 - $is] [expr $y0 + $js] \
-										   $color $id $tags
+										   $color $id $tags $record_grids
 							DrawAoeGrid $w [expr $x0 - $js] [expr $y0 + $is] \
 										   [expr $x0 - $js + $iscale] [expr $y0 + $is1] \
-										   $color $id $tags
+										   $color $id $tags $record_grids
 						}
 					}
 				}
@@ -5313,7 +5319,7 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags} {
 							set by [expr $y + $iscale]
 							foreach wid [$w find overlapping [expr $x+1] [expr $y+1] [expr $bx-1] [expr $by-1]] {
 								if {[lsearch -exact [$w gettags $wid] REF$id] >= 0} {
-									DrawAoeGrid $w $x $y $bx $by $color $id $tags
+									DrawAoeGrid $w $x $y $bx $by $color $id $tags $record_grids
 									break
 								}
 							}
@@ -5329,7 +5335,7 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags} {
 							set by [expr $y + $iscale]
 							foreach wid [$w find overlapping [expr $x+1] [expr $y+1] [expr $bx-1] [expr $by-1]] {
 								if {[lsearch -exact [$w gettags $wid] REF$id] >= 0} {
-									DrawAoeGrid $w $x $y $bx $by $color $id $tags
+									DrawAoeGrid $w $x $y $bx $by $color $id $tags $record_grids
 									break
 								}
 							}
@@ -5346,7 +5352,7 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags} {
 							set by [expr $y + $iscale]
 							foreach wid [$w find overlapping [expr $x+1] [expr $y+1] [expr $bx-1] [expr $by-1]] {
 								if {[lsearch -exact [$w gettags $wid] REF$id] >= 0} {
-									DrawAoeGrid $w $x $y $bx $by $color $id $tags
+									DrawAoeGrid $w $x $y $bx $by $color $id $tags $record_grids
 									break
 								}
 							}
@@ -5362,7 +5368,7 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags} {
 							set by [expr $y + $iscale]
 							foreach wid [$w find overlapping [expr $x+1] [expr $y+1] [expr $bx-1] [expr $by-1]] {
 								if {[lsearch -exact [$w gettags $wid] REF$id] >= 0} {
-									DrawAoeGrid $w $x $y $bx $by $color $id $tags
+									DrawAoeGrid $w $x $y $bx $by $color $id $tags $record_grids
 									break
 								}
 							}
@@ -5394,7 +5400,7 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags} {
 						if {($x < 0 && $x >= $y) || ($x >=0 && $x < -$y)} {
 							foreach wid [$w find overlapping [expr $x0+$x+$fuzz] [expr $y0+$y] [expr $x0+$x+$iscale-$fuzz] [expr $y0+$y]] {
 								if {[lsearch -exact [$w gettags $wid] REF$id] >= 0} {
-									DrawAoeGrid $w [expr $x0+$x] [expr $y0+$y] [expr $x0+$x+$iscale] [expr $y0+$y+$iscale] $color $id $tags
+									DrawAoeGrid $w [expr $x0+$x] [expr $y0+$y] [expr $x0+$x+$iscale] [expr $y0+$y+$iscale] $color $id $tags $record_grids
 									break
 								}
 							}
@@ -5411,7 +5417,7 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags} {
 						if {($y < 0 && $y >= $x) || ($y >= 0 && $y < -$x)} {
 							foreach wid [$w find overlapping [expr $x0+$x] [expr $y0+$y+$fuzz] [expr $x0+$x] [expr $y0+$y+$iscale-$fuzz]] {
 								if {[lsearch -exact [$w gettags $wid] REF$id] >= 0} {
-									DrawAoeGrid $w [expr $x0+$x] [expr $y0+$y] [expr $x0+$x+$iscale] [expr $y0+$y+$iscale] $color $id $tags
+									DrawAoeGrid $w [expr $x0+$x] [expr $y0+$y] [expr $x0+$x+$iscale] [expr $y0+$y+$iscale] $color $id $tags $record_grids
 									break
 								}
 							}
@@ -5429,7 +5435,7 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags} {
 							foreach wid [$w find overlapping [expr $x0+$x+$fuzz] [expr $y0+$y+$iscale] [expr $x0+$x+$iscale-$fuzz] [expr $y0+$y+$iscale]] {
 
 								if {[lsearch -exact [$w gettags $wid] REF$id] >= 0} {
-									DrawAoeGrid $w [expr $x0+$x] [expr $y0+$y] [expr $x0+$x+$iscale] [expr $y0+$y+$iscale] $color $id $tags
+									DrawAoeGrid $w [expr $x0+$x] [expr $y0+$y] [expr $x0+$x+$iscale] [expr $y0+$y+$iscale] $color $id $tags $record_grids
 									break
 								}
 							}
@@ -5447,7 +5453,7 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags} {
 							foreach wid [$w find overlapping [expr $x0+$x+$iscale] [expr $y0+$y+$fuzz] [expr $x0+$x+$iscale] [expr $y0+$y+$iscale-$fuzz]] {
 
 								if {[lsearch -exact [$w gettags $wid] REF$id] >= 0} {
-									DrawAoeGrid $w [expr $x0+$x] [expr $y0+$y] [expr $x0+$x+$iscale] [expr $y0+$y+$iscale] $color $id $tags
+									DrawAoeGrid $w [expr $x0+$x] [expr $y0+$y] [expr $x0+$x+$iscale] [expr $y0+$y+$iscale] $color $id $tags $record_grids
 									break
 								}
 							}
@@ -5615,9 +5621,16 @@ proc NeighborsOf {c1 r1} {
 	return $neighbors
 }
 
-proc DrawAoeGrid {w x1 y1 x2 y2 color id tags} {
+proc DrawAoeGrid {w x1 y1 x2 y2 color id tags {record_grids false}} {
 	global AoeHatchWidth
-	#DEBUG 0 "DrawAoEGrid $w $x1 $y1 $x2 $y2 $color $id"
+	global RawAoeGrids
+	#DEBUG 0 "DrawAoEGrid $w $x1=[CanvasToGrid $x1] $y1=[CanvasToGrid $y1] $x2=[CanvasToGrid $x2] $y2=[CanvasToGrid $y2] $color $id $tags"
+
+	set GX [CanvasToGrid $x1]
+	set GY [CanvasToGrid $y1]
+	if {$record_grids} {
+		set RawAoeGrids($id:$GX:$GY) [list $GX $GY]
+	}
 
 	for {set x $x1; set y $y2} {$x < $x2} {set x [expr $x + ($x2-$x1)/4.0]; set y [expr $y - ($y2-$y1)/4.0]} {
 		$w create line $x $y1 $x2 $y -fill $color -width $AoeHatchWidth -tags $tags
@@ -5680,6 +5693,7 @@ proc LastPoint {w x y} {
 
 proc LastAoePoint {w x y} {
 	global OBJdata OBJ_CURRENT OBJ_SNAP canvas zoom AOE_START
+	global RawAoeGrids
 	set x [$canvas canvasx $x]
 	set y [$canvas canvasy $y]
 	set xx [SnapCoordAlways $x]
@@ -5694,6 +5708,8 @@ proc LastAoePoint {w x y} {
 	$canvas create line [expr $xx-5] [expr $yy+5] [expr $xx+5] [expr $yy-5] -width 3 -fill [dict get $OBJdata($OBJ_CURRENT) Fill] -tags [list obj$OBJ_CURRENT]
 
 	::gmautil::dassign $OBJdata($OBJ_CURRENT) X X Y Y Points _Points
+	set gridX [CanvasToGrid $X]
+	set gridY [CanvasToGrid $Y]
 	global zoom 
 	catch {unset Points}
 	if {$zoom != 1} {
@@ -5709,11 +5725,33 @@ proc LastAoePoint {w x y} {
 			lappend Points [dict get $x Y]
 		}
 	}
-	DrawAoeZone $canvas $OBJ_CURRENT "$X $Y $Points"
+	ClearAoeGrids $OBJ_CURRENT
+	DrawAoeZone $canvas $OBJ_CURRENT "$X $Y $Points" -grids
+	puts "**********************"
+	parray RawAoeGrids
+	dict set OBJdata($OBJ_CURRENT) AoEGrids [DigestRawGridList $gridX $gridY $OBJ_CURRENT]
+	puts "AoEGrids $OBJ_CURRENT [dict get $OBJdata($OBJ_CURRENT) AoEGrids]"
 	aoe_target_prompt [GetAreaZoneTargets $OBJ_CURRENT]
 	
 	EndObj $w 
 	clear_message
+}
+
+# this used to compute deltas from (x,y) but we decided to use absolute coordinates
+# instead so this really just collects the values from the hash table now.
+proc DigestRawGridList {x y id} {
+	global RawAoeGrids
+	set deltas {}
+	foreach point [array names RawAoeGrids $id:*] {
+		lappend deltas $RawAoeGrids($point)
+	}
+	ClearAoeGrids $id
+	return $deltas
+}
+
+proc ClearAoeGrids {id} {
+	global RawAoeGrids
+	array unset RawAoeGrids $id:*
 }
 	
 proc LastArcPoint {w x y} {
@@ -6817,7 +6855,7 @@ proc RenderTarget {w x0 y0 x1 y1 tags basetag} {
 	}
 }
 
-proc RenderSomeone {w id {norecurse false}} {
+proc RenderSomeone {w id {norecurse false} args} {
 	DEBUG 3 "RenderSomeone $w $id"
 	global MOBdata ThreatLineWidth iscale SelectLineWidth ThreatLineHatchWidth ReachLineColor
 	global HealthBarWidth HealthBarFrameWidth HealthBarConditionFrameWidth
@@ -6894,14 +6932,14 @@ proc RenderSomeone {w id {norecurse false}} {
 				# Our (GX,GY) reference point is already at the upper left of the occupied space.
 				set sz [MonsterSizeValue [CreatureDisplayedSize $id]]
 				for {set AoEx 0} {$AoEx <= $sz} {incr AoEx} {
-					_DrawAoeZone $w $id [expr $GX0+$AoEx] $GY0 [expr $GXX+$AoEx] $GYY $aoe_radius $aoe_color radius [list M#$id MA#$id allMOB MAzone]			
+					_DrawAoeZone $w $id [expr $GX0+$AoEx] $GY0 [expr $GXX+$AoEx] $GYY $aoe_radius $aoe_color radius [list M#$id MA#$id allMOB MAzone] {*}$args
 					if {$sz >= 1} {
-						_DrawAoeZone $w $id [expr $GX0+$AoEx] [expr $GY0+$sz] [expr $GXX+$AoEx] [expr $GYY+$sz] $aoe_radius $aoe_color radius [list M#$id MA#$id allMOB MAzone]			
+						_DrawAoeZone $w $id [expr $GX0+$AoEx] [expr $GY0+$sz] [expr $GXX+$AoEx] [expr $GYY+$sz] $aoe_radius $aoe_color radius [list M#$id MA#$id allMOB MAzone]	{*}$args
 					}
 				}
 				for {set AoEy 1} {$AoEy < $sz} {incr AoEy} {
-					_DrawAoeZone $w $id $GX0 [expr $GY0+$AoEy] $GXX [expr $GYY+$AoEy] $aoe_radius $aoe_color radius [list M#$id MA#$id allMOB MAzone]			
-					_DrawAoeZone $w $id [expr $GX0+$sz] [expr $GY0+$AoEy] [expr $GXX+$sz] [expr $GYY+$AoEy] $aoe_radius $aoe_color radius [list M#$id MA#$id allMOB MAzone]			
+					_DrawAoeZone $w $id $GX0 [expr $GY0+$AoEy] $GXX [expr $GYY+$AoEy] $aoe_radius $aoe_color radius [list M#$id MA#$id allMOB MAzone] {*}$args
+					_DrawAoeZone $w $id [expr $GX0+$sz] [expr $GY0+$AoEy] [expr $GXX+$sz] [expr $GYY+$AoEy] $aoe_radius $aoe_color radius [list M#$id MA#$id allMOB MAzone] {*}$args
 				}
 			}
 		}
@@ -7090,11 +7128,11 @@ proc RenderSomeone {w id {norecurse false}} {
 	|| [info exists TILE_ANIMATION($mob_token_tile_id,frames)]} {
 		DEBUG 3 "$image_pfx:$disp_zoom"
 		if {!$is_transparent} {
-			$w create oval [expr $x*$iscale] [expr $y*$iscale] [expr ($x+$mob_size)*$iscale] [expr ($y+$mob_size)*$iscale] -fill $fillcolor -tags "mob MF#$id M#$id MN#$id allMOB MB#$id"
+			$w create oval [expr $x*$iscale] [expr $y*$iscale] [expr ($x+$mob_size)*$iscale] [expr ($y+$mob_size)*$iscale] -fill $fillcolor -tags "mob MO#$id MF#$id M#$id MN#$id allMOB MB#$id"
 		}
 
 		if {[info exists TILE_SET($mob_token_tile_id)]} {
-			$w create image [expr $x*$iscale] [expr $y*$iscale] -anchor nw -image $TILE_SET([tile_id $image_pfx $disp_zoom]) -tags "mob M#$id MN#$id allMOB"
+			$w create image [expr $x*$iscale] [expr $y*$iscale] -anchor nw -image $TILE_SET([tile_id $image_pfx $disp_zoom]) -tags "mob M#$id MN#$id MO#$id allMOB"
 		} else {
 			animation_create $w [expr $x*$iscale] [expr $y*$iscale] $mob_token_tile_id $id -start
 		}
@@ -7134,7 +7172,7 @@ proc RenderSomeone {w id {norecurse false}} {
 	} else {
 		set mob_name [::gmaclock::nameplate_text $mob_name]
 		DEBUG 3 "No $image_pfx:$disp_zoom found in TILE_SET"
-		$w create oval [expr $x*$iscale] [expr $y*$iscale] [expr ($x+$mob_size)*$iscale] [expr ($y+$mob_size)*$iscale] -fill $fillcolor -tags "mob MF#$id M#$id MN#$id MB#id allMOB"
+		$w create oval [expr $x*$iscale] [expr $y*$iscale] [expr ($x+$mob_size)*$iscale] [expr ($y+$mob_size)*$iscale] -fill $fillcolor -tags "mob MO#$id MF#$id M#$id MN#$id MB#id allMOB"
 		$w create text [expr ($x+(.5*$mob_size))*$iscale] [expr ($y+(.5*$mob_size))*$iscale] -fill $textcolor \
 			-font [FontBySize [CreatureDisplayedSize $id]] -text $mob_name -tags "M#$id MF#$id MN#$id MT#$id allMOB"
 	}
@@ -17411,48 +17449,69 @@ proc select_aka_toggle_none {w fn} {
 	}
 }
 
+
+proc IsMobOccupyingGrid {x y id} {
+	global MOBdata
+	if {[info exists MOBdata($id)]} {
+		::gmautil::dassign $MOBdata($id) Gx Gx Gy Gy 
+		set sz [_mob_size $id]
+	}
+	for {set i 0} {$i < $sz} {incr i} {
+		for {set j 0} {$j < $sz} {incr j} {
+#			puts "--mob size $sz ([expr $Gx+$i],[expr $Gy+$j])==($x,$y)?"
+			if {[expr $Gx + $i] == $x && [expr $Gy + $j] == $y} {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 # zoneid
 # mobid -mob
 set aoe_target_prompt_source {}
 proc GetAreaZoneTargets {zone_obj_id args} {
-#	DEBUG 0 "GetAreaZoneTargets $zone_obj_id $args"
+	#DEBUG 0 "GetAreaZoneTargets $zone_obj_id $args"
 	global canvas
+	global OBJdata
 	global MOBdata
-	global aoe_target_prompt_source
-	global MOBdata
-
+	set target_list {}
 	if {[lsearch -exact $args -mob] >= 0} {
-		set tag "MA#$zone_obj_id"
-		if {[catch {set aoe_target_prompt_source [list [dict get $MOBdata([GetBaseMobID $zone_obj_id]) Name]]} err]} {
-			DEBUG 0 $err
-		}
+		# render the creature with grid capture turned on
+		ClearAoeGrids $zone_obj_id
+		RenderSomeone $canvas $zone_obj_id true -grids
+		set grids [DigestRawGridList _ _ $zone_obj_id]
+		#puts "mob $zone_obj_id area grids $grids"
 	} else {
-		set tag "AoEZoneCrossHatch$zone_obj_id"
-		set aoe_target_prompt_source {}
-#		DEBUG 0 "Looking for $tag"
+		# search in an AoE zone object's grid list
+		if {[info exists OBJdata($zone_obj_id)] && [dict exists $OBJdata($zone_obj_id) AoEGrids]} {
+			set grids [dict get $OBJdata($zone_obj_id) AoEGrids]
+		} else {
+			DEBUG 0 "Unable to determine where the area of effect zone is, so we'll ignore the affected creatures. You're on your own to figure that out."
+			return {}
+		}
+	}
+
+	foreach mob_id [array names MOBdata] {
+		if {[info exists MOBdata([set bid [GetBaseMobID $mob_id]])] && [dict exists $MOBdata($bid) Hidden] && [dict get $MOBdata($bid) Hidden]} {
+			continue
+		}
+		set candidates($mob_id) {}
 	}
 	
-	foreach zh [$canvas find withtag $tag] {
-		set zhbbox [$canvas bbox $zh]
-#		DEBUG 0 "zone hatch $zh, bounding box $bbox"
-		foreach t [$canvas find overlapping {*}$zhbbox] {
-			foreach tt [$canvas gettags $t] {
-				if {[string range $tt 0 2] eq {MT#}} {
-					set targets([string range $tt 3 end]) 1
-				}
+	foreach grid $grids {
+		lassign $grid zx zy
+
+		foreach mob_id [array names candidates] {
+			#puts "Checking for occupancy in ($zx,$zy), $mob_id"
+			if {[IsMobOccupyingGrid $zx $zy $mob_id]} {
+				lappend target_list $mob_id
+				array unset candidates $mob_id
 			}
 		}
 	}
 
-	set target_list {}
-	foreach t [array names targets] {
-		set id [GetBaseMobID $t]
-		if {[info exists MOBdata($id)] && [dict exists $MOBdata($id) Name]} {
-			lappend target_list [dict get $MOBdata($id) Name]
-		}
-	}
-
-	return $target_list
+	return [mobIDsToNames $target_list -permissive]
 }
 
 proc aoe_target_prompt {targets} {
@@ -17529,10 +17588,14 @@ proc aoe_target_prompt_commit {} {
 		global ActiveTargetSource
 		set old_source $ActiveTargetSource
 		set ActiveTargetSource $aoe_target_prompt_source
-		_setMyTargets $targets
+		if {[llength $targets] > 0} {
+			_setMyTargets $targets
+		}
 		set ActiveTargetSource $old_source
 	} else {
-		_setMyTargets $targets
+		if {[llength $targets] > 0} {
+			_setMyTargets $targets
+		}
 	}
 	array unset aoe_target_prompt_targets
 	destroy .aoetargwindow
@@ -17678,7 +17741,7 @@ proc check_aka_commit {} {
 #
 #  called when rendering somone or advancing the initiative turn or updating target attribute
 #
-# @[00]@| GMA-Mapper 4.36.2
+# @[00]@| GMA-Mapper 4.36.3
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2025 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
