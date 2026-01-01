@@ -3,11 +3,11 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.36.3          <!-- @@##@@ -->
- * Effective Date: 30-Dec-2025               <!-- @@##@@ -->
+ * This Package Version: 4.36.4          <!-- @@##@@ -->
+ * Effective Date: 01-Jan-2026               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.39.1 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.41 <!-- @@##@@ -->
  * GMA Mapper File Format: 23	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 422        <!-- @@##@@ -->
  * GMA Mapper Preferences File Format: 12 <!-- @@##@@ -->
@@ -16,6 +16,10 @@
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.36.4
+## Fixes
+ * Missing field in `AC` protocol definition.
 
 # 4.36.3
 ## Fixes
