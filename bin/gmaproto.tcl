@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___       ______    ______     ______      #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ____ \   / ___  \     #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \( (    \/   \/   \  \    #
-# | |      | || || || (___) | Assistant  / (_) (_       ___) /| (____        ___) /    #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( |  ___ \      (___ (     #
-# | | \_  )| |   | || (   ) | VTT            ) (           ) \| (   ) )         ) \    #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /( (___) ) _ /\___/  /    #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/  \_____/ (_)\______/     #
+#  _______  _______  _______                ___       ______    ______        ___      #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ____ \      /   )     #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \( (    \/     / /) |     #
+# | |      | || || || (___) | Assistant  / (_) (_       ___) /| (____      / (_) (_    #
+# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( |  ___ \    (____   _)   #
+# | | \_  )| |   | || (   ) | VTT            ) (           ) \| (   ) )        ) (     #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /( (___) ) _      | |     #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/  \_____/ (_)     (_)     #
 #                                                                                      #
 ########################################################################################
 #
@@ -127,7 +127,7 @@ namespace eval ::gmaproto {
 		update_turn               I
 	}
 	array set _message_payload {
-		AC      {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l PolyGM ? Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}}}
+		AC      {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l PolyGM ? Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}} Targets l}
 		ACCEPT  {Messages l}
 		AA      {Name s Format s File s IsLocalFile ?}
 		AA?     {Name s}
@@ -2358,9 +2358,9 @@ proc ::gmaproto::normalize_dict {cmd d} {
 	return [::gmaproto::new_dict_from_json $cmd [::gmaproto::json_from_dict $cmd $d]]
 }
 
-# @[00]@| GMA-Mapper 4.36.3
+# @[00]@| GMA-Mapper 4.36.4
 # @[01]@|
-# @[10]@| Overall GMA package Copyright © 1992–2025 by Steven L. Willoughby (AKA MadScienceZone)
+# @[10]@| Overall GMA package Copyright © 1992–2026 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
 # @[12]@| Aloha, Oregon, USA. All Rights Reserved. Some components were introduced at different
 # @[13]@| points along that historical time line.
