@@ -6450,9 +6450,11 @@ proc _DrawCreatureStatusMarkers {w x y s tags conditions {customlist {}}} {
 			lappend customlist [list $shape $color $dashpattern]
 		}
 	}
+	#DEBUG 0 "draw $w $x $y $s $tags $conditions -> $customlist"
 
 	foreach marker $customlist {
 			lassign $marker shape color dashpattern
+			#DEBUG 0 "shape=$shape color=$color dash=$dashpattern"
 			# calculate border color
 			lassign [winfo rgb . $color] fillR fillG fillB
 			if {$fillR * 0.299 + $fillG * 0.587 + $fillB * 0.114 > 32767} {

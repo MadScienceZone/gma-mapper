@@ -947,15 +947,15 @@ namespace eval ::gmaprofile {
 		$st add $st.c -state normal -sticky news -text Colors
 		$st add $st.cl -state normal -sticky news -text Clocks
 		$st add $st.m -state normal -sticky news -text Markers
-		menu $st.m.shapemenu
-		variable __marker_shapes
-		foreach {symbol label} [array get __marker_shapes] {
-			$st.m.shapemenu add command -label $label -command [list ::gmaprofile::_marker_shape $symbol]
-		}
-		menu $st.m.dashmenu
-		$st.m.dashmenu add command -label {} -command {::gmaprofile::_marker_dashpattern {}}
-		$st.m.dashmenu add command -label {--} -command {::gmaprofile::_marker_dashpattern {--}}
-		$st.m.dashmenu add command -label {..} -command {::gmaprofile::_marker_dashpattern {..}}
+		menu $st.m.shapemenu -postcommand "::gmaprofile::_update_marker_shape_menu [list $st $st.m.shapemenu]"
+#		variable __marker_shapes
+#		foreach {symbol label} [array get __marker_shapes] {
+#			$st.m.shapemenu add command -label $label -command [list ::gmaprofile::_marker_shape $symbol]
+#		}
+		menu $st.m.dashmenu -postcommand "::gmaprofile::_update_marker_dash_menu [list $st $st.m.dashmenu]"
+#		$st.m.dashmenu add command -label {} -command {::gmaprofile::_marker_dashpattern {}}
+#		$st.m.dashmenu add command -label {--} -command {::gmaprofile::_marker_dashpattern {--}}
+#		$st.m.dashmenu add command -label {..} -command {::gmaprofile::_marker_dashpattern {..}}
 
 		global marker mods marker_desc marker_shape marker_dash marker_color
 		set marker_mods {}
@@ -976,17 +976,17 @@ namespace eval ::gmaprofile {
 		bind $st.m.markers <<ListboxSelect>> "::gmaprofile::_select_marker_by_idx $st \[%W curselection\]"
 		grid [canvas $st.m.c -height 150 -width 150]
 		$st.m.c create oval 25 25 125 125 -width 3 -outline "#aaaaaa"
-	        grid [label $st.m.l1 -text modifiers:] -row 5 -column 0 -sticky w
-		grid [ttk::entry $st.m.mods -textvariable marker_mods -width 30 -state disabled] - - -sticky we -row 5 -column 1
-	        grid [label $st.m.l2 -text description:] -row 6 -column 0 -sticky w 
-		grid [ttk::entry $st.m.desc -textvariable marker_desc -width 30 -state disabled] - - -sticky we -row 6 -column 1
-	        grid [label $st.m.l3 -text {marker shape:}] -row 7 -column 0 -sticky w 
+	        grid [label $st.m.l1 -text Modifiers:] -row 5 -column 0 -sticky w
+		grid [ttk::entry $st.m.mods -textvariable marker_mods -width 30 -state disabled -validate key -validatecommand "::gmaprofile::_set_marker_mods [list $st %W %P]"] - - -sticky we -row 5 -column 1
+	        grid [label $st.m.l2 -text Description:] -row 6 -column 0 -sticky w 
+		grid [ttk::entry $st.m.desc -textvariable marker_desc -width 30 -state disabled -validate key -validatecommand "::gmaprofile::_set_marker_desc [list $st %W %P]"] - - -sticky we -row 6 -column 1
+	        grid [label $st.m.l3 -text {Marker shape:}] -row 7 -column 0 -sticky w 
 		grid [ttk::menubutton $st.m.shape -menu $st.m.shapemenu -textvariable marker_shape -state disabled] - - -sticky w -row 7 -column 1
-	        grid [label $st.m.l4 -text {dash pattern and color:}] -row 8 -column 0 -sticky w 
+	        grid [label $st.m.l4 -text {Dash pattern and color:}] -row 8 -column 0 -sticky w 
 		grid [ttk::menubutton $st.m.dash -menu $st.m.dashmenu -textvariable marker_dash -state disabled] -sticky w -row 8 -column 1
 		grid [button $st.m.color -bg $marker_color -text [::gmacolors::rgb_name $marker_color] -state disabled \
 			-highlightcolor $marker_color -highlightbackground $marker_color -highlightthickness 2 \
-			-command "::gmaprofile::_set_marker_color $st.m.color"] -row 8 -column 2 -sticky we -padx 1 -pady 1
+			-command "::gmaprofile::_set_marker_color $st.m $st.m.color"] -row 8 -column 2 -sticky we -padx 1 -pady 1
 		
 
 		#XXX
@@ -1386,14 +1386,85 @@ namespace eval ::gmaprofile {
 		return [$lb get [lindex $sel 0]]
 	}
 
+	proc _update_marker_dash_menu {st m} {
+		$m delete 0 end
+		if {[set markername [_selected_marker_name $st.m.markers]] ne {}} {
+			$m add command -label {} -command [list ::gmaprofile::_marker_dashpattern $st.m {} $markername]
+			$m add command -label {--} -command [list ::gmaprofile::_marker_dashpattern $st.m {--} $markername]
+			$m add command -label {..} -command [list ::gmaprofile::_marker_dashpattern $st.m {..} $markername]
+		}
+	}
+	proc _update_marker_shape_menu {st m} {
+		$m delete 0 end
+		if {[set markername [_selected_marker_name $st.m.markers]] ne {}} {
+			variable __marker_shapes
+			foreach {symbol label} [array get __marker_shapes] {
+				$m add command -label $label -command [list ::gmaprofile::_marker_shape $st.m $symbol $markername]
+			}
+		}
+	}
 	proc _copy_selected_marker {w} {
+		variable _profile
+		set st $w.n.s.n
+		set lb $st.m.markers
+
+		if {[set srcmarker [_selected_marker_name $lb]] eq {}} {
+			tk_messageBox -type ok -icon error -title "No current selection" -message "You can't make a copy of a marker without first selecting the marker to copy from." -parent $w
+			return
+		}
+		set srcdata [dict get $_profile styles markers $srcmarker]
+		if {[::getstring::tk_getString $w.new_marker_name newname "Name of new marker (copy of $srcmarker)" -geometry [::parent_geometry_ctr $w]] && $newname ne {}} {
+			if {[dict exists $_profile styles markers $newname]} {
+				tk_messageBox -type ok -icon error -title "Duplicate name" -message "You tried to add a marker called \"$newname\" but that name already exists in the marker set." -parent $w
+				return
+			}
+			$lb insert end $newname
+			dict set _profile styles markers $newname $srcdata
+			$lb selection clear 0 end
+			$lb selection set end
+			_select_marker_by_name $st $newname
+		}
 	}
 	proc _delete_selected_marker {w} {
+		variable _profile
+		set st $w.n.s.n
+		set lb $st.m.markers
+
+		if {[set srcmarker [_selected_marker_name $lb]] eq {}} {
+			tk_messageBox -type ok -icon error -title "No current selection" -message "You can't delete a marker without first selecting which one you want to delete." -parent $w
+			return
+		}
+		if {![dict exists $_profile styles markers $srcmarker]} {
+			tk_messageBox -type ok -icon error -title "No such marker name" -message "You tried to delete a marker called \"$srcmarker\" but that name does not exist in the marker set." -parent $w
+			return
+		}
+		if {[llength [set idx [$lb curselection]]] == 0} {
+			tk_messageBox -type ok -icon error -title "Unable to delete" -message "An error prevented the deletion of the marker \"$srcmarker\"." -detail "Unable to find the listbox's current selection." -parent $w
+			return
+		}
+		$lb delete [lindex $idx 0]
+		$lb selection clear 0 end
+		_select_marker_by_name $st {}
+		dict unset _profile styles markers $srcmarker
+	}
+	proc _set_marker_mods {st e v} {
+		variable _profile
+		if {[set markername [_selected_marker_name $st.m.markers]] ne {}} {
+			dict set _profile styles markers $markername modifiers $v 
+		}
+		return 1
+	}
+	proc _set_marker_desc {st e v} {
+		variable _profile
+		if {[set markername [_selected_marker_name $st.m.markers]] ne {}} {
+			dict set _profile styles markers $markername description $v 
+		}
+		return 1
 	}
 	proc _select_marker_by_name {st name} {
 		if {$name eq {}} {
 			$st.m.copy configure -state disabled -text Copy
-			$st.m.del configure state disabled -text Delete
+			$st.m.del configure -state disabled -text Delete
 			$st.m.markers selection clear 0 end
 		} else {
 			$st.m.copy configure -state normal -text "Copy $name"
@@ -1415,6 +1486,7 @@ namespace eval ::gmaprofile {
 			set marker_shape O
 			set marker_dash {}
 			set marker_color black
+			#_draw_marker
 		} else {
 			$w.mods configure -state normal
 			$w.desc configure -state normal
@@ -1422,17 +1494,34 @@ namespace eval ::gmaprofile {
 			$w.dash configure -state normal
 			$w.color configure -state normal
 			::gmautil::dassign [dict get $_profile styles markers $name] modifiers marker_mods description marker_desc shape m_shape dashpattern m_dash color marker_color
-			::gmaprofile::_marker_dashpattern $m_dash
-			::gmaprofile::_marker_shape $m_shape
-			::gmaprofile::_set_marker_color $w.color $marker_color
-			set marker_mods {}
-			set marker_desc {}
+			::gmaprofile::_marker_dashpattern $w $m_dash $name
+			::gmaprofile::_marker_shape $w $m_shape $name
+			::gmaprofile::_set_marker_color $w $w.color $marker_color
 		}
 	}
+
 	proc _select_marker_by_idx {st idx} {
+		if {$idx eq {}} {
+			_select_marker_by_name $st {}
+		} else {
+			_select_marker_by_name $st [$st.m.markers get $idx]
+		}
 	}
-	proc _marker_shape {shape} {
-		variable marker_shape
+
+	proc _draw_marker {tab name} {
+		$tab.c delete Sample__Marker
+		if {$name ne {}} {
+			global marker_dash
+			global marker_color
+			global marker_shape
+			variable _profile
+			set shape [dict get $_profile styles markers $name shape]
+			::_DrawCreatureStatusMarkers $tab.c 25 25 100 [list Sample__Marker] {} [list [list $shape $marker_color $marker_dash]]
+		}
+	}
+
+	proc _marker_shape {tab shape {name {}}} {
+		global marker_shape
 		variable __marker_shapes
 		if {[info exists __marker_shapes($shape)]} {
 			set marker_shape $__marker_shapes($shape)
@@ -1440,16 +1529,28 @@ namespace eval ::gmaprofile {
 			tk_messageBox -type ok -icon error -title "Invalid marker shape" -message "The selected shape is not valid. Please select a different one."
 			if {[info exists __marker_shapes("O"]} {
 				set marker_shape $__marker_shapes("O")
+				set shape "O"
 			}
 		}
+
+		if {$name ne {}} {
+			variable _profile
+			dict set _profile styles markers $name shape $shape
+		}
+		_draw_marker $tab $name
 	}
-	proc _marker_dashpattern {pat} {
-		variable marker_dash
+	proc _marker_dashpattern {tab pat {name {}}} {
+		global marker_dash
 		set marker_dash $pat
+		if {$name ne {}} {
+			variable _profile
+			dict set _profile styles markers $name dashpattern $marker_dash
+		}
+		_draw_marker $tab $name
 	}
-	proc _set_marker_color {st {to_color {}}} {
+	proc _set_marker_color {s st {to_color {}}} {
 		variable _profile
-		variable marker_color
+		global marker_color
 		if {$to_color eq {}} {
 			set chosencolor [tk_chooseColor -initialcolor $marker_color -parent $st -title "Choose color for custom marker"]
 		} else {
@@ -1459,7 +1560,12 @@ namespace eval ::gmaprofile {
 			set marker_color $chosencolor
 			$st configure -bg $chosencolor -text [::gmacolors::rgb_name $chosencolor] \
 				-highlightcolor $chosencolor -highlightbackground $chosencolor -highlightthickness 2
+
+			if {[set markername [_selected_marker_name $s.markers]] ne {}} {
+				dict set _profile styles markers $markername color $chosencolor 
+			}
 		}
+		_draw_marker $s $markername
 	}
 
 	proc _chooser_visibility {w} {
