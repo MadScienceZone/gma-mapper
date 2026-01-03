@@ -11,14 +11,39 @@
 ########################################################################################
 # Profile editor
 
-package provide gmaprofile 1.6.1
+package provide gmaprofile 1.7.0
 package require gmacolors
 package require json 1.3.3
 package require json::write 1.0.3
 package require getstring
 
+
 namespace eval ::gmaprofile {
 	namespace export editor
+	variable __marker_shapes
+	array set __marker_shapes {
+		{O} "circle" 
+		{X} "X" 
+		{V} "downward triangle" 
+		{^} "upward triangle"
+		{<>} "diamond"
+		{#} "double cross"
+		{+} "single cross"
+		{\\\\} "double backslash"
+		{//} "double slash"
+		{\\} "backslash"
+		{/} "slash"
+		{=} "double horizontal"
+		{-} "single horizontal"
+		{||} "double vertical"
+		{|} "single vertical"
+		{|v} "small triangle to left"
+		{v|} "small triangle to right"
+		{|o} "small circle to left"
+		{o|} "small circle to right"
+		{|<>} "small diamond to left"
+		{<>|} "small diamond to right"
+	}
 	variable _fontid 0
 	variable lockout_select_fbn false
 	variable _profile {}
@@ -28,7 +53,7 @@ namespace eval ::gmaprofile {
 	variable font_repository
 	variable _default_color_table
 	variable minimum_file_version 1
-	variable maximum_file_version 12
+	variable maximum_file_version 13
 	array set _default_color_table {
 		fg,light           #000000
 		normal_fg,light    #000000
@@ -195,6 +220,13 @@ namespace eval ::gmaprofile {
 					underline ?
 					offset i
 				}}
+			}}
+			markers {D {
+				modifiers l
+				color s
+				shape s
+				dashpattern s
+				description s
 			}}
 		}}
 	}
@@ -539,7 +571,7 @@ namespace eval ::gmaprofile {
 
 		json::write indented true
 		json::write aligned true
-		dict set data GMA_Mapper_preferences_version 12
+		dict set data GMA_Mapper_preferences_version 13
 		set f [open $filename w]
 		puts $f [::gmaproto::_encode_payload $data $_file_format]
 		close $f
@@ -908,11 +940,62 @@ namespace eval ::gmaprofile {
 		frame $st.r
 		frame $st.c
 		frame $st.cl
+		frame $st.m
 		$st add $st.f -state normal -sticky news -text Fonts
 		$st add $st.d -state normal -sticky news -text Dialogs
 		$st add $st.r -state normal -sticky news -text {Die Rolls/Chat}
 		$st add $st.c -state normal -sticky news -text Colors
 		$st add $st.cl -state normal -sticky news -text Clocks
+		$st add $st.m -state normal -sticky news -text Markers
+		menu $st.m.shapemenu
+		variable __marker_shapes
+		foreach {symbol label} [array get __marker_shapes] {
+			$st.m.shapemenu add command -label $label -command [list ::gmaprofile::_marker_shape $symbol]
+		}
+		menu $st.m.dashmenu
+		$st.m.dashmenu add command -label {} -command {::gmaprofile::_marker_dashpattern {}}
+		$st.m.dashmenu add command -label {--} -command {::gmaprofile::_marker_dashpattern {--}}
+		$st.m.dashmenu add command -label {..} -command {::gmaprofile::_marker_dashpattern {..}}
+
+		global marker mods marker_desc marker_shape marker_dash marker_color
+		set marker_mods {}
+		set marker_desc {}
+		set marker_shape circle
+		set marker_dash {}
+		set marker_color black
+
+		grid [label $st.m.title -text "Define custom markers you can place on creatures to denote things like studied or smite evil targets, etc."] - -
+		grid [listbox $st.m.markers -yscrollcommand "$st.m.scroll set" -selectmode browse \
+			-selectforeground white -selectbackground blue\
+			-exportselection false\
+			] -sticky news
+		grid [scrollbar $st.m.scroll -orient vertical -command "$st.m.markers yview"] -column 1 -row 1 -sticky nsw
+		grid [button $st.m.add -text {Add New...} -command "::gmaprofile::_add_new_marker $w"] -sticky nw -column 2 -row 1
+		grid ^ ^ [button $st.m.copy -text Copy -state disabled -command "::gmaprofile::_copy_selected_marker $w"] -sticky nw
+		grid ^ ^ [button $st.m.del -text Delete -state disabled -foreground red -command "::gmaprofile::_delete_selected_marker $w"] -sticky sw
+		bind $st.m.markers <<ListboxSelect>> "::gmaprofile::_select_marker_by_idx $st \[%W curselection\]"
+		grid [canvas $st.m.c -height 150 -width 150]
+		$st.m.c create oval 25 25 125 125 -width 3 -outline "#aaaaaa"
+	        grid [label $st.m.l1 -text modifiers:] -row 5 -column 0 -sticky w
+		grid [ttk::entry $st.m.mods -textvariable marker_mods -width 30 -state disabled] - - -sticky we -row 5 -column 1
+	        grid [label $st.m.l2 -text description:] -row 6 -column 0 -sticky w 
+		grid [ttk::entry $st.m.desc -textvariable marker_desc -width 30 -state disabled] - - -sticky we -row 6 -column 1
+	        grid [label $st.m.l3 -text {marker shape:}] -row 7 -column 0 -sticky w 
+		grid [ttk::menubutton $st.m.shape -menu $st.m.shapemenu -textvariable marker_shape -state disabled] - - -sticky w -row 7 -column 1
+	        grid [label $st.m.l4 -text {dash pattern and color:}] -row 8 -column 0 -sticky w 
+		grid [ttk::menubutton $st.m.dash -menu $st.m.dashmenu -textvariable marker_dash -state disabled] -sticky w -row 8 -column 1
+		grid [button $st.m.color -bg $marker_color -text [::gmacolors::rgb_name $marker_color] -state disabled \
+			-highlightcolor $marker_color -highlightbackground $marker_color -highlightthickness 2 \
+			-command "::gmaprofile::_set_marker_color $st.m.color"] -row 8 -column 2 -sticky we -padx 1 -pady 1
+		
+
+		#XXX
+		#XXX modifiers color shape description dashpattern
+		#_select_marker_by_name $st {}
+		foreach marker [dict keys [dict get $_profile styles markers]] {
+			$st.m.markers insert end $marker
+		}
+
 
 		grid x [label $st.d.tl -text {Light Mode}] [label $st.d.td -text {Dark Mode}]
 		set row 1
@@ -1276,6 +1359,109 @@ namespace eval ::gmaprofile {
 		return $::gmaprofile::_profile
 	}
 
+	proc _add_new_marker {w} {
+		variable _profile
+		if {[::getstring::tk_getString $w.new_marker_name newname {Name of new marker} -geometry [::parent_geometry_ctr $w]] && $newname ne {}} {
+			if {[dict exists $_profile marker $newname]} {
+				tk_messageBox -type ok -icon error -title "Duplicate name" -message "You tried to add a marker called \"$newname\" but that name already exists in the marker set." -parent $w
+				return
+			}
+			$w.n.s.n.m.markers insert end $newname
+			dict set _profile styles markers $newname [dict create\
+				modifiers {}\
+				color black\
+				shape {O}\
+				dashpattern {}\
+				description {}\
+			]
+			$w.n.s.n.m.markers selection clear 0 end
+			$w.n.s.n.m.markers selection set end
+			_select_marker_by_name $w.n.s.n $newname
+		}
+	}
+	proc _selected_marker_name {lb} {
+		if {[llength [set sel [$lb curselection]]] == 0} {
+			return {}
+		}
+		return [$lb get [lindex $sel 0]]
+	}
+
+	proc _copy_selected_marker {w} {
+	}
+	proc _delete_selected_marker {w} {
+	}
+	proc _select_marker_by_name {st name} {
+		if {$name eq {}} {
+			$st.m.copy configure -state disabled -text Copy
+			$st.m.del configure state disabled -text Delete
+			$st.m.markers selection clear 0 end
+		} else {
+			$st.m.copy configure -state normal -text "Copy $name"
+			$st.m.del configure -state normal -text "Delete $name"
+		}
+		_push_marker $st.m $name
+	}
+	proc _push_marker {w name} {
+		variable _profile
+		global marker_mods marker_desc marker_shape marker_dash marker_color
+		if {$name eq {} || ![dict exists $_profile styles markers $name]} {
+			$w.mods configure -state disabled
+			$w.desc configure -state disabled
+			$w.shape configure -state disabled
+			$w.dash configure -state disabled
+			$w.color configure -state disabled
+			set marker_mods {}
+			set marker_desc {}
+			set marker_shape O
+			set marker_dash {}
+			set marker_color black
+		} else {
+			$w.mods configure -state normal
+			$w.desc configure -state normal
+			$w.shape configure -state normal
+			$w.dash configure -state normal
+			$w.color configure -state normal
+			::gmautil::dassign [dict get $_profile styles markers $name] modifiers marker_mods description marker_desc shape m_shape dashpattern m_dash color marker_color
+			::gmaprofile::_marker_dashpattern $m_dash
+			::gmaprofile::_marker_shape $m_shape
+			::gmaprofile::_set_marker_color $w.color $marker_color
+			set marker_mods {}
+			set marker_desc {}
+		}
+	}
+	proc _select_marker_by_idx {st idx} {
+	}
+	proc _marker_shape {shape} {
+		variable marker_shape
+		variable __marker_shapes
+		if {[info exists __marker_shapes($shape)]} {
+			set marker_shape $__marker_shapes($shape)
+		} else {
+			tk_messageBox -type ok -icon error -title "Invalid marker shape" -message "The selected shape is not valid. Please select a different one."
+			if {[info exists __marker_shapes("O"]} {
+				set marker_shape $__marker_shapes("O")
+			}
+		}
+	}
+	proc _marker_dashpattern {pat} {
+		variable marker_dash
+		set marker_dash $pat
+	}
+	proc _set_marker_color {st {to_color {}}} {
+		variable _profile
+		variable marker_color
+		if {$to_color eq {}} {
+			set chosencolor [tk_chooseColor -initialcolor $marker_color -parent $st -title "Choose color for custom marker"]
+		} else {
+			set chosencolor $to_color
+		}
+		if {$chosencolor ne {}} {
+			set marker_color $chosencolor
+			$st configure -bg $chosencolor -text [::gmacolors::rgb_name $chosencolor] \
+				-highlightcolor $chosencolor -highlightbackground $chosencolor -highlightthickness 2
+		}
+	}
+
 	proc _chooser_visibility {w} {
 		if {[tk fontchooser configure -visible]} {
 			$w.n.s.n.f.choose configure -text "Hide Font Chooser"
@@ -1508,6 +1694,7 @@ namespace eval ::gmaprofile {
 		    turndisp_font  "ClockTime"\
 		    default_font   "ClockList"\
 		  ] \
+		  markers {} \
 		  dialogs [dict create \
 		    heading_fg   [dict create dark cyan   light blue] \
 		    normal_fg    [dict create dark [default_color fg dark] light [default_color fg light]] \

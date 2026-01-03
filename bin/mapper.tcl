@@ -6408,9 +6408,13 @@ proc CreatureStatusMarker {w id x y s calc_condition} {
 		return
 	}
 
-	set x1 [expr $x + $s]
-	set y1 [expr $y + $s]
 	set tags "mob MF#$id M#$id MN#$id allMOB"
+
+	_DrawCreatureStatusMarkers $w $x $y $s $tags $conditions {}
+}
+
+proc _DrawCreatureStatusMarkers {w x y s tags conditions {customlist {}}} {
+	global MOBdata MarkerColor MarkerShape
 
 	set Vo   0; # V triangle around token full size
 	set To   0; # ^ triangle around token full size
@@ -6425,8 +6429,12 @@ proc CreatureStatusMarker {w id x y s calc_condition} {
 	set diao 0; # diamond <>              full size
 	set oo   0; # circle around full token
 
+	set x1 [expr $x + $s]
+	set y1 [expr $y + $s]
+
 	foreach condition $conditions {
 		if {[info exists MarkerShape($condition)] && [info exists MarkerColor($condition)]} {
+			set shape $MarkerShape($condition)
 			if {[set color $MarkerColor($condition)] eq {*}} {
 				set color [dict get $MOBdata($id) Color]
 			}
@@ -6439,7 +6447,12 @@ proc CreatureStatusMarker {w id x y s calc_condition} {
 			} else {
 				set dashpattern {}
 			}
-			
+			lappend customlist [list $shape $color $dashpattern]
+		}
+	}
+
+	foreach marker $customlist {
+			lassign $marker shape color dashpattern
 			# calculate border color
 			lassign [winfo rgb . $color] fillR fillG fillB
 			if {$fillR * 0.299 + $fillG * 0.587 + $fillB * 0.114 > 32767} {
@@ -6447,7 +6460,7 @@ proc CreatureStatusMarker {w id x y s calc_condition} {
 			} else {
 				set outlineColor white
 			}
-			switch -exact $MarkerShape($condition) {
+			switch -exact $shape {
 				|v		{
 							$w create polygon [expr $x+$vlo] [expr $y+($s*.5)] \
 									  [expr $x+$vlo+10] [expr $y+($s*.5)] \
@@ -6620,10 +6633,10 @@ proc CreatureStatusMarker {w id x y s calc_condition} {
 							 incr slo 5
 						}
 				default	{
-						}
+				}
 							
 			}
-		}
+		
 	}
 }
 
