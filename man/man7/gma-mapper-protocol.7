@@ -1,5 +1,5 @@
 '\" t
-'\" *** 422 ***
+'\" *** 423 ***
 '\" <<ital-is-var>>
 .TH GMA-MAPPER-PROTOCOL 7 "GMA-Mapper 4.36.4" 01-Jan-2026 "Protocols" \" @@mp@@
 .SH NAME
@@ -79,7 +79,7 @@ be implemented to wait synchronously for a server
 response during the authentication negotiation stage.
 .LP
 '\" <</bold-is-fixed>>
-.B "This describes protocol version 422."
+.B "This describes protocol version 423."
 '\" <<bold-is-fixed>>
 These notes are intended to be 
 detailed enough to implement a client from and should be considered
@@ -4318,6 +4318,28 @@ but indicates the distance for reach weapons.
 The list of designated combat targets. If non-empty, the first creature named in this attribute
 is the target of attack die rolls and all creatures named are the targets of any damage die rolls
 made by this creature.
+.TP
+.BI TargetedModifiers " (object)"
+The value of this attribute is a dictionary object mapping creature names as they appear on the
+map (as is the case with the
+.B Targets
+attribute) to an object describing the nature of how that creature is being targeted by the creature
+with this attribute:
+'\" <<list>>
+.RS
+.TP
+.B Type
+The custom target type, as a free-form string, typically something like \*(lqstudied\*(rq or \*(lqsmite evil\*(rq, etc.
+.TP
+.BI Modifiers " (list)"
+A list of modifier names. When this creature name appears in the creature's
+.B Targets
+attribute, then the die-roller SHOULD also enable the modifiers named in this attribute as well.
+It NEED NOT disable the modifiers in other cases. The assumption is that the user might manually activate them at their
+discretion if they are applicable globally, but otherwise would leave them off but this feature would selectively
+turn them on as needed bor specifically designated targets where they narrowly and cirucmstantially apply.
+.RE
+'\" <</>>
 '\" <</New>>
 .LP
 (Added in protocol 406.)
@@ -4962,15 +4984,19 @@ Steve Willoughby / steve@madscience.zone;
 John Mechalas (elevation and movement modes).
 .SH HISTORY
 .LP
-This document defines map protocol version 422,
-which adds the explicit
+This document defines map protocol version 423,
+which adds the
+.B TargetedModifiers
+attribute to creatures.
+.LP
+Historically, protocol version 422
+added the explicit
 .B NotPlaying
 flags to indicate if a user should not be considered
 as controlling any characters.
 .LP
-Historically,
-protocol version 421
-adds client platform identification and sound support.
+Protocol version 421
+added client platform identification and sound support.
 .LP
 Version 420
 introduced targets to die rolls and armor class as a tracked creature health item. It also introduces the

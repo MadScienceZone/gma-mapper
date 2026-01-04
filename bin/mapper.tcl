@@ -8604,7 +8604,7 @@ proc CondAll {mob_list condition} {
 }
 
 proc CreateConditionSubMenu {args} {
-	global MarkerShape MarkerColor is_GM
+	global MarkerShape MarkerColor is_GM PreferencesData
 
 	if {[lindex $args 0] == {-mass}} {
 		set mob_id __mass__
@@ -8621,8 +8621,8 @@ proc CreateConditionSubMenu {args} {
 	catch {$mid delete 0 end; destroy $mid}
 	menu $mid
 	set choices [lsort [array names MarkerShape]]
-	if {[llength $choices] > 20} {
-		set groupsize [expr int([llength $choices] / 10)]
+	if {[llength $choices] > 10} {
+		set groupsize [expr int([llength $choices] / 5)]
 		set submenu {}
 		for {set i 0} {$i < [llength $choices]} {incr i} {
 			if {$i % $groupsize == 0} {
@@ -8654,6 +8654,26 @@ proc CreateConditionSubMenu {args} {
 			}
 		}
 	}
+	if {[dict exists $PreferencesData styles markers] && [set marker_data [dict get $PreferencesData styles markers]] ne {}} {
+		$mid add separator
+		foreach {name d} $marker_data {
+			if {[dict exists $d description] && [set description [dict get $d description]] ne {}} {
+
+
+
+
+
+
+			if {$description ne {}} {
+				if {[AreMobsInCustomList $mob_list $name XXX]} {
+					$mid add command -command [list Custom$cmd $mob_list $name] -label $description -foreground #ff0000
+				} else {
+					$mid add command -command [list Custom$cmd $mob_list $name] -label $description
+				}
+			}
+		}
+	}
+
 	$mid add separator
 	$mid add command -command [list $cmd $mob_list __clear__] -label "(clear all)"
 	if {$is_GM} {
@@ -17680,6 +17700,15 @@ proc check_aka_commit {} {
 	destroy .akawindow
 }
 
+# TODO CustomCondAll (CondAll)
+# TODO CustomCondPerson (CondPerson)
+# TODO AreMobsInCustomList <mob_list> <condition> <targeter>
+# Attr TargetedMods  dict(name:modlist)
+#
+# 
+proc AreMobsInCustomList {mob_list condition targeter} {
+	return false
+}
 
 
 # dice_preset_data
