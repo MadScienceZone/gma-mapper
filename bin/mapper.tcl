@@ -3617,8 +3617,6 @@ proc loadfile {file args} {
 	set ClockDisplay $oldcd
 	update
 }
-# TODO use explicit -force (was implied before by !-nosend)
-# TODO make sure commands that send updates to peers don't when we're the receiver
 
 # unloadfile file ?-nosend? ?-force?
 proc unloadfile {file args} {
@@ -6777,7 +6775,6 @@ proc RefreshTargets {} {
 						}
 					}
 				}
-				# TODO this creature named $my_source with obj id $tid I control targets [dict get $d Targets]
 			}
 		    } err]} {
 			DEBUG 1 "Unable to draw target for $my_source: $err"
@@ -8658,7 +8655,8 @@ proc CreateConditionSubMenu {args} {
 		$mid add separator
 		foreach {name d} $marker_data {
 			if {[dict exists $d description] && [set description [dict get $d description]] ne {}} {
-
+				# TODO
+			}
 
 
 
