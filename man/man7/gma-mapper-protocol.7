@@ -367,18 +367,37 @@ For list values, each batch's values are appended to the previous ones. For obje
 each batch is a set of key/value pairs to add to those from previous batches.
 This is signalled by the presence
 of a field named
-.B Batch
-which contains a batch number starting at 1 and counts sequentially upward. If this field is missing or
-has the value 0 (zero), then this is the one and only message payload. Otherwise, another field called
-.B TotalBatches 
-will be present giving the total number of batches to expect, and the
-.B Batch
-field will run from 1 to this value. The receiver should assemble the batches in order of the
+.B BatchGroup
+which provides a unique identifier (such as a UUID) which the receiving end can use to be sure it's
+assembling the correct set of batches in case there happen to be multiple messages of the same type being sent in
+batches at the same time. Message types which already include a unique per-message identifier MAY reuse that value for the
+.B BatchGroup
+field as well. If this field is missing entirely (or is present but has the value of an empty string), this message
+is not split into batches and is only being sent as a single message payload.
+.LP
+When a message is being sent in batches, the following additional fields are also added to the JSON message payload:
+'\" <<list>>
+'\" <</ital-is-var>>
+.TP
+.B
+.BI Batch " (integer)"
+The batch sequence number for this message payload, starting at 0 and counting sequentially upward. 
+.TP
+.BI TotalBatches " (integer)"
+The total number of batches to expect.
+The receiver should assemble the batches in order of the
 .B Batch
 fields to aggregate their collection of whatever data array value the payload is being reported by that command.
-The other fields are only meaningful from batch #1 and are ignored in subsequent batches.
+The other fields are only meaningful from batch #0 and are ignored in subsequent batches.
+.TP 
+.B BatchError
+If present and non-empty, this field provides an explanation of what went wrong with breaking the message into
+batches and/or transmitting them, and indicates that the entire message should now be abandoned since the rest of
+the batches aren't going to be arriving.
+'\" <</>>
+'\" <<ital-is-var>>
 .LP
-The following server comands use this protocol to accumulate the variable attribute listed:
+The following server comands use this protocol to accumulate the variable attribute fields listed:
 '\" <<TeX>>
 '\"\begin{table}
 '\" \begin{tabular}{lll}\toprule
@@ -405,7 +424,6 @@ The following server comands use this protocol to accumulate the variable attrib
 '\"\z{TimerRequest}&\z{TMRQ}&\z{Targets}\\
 '\"\z{ChatMessage}&\z{TO}&\z{Recipients}\\
 '\"\z{UpdateVersions}&\z{UPDATES}&\z{Packages}\\
-'\"\z{World}&\z{WORLD}&\z{ClientSettings}\\\bottomrule
 '\"\end{tabular}
 '\"\caption{Variable-Length Server Messages\label{tbl:server-list-continuable}}
 '\"\end{table}
@@ -434,7 +452,6 @@ PlayAudio	SOUND	Addrs
 TimerRequest	TMRQ	Targets
 ChatMessage	TO	Recipients
 UpdateVersions	UPDATES	Packages
-World	WORLD	ClientSettings
 .TE
 '\" <</TeX>>
 .LP
@@ -455,17 +472,17 @@ Is semantically equivalent to the set of server messages
 .nf
 .ft C
 CONN {"PeerList": [{"Addr": "10.10.10.1 1234", "User": "Alice", "Client": 
-"mapper 1.23.45"}], "Batch": 1, "TotalBatches": 3}
+"mapper 1.23.45"}], "Batch": 0, "TotalBatches": 3, "BatchGroup": "12345"}
 CONN {"PeerList": [{"Addr": "10.10.10.2 1235", "User": "Bob", "Client": 
-"mapper 1.23.45"}], "Batch": 2, "TotalBatches": 3}
+"mapper 1.23.45"}], "Batch": 1, "TotalBatches": 3, "BatchGroup": "12345"}
 CONN {"PeerList": [{"Addr": "10.10.10.3 1236", "User": "Charlie", "Client": 
-"mapper 1.23.45"}], "Batch": 3, "TotalBatches": 3}
+"mapper 1.23.45"}], "Batch": 2, "TotalBatches": 3, "BatchGroup": "12345"}
 .ft
 .ad
 .fi
 .LP
 Clients and servers SHOULD use this method to break up large messages. They MUST not send message payloads which
-would exceed 64K total bytes, including command name, spaces, and terminating newline.
+would exceed 60K (i.e., 60\(mu1024) total bytes, including command name, spaces, and terminating newline.
 '\" <</New>>
 .SS "Command Details"
 .LP
