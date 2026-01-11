@@ -413,7 +413,6 @@ Servers which implement protocol versions 400 and later MUST send this message
 at the start of their conversations. Servers which implement older protocol versions
 SHOULD send it.
 .RE
-'\" <<New>>
 .TP
 .B AA
 Add an audio clip to the map.
@@ -494,7 +493,6 @@ the opposite is done: those whose names match
 will be removed.
 .RE
 '\" <</>>
-'\" <</New>>
 .TP
 .B AC
 Add a character to the pop-up menu for map clients. This makes it easy to place important character tokens
@@ -748,7 +746,6 @@ the opposite is done: images whose names match
 will be removed.
 .RE
 '\" <</>>
-'\" <<New>>
 .TP
 .B AKA
 Declare that the logged-in user is controlling one or more characters
@@ -780,7 +777,6 @@ message to all peer clients, using the requester's logged in user name in
 this field.
 '\" <</>>
 .RE
-'\" <</New>>
 .TP
 .B ALLOW
 The client MAY send this command to the server after logging in. This tells
@@ -847,7 +843,6 @@ The payload is a JSON object with the following parameters:
 .B Client
 This describes the client program. By convention, this value
 SHOULD include the version number (e.g., \*(lqmapper 4.0.1\*(rq).
-'\" <<New>>
 .TP
 .B Platform
 This describes the platform on which the client is running. It SHOULD
@@ -859,7 +854,6 @@ have the format
 .RB \*(lq FreeBSD 
 .B 14.3-RELEASE 
 .BR amd64 \*(rq).
-'\" <</New>>
 .TP
 '\" <</ital-is-var>>
 .BI Response " (base64-encoded bytes)"
@@ -1143,7 +1137,6 @@ command from the peer.
 .TP
 .BI IsAuthenticated " (bool)"
 If true, the client successfully negotiated the server's authentication process.
-'\" <<New>>
 .TP
 .BI AKA " (list of strings)"
 The list of creature names, if any, that the player is controlling instead of
@@ -1155,7 +1148,6 @@ field value.
 If true, this user is not playing any characters at all. In this case the
 .B AKA
 value should be empty and MUST be ignored at any rate.
-'\" <</New>>
 .TP
 .BI IsMe " (bool)"
 '\" <<ital-is-var>>
@@ -2327,7 +2319,6 @@ The die-roll specification, like \*(lqd20+12\*(rq or \*(lq6d6 fire\*(rq.
 If this field is empty, the previous die-roll from this client is repeated,
 or \*(lq1d20\*(rq if there was no previous one.
 '\" <</>>
-'\" <<New>>
 .TP
 .BI Targets " (list of strings)"
 '\" <<ital-is-var>>
@@ -2387,7 +2378,6 @@ the die-roll options take precedence and will be reflected in the results
 returned from the server.
 .RE
 '\" <</>>
-'\" <</New>>
 .RE
 .TP
 .B DD
@@ -3218,7 +3208,6 @@ The amount of lethal damage sustained.
 .TP
 .BI NonLethalDamage " (int)"
 The amount of non-lethal damage sustained.
-'\" <<New>>
 .TP
 .BI AC " (int)"
 Current armor class
@@ -3231,7 +3220,6 @@ Current touch armor class.
 .TP
 .BI CMD " (int)"
 Current combat maneuver defense.
-'\" <</New>>
 '\" <</>>
 .RE
 .TP
@@ -4110,7 +4098,6 @@ the percentage by which to \*(lqblur\*(rq the hit points as seen by the
 players. For example, if
 .B HPBlur
 is 10, then hit points are displayed only in 10% increments.
-'\" <<New>>
 .TP
 .BI AC " (int)"
 The creature's current full armor class.
@@ -4127,7 +4114,6 @@ The creature's current touch armor class.
 .TP
 .BI CMD " (int)"
 The creature's current combat maneuver defense.
-'\" <</New>>
 '\" <</>>
 .RE
 .TP
@@ -4312,13 +4298,11 @@ As
 but indicates the distance for reach weapons.
 '\" <</>>
 .RE
-'\" <<New>>
 .TP
 .BI Targets " (list of strings)"
 The list of designated combat targets. If non-empty, the first creature named in this attribute
 is the target of attack die rolls and all creatures named are the targets of any damage die rolls
 made by this creature.
-'\" <</New>>
 .LP
 (Added in protocol 406.)
 '\" <</>>
@@ -4392,7 +4376,6 @@ performing lookup table reports on it.
 The names of the people the message was explicitly addressed to. For
 global messages, this should be
 .BR null .
-'\" <<New>>
 .TP
 .BI Targets " (list of strings)"
 The names of the creatures this roll was targeted at. This is simply whatever list was sent in the
@@ -4407,7 +4390,6 @@ The type of thing the result applies to. This is simply whatever string was sent
 command's
 .B Type
 field, if any.
-'\" <</New>>
 .TP
 .BI MessageID " (int)"
 The unique number assigned by the server for this chat message. (Die roll
@@ -4503,7 +4485,6 @@ The value for this part of the result (as a string).
 '\" <</>>
 '\" <<ital-is-var>>
 .RE
-'\" <<New>>
 .TP
 .B SOUND
 Play a sound clip. Clients SHOULD allow users to locally disable playing of sounds as a user preference.
@@ -4534,7 +4515,6 @@ playing) the specified
 sound.
 .RE
 '\" <</>>
-'\" <</New>>
 .TP
 .B SYNC
 This command MUST be ignored if received by a client. A client sends this to the
@@ -4785,12 +4765,10 @@ command (q.v.), then the server will filter out these codes before sending the m
 .TP
 .B Text
 The text of the message to be sent.
-'\" <<New>>
 .TP
 .BI "Pin " (bool)
 If present and true, this message should be pinned in the recipients' chat windows as a persistent message
 until dismissed by the recipient.
-'\" <</New>>
 '\" <<ital-is-var>>
 .RE
 '\" <</>>
