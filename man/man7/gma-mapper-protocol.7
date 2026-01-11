@@ -253,6 +253,7 @@ since all communications are asynchronous.
 '\"  \z{OA+}    &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Add values to an attribute\\
 '\"  \z{OA-}    &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Remove values to an attribute\\
 '\"  \z{OK}     &C$\leftarrow$S     &\z{AUTH}   &N/A&\acronym{JSON}&Ask client to authenticate\\
+'\"  \z{SOUND}  &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Play a sound clip\\
 '\"  \z{SYNC}   &C$\rightarrow$S    &any        &no &none          &Request replay of commands\\
 '\"  \z{SYNC-CHAT}&C$\rightarrow$S  &\z{CC}/\z{ROLL}/\z{TO}&no&\acronym{JSON}&Request replay of messages\\
 '\"  \z{TB}     &C$\leftrightarrow$S&---        &yes&\acronym{JSON}&Turn on/off client toolbar\\
@@ -312,6 +313,7 @@ LoadTextObject	LS-TEXT	C\[<>]S	\fR\(em\fP	no	JSON	Add some text to the map
 LoadTileObject	LS-TILE	C\[<>]S	\fR\(em\fP	no	JSON	Add a graphic tile to the map
 Marco	MARCO	C\[<-]S	POLO	N/A	none	Check if client is alive
 Mark	MARK	C\[<>]S	\fR\(em\fP	no	JSON	Visually mark a spot
+PlayAudio	SOUND	C\[<>]S	\fR\(em\fP	no	JSON	Play a sound clip
 PlaceSomeone	PS	C\[<>]S	\fR\(em\fP	no	JSON	Place creature token
 Polo	POLO	C\[->]S	\fR\(em\fP	no	none	Acknowledge server's ping
 Priv	PRIV	C\[<-]S	\fR\(em\fP	N/A	JSON	Priveleged command denied
@@ -350,6 +352,121 @@ UpdateVersions	UPDATES	C\[<-]S	\fR\(em\fP	N/A	JSON	Advertise software updates
 World	WORLD	C\[<-]S	\fR\(em\fP	N/A	JSON	Campaign world info
 .TE
 '\"<</TeX>>
+'\" <<New>>
+.SS "Payload Size Limits"
+.LP
+The protocol is designed with small payloads in mind. Generally no message payload should exceed 10
+kilobytes. Typical libraries used to parse the messages are implemented with limitations on input token
+and record lengths which would run into issues if the payloads exceed 64K bytes. While this is not
+typically a problem for most data the server works with, it may be in some edge cases for server commands
+which send or receive collections of data values.
+.LP
+To mitigate these cases, the server implements a data continuation protocol which allows long messages to be broken
+into multiple \*(lqbatches\*(rq and sent separately then reassembled on the other end.
+For list values, each batch's values are appended to the previous ones. For object values,
+each batch is a set of key/value pairs to add to those from previous batches.
+This is signalled by the presence
+of a field named
+.B Batch
+which contains a batch number starting at 1 and counts sequentially upward. If this field is missing or
+has the value 0 (zero), then this is the one and only message payload. Otherwise, another field called
+.B TotalBatches 
+will be present giving the total number of batches to expect, and the
+.B Batch
+field will run from 1 to this value. The receiver should assemble the batches in order of the
+.B Batch
+fields to aggregate their collection of whatever data array value the payload is being reported by that command.
+The other fields are only meaningful from batch #1 and are ignored in subsequent batches.
+.LP
+The following server comands use this protocol to accumulate the variable attribute listed:
+'\" <<TeX>>
+'\"\begin{table}
+'\" \begin{tabular}{lll}\toprule
+'\" \multicolumn{1}{c}{\bfseries Message}&
+'\" \multicolumn{1}{c}{\bfseries Command}&
+'\" \multicolumn{1}{c}{\bfseries Variable Field(s)}\\\midrule
+'\"\z{AddImage}&\z{AI}&\z{Sizes}\\
+'\"\z{QueryImage}&\z{AI?}&\z{Sizes}\\
+'\"\z{UpdatePeerList}&\z{CONN}&\z{PeerList}\\
+'\"\z{RollDice}&\z{D}&\z{Recipients}, \z{Targets}\\
+'\"\z{DefineDicePresets}&\z{DD}&\z{Presets}, \z{DelegateFor}, \z{Delegates}\\
+'\"\z{AddDicePresets}&\z{DD+}&\z{Presets}, \z{DelegateFor}, \z{Delegates}\\
+'\"\z{UpdateDicePresets}&\z{DD=}&\z{Presets}, \z{DelegateFor}, \z{Delegates}\\
+'\"\z{DefineDiceDelegates}&\z{DDD}&\z{Delegates}\\
+'\"\z{HitPointRequest}&\z{HPREQ}&\z{Targets}\\
+'\"\z{UpdateInitiative}&\z{IL}&\z{InitiativeList}\\
+'\"\z{Load}*&\z{LS-}*&\z{Points}\\
+'\"\z{UpdateObjAttributes}&\z{OA}&\z{NewAttrs}\\
+'\"\z{AddObjAttributes}&\z{OA+}&\z{Values}\\
+'\"\z{RemoveObjAttributes}&\z{OA-}&\z{Values}\\
+'\"\z{PlaceSomeone}&\z{PS}&\z{Targets}, \z{TargetedModifiers}\\
+'\"\z{RollResult}&\z{ROLL}&\z{Recipients}, \z{Targets}, \z{Result}\\
+'\"\z{PlayAudio}&\z{SOUND}&\z{Addrs}\\
+'\"\z{TimerRequest}&\z{TMRQ}&\z{Targets}\\
+'\"\z{ChatMessage}&\z{TO}&\z{Recipients}\\
+'\"\z{UpdateVersions}&\z{UPDATES}&\z{Packages}\\
+'\"\z{World}&\z{WORLD}&\z{ClientSettings}\\\bottomrule
+'\"\end{tabular}
+'\"\caption{Variable-Length Server Messages\label{tbl:server-list-continuable}}
+'\"\end{table}
+.TS
+center;
+lB lB lB
+l lfC lfC.
+Message	Command	Variable Field(s)
+AddImage	AI	Sizes
+QueryImage	AI?	Sizes
+UpdatePeerList	CONN	PeerList
+RollDice	D	Recipients, Targets
+DefineDicePresets	DD	Presets, DelegateFor, Delegates
+AddDicePresets	DD+	Presets, DelegateFor, Delegates
+UpdateDicePresets	DD=	Presets, DelegateFor, Delegates
+DefineDiceDelegates	DDD	Delegates
+HitPointRequest	HPREQ	Targets
+UpdateInitiative	IL	InitiativeList
+Load*	LS-*	Points
+UpdateObjAttributes	OA	NewAttrs
+AddObjAttributes	OA+	Values
+RemoveObjAttributes	OA-	Values
+PlaceSomeone	PS	Targets, TargetedModifiers
+RollResult	ROLL	Recipients, Targets, Result
+PlayAudio	SOUND	Addrs
+TimerRequest	TMRQ	Targets
+ChatMessage	TO	Recipients
+UpdateVersions	UPDATES	Packages
+World	WORLD	ClientSettings
+.TE
+'\" <</TeX>>
+.LP
+For example, the single server message
+.na
+.nf
+.ft C
+CONN {"PeerList": [{"Addr": "10.10.10.1 1234", "User": "Alice", "Client": 
+"mapper 1.23.45"}, {"Addr": "10.10.10.2 1235", "User": "Bob", "Client": 
+"mapper 1.23.45"}, {"Addr": "10.10.10.3 1236", "User": "Charlie", "Client": 
+"mapper 1.23.45"}]}
+.ft
+.ad
+.fi
+.LP
+Is semantically equivalent to the set of server messages
+.na
+.nf
+.ft C
+CONN {"PeerList": [{"Addr": "10.10.10.1 1234", "User": "Alice", "Client": 
+"mapper 1.23.45"}], "Batch": 1, "TotalBatches": 3}
+CONN {"PeerList": [{"Addr": "10.10.10.2 1235", "User": "Bob", "Client": 
+"mapper 1.23.45"}], "Batch": 2, "TotalBatches": 3}
+CONN {"PeerList": [{"Addr": "10.10.10.3 1236", "User": "Charlie", "Client": 
+"mapper 1.23.45"}], "Batch": 3, "TotalBatches": 3}
+.ft
+.ad
+.fi
+.LP
+Clients and servers SHOULD use this method to break up large messages. They MUST not send message payloads which
+would exceed 64K total bytes, including command name, spaces, and terminating newline.
+'\" <</New>>
 .SS "Command Details"
 .LP
 The client/server messages and their parameters are detailed below, ordered by the server
@@ -4339,7 +4456,6 @@ command.
 Clients MAY but do not need to send this value.
 .RE
 '\" <</>>
-'\" <</New>>
 .LP
 (Added in protocol 406.)
 '\" <</>>
@@ -4980,7 +5096,7 @@ John Mechalas (elevation and movement modes).
 This document defines map protocol version 423,
 which adds the
 .B TargetedModifiers
-attribute to creatures.
+attribute to creatures and introduced the concept of payload splitting for large data sizes.
 .LP
 Historically, protocol version 422
 added the explicit
