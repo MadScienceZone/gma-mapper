@@ -354,6 +354,9 @@ World	WORLD	C\[<-]S	\fR\(em\fP	N/A	JSON	Campaign world info
 '\"<</TeX>>
 '\" <<New>>
 .SS "Payload Size Limits"
+'\" <<TeX>>
+'\" \label{batches}
+'\" <</TeX>>
 .LP
 The protocol is designed with small payloads in mind. Generally no message payload should exceed 10
 kilobytes. Typical libraries used to parse the messages are implemented with limitations on input token
@@ -379,7 +382,6 @@ When a message is being sent in batches, the following additional fields are als
 '\" <<list>>
 '\" <</ital-is-var>>
 .TP
-.B
 .BI Batch " (integer)"
 The batch sequence number for this message payload, starting at 0 and counting sequentially upward. 
 .TP
@@ -423,10 +425,33 @@ The following server comands use this protocol to accumulate the variable attrib
 '\"\z{PlayAudio}&\z{SOUND}&\z{Addrs}\\
 '\"\z{TimerRequest}&\z{TMRQ}&\z{Targets}\\
 '\"\z{ChatMessage}&\z{TO}&\z{Recipients}\\
-'\"\z{UpdateVersions}&\z{UPDATES}&\z{Packages}\\
+'\"\z{UpdateVersions}&\z{UPDATES}&\z{Packages}\\\bottomrule
 '\"\end{tabular}
 '\"\caption{Variable-Length Server Messages\label{tbl:server-list-continuable}}
 '\"\end{table}
+'\"
+'\"For example, the single server message
+'\"
+'\"\begin{SourceCode}
+'\"CONN {"PeerList": [{"Addr": "10.10.10.1 1234", "User": "Alice",
+'\""Client": "mapper 1.23.45"}, {"Addr": "10.10.10.2 1235", 
+'\""User": "Bob", "Client": "mapper 1.23.45"}, {"Addr": 
+'\""10.10.10.3 1236", "User": "Charlie", "Client": 
+'\""mapper 1.23.45"}]}
+'\"\end{SourceCode}
+'\"Is semantically equivalent to the set of server messages
+'\"\begin{SourceCode}
+'\"CONN {"PeerList": [{"Addr": "10.10.10.1 1234", "User": "Alice",
+'\""Client": "mapper 1.23.45"}], "Batch": 0, "TotalBatches": 3, 
+'\""BatchGroup": "12345"}
+'\"CONN {"PeerList": [{"Addr": "10.10.10.2 1235", "User": "Bob", 
+'\""Client": "mapper 1.23.45"}], "Batch": 1, "TotalBatches": 3, 
+'\""BatchGroup": "12345"}
+'\"CONN {"PeerList": [{"Addr": "10.10.10.3 1236", "User": 
+'\""Charlie", "Client": "mapper 1.23.45"}], "Batch": 2, 
+'\""TotalBatches": 3, "BatchGroup": "12345"}
+'\"\end{SourceCode}
+'\"
 .TS
 center;
 lB lB lB
@@ -453,7 +478,6 @@ TimerRequest	TMRQ	Targets
 ChatMessage	TO	Recipients
 UpdateVersions	UPDATES	Packages
 .TE
-'\" <</TeX>>
 .LP
 For example, the single server message
 .na
@@ -480,6 +504,7 @@ CONN {"PeerList": [{"Addr": "10.10.10.3 1236", "User": "Charlie", "Client":
 .ft
 .ad
 .fi
+'\" <</TeX>>
 .LP
 Clients and servers SHOULD use this method to break up large messages. They MUST not send message payloads which
 would exceed 60K (i.e., 60\(mu1024) total bytes, including command name, spaces, and terminating newline.
