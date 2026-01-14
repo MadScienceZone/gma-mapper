@@ -370,8 +370,11 @@ For list values, each batch's values are appended to the previous ones. For obje
 each batch is a set of key/value pairs to add to those from previous batches.
 This is signalled by the presence
 of a field named
+.B BatchGroup:
+'\" <<list>>
+.TP
 .B BatchGroup
-which provides a unique identifier (such as a UUID) which the receiving end can use to be sure it's
+Provides a unique identifier (such as a UUID) which the receiving end can use to be sure it's
 assembling the correct set of batches in case there happen to be multiple messages of the same type being sent in
 batches at the same time. Message types which already include a unique per-message identifier MAY reuse that value for the
 .B BatchGroup
@@ -379,7 +382,6 @@ field as well. If this field is missing entirely (or is present but has the valu
 is not split into batches and is only being sent as a single message payload.
 .LP
 When a message is being sent in batches, the following additional fields are also added to the JSON message payload:
-'\" <<list>>
 '\" <</ital-is-var>>
 .TP
 .BI Batch " (integer)"
