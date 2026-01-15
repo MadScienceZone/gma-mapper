@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       ______    ______        ___      #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ____ \      /   )     #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \( (    \/     / /) |     #
-# | |      | || || || (___) | Assistant  / (_) (_       ___) /| (____      / (_) (_    #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( |  ___ \    (____   _)   #
-# | | \_  )| |   | || (   ) | VTT            ) (           ) \| (   ) )        ) (     #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /( (___) ) _      | |     #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/  \_____/ (_)     (_)     #
+#  _______  _______  _______                ___       ______    ______     _______     #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ____ \   (  ____ \    #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \( (    \/   | (    \/    #
+# | |      | || || || (___) | Assistant  / (_) (_       ___) /| (____     | (____      #
+# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( |  ___ \    (_____ \     #
+# | | \_  )| |   | || (   ) | VTT            ) (           ) \| (   ) )         ) )    #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /( (___) ) _ /\____) )    #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/  \_____/ (_)\______/     #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -17,9 +17,9 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.36.4}     ;# @@##@@
+set GMAMapperVersion {4.36.5}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
-set GMAMapperProtocol {422}         ;# @@##@@
+set GMAMapperProtocol {423}         ;# @@##@@
 set CoreVersionNumber {6.41}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
@@ -1332,13 +1332,38 @@ proc mobsAtXY {x y args} {
 # somewhat misnamed but this allows you to select the source of the targeted attack
 # if you control more than one character
 proc toggleCombatSource {mousex mousey args} {
-	global canvas ActiveTargetSource
+	global canvas ActiveTargetSource is_GM
+	set me [my_map_names]
+	if {!$is_GM && [llength $me] == 1} {
+		tk_messageBox -type ok -icon error -title "Can't Choose Target Source" \
+			-message "You can't choose a target source if you're only playing one character." \
+			-detail "If you are playing another character as well, select \"Specify What Character You're Playing...\" from the Play menu, then you can select their individual targets."\
+			-parent $canvas
+		return
+	}
+	if {!$is_GM && [llength $me] == 0} {
+		tk_messageBox -type ok -icon error -title "Can't Choose Target Source" \
+			-message "You can't choose a target source if we don't know what character you are playing." \
+			-detail "You don't seem to be playing a character, and you're not the GM. Maybe you first need to select \"Specify What Character You're Playing...\" from the Play menu, then you can select your character(s)' individual targets."\
+			-parent $canvas
+		return
+	}
+
 	set mob_list [mobIDsToNames [mobsAtXY [expr $mousex-[winfo x $canvas]] [expr $mousey-[winfo y $canvas]] -noselection]] 
 	if {[llength $mob_list] > 1} {
 		tk_messageBox -type ok -icon error -title "Ambiguous Source" \
-			-message "Too many creatures under cursor ($mob_list). We can't tell which you're trying to select as the target source."
+			-message "Too many creatures under cursor ($mob_list). We can't tell which you're trying to select as the target source."\
+			-parent $canvas
 		return
 	}
+	if {!$is_GM && [lsearch -exact $me [lindex $mob_list 0]] < 0} {
+		tk_messageBox -type ok -icon error -title "Not Your Character" \
+			-message "[lindex $mob_list 0] isn't your character to control."\
+			-detail "If you are playing another character as well, select \"Specify What Character You're Playing...\" from the Play menu, then you can select their individual targets."\
+			-parent $canvas
+		return
+	}
+
 	set ActiveTargetSource $mob_list
 	RefreshTargets
 }
@@ -6740,8 +6765,23 @@ proc RefreshTargets {} {
 	# of damage being dealt
 	set ActiveTargetList {}
 	if {$is_GM} {
-		if {$current_actor ne {} && [info exists MOBdata([set tid [GetBaseMobID $current_actor]])] && [dict exists [set d $MOBdata($tid)] Targets]} {
-			set ActiveTargetList [dict get $d Targets]
+		if {$current_actor ne {} && [info exists MOBdata([set tid [GetBaseMobID $current_actor]])]} {
+			if {[dict exists [set d $MOBdata($tid)] Targets]} {
+				set ActiveTargetList [dict get $d Targets]
+			}
+			# set them as the target source as well so we can designate (new) targets for them
+			set ActiveTargetSource [list [dict get $d Name]]
+		}
+
+		$canvas delete SRCTARG
+		if {[catch {
+			if {$ActiveTargetSource ne {} && [info exists MOBid($ActiveTargetSource)] && [info exists MOBdata([set tid $MOBid($ActiveTargetSource)])]} {
+				::gmautil::dassign [dict get $MOBdata($tid)] Gx gx Gy gy
+				set sz [_mob_size $tid]
+				$canvas create rect [expr $gx*$iscale] [expr $gy*$iscale] [expr ($gx+$sz)*$iscale] [expr ($gy+$sz)*$iscale] -outline green -width 4 -tags SRCTARG -dash .
+			}
+		} err]} {
+			DEBUG 0 "Unable to draw target source: $err"
 		}
 	} else {
 		$canvas delete MYTARG
@@ -17783,7 +17823,7 @@ proc AreMobsInCustomList {mob_list condition targeter} {
 #
 #  called when rendering somone or advancing the initiative turn or updating target attribute
 #
-# @[00]@| GMA-Mapper 4.36.4
+# @[00]@| GMA-Mapper 4.36.5
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2026 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
