@@ -60,6 +60,7 @@ namespace eval ::gmaproto {
 	variable min_protocol 333
 	variable max_protocol 423
 	variable max_max_protocol 499
+	variable maximum_message_length 61440 
 	variable debug_f {}
 	variable legacy false
 	variable host {}
@@ -85,6 +86,35 @@ namespace eval ::gmaproto {
 	variable ClientSettings {}
 
 	variable _message_map
+	array unset _batch_storage
+	array set _collected_fields {
+		AI	{Sizes}
+		AI?	{Sizes}
+		CONN	{PeerList}
+		D	{Recipients Targets}
+		DD	{Presets DelegateFor Delegates}
+		DD+	{Presets DelegateFor Delegates}
+		DD=	{Presets DelegateFor Delegates}
+		DDD	{Delegates}
+		HPREQ	{Targets}
+		IL	{InitiativeList}
+		LS-ARC	{Points}
+		LS-CIRC	{Points}
+		LS-LINE	{Points}
+		LS-POLY	{Points}
+		LS-RECT	{Points}
+		LS-SAOE	{Points}
+		LS-TEXT	{Points}
+		LS-TILE	{Points}
+		OA	{*NewAttrs}
+		OA+	{Values}
+		OA-	{Values}
+		PS	{Targets *TargetedModifiers}
+		ROLL	{Recipients Targets {Result Details}}
+		SOUND	{Addrs}
+		TO	{Recipients}
+		UPDATES	{Packages}
+	}
 	array set _message_map {
 		add_audio                 AA
 		add_image                 AI
@@ -127,6 +157,7 @@ namespace eval ::gmaproto {
 		update_turn               I
 	}
 	array set _message_payload {
+		_batch	{BatchGroup s Batch i TotalBatches i BatchError s}
 		AC      {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l PolyGM ? Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}} Targets l TargetedModifiers {D {o {Type s Modifiers l}}}}
 		ACCEPT  {Messages l}
 		AA      {Name s Format s File s IsLocalFile ?}
@@ -470,7 +501,17 @@ proc ::gmaproto::from_enum {key value} {
 # _protocol_send command ?name value ...?
 #
 proc ::gmaproto::_protocol_send {command args} {
-	::gmaproto::_raw_send [::gmaproto::_protocol_encode $command $args]
+	set packet [::gmaproto::_protocol_encode $command $args]
+	if {[string length $packet] > $::gmaproto::maximum_message_length} {
+		# can we split this up?
+		if {[info exists $::gmaproto::_collected_fields($command)]} {
+			# break up into batches
+			set d [lindex $packet 1]
+			set varfields $::gmaproto::_collected_fields($command)
+			set batch_id [::gmaproto::new_id]
+## TODO
+
+	::gmaproto::_raw_send $packet
 }
 
 proc ::gmaproto::_protocol_encode_list {objtuple} {
@@ -1611,6 +1652,7 @@ proc ::gmaproto::_initial_read_poll {} {
 }
 
 # _read_poll -> cmd params; cmd=="" if no data available yet
+# collect batches in _batch_storage(BatchGroup,Batch) until all the pieces arrive
 proc ::gmaproto::_read_poll {} {
 	if {[llength $::gmaproto::poll_buffer] > 0} {
 		return [::gmautil::lpop ::gmaproto::poll_buffer 0]
@@ -1645,10 +1687,90 @@ proc ::gmaproto::_read_poll {} {
 		}
 		return $res
 	}
-	set res [::gmaproto::_parse_data_packet [::gmautil::lpop ::gmaproto::recv_buffer 0]]
-	if {[lindex $res 0] eq {NIL}} {
+	set packet [::gmautil::lpop ::gmaproto::recv_buffer 0]
+	set res [::gmaproto::_parse_data_packet $packet]
+	if {[set cmd [lindex $res 0]] eq {NIL}} {
 		return [list "" ""]
 	}
+
+	#
+	# We have a packet, but is it just part of a larger message that is being sent in batches?
+	#
+	if {[dict exists [set d [lindex $res 1]] BatchGroup] && [set batch_group [dict get $d BatchGroup]] ne {}} {
+		# yes, so squirrel this batch away until we've collected them all.
+		# add the batch metadata fields
+		set d [::gmaproto::_construct $d $::gmaproto::_message_payload(_batch)]
+		::gmautil::dassigndef $d Batch {batch -1} TotalBatches {total_batches 0} BatchError {batch_error {}}
+		if {$batch_error ne {}} {
+			::DEBUG 0 "Server error in batched $cmd: $batch_error (abandoning this message)"
+			array unset ::gmaproto::_batch_storage $batch_group,*
+			return [list "" ""]
+		}
+		if {$batch < 0 || $batch >= $total_batches} {
+			::DEBUG 0 "Error in batched $cmd: sequence number $batch missing or out of bounds (ignoring this batch)"
+			return [list "" ""]
+		}
+		if {$total_batches <=0} {
+			::DEBUG 0 "Error in batched $cmd: missing or negative total number of batches (ignoring this batch)"
+			return [list "" ""]
+		}
+
+		set ::gmaproto::_batch_storage($batch_group,$batch) [list [lindex $res 0] $d]
+		::DEBUG 0 "Stored batch $batchgroup,$batch of $cmd"
+
+		# did we collect tham all already?
+		if {[llength [array names ::gmaproto::_batch_storage $batch_group,*]] >= $total_batches} {
+			# combine the batches into the full message dictionary
+			# return it
+			set base $::gmaproto::_batch_storage $batch_group,0
+			set cmd [lindex $base 0]
+			set d [lindex $base 1]
+			set total_batches [dict get $d TotalBatches]
+			for {set batch 1} {$batch < $total_batches} {incr batch} {
+				foreach fld $::gmaproto::_collected_fields($cmd) {
+					if {[string range $fld 0 0] eq "*"} {
+						set fld [string range $fld 1 end]
+						# this is a key/value field, not a simple list
+						# merge the k/v pairs here with what's in the
+						# existing value
+						if {[dict exists $::gmaproto::_batch_storage($batch_group,$batch) {*}$fld]} {
+							if {[dict exists $d {*}$fld]} {
+								dict set d {*}$fld [dict merge [dict get $d {*}$fld] [dict get $::gmaproto::_batch_storage($batch_group,$batch) {*}$fld]]
+								::DEBUG 0 "merged kv $fld -> [dict get $d {*}$fld]"
+							} else {
+								dict set d {*}$fld [dict get $::gmaproto::_batch_storage($batch_group,$batch) {*}$fld]
+								::DEBUG 0 "copied kv $fld -> [dict get $d {*}$fld]"
+							}
+						}
+					} else {
+						if {[llength $fld] > 1} {
+							if {[dict exists $::gmaproto::_batch_storage($batch_group,$batch) {*}$fld]} {
+								if {[dict exists $d {*}$fld]} {
+									set dl [dict get $d {*}$fld]
+									lappend dl [dict get $::gmaproto::_batch_storage($batch_group,$batch) {*}$fld]
+									dict set d {*}$fld $dl
+									::DEBUG 0 "lappend $fld -> [dict get $d {*}$fld]"
+								} else {
+									dict set d {*}$fld [dict get $::gmaproto::_batch_storage($batch_group,$batch) {*}$fld]
+									::DEBUG 0 "copied list $fld -> [dict get $d {*}$fld]"
+								}
+							}
+						} else {
+							if {[dict exists $::gmaproto::_batch_storage($batch_group,$batch) $fld]} {
+								dict lappend d $fld {*}[dict get $::gmaproto::_batch_storage($batch_group,$batch) $fld]
+								::DEBUG 0 "appended $fld -> [dict get $d $fld]"
+							}
+						}
+					}
+				}
+			}
+			array unset ::gmaproto::_batch_storage $batch_group,*
+			::DEBUG 0 "collected batches into final message $cmd $d"
+			return [list $cmd $d]
+		}
+		return [list "" ""]
+	}
+	::DEBUG 0 "not batched; $res"
 	return $res
 }
 
