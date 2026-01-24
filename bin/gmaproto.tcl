@@ -499,18 +499,92 @@ proc ::gmaproto::from_enum {key value} {
 
 #
 # _protocol_send command ?name value ...?
+# _protocol_send_d command dict
 #
+
 proc ::gmaproto::_protocol_send {command args} {
-	set packet [::gmaproto::_protocol_encode $command $args]
+	::gmaproto::_protocol_send_d $command [dict create {*}$args]
+}
+proc ::gmaproto::_protocol_send_d {command dargs} {
+	set packet [::gmaproto::_protocol_encode $command $dargs]
 	if {[string length $packet] > $::gmaproto::maximum_message_length} {
 		# can we split this up?
 		if {[info exists $::gmaproto::_collected_fields($command)]} {
 			# break up into batches
 			set d [lindex $packet 1]
 			set varfields $::gmaproto::_collected_fields($command)
-			set batch_id [::gmaproto::new_id]
-## TODO
-
+			set batch_group [::gmaproto::new_id]
+			set total_batches 0
+			array unset split_values
+			set split_values(.flds.) {}
+			# break out fields we can split between batches
+			foreach fld $varfields {
+				if {[string range $fld 1 end]} {
+					# *FLD:	FLD is a dictionary value; split up each key/value set
+					set fld [string range $fld 1 end]
+					lappend split_values(.flds.) $fld
+					set split_values($fld,type) d
+					dict for {k v} [dict get $d {*}$fld] {
+						lappend split_values($fld,value) [list $k $v]
+						incr total_batches
+					}
+					dict set d {*}$fld {}
+				} elseif {[llength $fld] > 1} {
+					# FLD1 FLD2 ...: path to nested key
+					lappend split_values(.flds.) $fld
+					set split_values($fld,type) n
+					set split_values($fld,value) [dict get $d {*}$fld]
+					incr total_batches [llength $split_values($fld,value)
+					dict set d {*}$fld {}
+				} else {
+					# FLD: simple field
+					lappend split_values(.flds.) $fld
+					set split_values($fld,type) l
+					set split_values($fld,value) [dict get $d {*}$fld]
+					incr total_batches [llength $split_values($fld,value)
+					dict set d {*}$fld {}
+				}
+			}
+			set batch 0
+			foreach fld $split_values(.flds.) {
+				foreach value $split_values($fld,value) {
+					if {[catch {
+						if {$batch >= $total_batches} {
+							error "total batch estimate exceeded"
+						}
+						switch $split_values($fld,type) {
+							d {
+								dict set d {*}$fld [dict create [lindex $value 0] [lindex $value 1]]
+							}
+							l - n {
+								dict set d {*}$fld [list $value]
+							}
+							default {
+								error "internal error svt-$split_values($fld,type)"
+							}
+						}
+						::gmaproto::_raw_send ::gmaproto::_protocol_encode $command [dict merge $d [dict create \
+							BatchGroup $batch_group Batch $batch TotalBatches $total_batches]]
+						dict set {*}$fld {}
+						incr batch
+					} err]} {
+						::gmaproto::_raw_send ::gmaproto::_protocol_encode $command [dict create BatchGroup $batch_group BatchError "Unable to split into batches: $err" TotalBatches $total_batches Batch $batch]
+						::DEBUG 0 "Unable to split $command into batches: $err"
+						return
+					}
+				}
+			}
+			if $batch < $total_batches {
+				::gmaproto::_raw_send ::gmaproto::_protocol_encode $command [dict create BatchGroup $batch_group BatchError "Overestimated total batch count (was $batch, estimated $total_batches) for $command"
+				::DEBUG 0 "Overestimated total batch count (was $batch, estimated $total_batches) for $command"
+				return
+			}
+		} else {
+			::DEBUG 0 "$command packet could not be sent (would exceed maximum message length and can't be split up into batches)"
+		}
+		return
+	}
+	::DEBUG 0 "$command packet len [string length $packet]"
 	::gmaproto::_raw_send $packet
 }
 
@@ -1563,6 +1637,7 @@ proc ::gmaproto::update_clock {a r running} {
 	::gmaproto::_protocol_send CS Absolute $a Relative $r Running $running
 }
 
+# TODO
 proc ::gmaproto::update_obj_attributes {obj_id kvdict} {
 	set a {}
 	foreach {k v} [dict get $kvdict] {
@@ -1571,10 +1646,13 @@ proc ::gmaproto::update_obj_attributes {obj_id kvdict} {
 	::gmaproto::_raw_send "OA {\"ObjID\":[json::write string $obj_id],\"NewAttrs\":[json::write object {*}$a]}"
 }
 
+# TODO
 proc ::gmaproto::add_obj_attributes {obj_id attr vs} {
-	::gmaproto::_raw_send "OA+ {\"ObjID\":[json::write string $obj_id],\"AttrName\":[json::write string $attr],\"Values\":[json::write array {*}$vs]}"
+#	::gmaproto::_raw_send "OA+ {\"ObjID\":[json::write string $obj_id],\"AttrName\":[json::write string $attr],\"Values\":[json::write array {*}$vs]}"
+	::gmaproto::_protocol_send_d OA+ [dict create ObjID $obj_id AttrName $attr Values $vs]
 }
 
+# TODO
 proc ::gmaproto::remove_obj_attributes {obj_id attr vs} {
 	::gmaproto::_raw_send "OA- {\"ObjID\":[json::write string $obj_id],\"AttrName\":[json::write string $attr],\"Values\":[json::write array {*}$vs]}"
 }
@@ -1770,7 +1848,7 @@ proc ::gmaproto::_read_poll {} {
 		}
 		return [list "" ""]
 	}
-	::DEBUG 0 "not batched; $res"
+	::DEBUG 0 "not batched; $cmd"
 	return $res
 }
 

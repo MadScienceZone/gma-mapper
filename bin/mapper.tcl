@@ -2103,6 +2103,10 @@ for {set argi 0} {$argi < $optc} {incr argi} {
 			set newlimit [interp recursionlimit {} [getarg --recursionlimit]]
 			INFO "recurion limit changed from $oldlimit to $newlimit"
 		}
+		--test-protocol {
+			source [file normalize [file join {*}[lreplace [file split [file normalize $argv0]] end end test_protocol.tcl]]]
+			after 1000 [list countdown_to test_protocol 15]
+		}
 		default {
 			if {[string range $option 0 0] eq "-"} {
 				usage
@@ -2111,6 +2115,15 @@ for {set argi 0} {$argi < $optc} {incr argi} {
 				usage
 			}
 		}
+	}
+}
+
+proc countdown_to {fname secs} {
+	if {$secs <= 0} {
+		$fname
+	} else {
+		display_message "starting $fname in $secs..."
+		after 1000 [list countdown_to $fname [expr $secs - 1]]
 	}
 }
 
