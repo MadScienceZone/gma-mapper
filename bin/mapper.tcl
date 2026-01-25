@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       ______    ______     _______     #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ____ \   (  ____ \    #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \( (    \/   | (    \/    #
+#  _______  _______  _______                ___       ______    ______      ______     #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ____ \    / ____ \    #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \( (    \/   ( (    \/    #
 # | |      | || || || (___) | Assistant  / (_) (_       ___) /| (____     | (____      #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( |  ___ \    (_____ \     #
-# | | \_  )| |   | || (   ) | VTT            ) (           ) \| (   ) )         ) )    #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /( (___) ) _ /\____) )    #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/  \_____/ (_)\______/     #
+# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( |  ___ \    |  ___ \     #
+# | | \_  )| |   | || (   ) | VTT            ) (           ) \| (   ) )   | (   ) )    #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /( (___) ) _ ( (___) )    #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/  \_____/ (_) \_____/     #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -17,9 +17,9 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.36.5}     ;# @@##@@
+set GMAMapperVersion {4.36.6}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
-set GMAMapperProtocol {423}         ;# @@##@@
+set GMAMapperProtocol {422}         ;# @@##@@
 set CoreVersionNumber {6.41}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
@@ -6820,17 +6820,18 @@ proc RefreshTargets {} {
 		if {[info exists MOBdata($tid)] && [dict exists [set d $MOBdata($tid)] Targets]} {
 			if {[catch {
 				::gmautil::dassign $d Gx agx Gy agy Hidden ahidden
-				if {$ahidden} continue
-				set actor_mob_size [_mob_size $tid]
+				if {!$ahidden} {
+					set actor_mob_size [_mob_size $tid]
 
-				foreach target [dict get $d Targets] {
-					if {[info exists MOBid($target)] && [info exists MOBdata([set ttid $MOBid($target)])]} {
-						::gmautil::dassign $MOBdata($ttid) Gx gx Gy gy Hidden hidden
-						if {$hidden} continue
-						set mob_size [_mob_size $ttid]
-						RenderTarget $canvas [expr $gx*$iscale] [expr $gy*$iscale] [expr ($gx+$mob_size)*$iscale] [expr ($gy+$mob_size)*$iscale] [list MATARG MATARG#$tid] MATARG
-						$canvas create line [expr ($agx+($actor_mob_size/2.0))*$iscale] [expr ($agy+($actor_mob_size/2.0))*$iscale] [expr ($gx+($mob_size/2.0))*$iscale] [expr ($gy+($mob_size/2.0))*$iscale] -fill $TargetColor -width 3 -tags [list MATARG MATARG#$tid MATARG MATARGLINE] -dash - -arrow last
-						set start true
+					foreach target [dict get $d Targets] {
+						if {[info exists MOBid($target)] && [info exists MOBdata([set ttid $MOBid($target)])]} {
+							::gmautil::dassign $MOBdata($ttid) Gx gx Gy gy Hidden hidden
+							if {$hidden} continue
+							set mob_size [_mob_size $ttid]
+							RenderTarget $canvas [expr $gx*$iscale] [expr $gy*$iscale] [expr ($gx+$mob_size)*$iscale] [expr ($gy+$mob_size)*$iscale] [list MATARG MATARG#$tid] MATARG
+							$canvas create line [expr ($agx+($actor_mob_size/2.0))*$iscale] [expr ($agy+($actor_mob_size/2.0))*$iscale] [expr ($gx+($mob_size/2.0))*$iscale] [expr ($gy+($mob_size/2.0))*$iscale] -fill $TargetColor -width 3 -tags [list MATARG MATARG#$tid MATARG MATARGLINE] -dash - -arrow last
+							set start true
+						}
 					}
 				}
 			} err]} {
@@ -17781,7 +17782,7 @@ proc check_aka_commit {} {
 #
 #  called when rendering somone or advancing the initiative turn or updating target attribute
 #
-# @[00]@| GMA-Mapper 4.36.5
+# @[00]@| GMA-Mapper 4.36.6
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2026 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
