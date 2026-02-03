@@ -17,6 +17,10 @@ The support for old server protocols (<400) and map file formats (<20) will be d
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
+# 4.36.7 (unreleased)
+## Fixes
+ * Corrected issue that caused "Unable to set targets for <_ID_>" errors (type PS has no such attribute although it totally does have one) for creatures that were saved to `.map` files and then read back in; the `Targets` attributes were lost in the saved map files.
+
 # 4.36.6
 ## Fixes
  * Corrected issue that spammed "Unable to draw targets for <_ID_>:" messages in the Diagnostic Messages log.
