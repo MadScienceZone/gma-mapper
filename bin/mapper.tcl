@@ -7300,6 +7300,9 @@ proc RenderSomeone {w id {norecurse false} args} {
 		}
 
 
+		# TODO This either needs to move to GMA to determine when to set the Killed
+		# attribute, or GMA needs to send more details over to make this decision
+		# more accurately.
 		if {$its_dead_jim} {
 			set condition {}
 		} elseif {$condition eq {}} {
