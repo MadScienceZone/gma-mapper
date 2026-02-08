@@ -3,11 +3,11 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.36.6          <!-- @@##@@ -->
- * Effective Date: 25-Jan-2026               <!-- @@##@@ -->
+ * This Package Version: 4.36.7          <!-- @@##@@ -->
+ * Effective Date: 08-Feb-2026               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.41 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.42 <!-- @@##@@ -->
  * GMA Mapper File Format: 23	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 422        <!-- @@##@@ -->
  * GMA Mapper Preferences File Format: 13 <!-- @@##@@ -->
@@ -17,9 +17,10 @@ The support for old server protocols (<400) and map file formats (<20) will be d
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
-# 4.36.7 (unreleased)
+# 4.36.7
 ## Fixes
  * Corrected issue that caused "Unable to set targets for <_ID_>" errors (type PS has no such attribute although it totally does have one) for creatures that were saved to `.map` files and then read back in; the `Targets` attributes were lost in the saved map files.
+ * Corrected spurious error that is reported when a peer client requests temporary hit points.
 
 # 4.36.6
 ## Fixes
