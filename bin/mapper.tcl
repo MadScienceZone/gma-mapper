@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       ______    ______      ______     #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ____ \    / ____ \    #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \( (    \/   ( (    \/    #
-# | |      | || || || (___) | Assistant  / (_) (_       ___) /| (____     | (____      #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( |  ___ \    |  ___ \     #
-# | | \_  )| |   | || (   ) | VTT            ) (           ) \| (   ) )   | (   ) )    #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /( (___) ) _ ( (___) )    #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/  \_____/ (_) \_____/     #
+#  _______  _______  _______                ___       ______    ______     ______      #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ____ \   / ___  \     #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \( (    \/   \/   )  )    #
+# | |      | || || || (___) | Assistant  / (_) (_       ___) /| (____         /  /     #
+# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( |  ___ \       /  /      #
+# | | \_  )| |   | || (   ) | VTT            ) (           ) \| (   ) )     /  /       #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /( (___) ) _  /  /        #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/  \_____/ (_) \_/         #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -17,10 +17,10 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.36.6}     ;# @@##@@
+set GMAMapperVersion {4.36.7}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {422}         ;# @@##@@
-set CoreVersionNumber {6.41}            ;# @@##@@
+set CoreVersionNumber {6.42}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -7300,6 +7300,9 @@ proc RenderSomeone {w id {norecurse false} args} {
 		}
 
 
+		# TODO This either needs to move to GMA to determine when to set the Killed
+		# attribute, or GMA needs to send more details over to make this decision
+		# more accurately.
 		if {$its_dead_jim} {
 			set condition {}
 		} elseif {$condition eq {}} {
@@ -10526,6 +10529,10 @@ proc DoCommandHPACK {d} {
 	# Acknowledge our timer request. If we're still showing a request dialog, update/dismiss it
 	# based on RequestID field
 	ihr_accepted [dict get $d RequestID]
+}
+
+proc DoCommandHPREQ {d} {
+	# clients ignore these upon receipt
 }
 
 proc DoCommandFAILED {d} {
@@ -17782,7 +17789,7 @@ proc check_aka_commit {} {
 #
 #  called when rendering somone or advancing the initiative turn or updating target attribute
 #
-# @[00]@| GMA-Mapper 4.36.6
+# @[00]@| GMA-Mapper 4.36.7
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2026 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
