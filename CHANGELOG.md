@@ -17,6 +17,10 @@ The support for old server protocols (<400) and map file formats (<20) will be d
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
+# 4.36.8-beta
+## Fixes
+ * No longer loads images advertised to the client via server `AI` commands into memory, so the client can update its cache to have map images ready to use before a game session without filling up all of RAM in the process.
+
 # 4.36.7
 ## Fixes
  * Corrected issue that caused "Unable to set targets for <_ID_>" errors (type PS has no such attribute although it totally does have one) for creatures that were saved to `.map` files and then read back in; the `Targets` attributes were lost in the saved map files.
