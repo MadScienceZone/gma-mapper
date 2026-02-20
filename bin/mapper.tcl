@@ -2397,7 +2397,7 @@ DEBUG 1 "Loading cached images"
 					DEBUG 2 "Not pre-loading cache file $cache_filename for [lindex $frame0_stats 2] at zoom [lindex $frame0_stats 3] because it is [lindex $frame0_stats 1] days old."
 					continue
 				}
-				DEBUG 2 "Pre-loading cacheed animated image files $cache_filename/... for [lindex $cache_stats 2] at zoom [lindex $cache_stats 3]."
+				DEBUG 2 "Pre-loading cached animated image files $cache_filename/... for [lindex $cache_stats 2] at zoom [lindex $cache_stats 3]."
 				if {[catch {
 					set animation_meta [animation_read_metadata $cache_filename \
 									[lindex $cache_stats 2] \
@@ -10244,13 +10244,16 @@ proc send_file_to_server {id local_file} {
 #
 # load an image file from cache or the web server
 #
-proc fetch_image {name zoom id} {
+proc fetch_image {name zoom id args} {
 	global ClockDisplay
 	global ImageFormat
 	global CURLproxy CURLpath CURLserver CURLinsecure
 	global cache_too_old_days
 	global my_stdout
 	global forbidden_url
+	set load_image true
+
+	if {[lsearch -exact $args -noload] >= 0} {set load_image false}
 
 	set age $cache_too_old_days
 	set oldcd $ClockDisplay
@@ -10272,7 +10275,9 @@ proc fetch_image {name zoom id} {
 		DEBUG 3 "Found cache file for this image in $cache_filename, age=$cache_age"
 		if {$cache_age < $age} {
 			DEBUG 3 "Cache is $cache_age days old, so we'll just use that"
-			create_image_from_file $tile_id $cache_filename
+			if {$load_image} {
+				create_image_from_file $tile_id $cache_filename
+			}
 			set ClockDisplay $oldcd
 			return
 		}
@@ -10313,20 +10318,27 @@ proc fetch_image {name zoom id} {
 			DEBUG 0 "Error running $CURLpath to get $url into $cache_filename: $err"
 		}
 	}
-	create_image_from_file $tile_id $cache_filename
+	if {$load_image} {
+		create_image_from_file $tile_id $cache_filename
+	}
 	set ClockDisplay $oldcd
-	refreshScreen
+	if {$load_image} {
+		refreshScreen
+	}
 }
 
 #
 # load an animated image file from cache or the web server
 #
-proc fetch_animated_image {name zoom id frames speed loops} {
+proc fetch_animated_image {name zoom id frames speed loops args} {
 	global ClockDisplay
 	global ImageFormat
 	global CURLproxy CURLpath CURLserver CURLinsecure
 	global cache_too_old_days
 	global my_stdout
+	set load_image true
+
+	if {[lsearch -exact $args -noload] >= 0} {set load_image false}
 
 
 	set age $cache_too_old_days
@@ -10357,7 +10369,9 @@ proc fetch_animated_image {name zoom id frames speed loops} {
 
 			if {$cache_age < $age} {
 				DEBUG 3 "Cache is $cache_age days old, so we'll just use that"
-				create_animated_frame_from_file $tile_id $n $cache_filename
+				if {$load_image} {
+					create_animated_frame_from_file $tile_id $n $cache_filename
+				}
 				continue
 			}
 			set cache_newer_than [file mtime $cache_filename]
@@ -10392,7 +10406,9 @@ proc fetch_animated_image {name zoom id frames speed loops} {
 				DEBUG 0 "Error running $CURLpath to get $url into $cache_filename: $err"
 			}
 		}
-		create_animated_frame_from_file $tile_id $n $cache_filename
+		if {$load_image} {
+			create_animated_frame_from_file $tile_id $n $cache_filename
+		}
 	}
 	if {[catch {
 		set mf [open [file join $cache_dirname "${name}@[normalize_zoom ${zoom}].meta"] w]
@@ -10881,9 +10897,9 @@ proc DoCommandAI {d} {
 		} else {
 			DEBUG 2 "Caching copy of server image $server_id for $name @$zoom"
 			if {$aframes > 0} {
-				fetch_animated_image $name $zoom $server_id $aframes $aspeed $aloops
+				fetch_animated_image $name $zoom $server_id $aframes $aspeed $aloops -noload
 			} else {
-				fetch_image $name $zoom $server_id
+				fetch_image $name $zoom $server_id -noload
 			}
 		}
 	}
@@ -17829,3 +17845,10 @@ proc check_aka_commit {} {
 # @[50]@| This software is not intended for any use or application in which
 # @[51]@| the safety of lives or property would be at risk due to failure or
 # @[52]@| defect of the software.
+
+# _load_local_animated_file
+# fetch_animated_image
+# fetch_image name zoom id
+#	
+#
+# TILE_SET([tile_id name zoom]) = image_object
