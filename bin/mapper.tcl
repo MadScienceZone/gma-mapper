@@ -7300,25 +7300,27 @@ proc RenderSomeone {w id {norecurse false} args} {
 		}
 
 
-		# TODO This either needs to move to GMA to determine when to set the Killed
 		# attribute, or GMA needs to send more details over to make this decision
 		# more accurately.
 		if {$its_dead_jim} {
 			set condition {}
 		} elseif {$condition eq {}} {
 			# calculate condition automatically, otherwise it's forced
-			if {$effective_hp <= 0 || ($true_hp_remaining <= -$grace)} { 
-				set condition dead 
+			# We no longer set the dead condition on our own. GMA will do that for us becuase
+			# we can't take into account all the rules in play for this.
+			#if {$effective_hp <= 0 || ($true_hp_remaining <= -$grace)} { 
+			#	set condition dead 
 				# We're making the change locally here instead of broadcasting it out
 				# because all the other map clients will be acting on the same logic
 				# themselves and we don't need a storm of "this creature died" messages.
-				dict set MOBdata($id) Killed true
-				set its_dead_jim true
+			#	dict set MOBdata($id) Killed true
+			#	set its_dead_jim true
 				# Oh, no! We're already past the point where this would have been
 				# useful to know. Start over and re-render them as a corpse this time.
-				RenderSomeone $w $id
-				return
-			} elseif {$true_hp_remaining < 0} {
+			#	RenderSomeone $w $id
+			#	return
+			#} else
+			if {$true_hp_remaining < 0} {
 				set condition dying
 			} elseif {$nonlethal > $true_hp_remaining} {
 				set condition unconscious
