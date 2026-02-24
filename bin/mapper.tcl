@@ -11403,7 +11403,7 @@ proc DoCommandLoginSuccessful {} {
 	if {[dict get $_preferences colorize_die_rolls]} {
 		lappend feature_set DICE-COLOR-BOXES
 	}
-	if {[dict get $_preferences colorize_die_labels]} {
+	if {[dict get $_preferences a11y colorize_die_labels]} {
 		lappend feature_set DICE-COLOR-LABELS
 	}
 	::gmaproto::allow $feature_set
