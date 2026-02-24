@@ -1,17 +1,17 @@
 ########################################################################################
-#  _______  _______  _______                ___       ______    ______     ______      #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ____ \   / ___  \     #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \( (    \/   \/   )  )    #
-# | |      | || || || (___) | Assistant  / (_) (_       ___) /| (____         /  /     #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( |  ___ \       /  /      #
-# | | \_  )| |   | || (   ) | VTT            ) (           ) \| (   ) )     /  /       #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /( (___) ) _  /  /        #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/  \_____/ (_) \_/         #
+#  _______  _______  _______                ___       ______    ______      _____      #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ____ \    / ___ \     #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \( (    \/   ( (___) )    #
+# | |      | || || || (___) | Assistant  / (_) (_       ___) /| (____      \     /     #
+# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( |  ___ \     / ___ \     #
+# | | \_  )| |   | || (   ) | VTT            ) (           ) \| (   ) )   ( (   ) )    #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /( (___) ) _ ( (___) )    #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/  \_____/ (_) \_____/     #
 #                                                                                      #
 ########################################################################################
 # Profile editor
 
-package provide gmaprofile 1.6.1
+package provide gmaprofile 1.6.2
 package require gmacolors
 package require json 1.3.3
 package require json::write 1.0.3
@@ -28,7 +28,7 @@ namespace eval ::gmaprofile {
 	variable font_repository
 	variable _default_color_table
 	variable minimum_file_version 1
-	variable maximum_file_version 12
+	variable maximum_file_version 13
 	array set _default_color_table {
 		fg,light           #000000
 		normal_fg,light    #000000
@@ -87,7 +87,9 @@ namespace eval ::gmaprofile {
 		button_size s
 		chat_timestamp ?
 		colorize_die_rolls ?
-		colorize_die_labels ?
+		a11y {o {
+			colorize_die_labels ?
+		}}
 		curl_path s
 		curl_insecure ?
 		current_profile s
@@ -304,7 +306,9 @@ namespace eval ::gmaprofile {
 			button_size     small\
 			chat_timestamp  true\
 			colorize_die_rolls true\
-			colorize_die_labels true\
+			a11y [dict create \
+				colorize_die_labels true\
+			] \
 			markup_enabled true\
 			curl_path       [::gmautil::searchInPath curl]\
 			curl_insecure   false\
@@ -539,7 +543,7 @@ namespace eval ::gmaprofile {
 
 		json::write indented true
 		json::write aligned true
-		dict set data GMA_Mapper_preferences_version 12
+		dict set data GMA_Mapper_preferences_version 13
 		set f [open $filename w]
 		puts $f [::gmaproto::_encode_payload $data $_file_format]
 		close $f
@@ -572,6 +576,9 @@ namespace eval ::gmaprofile {
 				puts "** Preferences data is missing font $font_name; setting to default $font_dict **"
 				dict set data fonts $font_name $font_dict
 			}
+		}
+		if {![dict exists $data a11y colorize_die_labels]} {
+			dict set data a11y colorize_die_labels false
 		}
 		return $data
 	}
@@ -618,7 +625,9 @@ namespace eval ::gmaprofile {
 			button_size $button_size \
 			chat_timestamp $chat_timestamp \
 			colorize_die_rolls $colorize_die_rolls \
-			colorize_die_labels $colorize_die_labels \
+			a11y [dict create \
+				colorize_die_labels $colorize_die_labels \
+			]\
 			markup_enabled $markup_enabled \
 			curl_path $curl_path \
 			curl_insecure $curl_insecure \
@@ -818,7 +827,6 @@ namespace eval ::gmaprofile {
 			button_size button_size \
 			chat_timestamp chat_timestamp \
 			colorize_die_rolls colorize_die_rolls \
-			colorize_die_labels colorize_die_labels \
 			markup_enabled markup_enabled \
 			curl_path curl_path \
 			curl_insecure curl_insecure \
@@ -826,6 +834,7 @@ namespace eval ::gmaprofile {
 			debug_level debug_level \
 			debug_proto debug_proto \
 			flash_updates flash_updates\
+			a11y a11y\
 			guide_lines guides \
 			image_format image_format \
 			keep_tools keep_tools \
@@ -845,7 +854,6 @@ namespace eval ::gmaprofile {
 		set animate [::gmaproto::int_bool $animate]
 		set flash_updates [::gmaproto::int_bool $flash_updates]
 		set colorize_die_rolls [::gmaproto::int_bool $colorize_die_rolls]
-		set colorize_die_labels [::gmaproto::int_bool $colorize_die_labels]
 		set markup_enabled [::gmaproto::int_bool $markup_enabled]
 		set chat_timestamp [::gmaproto::int_bool $chat_timestamp]
 		set dark [::gmaproto::int_bool $dark]
@@ -869,6 +877,10 @@ namespace eval ::gmaprofile {
 				offsets [dict create x 0 y 0]]\
 			] $guides\
 		]
+		::gmautil::dassign $a11y \
+			colorize_die_labels colorize_die_labels 
+		set colorize_die_labels [::gmaproto::int_bool $colorize_die_labels]
+			
 		::gmautil::dassign $guides \
 			{major interval} major_interval \
 			{major offsets x} major_offset_x \
@@ -895,11 +907,13 @@ namespace eval ::gmaprofile {
 		frame $w.n.t
 		frame $w.n.s
 		frame $w.n.p
+		frame $w.n.a11y
 		$w.n add $w.n.a -state normal -sticky nsew -text Appearance
 		$w.n add $w.n.p -state normal -sticky news -text Servers
 		$w.n add $w.n.s -state normal -sticky news -text Styles
 		$w.n add $w.n.t -state normal -sticky nsew -text Tools
 		$w.n add $w.n.d -state normal -sticky nsew -text Diagnostics
+		$w.n add $w.n.a11y -state normal -sticky nsew -text Accessibility
 
 		ttk::notebook $w.n.s.n
 		set st $w.n.s.n
@@ -1121,6 +1135,8 @@ namespace eval ::gmaprofile {
 			set sep_bg black
 		}
 
+		
+		grid [ttk::checkbutton $w.n.a11y.cdl -text "Enable colors in die-roll modifier labels" -variable colorize_die_labels] -sticky w
 
 		menu $w.n.a.m_bsize
 		$w.n.a.m_bsize add command -label small -command {::gmaprofile::_bsize small}
@@ -1140,7 +1156,6 @@ namespace eval ::gmaprofile {
 		grid [ttk::checkbutton $w.n.a.flash -text "Flash objects when they are updated" -variable flash_updates] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.chat_timestamp -text "Show timestamp in chat messages" -variable chat_timestamp] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.cdr -text "Enable colors in die-roll titles" -variable colorize_die_rolls] - - - - - - -sticky w
-		grid [ttk::checkbutton $w.n.a.cdl -text "Enable colors in die-roll modifier labels" -variable colorize_die_labels] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.mark -text "Enable markup by default in chat messages" -variable markup_enabled] - - - - - - -sticky w
 		grid [ttk::checkbutton $w.n.a.dark -text "Dark theme" -variable dark] - - - - - - -sticky w
 		grid [ttk::label $w.n.a.scalingl -text "Visual scaling factor:"] [ttk::spinbox $w.n.a.scaling -textvariable scaling -from 1.0 -to 100.0 -increment 1.0 -format "%.1f" -width 5] -sticky we

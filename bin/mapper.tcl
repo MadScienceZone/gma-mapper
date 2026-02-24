@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       ______    ______     ______      #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ____ \   / ___  \     #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \( (    \/   \/   )  )    #
-# | |      | || || || (___) | Assistant  / (_) (_       ___) /| (____         /  /     #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( |  ___ \       /  /      #
-# | | \_  )| |   | || (   ) | VTT            ) (           ) \| (   ) )     /  /       #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /( (___) ) _  /  /        #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/  \_____/ (_) \_/         #
+#  _______  _______  _______                ___       ______    ______      _____      #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ____ \    / ___ \     #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \( (    \/   ( (___) )    #
+# | |      | || || || (___) | Assistant  / (_) (_       ___) /| (____      \     /     #
+# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( |  ___ \     / ___ \     #
+# | | \_  )| |   | || (   ) | VTT            ) (           ) \| (   ) )   ( (   ) )    #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /( (___) ) _ ( (___) )    #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/  \_____/ (_) \_____/     #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -17,7 +17,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.36.7}     ;# @@##@@
+set GMAMapperVersion {4.36.8}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {422}         ;# @@##@@
 set CoreVersionNumber {6.42}            ;# @@##@@
@@ -2397,7 +2397,7 @@ DEBUG 1 "Loading cached images"
 					DEBUG 2 "Not pre-loading cache file $cache_filename for [lindex $frame0_stats 2] at zoom [lindex $frame0_stats 3] because it is [lindex $frame0_stats 1] days old."
 					continue
 				}
-				DEBUG 2 "Pre-loading cacheed animated image files $cache_filename/... for [lindex $cache_stats 2] at zoom [lindex $cache_stats 3]."
+				DEBUG 2 "Pre-loading cached animated image files $cache_filename/... for [lindex $cache_stats 2] at zoom [lindex $cache_stats 3]."
 				if {[catch {
 					set animation_meta [animation_read_metadata $cache_filename \
 									[lindex $cache_stats 2] \
@@ -7300,25 +7300,27 @@ proc RenderSomeone {w id {norecurse false} args} {
 		}
 
 
-		# TODO This either needs to move to GMA to determine when to set the Killed
 		# attribute, or GMA needs to send more details over to make this decision
 		# more accurately.
 		if {$its_dead_jim} {
 			set condition {}
 		} elseif {$condition eq {}} {
 			# calculate condition automatically, otherwise it's forced
-			if {$effective_hp <= 0 || ($true_hp_remaining <= -$grace)} { 
-				set condition dead 
+			# We no longer set the dead condition on our own. GMA will do that for us becuase
+			# we can't take into account all the rules in play for this.
+			#if {$effective_hp <= 0 || ($true_hp_remaining <= -$grace)} { 
+			#	set condition dead 
 				# We're making the change locally here instead of broadcasting it out
 				# because all the other map clients will be acting on the same logic
 				# themselves and we don't need a storm of "this creature died" messages.
-				dict set MOBdata($id) Killed true
-				set its_dead_jim true
+			#	dict set MOBdata($id) Killed true
+			#	set its_dead_jim true
 				# Oh, no! We're already past the point where this would have been
 				# useful to know. Start over and re-render them as a corpse this time.
-				RenderSomeone $w $id
-				return
-			} elseif {$true_hp_remaining < 0} {
+			#	RenderSomeone $w $id
+			#	return
+			#} else
+			if {$true_hp_remaining < 0} {
 				set condition dying
 			} elseif {$nonlethal > $true_hp_remaining} {
 				set condition unconscious
@@ -10244,13 +10246,16 @@ proc send_file_to_server {id local_file} {
 #
 # load an image file from cache or the web server
 #
-proc fetch_image {name zoom id} {
+proc fetch_image {name zoom id args} {
 	global ClockDisplay
 	global ImageFormat
 	global CURLproxy CURLpath CURLserver CURLinsecure
 	global cache_too_old_days
 	global my_stdout
 	global forbidden_url
+	set load_image true
+
+	if {[lsearch -exact $args -noload] >= 0} {set load_image false}
 
 	set age $cache_too_old_days
 	set oldcd $ClockDisplay
@@ -10272,7 +10277,9 @@ proc fetch_image {name zoom id} {
 		DEBUG 3 "Found cache file for this image in $cache_filename, age=$cache_age"
 		if {$cache_age < $age} {
 			DEBUG 3 "Cache is $cache_age days old, so we'll just use that"
-			create_image_from_file $tile_id $cache_filename
+			if {$load_image} {
+				create_image_from_file $tile_id $cache_filename
+			}
 			set ClockDisplay $oldcd
 			return
 		}
@@ -10313,20 +10320,27 @@ proc fetch_image {name zoom id} {
 			DEBUG 0 "Error running $CURLpath to get $url into $cache_filename: $err"
 		}
 	}
-	create_image_from_file $tile_id $cache_filename
+	if {$load_image} {
+		create_image_from_file $tile_id $cache_filename
+	}
 	set ClockDisplay $oldcd
-	refreshScreen
+	if {$load_image} {
+		refreshScreen
+	}
 }
 
 #
 # load an animated image file from cache or the web server
 #
-proc fetch_animated_image {name zoom id frames speed loops} {
+proc fetch_animated_image {name zoom id frames speed loops args} {
 	global ClockDisplay
 	global ImageFormat
 	global CURLproxy CURLpath CURLserver CURLinsecure
 	global cache_too_old_days
 	global my_stdout
+	set load_image true
+
+	if {[lsearch -exact $args -noload] >= 0} {set load_image false}
 
 
 	set age $cache_too_old_days
@@ -10357,7 +10371,9 @@ proc fetch_animated_image {name zoom id frames speed loops} {
 
 			if {$cache_age < $age} {
 				DEBUG 3 "Cache is $cache_age days old, so we'll just use that"
-				create_animated_frame_from_file $tile_id $n $cache_filename
+				if {$load_image} {
+					create_animated_frame_from_file $tile_id $n $cache_filename
+				}
 				continue
 			}
 			set cache_newer_than [file mtime $cache_filename]
@@ -10392,7 +10408,9 @@ proc fetch_animated_image {name zoom id frames speed loops} {
 				DEBUG 0 "Error running $CURLpath to get $url into $cache_filename: $err"
 			}
 		}
-		create_animated_frame_from_file $tile_id $n $cache_filename
+		if {$load_image} {
+			create_animated_frame_from_file $tile_id $n $cache_filename
+		}
 	}
 	if {[catch {
 		set mf [open [file join $cache_dirname "${name}@[normalize_zoom ${zoom}].meta"] w]
@@ -10881,9 +10899,9 @@ proc DoCommandAI {d} {
 		} else {
 			DEBUG 2 "Caching copy of server image $server_id for $name @$zoom"
 			if {$aframes > 0} {
-				fetch_animated_image $name $zoom $server_id $aframes $aspeed $aloops
+				fetch_animated_image $name $zoom $server_id $aframes $aspeed $aloops -noload
 			} else {
-				fetch_image $name $zoom $server_id
+				fetch_image $name $zoom $server_id -noload
 			}
 		}
 	}
@@ -11385,7 +11403,7 @@ proc DoCommandLoginSuccessful {} {
 	if {[dict get $_preferences colorize_die_rolls]} {
 		lappend feature_set DICE-COLOR-BOXES
 	}
-	if {[dict get $_preferences colorize_die_labels]} {
+	if {[dict get $_preferences a11y colorize_die_labels]} {
 		lappend feature_set DICE-COLOR-LABELS
 	}
 	::gmaproto::allow $feature_set
@@ -17789,7 +17807,7 @@ proc check_aka_commit {} {
 #
 #  called when rendering somone or advancing the initiative turn or updating target attribute
 #
-# @[00]@| GMA-Mapper 4.36.7
+# @[00]@| GMA-Mapper 4.36.8
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2026 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
@@ -17829,3 +17847,10 @@ proc check_aka_commit {} {
 # @[50]@| This software is not intended for any use or application in which
 # @[51]@| the safety of lives or property would be at risk due to failure or
 # @[52]@| defect of the software.
+
+# _load_local_animated_file
+# fetch_animated_image
+# fetch_image name zoom id
+#	
+#
+# TILE_SET([tile_id name zoom]) = image_object
