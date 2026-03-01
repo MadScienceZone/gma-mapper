@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       ______    ______     _______     #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ____ \   (  ____ \    #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \( (    \/   | (    \/    #
-# | |      | || || || (___) | Assistant  / (_) (_       ___) /| (____     | (____      #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( |  ___ \    (_____ \     #
-# | | \_  )| |   | || (   ) | VTT            ) (           ) \| (   ) )         ) )    #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /( (___) ) _ /\____) )    #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/  \_____/ (_)\______/     #
+#  _______  _______  _______                ___       ______    ______     ______      #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ____ \   / ___  \     #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \( (    \/   \/   )  )    #
+# | |      | || || || (___) | Assistant  / (_) (_       ___) /| (____         /  /     #
+# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( |  ___ \       /  /      #
+# | | \_  )| |   | || (   ) | VTT            ) (           ) \| (   ) )     /  /       #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /( (___) ) _  /  /        #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/  \_____/ (_) \_/         #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -17,10 +17,10 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.36.5}     ;# @@##@@
+set GMAMapperVersion {4.36.8-beta}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
-set GMAMapperProtocol {423}         ;# @@##@@
-set CoreVersionNumber {6.41}            ;# @@##@@
+set GMAMapperProtocol {422}         ;# @@##@@
+set CoreVersionNumber {6.42}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -2410,7 +2410,7 @@ DEBUG 1 "Loading cached images"
 					DEBUG 2 "Not pre-loading cache file $cache_filename for [lindex $frame0_stats 2] at zoom [lindex $frame0_stats 3] because it is [lindex $frame0_stats 1] days old."
 					continue
 				}
-				DEBUG 2 "Pre-loading cacheed animated image files $cache_filename/... for [lindex $cache_stats 2] at zoom [lindex $cache_stats 3]."
+				DEBUG 2 "Pre-loading cached animated image files $cache_filename/... for [lindex $cache_stats 2] at zoom [lindex $cache_stats 3]."
 				if {[catch {
 					set animation_meta [animation_read_metadata $cache_filename \
 									[lindex $cache_stats 2] \
@@ -6845,17 +6845,18 @@ proc RefreshTargets {} {
 		if {[info exists MOBdata($tid)] && [dict exists [set d $MOBdata($tid)] Targets]} {
 			if {[catch {
 				::gmautil::dassign $d Gx agx Gy agy Hidden ahidden
-				if {$ahidden} continue
-				set actor_mob_size [_mob_size $tid]
+				if {!$ahidden} {
+					set actor_mob_size [_mob_size $tid]
 
-				foreach target [dict get $d Targets] {
-					if {[info exists MOBid($target)] && [info exists MOBdata([set ttid $MOBid($target)])]} {
-						::gmautil::dassign $MOBdata($ttid) Gx gx Gy gy Hidden hidden
-						if {$hidden} continue
-						set mob_size [_mob_size $ttid]
-						RenderTarget $canvas [expr $gx*$iscale] [expr $gy*$iscale] [expr ($gx+$mob_size)*$iscale] [expr ($gy+$mob_size)*$iscale] [list MATARG MATARG#$tid] MATARG
-						$canvas create line [expr ($agx+($actor_mob_size/2.0))*$iscale] [expr ($agy+($actor_mob_size/2.0))*$iscale] [expr ($gx+($mob_size/2.0))*$iscale] [expr ($gy+($mob_size/2.0))*$iscale] -fill $TargetColor -width 3 -tags [list MATARG MATARG#$tid MATARG MATARGLINE] -dash - -arrow last
-						set start true
+					foreach target [dict get $d Targets] {
+						if {[info exists MOBid($target)] && [info exists MOBdata([set ttid $MOBid($target)])]} {
+							::gmautil::dassign $MOBdata($ttid) Gx gx Gy gy Hidden hidden
+							if {$hidden} continue
+							set mob_size [_mob_size $ttid]
+							RenderTarget $canvas [expr $gx*$iscale] [expr $gy*$iscale] [expr ($gx+$mob_size)*$iscale] [expr ($gy+$mob_size)*$iscale] [list MATARG MATARG#$tid] MATARG
+							$canvas create line [expr ($agx+($actor_mob_size/2.0))*$iscale] [expr ($agy+($actor_mob_size/2.0))*$iscale] [expr ($gx+($mob_size/2.0))*$iscale] [expr ($gy+($mob_size/2.0))*$iscale] -fill $TargetColor -width 3 -tags [list MATARG MATARG#$tid MATARG MATARGLINE] -dash - -arrow last
+							set start true
+						}
 					}
 				}
 			} err]} {
@@ -7324,6 +7325,9 @@ proc RenderSomeone {w id {norecurse false} args} {
 		}
 
 
+		# TODO This either needs to move to GMA to determine when to set the Killed
+		# attribute, or GMA needs to send more details over to make this decision
+		# more accurately.
 		if {$its_dead_jim} {
 			set condition {}
 		} elseif {$condition eq {}} {
@@ -10286,13 +10290,16 @@ proc send_file_to_server {id local_file} {
 #
 # load an image file from cache or the web server
 #
-proc fetch_image {name zoom id} {
+proc fetch_image {name zoom id args} {
 	global ClockDisplay
 	global ImageFormat
 	global CURLproxy CURLpath CURLserver CURLinsecure
 	global cache_too_old_days
 	global my_stdout
 	global forbidden_url
+	set load_image true
+
+	if {[lsearch -exact $args -noload] >= 0} {set load_image false}
 
 	set age $cache_too_old_days
 	set oldcd $ClockDisplay
@@ -10314,7 +10321,9 @@ proc fetch_image {name zoom id} {
 		DEBUG 3 "Found cache file for this image in $cache_filename, age=$cache_age"
 		if {$cache_age < $age} {
 			DEBUG 3 "Cache is $cache_age days old, so we'll just use that"
-			create_image_from_file $tile_id $cache_filename
+			if {$load_image} {
+				create_image_from_file $tile_id $cache_filename
+			}
 			set ClockDisplay $oldcd
 			return
 		}
@@ -10355,20 +10364,27 @@ proc fetch_image {name zoom id} {
 			DEBUG 0 "Error running $CURLpath to get $url into $cache_filename: $err"
 		}
 	}
-	create_image_from_file $tile_id $cache_filename
+	if {$load_image} {
+		create_image_from_file $tile_id $cache_filename
+	}
 	set ClockDisplay $oldcd
-	refreshScreen
+	if {$load_image} {
+		refreshScreen
+	}
 }
 
 #
 # load an animated image file from cache or the web server
 #
-proc fetch_animated_image {name zoom id frames speed loops} {
+proc fetch_animated_image {name zoom id frames speed loops args} {
 	global ClockDisplay
 	global ImageFormat
 	global CURLproxy CURLpath CURLserver CURLinsecure
 	global cache_too_old_days
 	global my_stdout
+	set load_image true
+
+	if {[lsearch -exact $args -noload] >= 0} {set load_image false}
 
 
 	set age $cache_too_old_days
@@ -10399,7 +10415,9 @@ proc fetch_animated_image {name zoom id frames speed loops} {
 
 			if {$cache_age < $age} {
 				DEBUG 3 "Cache is $cache_age days old, so we'll just use that"
-				create_animated_frame_from_file $tile_id $n $cache_filename
+				if {$load_image} {
+					create_animated_frame_from_file $tile_id $n $cache_filename
+				}
 				continue
 			}
 			set cache_newer_than [file mtime $cache_filename]
@@ -10434,7 +10452,9 @@ proc fetch_animated_image {name zoom id frames speed loops} {
 				DEBUG 0 "Error running $CURLpath to get $url into $cache_filename: $err"
 			}
 		}
-		create_animated_frame_from_file $tile_id $n $cache_filename
+		if {$load_image} {
+			create_animated_frame_from_file $tile_id $n $cache_filename
+		}
 	}
 	if {[catch {
 		set mf [open [file join $cache_dirname "${name}@[normalize_zoom ${zoom}].meta"] w]
@@ -10571,6 +10591,10 @@ proc DoCommandHPACK {d} {
 	# Acknowledge our timer request. If we're still showing a request dialog, update/dismiss it
 	# based on RequestID field
 	ihr_accepted [dict get $d RequestID]
+}
+
+proc DoCommandHPREQ {d} {
+	# clients ignore these upon receipt
 }
 
 proc DoCommandFAILED {d} {
@@ -10919,9 +10943,9 @@ proc DoCommandAI {d} {
 		} else {
 			DEBUG 2 "Caching copy of server image $server_id for $name @$zoom"
 			if {$aframes > 0} {
-				fetch_animated_image $name $zoom $server_id $aframes $aspeed $aloops
+				fetch_animated_image $name $zoom $server_id $aframes $aspeed $aloops -noload
 			} else {
-				fetch_image $name $zoom $server_id
+				fetch_image $name $zoom $server_id -noload
 			}
 		}
 	}
@@ -17836,7 +17860,7 @@ proc AreMobsInCustomList {mob_list condition targeter} {
 #
 #  called when rendering somone or advancing the initiative turn or updating target attribute
 #
-# @[00]@| GMA-Mapper 4.36.5
+# @[00]@| GMA-Mapper 4.36.7
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2026 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
@@ -17876,3 +17900,10 @@ proc AreMobsInCustomList {mob_list condition targeter} {
 # @[50]@| This software is not intended for any use or application in which
 # @[51]@| the safety of lives or property would be at risk due to failure or
 # @[52]@| defect of the software.
+
+# _load_local_animated_file
+# fetch_animated_image
+# fetch_image name zoom id
+#	
+#
+# TILE_SET([tile_id name zoom]) = image_object
