@@ -911,7 +911,12 @@ proc MarshalChatHistoryEntry {m} {
 	if {[lindex $m 0] eq {-system}} {
 		return [list CHAT -system [::json::write string [lindex $m 1]]]
 	}
-	return [list CHAT [lindex $m 0] [::gmaproto::_encode_payload [lindex $m 1] $::gmaproto::_message_payload([lindex $m 0])]]
+	if {[catch {
+		set retval [list CHAT [lindex $m 0] [::gmaproto::_encode_payload [lindex $m 1] [::gmaproto::payload_format [lindex $m 0]]]]
+	} err]} {
+		set retval [list CHAT -system [::json::write string "error recording chat history entry: $err"]]
+	}
+	return $retval
 }
 
 #
@@ -922,7 +927,11 @@ proc UnmarshalChatHistoryEntry {m} {
 		return [list {-system} [::json::json2dict [lindex $m 2]] -1]
 	}
 	DEBUG 2 "unmarshal $m"
-	set d [::gmaproto::_construct [::json::json2dict [lindex $m 2]] $::gmaproto::_message_payload([lindex $m 1])]
+	if {[catch {
+		set d [::gmaproto::_construct [::json::json2dict [lindex $m 2]] [::gmaproto::payload_format [lindex $m 1]]]
+	} err]} {
+		return [list -system "error decoding chat history entry: $err" -1]
+	}
 	DEBUG 3 "-> [lindex $m 1] $d" 
 	return [list [lindex $m 1] $d [dict get $d MessageID]]
 }

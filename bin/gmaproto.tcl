@@ -91,10 +91,11 @@ namespace eval ::gmaproto {
 		AI?	{Sizes}
 		CONN	{PeerList}
 		D	{Recipients Targets}
-		DD	{Presets DelegateFor Delegates}
-		DD+	{Presets DelegateFor Delegates}
+		DD	{Presets}
+		DD+	{Presets}
 		DD=	{Presets DelegateFor Delegates}
 		DDD	{Delegates}
+		ECHO	{*o}
 		HPREQ	{Targets}
 		IL	{InitiativeList}
 		LS-ARC	{Points}
@@ -111,6 +112,7 @@ namespace eval ::gmaproto {
 		PS	{Targets *TargetedModifiers}
 		ROLL	{Recipients Targets {Result Details}}
 		SOUND	{Addrs}
+		TMRQ	{Targets}
 		TO	{Recipients}
 		UPDATES	{Packages}
 	}
@@ -161,8 +163,8 @@ namespace eval ::gmaproto {
 		ACCEPT  {Messages l}
 		AA      {Name s Format s File s IsLocalFile ?}
 		AA?     {Name s}
-		AI      {Name s Sizes {a {File s ImageData b IsLocalFile ? Zoom f}} Animation {o {Frames i FrameSpeed i Loops i}}}
-		AI?	{Name s Sizes {a {Zoom f}}}
+		AI      {Name s Sizes {a {File s ImageData b IsLocalFile ? Zoom f}} Animation {o {Frames i FrameSpeed i Loops i}} .BATCHABLE}
+		AI?	{Name s Sizes {a {Zoom f}} .BATCHABLE}
 		AKA	{Names l User s NotPlaying ?}
 		ALLOW   {Features l}
 		AUTH    {Client s Response b User s Platform s}
@@ -176,54 +178,54 @@ namespace eval ::gmaproto {
 		CORE/	{Filter s Type s IsHidden ? InvertSelection ?}
 		COREIDX {Type s CodeRegex s NameRegex s Since s RequestID s}
 		COREIDX= {RequestID s Type s IsDone ? N i Of i Name s Code s}
-		CONN    {PeerList {a {Addr s User s Client s LastPolo f IsAuthenticated ? IsMe ? AKA l NotPlaying ?}}}
+		CONN    {PeerList {a {Addr s User s Client s LastPolo f IsAuthenticated ? IsMe ? AKA l NotPlaying ?}} .BATCHABLE}
 		CS      {Absolute f Relative f Running ?}
-		D       {Recipients l ToAll ? ToGM ? RollSpec s RequestID s Targets l Type s}
-		DD      {Global ? For s Presets {a {Name s Description s DieRollSpec s}}}
-		DD+     {Global ? For s Presets {a {Name s Description s DieRollSpec s}}}
+		D       {Recipients l ToAll ? ToGM ? RollSpec s RequestID s Targets l Type s .BATCHABLE}
+		DD      {Global ? For s Presets {a {Name s Description s DieRollSpec s}} .BATCHABLE}
+		DD+     {Global ? For s Presets {a {Name s Description s DieRollSpec s}} .BATCHABLE}
 		DD/     {Global ? For s Filter s}
-		DD=     {Global ? For s Presets {a {Global ? Name s Description s DieRollSpec s}} DelegateFor l Delegates l}
-		DDD	{For s Delegates l}
+		DD=     {Global ? For s Presets {a {Global ? Name s Description s DieRollSpec s}} DelegateFor l Delegates l .BATCHABLE}
+		DDD	{For s Delegates l .BATCHABLE}
 		DENIED  {Reason s}
 		DR      {For s}
 		DSM     {Condition s Shape s Color s Description s Transparent ?}
-		ECHO    {s s i i o d ReceivedTime s SentTime s}
+		ECHO    {s s i i o d ReceivedTime s SentTime s .BATCHABLE}
 		FAILED	{IsError ? IsDiscretionary ? Command s Reason s RequestID s RequestedBy s RequestingClient s}
 		GRANTED {User s}
 		HPACK	{RequestID s RequestingClient s RequestedBy s}
-		HPREQ   {Targets l Description s RequestID s RequestingClient s RequestedBy s Health {o {MaxHP i LethalDamage i NonLethalDamage i AC i FlatFootedAC i TouchAC i CMD i}} TmpHP {o {TmpHP i TmpDamage i Expires s}}}
+		HPREQ   {Targets l Description s RequestID s RequestingClient s RequestedBy s Health {o {MaxHP i LethalDamage i NonLethalDamage i AC i FlatFootedAC i TouchAC i CMD i}} TmpHP {o {TmpHP i TmpDamage i Expires s}} .BATCHABLE}
 		I       {ActorID s Hours i Minutes i Seconds i Rounds i Count i}
-		IL      {InitiativeList {a {Slot i CurrentHP i Name s IsHolding ? HasReadiedAction ? IsFlatFooted ?}}}
+		IL      {InitiativeList {a {Slot i CurrentHP i Name s IsHolding ? HasReadiedAction ? IsFlatFooted ?}} .BATCHABLE}
 		L       {File s IsLocalFile ? CacheOnly ? Merge ?}
-		LS-ARC  {ArcMode i Start f Extent f ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Stipple s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
-		LS-CIRC {ArcMode i Start f Extent f ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Stipple s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
-		LS-LINE {Arrow i ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Stipple s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
-		LS-POLY {Spline i Join i ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Stipple s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
-		LS-RECT {ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Stipple s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
-		LS-SAOE {AoEShape i ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
-		LS-TEXT {Text s Font {o {Family s Size f Weight i Slant i}} Anchor i ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Stipple s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
-		LS-TILE {Image s BBHeight f BBWidth f ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
+		LS-ARC  {ArcMode i Start f Extent f ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Stipple s Width i Layer s Level i Group s Dash i Hidden ? Locked ? .BATCHABLE}
+		LS-CIRC {ArcMode i Start f Extent f ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Stipple s Width i Layer s Level i Group s Dash i Hidden ? Locked ? .BATCHABLE}
+		LS-LINE {Arrow i ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Stipple s Width i Layer s Level i Group s Dash i Hidden ? Locked ? .BATCHABLE}
+		LS-POLY {Spline i Join i ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Stipple s Width i Layer s Level i Group s Dash i Hidden ? Locked ? .BATCHABLE}
+		LS-RECT {ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Stipple s Width i Layer s Level i Group s Dash i Hidden ? Locked ? .BATCHABLE}
+		LS-SAOE {AoEShape i ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ? .BATCHABLE}
+		LS-TEXT {Text s Font {o {Family s Size f Weight i Slant i}} Anchor i ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Stipple s Width i Layer s Level i Group s Dash i Hidden ? Locked ? .BATCHABLE}
+		LS-TILE {Image s BBHeight f BBWidth f ID s X f Y f Points {a {X f Y f}} Z i Line s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ? .BATCHABLE}
 		MARCO   {}
 		MARK    {X f Y f}
-		OA      {ObjID s NewAttrs d}
-		OA+     {ObjID s AttrName s Values l}
-		OA-     {ObjID s AttrName s Values l}
+		OA      {ObjID s NewAttrs d .BATCHABLE}
+		OA+     {ObjID s AttrName s Values l .BATCHABLE}
+		OA-     {ObjID s AttrName s Values l .BATCHABLE}
 		OK      {Protocol i Challenge b ServerStarted s ServerActive s ServerTime s ServerVersion s Iterations i}
 		PRIV    {Command s Reason s}
 		POLO    {}
 		PROGRESS {OperationID s Title s Value i MaxValue i IsDone ? Targets l IsTimer ?}
-		PS      {ID s Name s Health {o {MaxHP i TmpHP i TmpDamage i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i AC i FlatFootedAC i TouchAC i CMD i}} Gx f Gy f Skin i SkinSize l PolyGM ? Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}} Targets l TargetedModifiers {D {o {Type s Modifiers l}}}}
+		PS      {ID s Name s Health {o {MaxHP i TmpHP i TmpDamage i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i AC i FlatFootedAC i TouchAC i CMD i}} Gx f Gy f Skin i SkinSize l PolyGM ? Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}} Targets l TargetedModifiers {D {o {Type s Modifiers l}}} .BATCHABLE}
 		READY   {}
 		REDIRECT {Host s Port i Reason s}
-		ROLL    {Replay ? Sender s Recipients l MessageID i ToAll ? ToGM ? Title s Result {o {InvalidRequest ? ResultSuppressed ? Result i Details {a {Type s Value s}}}} RequestID s MoreResults ? Sent s Origin ? Targets l Type s}
-		SOUND   {Name s Loop ? Stop ? Addrs l}
+		ROLL    {Replay ? Sender s Recipients l MessageID i ToAll ? ToGM ? Title s Result {o {InvalidRequest ? ResultSuppressed ? Result i Details {a {Type s Value s}}}} RequestID s MoreResults ? Sent s Origin ? Targets l Type s .BATCHABLE}
+		SOUND   {Name s Loop ? Stop ? Addrs l .BATCHABLE}
 		SYNC    {}
 		SYNC-CHAT {Target i}
 		TB      {Enabled ?}
 		TMACK	{RequestID s RequestingClient s RequestedBy s}
-		TMRQ	{Description s Expires s Targets l ShowToAll ? IsRunning ? RequestedBy s RequestingClient s RequestID s}
-		TO      {Replay ? Sender s Recipients l MessageID i ToAll ? ToGM ? Text s Sent s Markup ? Origin ? Pin ?}
-		UPDATES {Packages {a {Name s Instances {a {OS s Arch s Version s Token s}}}}}
+		TMRQ	{Description s Expires s Targets l ShowToAll ? IsRunning ? RequestedBy s RequestingClient s RequestID s .BATCHABLE}
+		TO      {Replay ? Sender s Recipients l MessageID i ToAll ? ToGM ? Text s Sent s Markup ? Origin ? Pin ? .BATCHABLE}
+		UPDATES {Packages {a {Name s Instances {a {OS s Arch s Version s Token s}}}} .BATCHABLE}
 		WORLD   {Calendar s ClientSettings {o {MkdirPath s ImageBaseURL s ModuleCode s SCPDestination s ServerHostname s}}}
 		/CONN   {}
 		Animation {Frames i FrameSpeed i Loops i}
@@ -507,10 +509,12 @@ proc ::gmaproto::_protocol_send {command args} {
 proc ::gmaproto::_protocol_send_d {command dargs} {
 	set packet [::gmaproto::_protocol_encode $command $dargs]
 	if {[string length $packet] > $::gmaproto::maximum_message_length} {
+		::gmaproto::DEBUG "$command packet length [string length $packet] exceeds maximum $::gmaproto::maximum_message_length"
 		# can we split this up?
-		if {[info exists $::gmaproto::_collected_fields($command)]} {
+		if {[info exists ::gmaproto::_collected_fields($command)]} {
 			# break up into batches
-			set d [lindex $packet 1]
+			set d $dargs
+			::gmaproto::DEBUG "d=$d"
 			set varfields $::gmaproto::_collected_fields($command)
 			set batch_group [::gmaproto::new_id]
 			set total_batches 0
@@ -518,7 +522,7 @@ proc ::gmaproto::_protocol_send_d {command dargs} {
 			set split_values(.flds.) {}
 			# break out fields we can split between batches
 			foreach fld $varfields {
-				if {[string range $fld 1 end]} {
+				if {[string range $fld 0 0] eq "*"} {
 					# *FLD:	FLD is a dictionary value; split up each key/value set
 					set fld [string range $fld 1 end]
 					lappend split_values(.flds.) $fld
@@ -526,8 +530,10 @@ proc ::gmaproto::_protocol_send_d {command dargs} {
 					dict for {k v} [dict get $d {*}$fld] {
 						lappend split_values($fld,value) [list $k $v]
 						incr total_batches
+						::gmaproto::DEBUG "split off $fld $k value"
 					}
 					dict set d {*}$fld {}
+					::gmaproto::DEBUG "d=$d"
 				} elseif {[llength $fld] > 1} {
 					# FLD1 FLD2 ...: path to nested key
 					lappend split_values(.flds.) $fld
@@ -535,6 +541,8 @@ proc ::gmaproto::_protocol_send_d {command dargs} {
 					set split_values($fld,value) [dict get $d {*}$fld]
 					incr total_batches [llength $split_values($fld,value)
 					dict set d {*}$fld {}
+					::gmaproto::DEBUG "split off $fld value"
+					::gmaproto::DEBUG "d=$d"
 				} else {
 					# FLD: simple field
 					lappend split_values(.flds.) $fld
@@ -542,6 +550,8 @@ proc ::gmaproto::_protocol_send_d {command dargs} {
 					set split_values($fld,value) [dict get $d {*}$fld]
 					incr total_batches [llength $split_values($fld,value)
 					dict set d {*}$fld {}
+					::gmaproto::DEBUG "split off $fld value"
+					::gmaproto::DEBUG "d=$d"
 				}
 			}
 			set batch 0
@@ -562,19 +572,18 @@ proc ::gmaproto::_protocol_send_d {command dargs} {
 								error "internal error svt-$split_values($fld,type)"
 							}
 						}
-						::gmaproto::_raw_send ::gmaproto::_protocol_encode $command [dict merge $d [dict create \
-							BatchGroup $batch_group Batch $batch TotalBatches $total_batches]]
-						dict set {*}$fld {}
+						::gmaproto::_raw_send [::gmaproto::_protocol_encode $command [dict merge $d [dict create BatchGroup $batch_group Batch $batch TotalBatches $total_batches]]]
+						set d {}
 						incr batch
 					} err]} {
-						::gmaproto::_raw_send ::gmaproto::_protocol_encode $command [dict create BatchGroup $batch_group BatchError "Unable to split into batches: $err" TotalBatches $total_batches Batch $batch]
+						::gmaproto::_raw_send [::gmaproto::_protocol_encode $command [dict create BatchGroup $batch_group BatchError "Unable to split into batches: $err" TotalBatches $total_batches Batch $batch]]
 						::DEBUG 0 "Unable to split $command into batches: $err"
 						return
 					}
 				}
 			}
-			if $batch < $total_batches {
-				::gmaproto::_raw_send ::gmaproto::_protocol_encode $command [dict create BatchGroup $batch_group BatchError "Overestimated total batch count (was $batch, estimated $total_batches) for $command"
+			if {$batch < $total_batches} {
+				::gmaproto::_raw_send [::gmaproto::_protocol_encode $command [dict create BatchGroup $batch_group BatchError "Overestimated total batch count (was $batch, estimated $total_batches) for $command"]]
 				::DEBUG 0 "Overestimated total batch count (was $batch, estimated $total_batches) for $command"
 				return
 			}
@@ -594,22 +603,35 @@ proc ::gmaproto::_protocol_encode_list {objtuple} {
 	return [::gmaproto::_protocol_encode {*}$objtuple]
 }
 
+proc ::gmaproto::payload_format {cmd} {
+	::gmaproto::DEBUG "payload_format $cmd"
+	if {[info exists ::gmaproto::_message_payload($cmd)]} {
+		set fmt $::gmaproto::_message_payload($cmd)
+		::gmaproto::DEBUG "found payload_format $cmd is $fmt"
+		if {[set b [string first .BATCHABLE $fmt]] >= 0} {
+			set fmt [string replace $fmt $b $b+9 $::gmaproto::_message_payload(_batch)]
+			::gmaproto::DEBUG "updated payload_format $cmd to $fmt"
+		}
+		return $fmt
+	}
+	::gmaproto::DEBUG "no payload_format for $cmd"
+	error "undefined protocol message $cmd"
+}
+
 proc ::gmaproto::_protocol_encode {oldcommand kvdict} {
 	set command [::gmaproto::GMATypeToProtocolCommand $oldcommand]
 	#
 	# encode as JSON, eliminating zero fields and ones not mentioned in the protocol spec
 	#
-	if {![info exists ::gmaproto::_message_payload($command)]} {
-		error "protocol command $command is not valid"
-	}
+	set pfmt [::gmaproto::payload_format $command]; # throws error if $command is not valid
 
-	if {[llength $::gmaproto::_message_payload($command)] == 0} {
+	if {[llength $pfmt] == 0} {
 		set message $command
 	} else {
 		::json::write aligned false
 		::json::write indented false
 		set message "$command "
-		append message [::gmaproto::_encode_payload $kvdict $::gmaproto::_message_payload($command)]
+		append message [::gmaproto::_encode_payload $kvdict $pfmt]
 	}
 	return $message
 }
@@ -619,16 +641,14 @@ proc ::gmaproto::_protocol_encode_struct {oldcommand kvdict} {
 	#
 	# encode as JSON, eliminating zero fields and ones not mentioned in the protocol spec
 	#
-	if {![info exists ::gmaproto::_message_payload($command)]} {
-		error "protocol command $command is not valid"
-	}
+	set pfmt [::gmaproto::payload_format $command]; # throws error if $command is not valid
 
-	if {[llength $::gmaproto::_message_payload($command)] == 0} {
+	if {[llength $pfmt] == 0} {
 		set message {}
 	} else {
 		::json::write aligned false
 		::json::write indented false
-		set message [::gmaproto::_encode_payload $kvdict $::gmaproto::_message_payload($command)]
+		set message [::gmaproto::_encode_payload $kvdict $pfmt]
 	}
 	return $message
 }
@@ -1131,6 +1151,7 @@ proc ::gmaproto::_raw_send {message} {
 		return
 	}
 
+	::gmaproto::DEBUG "-> $message"
 	lappend ::gmaproto::send_buffer $message
 	if {[catch {
 		::gmaproto::_transmit
@@ -1298,24 +1319,28 @@ proc ::gmaproto::_parse_data_packet {raw_line} {
 		set json_payload {}
 	}
 
-	if {[info exists ::gmaproto::_message_payload($command)]} {
-		return [list $command [::gmaproto::_construct $json_payload $::gmaproto::_message_payload($command)]]
-	} else {
+	if {[catch {
+		::gmaproto::DEBUG "looking up $command"
+		set pfmt [::gmaproto::payload_format $command]
+	}]} {
+		::gmaproto::DEBUG "falling back to UNDEFINED for $command ($raw_line)"
 		return [list UNDEFINED $raw_line]
+	} else {
+		return [list $command [::gmaproto::_construct $json_payload $pfmt]]
 	}
 
 	return [list ERROR [list {input not handled correctly} $raw_input]]
 }
 
 proc ::gmaproto::new_dict {command args} {
-	return [::gmaproto::_construct [dict create {*}$args] $::gmaproto::_message_payload($command)]
+	return [::gmaproto::_construct [dict create {*}$args] [::gmaproto::payload_format $command]]
 }
 
 proc ::gmaproto::new_dict_from_json {command jsondata} {
-	return [::gmaproto::_construct [::json::json2dict $jsondata] $::gmaproto::_message_payload($command)]
+	return [::gmaproto::_construct [::json::json2dict $jsondata] [::gmaproto::payload_format $command]]
 }
 proc ::gmaproto::json_from_dict {command d} {
-	return [::gmaproto::_encode_payload $d $::gmaproto::_message_payload($command)]
+	return [::gmaproto::_encode_payload $d [::gmaproto::payload_format $command]]
 }
 #
 # _construct input_dict type_dict
@@ -1739,6 +1764,11 @@ proc ::gmaproto::_read_poll {} {
 	if {[dict exists [set d [lindex $res 1]] BatchGroup] && [set batch_group [dict get $d BatchGroup]] ne {}} {
 		# yes, so squirrel this batch away until we've collected them all.
 		# add the batch metadata fields
+		if {![info exists ::gmaproto::_collected_fields($cmd)]} {
+			::DEBUG 0 "Protocol error in $cmd message: appears to be batched but not a message type we support batching operations for. Message rejected."
+			return [list "" ""]
+		}
+
 		set d [::gmaproto::_construct $d $::gmaproto::_message_payload(_batch)]
 		::gmautil::dassigndef $d Batch {batch -1} TotalBatches {total_batches 0} BatchError {batch_error {}}
 		if {$batch_error ne {}} {
@@ -2495,9 +2525,9 @@ proc ::gmaproto::GMATypeToProtocolCommand {gt} {
 # 	or error
 #
 proc ::gmaproto::normalize_dict {cmd d} {
-	if {! [info exists ::gmaproto::_message_payload($cmd)]} {
+	if {[catch {::gmaproto::payload_format $cmd}]} {
 		set cmd [::gmaproto::GMATypeToProtocolCommand $cmd]
-		if {! [info exists ::gmaproto::_message_payload($cmd)]} {
+		if {[catch {::gmaproto::payload_format $cmd}]} {
 			error "can't normalize type $cmd dictionary $d"
 		}
 	}
