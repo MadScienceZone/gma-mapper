@@ -3470,6 +3470,19 @@ is an object with the following fields:
 The slot number. As currently implemented this is a number in the range [0,59] which
 gives the \*(lqcount\*(rq (1/10th second) in the round where this creature may act.
 .TP
+.BI CurrentHP " (int)"
+The creature's current hit point total.
+'\" <</bold-is-fixed>>
+.B "This field is deprecated"
+'\" <<bold-is-fixed>>
+as a way to update or track a creature's health status. Clienct MAY
+use this to display the initiative list in ways that show dying creatures
+differently. Clients MUST use the
+.B OA
+command to change a creature's health attribute when hit points change
+instead of sending the current hit points here. A future version may remove
+support for this field entirely.
+.TP
 .BI Name
 The creature's name as displayed on the map.
 .TP
