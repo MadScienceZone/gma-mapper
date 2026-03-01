@@ -386,8 +386,6 @@ When a message is being sent in batches, the following additional fields are als
 .TP
 .BI Batch " (integer)"
 The batch sequence number for this message payload, starting at 0 and counting sequentially upward. 
-Note that this field may be suppressed for the first batch due to the rule that allows fields to be 
-left out of payloads if their value is zero.
 .TP
 .BI TotalBatches " (integer)"
 The total number of batches to expect.
@@ -414,11 +412,10 @@ The following server comands use this protocol to accumulate the variable attrib
 '\"\z{QueryImage}&\z{AI?}&\z{Sizes}\\
 '\"\z{UpdatePeerList}&\z{CONN}&\z{PeerList}\\
 '\"\z{RollDice}&\z{D}&\z{Recipients}, \z{Targets}\\
-'\"\z{DefineDicePresets}&\z{DD}&\z{Presets}\\
-'\"\z{AddDicePresets}&\z{DD+}&\z{Presets}\\
+'\"\z{DefineDicePresets}&\z{DD}&\z{Presets}, \z{DelegateFor}, \z{Delegates}\\
+'\"\z{AddDicePresets}&\z{DD+}&\z{Presets}, \z{DelegateFor}, \z{Delegates}\\
 '\"\z{UpdateDicePresets}&\z{DD=}&\z{Presets}, \z{DelegateFor}, \z{Delegates}\\
 '\"\z{DefineDiceDelegates}&\z{DDD}&\z{Delegates}\\
-'\"\z{Echo}&\z{ECHO}&\z{o}\\
 '\"\z{HitPointRequest}&\z{HPREQ}&\z{Targets}\\
 '\"\z{UpdateInitiative}&\z{IL}&\z{InitiativeList}\\
 '\"\z{Load}*&\z{LS-}*&\z{Points}\\
@@ -426,7 +423,7 @@ The following server comands use this protocol to accumulate the variable attrib
 '\"\z{AddObjAttributes}&\z{OA+}&\z{Values}\\
 '\"\z{RemoveObjAttributes}&\z{OA-}&\z{Values}\\
 '\"\z{PlaceSomeone}&\z{PS}&\z{Targets}, \z{TargetedModifiers}\\
-'\"\z{RollResult}&\z{ROLL}&\z{Recipients}, \z{Targets}, \z{Result.Details}\\
+'\"\z{RollResult}&\z{ROLL}&\z{Recipients}, \z{Targets}, \z{Result}\\
 '\"\z{PlayAudio}&\z{SOUND}&\z{Addrs}\\
 '\"\z{TimerRequest}&\z{TMRQ}&\z{Targets}\\
 '\"\z{ChatMessage}&\z{TO}&\z{Recipients}\\
@@ -466,11 +463,10 @@ AddImage	AI	Sizes
 QueryImage	AI?	Sizes
 UpdatePeerList	CONN	PeerList
 RollDice	D	Recipients, Targets
-DefineDicePresets	DD	Presets
-AddDicePresets	DD+	Presets
+DefineDicePresets	DD	Presets, DelegateFor, Delegates
+AddDicePresets	DD+	Presets, DelegateFor, Delegates
 UpdateDicePresets	DD=	Presets, DelegateFor, Delegates
 DefineDiceDelegates	DDD	Delegates
-Echo	ECHO	o
 HitPointRequest	HPREQ	Targets
 UpdateInitiative	IL	InitiativeList
 Load*	LS-*	Points
@@ -478,7 +474,7 @@ UpdateObjAttributes	OA	NewAttrs
 AddObjAttributes	OA+	Values
 RemoveObjAttributes	OA-	Values
 PlaceSomeone	PS	Targets, TargetedModifiers
-RollResult	ROLL	Recipients, Targets, Result.Details
+RollResult	ROLL	Recipients, Targets, Result
 PlayAudio	SOUND	Addrs
 TimerRequest	TMRQ	Targets
 ChatMessage	TO	Recipients
@@ -3469,6 +3465,19 @@ is an object with the following fields:
 .BI Slot " (int)"
 The slot number. As currently implemented this is a number in the range [0,59] which
 gives the \*(lqcount\*(rq (1/10th second) in the round where this creature may act.
+'\" <<Warning>>
+.TP
+.BI CurrentHP " (int)"
+The creature's current hit point total.
+'\" <</bold-is-fixed>>
+.B "This field is deprecated."
+'\" <<bold-is-fixed>>
+Clients MUST use the
+.B OA
+command to change a creature's health attribute when hit points change
+instead of sending the current hit points here. A future version will remove
+support for this field.
+'\" <</Warning>>
 .TP
 .BI Name
 The creature's name as displayed on the map.
@@ -5132,11 +5141,6 @@ This document defines map protocol version 423,
 which adds the
 .B TargetedModifiers
 attribute to creatures and introduced the concept of payload splitting for large data sizes.
-It also removed the deprecated
-.B CurrentHP
-field fromm the
-.B IL
-message.
 .LP
 Historically, protocol version 422
 added the explicit
