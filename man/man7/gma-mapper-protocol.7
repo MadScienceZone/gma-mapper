@@ -1031,14 +1031,23 @@ MUST be broken into smaller fragments to be sent as separate messages so that no
 individual one exceeds the maximum length. To accomplish this, the fragments
 are each sent inside a
 .B BATCH
-message group, each of which share a common
-.B ID
-field. The JSON-encoded payload of a
+message group.
+The JSON-encoded payload of a
 .B BATCH
 message includes the following fields:
 '\" <<list>>
 .RS
 '\" <</ital-is-var>>
+.TP
+.B ID
+A unique identifier for this batch (typically a generated UUID, but can be
+anything as long as it uniquely identifies a batch of messages amongst any
+and all other batches which may be active on the server). All
+.B BATCH
+messages containing fragments of the same original message MUST have the
+same
+.B ID
+field so they will be associated together.
 .TP
 .BI Batch " (integer)"
 The batch sequence number for this fragment, starting at 0 and counting 
@@ -1048,9 +1057,6 @@ value is zero.
 .TP
 .BI Total " (integer)"
 The total number of batches to expect.
-The receiver should assemble the batches in order of the
-.B Batch
-fields to aggregate their collection of whatever data array value the payload is being reported by that command.
 Once the receiver has received this many fragments, it MUST assemble the collected
 fragments and proceed to interpret the reconstructed message. There is no other
 indication that the batch is complete.
@@ -1108,7 +1114,11 @@ would exceed 60K (i.e., 60\(mu1024) total bytes, including command name, spaces,
 .LP
 Fragments MAY arrive in any order, and may have other messages arrive between
 them. The receiver MAY choose to abandon partially-received batches if they
-haven't been completed after a reasonable amount of time has elapsed.
+haven't been completed after a reasonable amount of time has elapsed (where
+the definition of \*(lqreasonable\*(rq is up to the receiver to determine
+based on the resources it has to devote to storing partial messages as they
+are being collected).
+.RE
 '\" <</New>>
 .TP
 .B CC
