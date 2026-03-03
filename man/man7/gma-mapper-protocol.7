@@ -1050,13 +1050,19 @@ same
 .B ID
 field so they will be associated together.
 .TP
-.BI Batch " (integer)"
+.B Command
+The name of the original command that was being sent. This SHOULD only
+be included in the first fragment (where the
+.B Part
+field has the value 0).
+.TP
+.BI Part " (integer)"
 The batch sequence number for this fragment, starting at 0 and counting 
 sequentially upward.  Note that this field may be suppressed for the first 
 batch due to the rule that allows fields to be left out of payloads if their 
 value is zero.
 .TP
-.BI Total " (integer)"
+.BI Of " (integer)"
 The total number of batches to expect.
 Once the receiver has received this many fragments, it MUST assemble the collected
 fragments and proceed to interpret the reconstructed message. There is no other
@@ -1068,47 +1074,50 @@ and that the sender does not intend to continue transmitting the remaining
 fragments. The value of this field also provides the reason for this decision.
 .TP
 .B Data
-The fragment of the original message. This is a base-64 encoding of the JSON text
-such that when all the fragments are concatenated in order of their
-.B Batch
-fields and then base-64 decoded, the result will be identical to the original
-message's JSON payload string again.
+The fragment of the original message. This is a raw byte sequence sliced out
+of the original JSON-encoded payload, encoded as base-64 for transport in the
+.B BATCH
+message. The base-64 encoding is for each individual
+.B BATCH
+message; it is the underlying binary bytes that are then concatenated when
+the completed batch is received that will result in the reconstruction of
+the original JSON payload again.
 '\" <</>>
 '\" <<ital-is-var>>
-.LP
-.LP
-For example, the single server message
-.na
-.nf
-.ft C
-CONN {"PeerList": [{"Addr": "10.10.10.1 1234", "User": "Alice", "Client": 
-"mapper 1.23.45"}, {"Addr": "10.10.10.2 1235", "User": "Bob", "Client": 
-"mapper 1.23.45"}, {"Addr": "10.10.10.3 1236", "User": "Charlie", "Client": 
-"mapper 1.23.45"}]}
-.ft
-.ad
-.fi
-.LP
-Is semantically equivalent to the set of server messages
-.na
-.nf
-.ft C
-BATCH {"ID": "b1a6ebdc", "Batch": 0, "Total": 5, "Data":
-"eyJQZWVyTGlzdCI6IFt7IkFkZHIiOiAiMTAuMTAuMTAuMSAxMjM0IiwgIlVzZXIi"}
-BATCH {"ID": "b1a6ebdc", "Batch": 1, "Total": 5, "Data":
-"OiAiQWxpY2UiLCAiQ2xpZW50IjoibWFwcGVyIDEuMjMuNDUifSwgeyJBZGRyIjogI"}
-BATCH {"ID": "b1a6ebdc", "Batch": 2, "Total": 5, "Data":
-"jEwLjEwLjEwLjIgMTIzNSIsICJVc2VyIjogIkJvYiIsICJDbGllbnQiOiJtYXBwZX"}
-BATCH {"ID": "b1a6ebdc", "Batch": 3, "Total": 5, "Data":
-"IgMS4yMy40NSJ9LCB7IkFkZHIiOiAiMTAuMTAuMTAuMyAxMjM2IiwgIlVzZXIiOiA"}
-BATCH {"ID": "b1a6ebdc", "Batch": 4, "Total": 5, "Data":
-"iQ2hhcmxpZSIsICJDbGllbnQiOiJtYXBwZXIgMS4yMy40NSJ9XX0="}
-.ft
-.ad
-.fi
-.LP
-(Obviously in practice you wouldn't break them into such tiny fragments; this
-was done here for simplicity of illustration.)
+'\".LP
+'\".LP
+'\"For example, the single server message
+'\".na
+'\".nf
+'\".ft C
+'\"CONN {"PeerList": [{"Addr": "10.10.10.1 1234", "User": "Alice", "Client": 
+'\""mapper 1.23.45"}, {"Addr": "10.10.10.2 1235", "User": "Bob", "Client": 
+'\""mapper 1.23.45"}, {"Addr": "10.10.10.3 1236", "User": "Charlie", "Client": 
+'\""mapper 1.23.45"}]}
+'\".ft
+'\".ad
+'\".fi
+'\".LP
+'\"Is semantically equivalent to the set of server messages
+'\".na
+'\".nf
+'\".ft C
+'\"BATCH {"ID": "b1a6ebdc", "Batch": 0, "Total": 5, "Data":
+'\""eyJQZWVyTGlzdCI6IFt7IkFkZHIiOiAiMTAuMTAuMTAuMSAxMjM0IiwgIlVzZXIi"}
+'\"BATCH {"ID": "b1a6ebdc", "Batch": 1, "Total": 5, "Data":
+'\""OiAiQWxpY2UiLCAiQ2xpZW50IjoibWFwcGVyIDEuMjMuNDUifSwgeyJBZGRyIjogI"}
+'\"BATCH {"ID": "b1a6ebdc", "Batch": 2, "Total": 5, "Data":
+'\""jEwLjEwLjEwLjIgMTIzNSIsICJVc2VyIjogIkJvYiIsICJDbGllbnQiOiJtYXBwZX"}
+'\"BATCH {"ID": "b1a6ebdc", "Batch": 3, "Total": 5, "Data":
+'\""IgMS4yMy40NSJ9LCB7IkFkZHIiOiAiMTAuMTAuMTAuMyAxMjM2IiwgIlVzZXIiOiA"}
+'\"BATCH {"ID": "b1a6ebdc", "Batch": 4, "Total": 5, "Data":
+'\""iQ2hhcmxpZSIsICJDbGllbnQiOiJtYXBwZXIgMS4yMy40NSJ9XX0="}
+'\".ft
+'\".ad
+'\".fi
+'\".LP
+'\"(Obviously in practice you wouldn't break them into such tiny fragments; this
+'\"was done here for simplicity of illustration.)
 .LP
 Clients and servers SHOULD use this method to break up large messages. They MUST not send message payloads which
 would exceed 60K (i.e., 60\(mu1024) total bytes, including command name, spaces, and terminating newline.
