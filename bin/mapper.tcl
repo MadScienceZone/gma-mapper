@@ -15665,17 +15665,24 @@ proc AddToObjectAttribute {id key vlist} {
 	lassign $idlist a id datatype
 	global $a
 
-	if {![dict exists [set ${a}($id)] $key]} {
+	set keys [split $key .]
+	if {![dict exists [set ${a}($id)] {*}$keys]} {
 		DEBUG 0 "Attempt to access field $key in object $id but type $datatype has no such field."
 		return
 	}
 	DEBUG 4 "Adding values to object $id.$key (in $a) from $vlist"
 	foreach v $vlist {
-		if {[lsearch -exact [dict get [set ${a}($id)] $key] $v] < 0} {
-			dict lappend ${a}($id) $key $v
+		if {[lsearch -exact [dict get [set ${a}($id)] {*}$keys] $v] < 0} {
+			if {[llength $keys] > 1} {
+				set l [dict get [set ${a}($id)] {*}$keys]
+				lappend l $v
+				dict set [set ${a}($id)] {*}$keys $l
+			} else {
+				dict lappend ${a}($id) $key $v
+			}
 		}
 	}
-	DEBUG 4 "New value is [dict get [set ${a}($id)] $key]"
+	DEBUG 4 "New value is [dict get [set ${a}($id)] {*}$keys]"
 }
 	
 proc RemoveFromObjectAttribute {id key vlist} {
@@ -15685,18 +15692,19 @@ proc RemoveFromObjectAttribute {id key vlist} {
 	lassign $idlist a id datatype
 	global $a
 
-	if {![dict exists [set ${a}($id)] $key]} {
+	set keys [split $key .]
+	if {![dict exists [set ${a}($id)] {*}$keys]} {
 		DEBUG 0 "Attempt to access field $key in object $id but type $datatype has no such field."
 		return
 	}
 
 	DEBUG 4 "Removing values from object $id.$key from $vlist"
 	foreach v $vlist {
-		if {[set index [lsearch -exact [dict get [set ${a}($id)] $key] $v]] >= 0} {
-			dict set ${a}($id) $key [lreplace [dict get [set ${a}($id)] $key] $index $index]
+		if {[set index [lsearch -exact [dict get [set ${a}($id)] {*}$keys] $v]] >= 0} {
+			dict set ${a}($id) {*}$keys [lreplace [dict get [set ${a}($id)] {*}$keys] $index $index]
 		}
 	}
-	DEBUG 4 "New value is [dict get [set ${a}($id)] $key]"
+	DEBUG 4 "New value is [dict get [set ${a}($id)] {*}$keys]"
 }
 
 # @name|id -> {arrayname id commandtype} or {}
@@ -15743,6 +15751,7 @@ proc SetObjectAttribute {id kvlist} {
 
 	DEBUG 4 "Changing attributes of object $id from $kvlist"
 	foreach {k v} $kvlist {
+		set keys [split $k .]
 		if {$datatype eq "PS" && $k eq "CustomReach"} {
 			set v [::gmaproto::new_dict CustomReach {*}$v]
 		}
@@ -15776,13 +15785,13 @@ proc SetObjectAttribute {id kvlist} {
 				DEBUG 5 "-Changed ID reverse pointer MOBid($old_name) to MOBid($v)=$id"
 			}
 		}
-		if {![dict exists [set ${a}($id)] $k]} {
+		if {![dict exists [set ${a}($id)] {*}$keys]} {
 			DEBUG 0 "Attempt to set field $k in object $id but type $datatype has no such field."
 		} else {
 			if {$k eq {AoE} && $v eq {null}} {
 				set v {}
 			}
-			dict set ${a}($id) $k $v
+			dict set ${a}($id) {*}$keys $v
 			DEBUG 5 "-$a $id $k <- $v"
 		}
 	}
