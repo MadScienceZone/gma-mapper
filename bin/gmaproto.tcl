@@ -518,17 +518,10 @@ proc ::gmaproto::_protocol_encode_list {objtuple} {
 }
 
 proc ::gmaproto::payload_format {cmd} {
-	::gmaproto::DEBUG "payload_format $cmd"
 	if {[info exists ::gmaproto::_message_payload($cmd)]} {
 		set fmt $::gmaproto::_message_payload($cmd)
-		::gmaproto::DEBUG "found payload_format $cmd is $fmt"
-		if {[set b [string first .BATCHABLE $fmt]] >= 0} {
-			set fmt [string replace $fmt $b $b+9 $::gmaproto::_message_payload(_batch)]
-			::gmaproto::DEBUG "updated payload_format $cmd to $fmt"
-		}
 		return $fmt
 	}
-	::gmaproto::DEBUG "no payload_format for $cmd"
 	error "undefined protocol message $cmd"
 }
 
@@ -1728,7 +1721,6 @@ proc ::gmaproto::_read_poll {} {
 		}
 		return [list "" ""]
 	}
-	::DEBUG 0 "not batched; $cmd"
 	return $res
 }
 
