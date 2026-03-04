@@ -229,19 +229,19 @@ since all communications are asynchronous.
 '\"  \z{LS-ARC} &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Add an arc to the map\\
 '\"  \z{LS-CIRC}&C$\leftrightarrow$S&---        &no &\acronym{JSON}&Add an ellipse to the map\\
 '\"  \z{LS-LINE}&C$\leftrightarrow$S&---        &no &\acronym{JSON}&Add a line to the map\\
-'\"  \z{LS-POLY}&C$\leftrightarrow$S&---        &no &\acronym{JSON}&Add a polygon to the map\\
-'\"  \z{LS-RECT}&C$\leftrightarrow$S&---        &no &\acronym{JSON}&Add a rectangle to the map\\
-'\"  \z{LS-SAOE}&C$\leftrightarrow$S&---        &no &\acronym{JSON}&Add an area of effect to the map\\
-'\"  \z{LS-TEXT}&C$\leftrightarrow$S&---        &no &\acronym{JSON}&Add some text to the map\\
-'\"  \z{LS-TILE}&C$\leftrightarrow$S&---        &no &\acronym{JSON}&Add a graphic tile to the map\\
-'\"  \z{MARCO}  &C$\leftarrow$S     &\z{POLO}   &N/A&none          &Check if client is alive\\
+'\"  \z{LS-POLY}&C$\leftrightarrow$S&---        &no &\acronym{JSON}&Add a polygon to the map\\\bottomrule
 '\" \end{tabular}
 '\" \caption{Summary of Client/Server Messages}\label{tbl:mapper:6:messages}
 '\"\end{table}
 '\"\begin{table}
 '\" \begin{tabular}{lcllll}\toprule
 '\"  {\bfseries Command}&{\bfseries C$\leftrightarrow$S}&{\bfseries Reply}&{\bfseries Priv}&{\bfseries Data}&{\bfseries Description}\\\midrule
-'\"  \z{MARK}   &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Visually mark a spot\\\bottomrule
+'\"  \z{LS-RECT}&C$\leftrightarrow$S&---        &no &\acronym{JSON}&Add a rectangle to the map\\
+'\"  \z{LS-SAOE}&C$\leftrightarrow$S&---        &no &\acronym{JSON}&Add an area of effect to the map\\
+'\"  \z{LS-TEXT}&C$\leftrightarrow$S&---        &no &\acronym{JSON}&Add some text to the map\\
+'\"  \z{LS-TILE}&C$\leftrightarrow$S&---        &no &\acronym{JSON}&Add a graphic tile to the map\\
+'\"  \z{MARCO}  &C$\leftarrow$S     &\z{POLO}   &N/A&none          &Check if client is alive\\
+'\"  \z{MARK}   &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Visually mark a spot\\
 '\"  \z{POLO}   &C$\rightarrow$S    &---        &no &none          &Acknowledge server's ping\\
 '\"  \z{PRIV}   &C$\leftarrow$S     &---        &N/A&\acronym{JSON}&Privileged command denied\\
 '\"  \z{PROGRESS}&C$\leftrightarrow$S&---       &no &\acronym{JSON}&Indicate progress on task\\
