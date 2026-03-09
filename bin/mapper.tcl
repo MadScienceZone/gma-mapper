@@ -6455,10 +6455,10 @@ proc CreatureStatusMarker {w id x y s calc_condition} {
 
 	set tags "mob MF#$id M#$id MN#$id allMOB"
 
-	_DrawCreatureStatusMarkers $w $x $y $s $tags $conditions {}
+	_DrawCreatureStatusMarkers $w $x $y $s $tags $conditions $id {}
 }
 
-proc _DrawCreatureStatusMarkers {w x y s tags conditions {customlist {}}} {
+proc _DrawCreatureStatusMarkers {w x y s tags conditions id {customlist {}}} {
 	global MOBdata MarkerColor MarkerShape
 
 	set Vo   0; # V triangle around token full size
