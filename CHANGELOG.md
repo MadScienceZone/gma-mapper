@@ -3,8 +3,8 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.36.7          <!-- @@##@@ -->
- * Effective Date: 08-Feb-2026               <!-- @@##@@ -->
+ * This Package Version: 4.36.8          <!-- @@##@@ -->
+ * Effective Date: 24-Feb-2026               <!-- @@##@@ -->
 
 ## Compatibility
  * GMA Core API Library Version: 6.42 <!-- @@##@@ -->
@@ -17,9 +17,11 @@ The support for old server protocols (<400) and map file formats (<20) will be d
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
-# 4.36.8-beta
+# 4.36.8
 ## Fixes
  * No longer loads images advertised to the client via server `AI` commands into memory, so the client can update its cache to have map images ready to use before a game session without filling up all of RAM in the process.
+ * Moved custom colorized die-roll labels to accessibility features.
+ * No longer assumes it can auto-set creature tokens to "killed" state based on hit points. Now follows the GMA program's central management on creature's dying/living/regeneration status.
 
 # 4.36.7
 ## Fixes

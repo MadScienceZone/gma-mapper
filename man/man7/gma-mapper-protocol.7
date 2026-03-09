@@ -3978,6 +3978,37 @@ attribute, including
 The 
 .B mapper
 client itself does this correctly starting with version 3.39.
+'\" <<New>>
+.LP
+Attribute names may be hierarchical, where an attribute is actually a complex structure
+containing sub-fields. In this case, the attribute name as specified in the keys of the
+.B NewAttrs
+field object use dot notation to separate each level of name to indicate the nested level
+of field names within the attribute. For example, You can use the
+.B OA
+server message to set a creture's 
+.B Health
+attribute by naming just the attribute as 
+.RB \*(lq Health \*(rq,
+giving its value as a data structure containing all of its sub-fields (with any
+unnamed fields taking default values, since you're assigning a new value to
+.B Health
+as a whole here), or you may directly change the value of the creature's current
+number of lethal wound points by naming the attribute as
+.RB \*(lq Health.LethalDamage \*(rq
+and giving the integer number of hit points as its value. This updates just that field
+in the
+.B Health
+attribute structure without changing anything else in it.
+.LP
+This is also true for naming attributes in the
+.B AttrName
+fields of the
+.B OA+
+and
+.B OA\-
+server messages.
+'\" <</New>>
 .RE
 .TP
 .B OA+

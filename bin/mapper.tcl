@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       ______    ______     ______      #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ____ \   / ___  \     #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \( (    \/   \/   )  )    #
-# | |      | || || || (___) | Assistant  / (_) (_       ___) /| (____         /  /     #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( |  ___ \       /  /      #
-# | | \_  )| |   | || (   ) | VTT            ) (           ) \| (   ) )     /  /       #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /( (___) ) _  /  /        #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/  \_____/ (_) \_/         #
+#  _______  _______  _______                ___       ______    ______      _____      #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ____ \    / ___ \     #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \( (    \/   ( (___) )    #
+# | |      | || || || (___) | Assistant  / (_) (_       ___) /| (____      \     /     #
+# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( |  ___ \     / ___ \     #
+# | | \_  )| |   | || (   ) | VTT            ) (           ) \| (   ) )   ( (   ) )    #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /( (___) ) _ ( (___) )    #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/  \_____/ (_) \_____/     #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -17,7 +17,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.36.8-beta}     ;# @@##@@
+set GMAMapperVersion {4.36.8}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {422}         ;# @@##@@
 set CoreVersionNumber {6.42}            ;# @@##@@
@@ -7334,25 +7334,25 @@ proc RenderSomeone {w id {norecurse false} args} {
 		}
 
 
-		# TODO This either needs to move to GMA to determine when to set the Killed
-		# attribute, or GMA needs to send more details over to make this decision
-		# more accurately.
 		if {$its_dead_jim} {
 			set condition {}
 		} elseif {$condition eq {}} {
 			# calculate condition automatically, otherwise it's forced
-			if {$effective_hp <= 0 || ($true_hp_remaining <= -$grace)} { 
-				set condition dead 
+			# We no longer set the dead condition on our own. GMA will do that for us becuase
+			# we can't take into account all the rules in play for this.
+			#if {$effective_hp <= 0 || ($true_hp_remaining <= -$grace)} { 
+			#	set condition dead 
 				# We're making the change locally here instead of broadcasting it out
 				# because all the other map clients will be acting on the same logic
 				# themselves and we don't need a storm of "this creature died" messages.
-				dict set MOBdata($id) Killed true
-				set its_dead_jim true
+			#	dict set MOBdata($id) Killed true
+			#	set its_dead_jim true
 				# Oh, no! We're already past the point where this would have been
 				# useful to know. Start over and re-render them as a corpse this time.
-				RenderSomeone $w $id
-				return
-			} elseif {$true_hp_remaining < 0} {
+			#	RenderSomeone $w $id
+			#	return
+			#} else
+			if {$true_hp_remaining < 0} {
 				set condition dying
 			} elseif {$nonlethal > $true_hp_remaining} {
 				set condition unconscious
@@ -11456,7 +11456,7 @@ proc DoCommandLoginSuccessful {} {
 	if {[dict get $_preferences colorize_die_rolls]} {
 		lappend feature_set DICE-COLOR-BOXES
 	}
-	if {[dict get $_preferences colorize_die_labels]} {
+	if {[dict get $_preferences a11y colorize_die_labels]} {
 		lappend feature_set DICE-COLOR-LABELS
 	}
 	::gmaproto::allow $feature_set
@@ -15718,17 +15718,24 @@ proc AddToObjectAttribute {id key vlist} {
 	lassign $idlist a id datatype
 	global $a
 
-	if {![dict exists [set ${a}($id)] $key]} {
+	set keys [split $key .]
+	if {![dict exists [set ${a}($id)] {*}$keys]} {
 		DEBUG 0 "Attempt to access field $key in object $id but type $datatype has no such field."
 		return
 	}
 	DEBUG 4 "Adding values to object $id.$key (in $a) from $vlist"
 	foreach v $vlist {
-		if {[lsearch -exact [dict get [set ${a}($id)] $key] $v] < 0} {
-			dict lappend ${a}($id) $key $v
+		if {[lsearch -exact [dict get [set ${a}($id)] {*}$keys] $v] < 0} {
+			if {[llength $keys] > 1} {
+				set l [dict get [set ${a}($id)] {*}$keys]
+				lappend l $v
+				dict set [set ${a}($id)] {*}$keys $l
+			} else {
+				dict lappend ${a}($id) $key $v
+			}
 		}
 	}
-	DEBUG 4 "New value is [dict get [set ${a}($id)] $key]"
+	DEBUG 4 "New value is [dict get [set ${a}($id)] {*}$keys]"
 }
 	
 proc RemoveFromObjectAttribute {id key vlist} {
@@ -15738,18 +15745,19 @@ proc RemoveFromObjectAttribute {id key vlist} {
 	lassign $idlist a id datatype
 	global $a
 
-	if {![dict exists [set ${a}($id)] $key]} {
+	set keys [split $key .]
+	if {![dict exists [set ${a}($id)] {*}$keys]} {
 		DEBUG 0 "Attempt to access field $key in object $id but type $datatype has no such field."
 		return
 	}
 
 	DEBUG 4 "Removing values from object $id.$key from $vlist"
 	foreach v $vlist {
-		if {[set index [lsearch -exact [dict get [set ${a}($id)] $key] $v]] >= 0} {
-			dict set ${a}($id) $key [lreplace [dict get [set ${a}($id)] $key] $index $index]
+		if {[set index [lsearch -exact [dict get [set ${a}($id)] {*}$keys] $v]] >= 0} {
+			dict set ${a}($id) {*}$keys [lreplace [dict get [set ${a}($id)] {*}$keys] $index $index]
 		}
 	}
-	DEBUG 4 "New value is [dict get [set ${a}($id)] $key]"
+	DEBUG 4 "New value is [dict get [set ${a}($id)] {*}$keys]"
 }
 
 # @name|id -> {arrayname id commandtype} or {}
@@ -15796,6 +15804,7 @@ proc SetObjectAttribute {id kvlist} {
 
 	DEBUG 4 "Changing attributes of object $id from $kvlist"
 	foreach {k v} $kvlist {
+		set keys [split $k .]
 		if {$datatype eq "PS" && $k eq "CustomReach"} {
 			set v [::gmaproto::new_dict CustomReach {*}$v]
 		}
@@ -15829,13 +15838,13 @@ proc SetObjectAttribute {id kvlist} {
 				DEBUG 5 "-Changed ID reverse pointer MOBid($old_name) to MOBid($v)=$id"
 			}
 		}
-		if {![dict exists [set ${a}($id)] $k]} {
+		if {![dict exists [set ${a}($id)] {*}$keys]} {
 			DEBUG 0 "Attempt to set field $k in object $id but type $datatype has no such field."
 		} else {
 			if {$k eq {AoE} && $v eq {null}} {
 				set v {}
 			}
-			dict set ${a}($id) $k $v
+			dict set ${a}($id) {*}$keys $v
 			DEBUG 5 "-$a $id $k <- $v"
 		}
 	}
@@ -17869,7 +17878,7 @@ proc AreMobsInCustomList {mob_list condition targeter} {
 #
 #  called when rendering somone or advancing the initiative turn or updating target attribute
 #
-# @[00]@| GMA-Mapper 4.36.7
+# @[00]@| GMA-Mapper 4.36.8
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2026 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
