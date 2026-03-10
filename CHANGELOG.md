@@ -3,19 +3,31 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.36.8          <!-- @@##@@ -->
- * Effective Date: 24-Feb-2026               <!-- @@##@@ -->
+ * This Package Version: 4.37.0          <!-- @@##@@ -->
+ * Effective Date: 09-Mar-2026               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.42 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.43 <!-- @@##@@ -->
  * GMA Mapper File Format: 23	     <!-- @@##@@ -->
- * GMA Mapper Protocol: 422        <!-- @@##@@ -->
+ * GMA Mapper Protocol: 423        <!-- @@##@@ -->
  * GMA Mapper Preferences File Format: 13 <!-- @@##@@ -->
 
 ## DEPRECATION NOTICE
 The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.37
+## Fixes
+ * Removed a bunch of old dead code that supported pre-400 server protocol commands which haven't been used in a long time.
+
+### Enhancements
+ * Implements server protocol 423.
+   * Handles larger message sizes which previously caused issues for some clients when handling large data payloads.
+ * Setting object attributes in multi-level structures now supported via dot notation in attribute names.
+
+### WIP
+ * Experimental features in progress are in the code but not yet available for use.
 
 # 4.36.8
 ## Fixes

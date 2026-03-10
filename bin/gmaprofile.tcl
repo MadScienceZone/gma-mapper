@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___       ______    ______      _____      #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ____ \    / ___ \     #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \( (    \/   ( (___) )    #
-# | |      | || || || (___) | Assistant  / (_) (_       ___) /| (____      \     /     #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( |  ___ \     / ___ \     #
-# | | \_  )| |   | || (   ) | VTT            ) (           ) \| (   ) )   ( (   ) )    #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /( (___) ) _ ( (___) )    #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/  \_____/ (_) \_____/     #
+#  _______  _______  _______                ___       ______   ______      _______     #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \ / ___  \    (  __   )    #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \\/   )  )   | (  )  |    #
+# | |      | || || || (___) | Assistant  / (_) (_       ___) /    /  /    | | /   |    #
+# | | ____ | |(_)| ||  ___  |           (____   _)     (___ (    /  /     | (/ /) |    #
+# | | \_  )| |   | || (   ) | VTT            ) (           ) \  /  /      |   / | |    #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  / /  /     _ |  (__) |    #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/  \_/     (_)(_______)    #
 #                                                                                      #
 ########################################################################################
 # Profile editor
@@ -223,7 +223,7 @@ namespace eval ::gmaprofile {
 					offset i
 				}}
 			}}
-			markers {D {
+			markers {*D {
 				modifiers l
 				color s
 				shape s
@@ -960,7 +960,7 @@ namespace eval ::gmaprofile {
 		$st add $st.r -state normal -sticky news -text {Die Rolls/Chat}
 		$st add $st.c -state normal -sticky news -text Colors
 		$st add $st.cl -state normal -sticky news -text Clocks
-		$st add $st.m -state normal -sticky news -text Markers
+		$st add $st.m -state disabled -sticky news -text Markers
 		menu $st.m.shapemenu -postcommand "::gmaprofile::_update_marker_shape_menu [list $st $st.m.shapemenu]"
 #		variable __marker_shapes
 #		foreach {symbol label} [array get __marker_shapes] {
@@ -1007,7 +1007,7 @@ namespace eval ::gmaprofile {
 		#XXX modifiers color shape description dashpattern
 		#_select_marker_by_name $st {}
 		foreach marker [dict keys [dict get $_profile styles markers]] {
-			$st.m.markers insert end $marker
+			$st.m.markers insert end [::_S $marker]
 		}
 
 
@@ -1377,12 +1377,12 @@ namespace eval ::gmaprofile {
 	proc _add_new_marker {w} {
 		variable _profile
 		if {[::getstring::tk_getString $w.new_marker_name newname {Name of new marker} -geometry [::parent_geometry_ctr $w]] && $newname ne {}} {
-			if {[dict exists $_profile marker $newname]} {
+			if {[dict exists $_profile marker [::S_ $newname]]} {
 				tk_messageBox -type ok -icon error -title "Duplicate name" -message "You tried to add a marker called \"$newname\" but that name already exists in the marker set." -parent $w
 				return
 			}
 			$w.n.s.n.m.markers insert end $newname
-			dict set _profile styles markers $newname [dict create\
+			dict set _profile styles markers [::S_ $newname] [dict create\
 				modifiers {}\
 				color black\
 				shape {O}\
@@ -1427,14 +1427,14 @@ namespace eval ::gmaprofile {
 			tk_messageBox -type ok -icon error -title "No current selection" -message "You can't make a copy of a marker without first selecting the marker to copy from." -parent $w
 			return
 		}
-		set srcdata [dict get $_profile styles markers $srcmarker]
+		set srcdata [dict get $_profile styles markers [::S_ $srcmarker]]
 		if {[::getstring::tk_getString $w.new_marker_name newname "Name of new marker (copy of $srcmarker)" -geometry [::parent_geometry_ctr $w]] && $newname ne {}} {
-			if {[dict exists $_profile styles markers $newname]} {
+			if {[dict exists $_profile styles markers [::S_ $newname]]} {
 				tk_messageBox -type ok -icon error -title "Duplicate name" -message "You tried to add a marker called \"$newname\" but that name already exists in the marker set." -parent $w
 				return
 			}
 			$lb insert end $newname
-			dict set _profile styles markers $newname $srcdata
+			dict set _profile styles markers [::S_ $newname] $srcdata
 			$lb selection clear 0 end
 			$lb selection set end
 			_select_marker_by_name $st $newname
@@ -1449,7 +1449,7 @@ namespace eval ::gmaprofile {
 			tk_messageBox -type ok -icon error -title "No current selection" -message "You can't delete a marker without first selecting which one you want to delete." -parent $w
 			return
 		}
-		if {![dict exists $_profile styles markers $srcmarker]} {
+		if {![dict exists $_profile styles markers [::S_ $srcmarker]]} {
 			tk_messageBox -type ok -icon error -title "No such marker name" -message "You tried to delete a marker called \"$srcmarker\" but that name does not exist in the marker set." -parent $w
 			return
 		}
@@ -1460,19 +1460,19 @@ namespace eval ::gmaprofile {
 		$lb delete [lindex $idx 0]
 		$lb selection clear 0 end
 		_select_marker_by_name $st {}
-		dict unset _profile styles markers $srcmarker
+		dict unset _profile styles markers [::S_ $srcmarker]
 	}
 	proc _set_marker_mods {st e v} {
 		variable _profile
 		if {[set markername [_selected_marker_name $st.m.markers]] ne {}} {
-			dict set _profile styles markers $markername modifiers $v 
+			dict set _profile styles markers [::S_ $markername] modifiers $v 
 		}
 		return 1
 	}
 	proc _set_marker_desc {st e v} {
 		variable _profile
 		if {[set markername [_selected_marker_name $st.m.markers]] ne {}} {
-			dict set _profile styles markers $markername description $v 
+			dict set _profile styles markers [::S_ $markername] description $v 
 		}
 		return 1
 	}
@@ -1490,7 +1490,7 @@ namespace eval ::gmaprofile {
 	proc _push_marker {w name} {
 		variable _profile
 		global marker_mods marker_desc marker_shape marker_dash marker_color
-		if {$name eq {} || ![dict exists $_profile styles markers $name]} {
+		if {$name eq {} || ![dict exists $_profile styles markers [::S_ $name]]} {
 			$w.mods configure -state disabled
 			$w.desc configure -state disabled
 			$w.shape configure -state disabled
@@ -1508,7 +1508,7 @@ namespace eval ::gmaprofile {
 			$w.shape configure -state normal
 			$w.dash configure -state normal
 			$w.color configure -state normal
-			::gmautil::dassign [dict get $_profile styles markers $name] modifiers marker_mods description marker_desc shape m_shape dashpattern m_dash color marker_color
+			::gmautil::dassign [dict get $_profile styles markers [::S_ $name]] modifiers marker_mods description marker_desc shape m_shape dashpattern m_dash color marker_color
 			::gmaprofile::_marker_dashpattern $w $m_dash $name
 			::gmaprofile::_marker_shape $w $m_shape $name
 			::gmaprofile::_set_marker_color $w $w.color $marker_color
@@ -1530,8 +1530,8 @@ namespace eval ::gmaprofile {
 			global marker_color
 			global marker_shape
 			variable _profile
-			set shape [dict get $_profile styles markers $name shape]
-			::_DrawCreatureStatusMarkers $tab.c 25 25 100 [list Sample__Marker] {} [list [list $shape $marker_color $marker_dash]]
+			set shape [dict get $_profile styles markers [::S_ $name] shape]
+			::_DrawCreatureStatusMarkers $tab.c 25 25 100 [list Sample__Marker] {} {} [list [list $shape $marker_color $marker_dash]]
 		}
 	}
 
@@ -1550,7 +1550,7 @@ namespace eval ::gmaprofile {
 
 		if {$name ne {}} {
 			variable _profile
-			dict set _profile styles markers $name shape $shape
+			dict set _profile styles markers [::S_ $name] shape $shape
 		}
 		_draw_marker $tab $name
 	}
@@ -1559,7 +1559,7 @@ namespace eval ::gmaprofile {
 		set marker_dash $pat
 		if {$name ne {}} {
 			variable _profile
-			dict set _profile styles markers $name dashpattern $marker_dash
+			dict set _profile styles markers [::S_ $name] dashpattern $marker_dash
 		}
 		_draw_marker $tab $name
 	}
@@ -1577,10 +1577,10 @@ namespace eval ::gmaprofile {
 				-highlightcolor $chosencolor -highlightbackground $chosencolor -highlightthickness 2
 
 			if {[set markername [_selected_marker_name $s.markers]] ne {}} {
-				dict set _profile styles markers $markername color $chosencolor 
+				dict set _profile styles markers [::S_ $markername] color $chosencolor 
 			}
+			_draw_marker $s $markername
 		}
-		_draw_marker $s $markername
 	}
 
 	proc _chooser_visibility {w} {

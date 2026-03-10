@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___       ______    ______      _____      #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ____ \    / ___ \     #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \( (    \/   ( (___) )    #
-# | |      | || || || (___) | Assistant  / (_) (_       ___) /| (____      \     /     #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( |  ___ \     / ___ \     #
-# | | \_  )| |   | || (   ) | VTT            ) (           ) \| (   ) )   ( (   ) )    #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /( (___) ) _ ( (___) )    #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/  \_____/ (_) \_____/     #
+#  _______  _______  _______                ___       ______   ______      _______     #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \ / ___  \    (  __   )    #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \\/   )  )   | (  )  |    #
+# | |      | || || || (___) | Assistant  / (_) (_       ___) /    /  /    | | /   |    #
+# | | ____ | |(_)| ||  ___  |           (____   _)     (___ (    /  /     | (/ /) |    #
+# | | \_  )| |   | || (   ) | VTT            ) (           ) \  /  /      |   / | |    #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  / /  /     _ |  (__) |    #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/  \_/     (_)(_______)    #
 #                                                                                      #
 ########################################################################################
 #
@@ -129,7 +129,7 @@ namespace eval ::gmaproto {
 		update_turn               I
 	}
 	array set _message_payload {
-		AC      {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l PolyGM ? Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}} Targets l TargetedModifiers {D {o {Type s Modifiers l}}}}
+		AC      {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l PolyGM ? Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}} Targets l TargetedModifiers {D {D {o {Modifiers l}}}}}
 		ACCEPT  {Messages l}
 		AA      {Name s Format s File s IsLocalFile ?}
 		AA?     {Name s}
@@ -185,7 +185,7 @@ namespace eval ::gmaproto {
 		PRIV    {Command s Reason s}
 		POLO    {}
 		PROGRESS {OperationID s Title s Value i MaxValue i IsDone ? Targets l IsTimer ?}
-		PS      {ID s Name s Health {o {MaxHP i TmpHP i TmpDamage i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i AC i FlatFootedAC i TouchAC i CMD i}} Gx f Gy f Skin i SkinSize l PolyGM ? Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}} Targets l TargetedModifiers {D {o {Type s Modifiers l}}}}
+		PS      {ID s Name s Health {o {MaxHP i TmpHP i TmpDamage i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i AC i FlatFootedAC i TouchAC i CMD i}} Gx f Gy f Skin i SkinSize l PolyGM ? Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}} Targets l TargetedModifiers {D {D {o {Modifiers l}}}}}
 		READY   {}
 		REDIRECT {Host s Port i Reason s}
 		ROLL    {Replay ? Sender s Recipients l MessageID i ToAll ? ToGM ? Title s Result {o {InvalidRequest ? ResultSuppressed ? Result i Details {a {Type s Value s}}}} RequestID s MoreResults ? Sent s Origin ? Targets l Type s}
@@ -610,6 +610,16 @@ proc ::gmaproto::_attribute_encode {k v} {
 		Font   -
 		CustomReach -
 		Health { return [::gmaproto::_protocol_encode_struct $k $v] }
+
+		TargetedModifiers {
+			return [json::write object {*}[dict map {dk dv} $v {
+				set dk [::_S $dk]
+				set dv [json::write object {*}[dict map {dkk dvv} $dv {
+					set dkk [::_S $dkk]
+					set dvv [::gmaproto::_encode_payload $dvv {Modifiers l}]
+				}]]
+			}]]
+		}
 
 		Points {
 			set plist {}
@@ -1110,6 +1120,10 @@ proc ::gmaproto::_transmit {} {
 proc ::gmaproto::_encode_payload {input_dict type_dict} {
 	set a [dict create]
 	foreach {f t} $type_dict {
+		if {[string range $t 0 0] eq "*"} {
+			set f [::_S $f]
+			set t [string range $t 1 end]
+		}
 		if {[dict exists $input_dict $f]} {
 			set v [dict get $input_dict $f]
 			switch -exact -- [lindex $t 0] {
@@ -1387,6 +1401,7 @@ proc ::gmaproto::_construct {input types} {
 					dict set input $field {}
 				}
 			}
+			*D -
 			D {
 				if {[dict exists $input $field]} {
 					if {[set srcdata [dict get $input $field]] eq "null"} {
@@ -1399,6 +1414,15 @@ proc ::gmaproto::_construct {input types} {
 					}
 				} else {
 					dict set input $field {}
+				}
+
+				# TODO this isn't a perfect solution, should refactor
+				if {[string range [lindex $t 0] 0 0] eq "*"} {
+					set newname [::S_ $field]
+					if {$newname ne $field} {
+						dict set input $newname [dict get $input $field]
+						dict unset input $field
+					}
 				}
 			}
 			d {
@@ -1708,7 +1732,7 @@ proc ::gmaproto::_read_poll {} {
 			for {set batch 0} {$batch < $total_batches} {incr batch} {
 				::gmaproto::DEBUG "merging batch $batch"
 				append data [lindex $::gmaproto::_batch_storage($batch_group,$batch) 1]
-				::gmaproto::DEBUG "data now $data"
+				#::gmaproto::DEBUG "data now $data"
 			}
 			array unset ::gmaproto::_batch_storage $batch_group,*
 			set res [::gmaproto::_parse_data_packet "$cmd $data"]
@@ -1716,7 +1740,7 @@ proc ::gmaproto::_read_poll {} {
 				::gmaproto::DEBUG "unable to restore command; got NIL"
 				return [list "" ""]
 			}
-			::gmaproto::DEBUG "collected batches into final message $res and cleared temporary storage"
+			::gmaproto::DEBUG "collected batches into final message and cleared temporary storage"
 			return $res
 		}
 		return [list "" ""]
@@ -2414,7 +2438,7 @@ proc ::gmaproto::normalize_dict {cmd d} {
 	return [::gmaproto::new_dict_from_json $cmd [::gmaproto::json_from_dict $cmd $d]]
 }
 
-# @[00]@| GMA-Mapper 4.36.8
+# @[00]@| GMA-Mapper 4.37.0
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2026 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

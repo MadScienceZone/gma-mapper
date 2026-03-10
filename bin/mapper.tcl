@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       ______    ______      _____      #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ____ \    / ___ \     #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \( (    \/   ( (___) )    #
-# | |      | || || || (___) | Assistant  / (_) (_       ___) /| (____      \     /     #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ ( |  ___ \     / ___ \     #
-# | | \_  )| |   | || (   ) | VTT            ) (           ) \| (   ) )   ( (   ) )    #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /( (___) ) _ ( (___) )    #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/  \_____/ (_) \_____/     #
+#  _______  _______  _______                ___       ______   ______      _______     #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \ / ___  \    (  __   )    #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \\/   )  )   | (  )  |    #
+# | |      | || || || (___) | Assistant  / (_) (_       ___) /    /  /    | | /   |    #
+# | | ____ | |(_)| ||  ___  |           (____   _)     (___ (    /  /     | (/ /) |    #
+# | | \_  )| |   | || (   ) | VTT            ) (           ) \  /  /      |   / | |    #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  / /  /     _ |  (__) |    #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/  \_/     (_)(_______)    #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -17,10 +17,10 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.36.8}     ;# @@##@@
+set GMAMapperVersion {4.37.0}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
-set GMAMapperProtocol {422}         ;# @@##@@
-set CoreVersionNumber {6.42}            ;# @@##@@
+set GMAMapperProtocol {423}         ;# @@##@@
+set CoreVersionNumber {6.43}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -73,6 +73,16 @@ set SERVER_MKDIRpath /bin/mkdir
 set ModuleID {}
 set UpgradeNotice false
 set CurrentCombatants {}
+#
+# convert spaces to something else for dictionary keys to prevent needless data structure nesting
+proc S_ {s} {
+	return [string map {{ } "\u203b"} $s]
+}
+
+# and the inverse
+proc _S {s} {
+	return [string map {"\u203b" { }} $s]
+}
 #
 # Cache files newer than this many days are used without any further
 # checks. Otherwise, we check with the server to see if there's a newer
@@ -1377,6 +1387,16 @@ proc toggleCombatSource {mousex mousey args} {
 	RefreshTargets
 }
 
+# returns the map name of the targeting creature or the empty string if unknown or unset.
+proc CurrentTargetSource {} {
+	global ActiveTargetSource
+	if {$ActiveTargetSource ne {}} {
+		return [lindex $ActiveTargetSource 0]
+	}
+	return [lindex [my_map_names] 0]
+}
+
+
 # somewhat misnamed but this allows you to change the target(s) of your attacks to a new
 # list of creatures
 proc toggleCombatTargets {mousex mousey args} {
@@ -1389,7 +1409,7 @@ proc EnsureTargetSourceFirst {} {
 	global ActiveTargetSource is_GM
 	
 	if {$is_GM} {
-		if {$ActiveTargetSource ne {}} {
+		if {[llength $ActiveTargetSource] != 0 && [lindex $ActiveTargetSource 0] ne {}} {
 			# The GM can set the target of the creature whose turn it is now
 			set me $ActiveTargetSource
 		} else {
@@ -3265,6 +3285,13 @@ proc CreateHealthStatsToolTip {mob_id {extra_condition {}}} {
 			append tiptext "\n$status."
 		}
 	}
+
+#TODO
+#	if {[dict exists $MOBdata($mob_id) TargetedModifiers]} {
+#		dict map {tname details} [dict get $MOBdata($mob_id) TargetedModifiers] {
+#			append tiptext "\nCustom condition on [_S $tname] ([join [dict keys $details] {, }])"
+#		}
+#	}
 
 	return $tiptext
 }
@@ -6442,20 +6469,20 @@ proc CreatureStatusConditions {id calc_condition} {
 	return $conditions
 }
 
-proc CreatureStatusMarker {w id x y s calc_condition} {
+proc CreatureStatusMarker {w id x y s calc_condition {customList {}}} {
 	global MOBdata MarkerColor MarkerShape
 	
 	# HEALTH conditions
 	#  normal/{} flat staggered unconscious stable disabled dying
 	# dying: half-slash through the token
 	set conditions [CreatureStatusConditions $id $calc_condition]
-	if {[llength $conditions] == 0} {
+	if {[llength $conditions] == 0 && [llength $customList] == 0} {
 		return
 	}
 
 	set tags "mob MF#$id M#$id MN#$id allMOB"
 
-	_DrawCreatureStatusMarkers $w $x $y $s $tags $conditions $id {}
+	_DrawCreatureStatusMarkers $w $x $y $s $tags $conditions $id $customList
 }
 
 proc _DrawCreatureStatusMarkers {w x y s tags conditions id {customlist {}}} {
@@ -6481,7 +6508,11 @@ proc _DrawCreatureStatusMarkers {w x y s tags conditions id {customlist {}}} {
 		if {[info exists MarkerShape($condition)] && [info exists MarkerColor($condition)]} {
 			set shape $MarkerShape($condition)
 			if {[set color $MarkerColor($condition)] eq {*}} {
-				set color [dict get $MOBdata($id) Color]
+				if {$id eq {}} {
+					set color black
+				} else {
+					set color [dict get $MOBdata($id) Color]
+				}
 			}
 			if {[string range $color 0 1] eq {--}} {
 				set color [string range $color 2 end]
@@ -7397,7 +7428,16 @@ proc RenderSomeone {w id {norecurse false} args} {
 	}
 
 	tooltip::tooltip $w -items MN#$id [CreateHealthStatsToolTip $id $condition]
-	CreatureStatusMarker $w $id [expr $x*$iscale] [expr $y*$iscale] [expr $mob_size*$iscale] $condition
+	set customList {}
+	global PreferencesData
+	if {[set tname [CurrentTargetSource]] ne {} && [info exists MOBdata([set tmid [GetBaseMobID $tname]])] && [dict exists $MOBdata($tmid) TargetedModifiers [S_ $mob_name]] && [dict exists $PreferencesData styles markers] && [set marker_data [dict get $PreferencesData styles markers]] ne {}} {
+		foreach ccond [dict keys [dict get $MOBdata($tmid) TargetedModifiers [S_ $mob_name]]] {
+			if {[dict exists $marker_data $ccond]} {
+				lappend customList [list [dict get $marker_data $ccond shape] [dict get $marker_data $ccond color] [dict get $marker_data $ccond dashpattern ]]
+			}
+		}
+	}
+	CreatureStatusMarker $w $id [expr $x*$iscale] [expr $y*$iscale] [expr $mob_size*$iscale] $condition $customList
 	if {$MOB_COMBATMODE} {
 		if {$show_healthbar} {
 			if {$its_dead_jim} {
@@ -8718,21 +8758,14 @@ proc CreateConditionSubMenu {args} {
 		}
 	}
 	if {[dict exists $PreferencesData styles markers] && [set marker_data [dict get $PreferencesData styles markers]] ne {}} {
-		$mid add separator
-		foreach {name d} $marker_data {
-			if {[dict exists $d description] && [set description [dict get $d description]] ne {}} {
-				# TODO
-			}
-
-
-
-
-
-			if {$description ne {}} {
-				if {[AreMobsInCustomList $mob_list $name XXX]} {
-					$mid add command -command [list Custom$cmd $mob_list $name] -label $description -foreground #ff0000
+		if {[set targeter [EnsureTargetSourceFirst]] ne {}} {
+			$mid add separator
+			foreach {name d} $marker_data {
+				set display_name [_S $name]
+				if {[AreMobsInCustomList $mob_list $name $targeter]} {
+					$mid add command -command [list Custom$cmd $mob_list $name $targeter $marker_data] -label $display_name -foreground #ff0000 -state disabled
 				} else {
-					$mid add command -command [list Custom$cmd $mob_list $name] -label $description
+					$mid add command -command [list Custom$cmd $mob_list $name $targeter $marker_data] -label $display_name -state disabled
 				}
 			}
 		}
@@ -9306,6 +9339,14 @@ proc DoContext {x y} {
 proc MobNameComparison {a b} {
 	global MOBdata
 	return [string compare -nocase [dict get $MOBdata($a) Name] [dict get $MOBdata($b) Name]]
+}
+
+proc GetMobName {id} {
+	global MOBdata
+	if {[info exists MOBdata([set bid [GetBaseMobID $id]])] && [dict exists [set d $MOBdata($bid)] Name]} {
+		return [dict get $d Name]
+	}
+	return {}
 }
 
 report_progress "Setting up UI: context menu"
@@ -15808,6 +15849,25 @@ proc SetObjectAttribute {id kvlist} {
 		if {$datatype eq "PS" && $k eq "CustomReach"} {
 			set v [::gmaproto::new_dict CustomReach {*}$v]
 		}
+		if {$datatype eq "PS" && $k eq "TargetedModifiers"} {
+			set dd $v
+			if {[catch {
+				set v {}
+				dict for {monster conds} $dd {
+					dict for {condition details} $conds {
+						if {[dict exists $details Modifiers]} {
+							dict set v TargetedModifiers [S_ $monster] [S_ $condition] Modifiers [dict get $details Modifiers]
+						} else {
+							dict set v TargetedModifiers [S_ $monster] [S_ $condition] Modifiers {}
+						}
+					}
+				}
+			} err]} {
+				set v {}
+				DEBUG 0 "Rejecting object update for $id TargetedModifiers: $err"
+			}
+			continue
+		}
 
 		if {$datatype eq "PS" && $k eq "Gx"} {
 			set move_to_Gx $v
@@ -17793,14 +17853,73 @@ proc check_aka_commit {} {
 	destroy .akawindow
 }
 
-# TODO CustomCondAll (CondAll)
-# TODO CustomCondPerson (CondPerson)
-# TODO AreMobsInCustomList <mob_list> <condition> <targeter>
 # Attr TargetedMods  dict(name:modlist)
 #
 # 
+
+
 proc AreMobsInCustomList {mob_list condition targeter} {
+	global MOBdata
+
+	if {[llength $targeter] == 0} {
+		return false
+	}
+	if {[llength $targeter] > 1} {
+		DEBUG 0 "Target sources set to $targeter; using only first one ([lindex $targeter 0])"
+	}
+	set id [GetBaseMobID [lindex $targeter 0]]
+	foreach m $mob_list {
+		if {[info exists MOBdata($id)] && [dict exists $MOBdata($id) TargetedModifiers [S_ [GetMobName $m]] [S_ $condition]]} {
+			return true
+		}
+	}
 	return false
+}
+
+proc CustomCondAll {mob_list condition targeter marker_data} {
+	foreach mob_id $mob_list {
+		CustomCondPerson $mob_id $condition $targeter $marker_data
+	}
+}
+
+proc CustomCondPerson {mob_id condition targeter marker_data} {
+	global MOBdata
+	if {[llength $targeter] == 0} {
+		DEBUG 0 "No targeter object found."
+		return
+	}
+	if {[llength $targeter] > 1} {
+		DEBUG 0 "Target sources set to $targeter; using only first one ([lindex $targeter 0])"
+	}
+	set id [GetBaseMobID [lindex $targeter 0]]
+	if {![info exists MOBdata($id)]} {
+		DEBUG 0 "No such creature object found: $targeter (base object $id)"
+		return
+	}
+	if {[set mob_name [GetMobName $mob_id]] eq {}} {
+		DEBUG 0 "No such creature \"$mob_id\""
+		return
+	}
+	# toggle presence of this condition for this target
+	if {[dict exists $MOBdata($id) TargetedModifiers [S_ $mob_name] [S_ $condition]]} {
+#		DEBUG 0 "removing $condition from $mob_name d=[dict get $MOBdata($id) TargetedModifiers]"
+		# we are targeting them with this condition; remove it
+		dict unset MOBdata($id) TargetedModifiers [S_ $mob_name] [S_ $condition]
+#		DEBUG 0 "d=[dict get $MOBdata($id) TargetedModifiers]"
+		if {[dict size [dict get $MOBdata($id) TargetedModifiers [S_ $mob_name]]] == 0} {
+			dict unset MOBdata($id) TargetedModifiers [S_ $mob_name]
+#			DEBUG 0 "removed inner dict; d=[dict get $MOBdata($id) TargetedModifiers]"
+		}
+	} else {
+		# we don't, so set it now
+#		DEBUG 0 "adding $condition to $mob_name d=[dict get $MOBdata($id) TargetedModifiers]"
+		dict set MOBdata($id) TargetedModifiers [S_ $mob_name] [S_ $condition] [dict create \
+			Modifiers [dict get $marker_data $condition modifiers] \
+		]
+#		DEBUG 0 "d=[dict get $MOBdata($id) TargetedModifiers]"
+	}
+	::gmaproto::update_obj_attributes "@[GetMobName $id]" [dict create TargetedModifiers [dict get $MOBdata($id) TargetedModifiers]]
+	RefreshMOBs
 }
 
 
@@ -17878,7 +17997,7 @@ proc AreMobsInCustomList {mob_list condition targeter} {
 #
 #  called when rendering somone or advancing the initiative turn or updating target attribute
 #
-# @[00]@| GMA-Mapper 4.36.8
+# @[00]@| GMA-Mapper 4.37.0
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2026 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
