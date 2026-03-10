@@ -13,7 +13,7 @@
  * GMA Mapper Preferences File Format: 13 <!-- @@##@@ -->
 
 ## DEPRECATION NOTICE
-The support for old server protocols (<400) and map file formats (<20) will be dropped in the near future.
+The support for old server protocols (<400) has ended.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
