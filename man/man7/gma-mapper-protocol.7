@@ -1,5 +1,5 @@
 '\" t
-'\" *** 423 ***
+'\" *** 424 ***
 '\" <<ital-is-var>>
 .TH GMA-MAPPER-PROTOCOL 7 "GMA-Mapper 4.37.0" 09-Mar-2026 "Protocols" \" @@mp@@
 .SH NAME
@@ -79,7 +79,7 @@ be implemented to wait synchronously for a server
 response during the authentication negotiation stage.
 .LP
 '\" <</bold-is-fixed>>
-.B "This describes protocol version 423."
+.B "This describes protocol version 424."
 '\" <<bold-is-fixed>>
 These notes are intended to be 
 detailed enough to implement a client from and should be considered
@@ -1145,6 +1145,19 @@ message to clients.
 .BI DoSilently " (bool)"
 If true, the client MAY clear its chat history without notifying the user;
 otherwise it SHOULD indicate the action to the user.
+'\" <<New>>
+.TP
+.BI TargetMessages " (list of ints)"
+If present and non-empty, clear 
+.I only 
+the listed
+.B MessageID
+numbers from the history. In this case, the
+.B Target
+field MUST be ignored by the receiver; it SHOULD be set to
+.B 0
+(zero) or omitted.
+'\" <</New>>
 .TP
 .BI Target " (int)"
 If 0 or missing, clear all messages in the history. Otherwise, if positive, clear all
@@ -5084,6 +5097,38 @@ prior to protocol version 400.)
 
 Declares which calendaring system the various dates and times are based upon.
 '\" <</ital-is-var>>
+'\" <<New>>
+.TP
+.BI MinimumMessageID " (int)"
+This provides the minimum
+.B MessageID
+known to the server. Any history the client was holding onto relating
+to messages with IDs less than this number SHOULD be discarded by the
+client.
+This field is not included in the
+.B WORLD
+command as configured into the server's initialization file; the
+server will add it when sending the
+.B WORLD
+message out to the client.
+.TP
+.BI MaximumMessageID " (int)"
+This provides the maximum
+.B MessageID
+known to the server. From this point forward, new messages arriving
+to the client will have IDs larger than this, but if the client happened
+to be holding information relating to any such message at the 
+time this message is received, it SHOULD be
+discarded by the client since it can't refer to any message currently
+in play from the server's point of view, and will conflict with new
+messages which will have that ID in the future.
+This field is not included in the
+.B WORLD
+command as configured into the server's initialization file; the
+server will add it when sending the
+.B WORLD
+message out to the client.
+'\" <</New>>
 .TP
 .BI "ClientSettings " (object)
 Any of the following settings will override the client's own settings. Clients SHOULD
@@ -5134,8 +5179,13 @@ Steve Willoughby / steve@madscience.zone;
 John Mechalas (elevation and movement modes).
 .SH HISTORY
 .LP
-This document defines map protocol version 423,
-which adds the
+This document defines map protocol version 424,
+which adds the capability to clear specific, individual messages
+from the chat history and reports the extreme range of valid message
+IDs upon connection to the server.
+.LP
+Historically, protocol version 423
+added the
 .B TargetedModifiers
 attribute to creatures and introduced the concept of payload splitting for large data sizes via the
 .B BATCH
@@ -5146,7 +5196,7 @@ message.
 '\".B IL
 '\"message.
 .LP
-Historically, protocol version 422
+Protocol version 422
 added the explicit
 .B NotPlaying
 flags to indicate if a user should not be considered
