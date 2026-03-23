@@ -1474,7 +1474,12 @@ proc ::gmaproto::clear_chat {silent target} {
 	::gmaproto::_protocol_send CC DoSilently $silent Target $target
 }
 proc ::gmaproto::clear_chat_list {silent targets} {
-	::gmaproto::_protocol_send CC DoSilently $silent TargetMessages $targets
+	if {[llength $targets] > 0} {
+		::gmaproto::_protocol_send CC DoSilently $silent TargetMessages $targets
+	} else {
+		# avoid wiping all messages if list is empty and target is 0
+		::DEBUG 0 "clear_chat_list: refusing to send empty list of targets"
+	}
 }
 proc ::gmaproto::clear_from {server_id} {
 	::gmaproto::_protocol_send CLR@ File $server_id

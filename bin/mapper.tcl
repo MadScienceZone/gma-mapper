@@ -17,9 +17,9 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.37.0}     ;# @@##@@
+set GMAMapperVersion {4.38.0-alpha.0}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
-set GMAMapperProtocol {423}         ;# @@##@@
+set GMAMapperProtocol {424}         ;# @@##@@
 set CoreVersionNumber {6.43}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
@@ -876,6 +876,7 @@ proc InitializeChatHistory {} {
 						DEBUG 0 "Unable to overwrite the chat history in $ChatHistoryFile ($err). No history will be kept now."
 						set ChatHistoryFileHandle {}
 					} else {
+						# TODO maybe force writing the hidelist unconditionally so we don't "expire" them out
 						set ChatHistoryFileDirection w
 						set ChatHistory [lrange $ChatHistory end-$ChatHistoryLimit end]
 						foreach msg $ChatHistory {
@@ -919,11 +920,14 @@ proc InitializeChatHistory {} {
 set _last_known_message_id 0
 
 #
-# {CC|TO|ROLL|-system d|msg id} -> CHAT type jsonified-d
+# {CC|TO|ROLL|-unpin|-system d|msg id} -> CHAT type jsonified-d
 #
 proc MarshalChatHistoryEntry {m} {
 	if {[lindex $m 0] eq {-system}} {
 		return [list CHAT -system [::json::write string [lindex $m 1]]]
+	}
+	if {[lindex $m 0] eq {UNPIN}} {
+		return [list CHAT -unpin [::json::write string [lindex $m 2]]
 	}
 	if {[catch {
 		set retval [list CHAT [lindex $m 0] [::gmaproto::_encode_payload [lindex $m 1] [::gmaproto::payload_format [lindex $m 0]]]]
@@ -934,11 +938,14 @@ proc MarshalChatHistoryEntry {m} {
 }
 
 #
-# {CHAT type json} -> {CC|TO|ROLL|-system d|msg id}
+# {CHAT type json} -> {CC|TO|ROLL|-unpin|-system d|msg id}
 #
 proc UnmarshalChatHistoryEntry {m} {
 	if {[lindex $m 1] eq {-system}} {
 		return [list {-system} [::json::json2dict [lindex $m 2]] -1]
+	}
+	if {[lindex $m 1] eq {-unpin}} {
+		return [list {-unpin} {} [::json::json2dict [lindex $m 2]]]
 	}
 	DEBUG 2 "unmarshal $m"
 	if {[catch {
@@ -952,6 +959,7 @@ proc UnmarshalChatHistoryEntry {m} {
 
 # ChatHistoryAppend {CC|ROLL|TO d mid}
 # ChatHistoryAppend {-system msg -1}
+# ChatHistoryAppend {-unpin {} mid}
 proc ChatHistoryAppend {event} {
 	global ChatHistory ChatHistoryFileHandle _last_known_message_id ChatHistoryFileDirection
 
@@ -1465,10 +1473,17 @@ proc _setMyTargets {tlist args} {
 
 proc ClearPinnedChats {} {
 	global dice_preset_data
+	global HideList
 
 	set tkey [root_user_key] 
 	set w $dice_preset_data(cw,$tkey)
 	if {[catch {
+		foreach {start end} [$w.p.pinnedchat.1.text tag ranges .msgid] {
+			set id [$w.p.pinnedchat.1.text get $start $end]
+			set HideList($id) {}
+			ChatHistoryAppend -unpin {} $id
+		}
+
 		$w.p.pinnedchat.1.text configure -state normal 
 		$w.p.pinnedchat.1.text delete 1.0 end
 		$w.p.pinnedchat.1.text configure -state disabled 
@@ -10578,18 +10593,32 @@ proc BackgroundConnectToServer {tries} {
 # TODO
 proc TriggerMessageHistoryPurge {} {
 	global ServerState
-	puts "** purge ** min=[dict get $ServerState MinimumMessageID] max=[dict get $ServerState MaximumMessageID]"
+	PruneHideList [dict get $ServerState MinimumMessageID] [dict get $ServerState MaximumMessageID]
+	PruneChatHistory [dict get $ServerState MinimumMessageID] [dict get $ServerState MaximumMessageID]
+	# TODO remove from display
+	# or just blank the display and then: LoadChatHistory
 }
 
-#
-# TODO keep list of message IDs to suppress from view
-# TODO save/restore message suppression list
-# TODO filter ignored ones out of any load of our message cache
-# TODO remove ignored ones from the actual display in real time
-# TODO add button to delete a message I AUTHORED from the chat history altogether
-# TODO add button to unpin (delete and suppress) pinned messages from anyone
-#
+proc IsMessageHidden {id} {
+	global HideList
+	return [info exists HideList($id)]
+}
 
+proc PruneHideList {minid maxid} {
+	global HideList HideBefore
+	if {$HideBefore < $minid} {
+		set HideBefore [expr $minid - 1]
+	}
+	# TODO actually remove all < minid and > maxid from history
+	set hlist [array names HideList]
+	foreach hid $hlist {
+		if {$hid < $minid || $hid > $maxid} {
+			DEBUG 1 "pruned message $hid (out of range $minid-$maxid)"
+			array unset HideList $hid
+		}
+	}
+}
+		
 #
 # Server interaction
 #
@@ -11056,7 +11085,8 @@ proc DoCommandCC {d} {
 
 	ClearChatHistory $d
 	ChatHistoryAppend [list CC $d [dict get $d MessageID]]
-	LoadChatHistory
+	# TODO: fix up display or just blank it and then
+	# LoadChatHistory
 }
 
 proc DoCommandCLR@ {d} {
@@ -14757,6 +14787,11 @@ proc DisplayChatMessage {d for_user args} {
 				$wpc.1.text tag configure $tag {*}$options
 				DEBUG 3 "Configure tag $tag as $options"
 			}
+			$wc.1.text tag configure pushpin 
+			$wc.1.text tag configure delmsg
+			$wc.1.text tag configure .msgid -elide true
+			$wc.1.text tag bind pushpin <1> [list ChatMessageUnpin $wc.1.text %x %y]
+			$wc.1.text tag bind delmsg <1> [list ChatMessageRequestDeletion $wc.1.text %x %y]
 		}
 
 		if {!$no_dice} {
@@ -14779,12 +14814,65 @@ proc DisplayChatMessage {d for_user args} {
 	}
 
 	set system [expr [lsearch -exact $args "-system"] >= 0] 
-	_render_chat_message $wc.1.text $system $message $recipientlist $from [dict get $d ToAll] [dict get $d ToGM] $date_sent $markup $pinned
+	_render_chat_message $wc.1.text $system $message $recipientlist $from [dict get $d ToAll] [dict get $d ToGM] $date_sent $markup $pinned [dict get $d MessageID]
 	if {$system} {
 		TranscribeChat (system) $recipientlist $message [dict get $d ToAll] [dict get $d ToGM] $date_sent $markup $pinned
 	} else {
 		TranscribeChat $from $recipientlist $message [dict get $d ToAll] [dict get $d ToGM] $date_sent $markup $pinned
 	}
+}
+
+proc ChatMessageUnpin {w x y args} { 
+	global HideList
+	if {[set mid [_GetHiddenChatMessageID $w $x $y]] eq {}} {
+		return
+	}
+	set msgid [lindex $mid 0]
+	DEBUG 0 "unpin $msgid"
+	$w configure -state normal
+	$w delete [lindex $mid 2] [lindex $mid 4]
+	$w configure -state disabled
+	ChatHistoryAppend -unpin {} $msgid
+	set HideList($msgid) {}
+}
+
+proc ChatMessageRequestDeletion {w x y args} {
+	if {[set mid [_GetHiddenChatMessageID $w $x $y]] eq {}} {
+		return
+	}
+	set msgid [lindex $mid 0]
+	if {[tk_messageBox -type yesno -parent $w -icon question -title "Delete message?" \
+			-message "This will delete the chat mesage for all players. Are you sure?" \
+			-detail [lindex $mid 1] \
+			-default yes] eq yes} {
+		DEBUG 0 "delete $msgid [lindex $mid 2] [lindex $mid 3]"
+		$w configure -state normal
+		$w delete [lindex $mid 2] [lindex $mid 4]
+		$w configure -state disabled
+		global HideList
+		set HideList($msgid) {}
+		ChatHistoryAppend CC [::gmaproto::_construct [dict create TargetMessages [list $msgid]] [::gmaproto::payload_format CC]]  -1
+		::gmaproto::clear_chat_list false [list $msgid]
+	} else {
+		DEBUG 0 "NO delete $msgid"
+	}
+}
+
+proc _GetHiddenChatMessageID {w x y} {
+	set idx [$w index "@$x,$y"]
+	if {[catch {
+		set eol [expr int($idx)].end
+		set sol [expr int($idx)].0
+		set nsol [expr int($idx+1)].0
+	} err ]} {
+		DEBUG 0 "Unable to locate message (eol: $err)"
+		return {}
+	}
+	if {[set msgid_idx [$w tag nextrange .msgid $idx $eol]] eq {}} {
+		DEBUG 0 "Unable to locate message (no embedded ID found in range $idx-$eol)"
+		return {}
+	}
+	return [list [$w get {*}$msgid_idx] [$w get -displaychars $sol $eol] $sol $eol $nsol] 
 }
 
 #proc ToggleChatLock {buttonw textw} {
@@ -14802,8 +14890,9 @@ proc DisplayChatMessage {d for_user args} {
 #	}
 #}
 
-proc _render_chat_message {w system message recipientlist from toall togm {date_sent {}} {markup false} {pinned false}} {
+proc _render_chat_message {w system message recipientlist from toall togm {date_sent {}} {markup false} {pinned false} {msgid {}}} {
 	global SuppressChat _preferences LastDisplayedChatDate dice_preset_data
+	global icon_delete icon_cross
 
 	if {$pinned} {
 		if {[set start [string first .chat.1 $w]] >= 0} {
@@ -14813,6 +14902,11 @@ proc _render_chat_message {w system message recipientlist from toall togm {date_
 
 	if {!$SuppressChat && [winfo exists $w]} {
 		$w configure -state normal
+		global local_user
+		if {[set me [my_map_names]] eq {}} {
+			set me [list $local_user]
+		}
+
 		if {$system} {
 			$w insert end "$message\n" system
 		} else {
@@ -14832,15 +14926,23 @@ proc _render_chat_message {w system message recipientlist from toall togm {date_
 					$w insert end "--:-- " timestamp
 				}
 			}
+			#$w image create end -image $icon_delete
+			if {$pinned && $msgid ne {}} {
+				$w insert end "📌" pushpin $msgid .msgid
+			}
 			ChatAttribution $w $from $recipientlist $toall $togm
 			if {$markup} {
 				foreach {fontstyle text} [gma::minimarkup::render $message] {
 					$w insert end $text $fontstyle
 				}
-				$w insert end "\n" normal
 			} else {
-				$w insert end "$message\n" normal
+				$w insert end $message normal
 			}
+			DEBUG 0 "$msgid $from in $me: [lsearch -exact $me $from]"
+			if {[lsearch -exact $me $from] >= 0 && $msgid ne {}} {
+				$w insert end "⌫" delmsg $msgid .msgid
+			}
+			$w insert end "\n"
 		}
 		$w see end
 #		if {![info exists dice_preset_data(chat_lock)] || $dice_preset_data(chat_lock)} {
@@ -14892,6 +14994,9 @@ proc ValidateChatHistoryEntry {e} {
 	}
 
 	switch -exact -- [lindex $e 0] {
+		-unpin	{
+			return $e
+		}
 		ROLL {
 			# old: ROLL from recip title result rlist mid
 			# new: ROLL d mid
@@ -15072,10 +15177,12 @@ proc LoadChatHistory {} {
 				} else {
 					set pinned false
 				}
-				_render_chat_message $w 0 [dict get $d Text] [dict get $d Recipients] [dict get $d Sender] [dict get $d ToAll] [dict get $d ToGM] $date_sent $markup $pinned
+				_render_chat_message $w 0 [dict get $d Text] [dict get $d Recipients] [dict get $d Sender] [dict get $d ToAll] [dict get $d ToGM] $date_sent $markup $pinned [dict get $d MessageID]
 			}
 		}
                 CC	 {
+			# TODO update hide list & display
+			# TODO handle list clear
                     set by [dict get $d RequestedBy]
 		    if {[dict get $d DoSilently]} {
                         _render_chat_message $w 1 "Chat history cleared." {} {} false false
