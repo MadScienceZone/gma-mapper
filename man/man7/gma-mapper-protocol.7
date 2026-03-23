@@ -198,7 +198,7 @@ since all communications are asynchronous.
 '\"  \z{AI?}    &C$\leftrightarrow$S&\z{AI}     &no &\acronym{JSON}&Ask for definition of image\\
 '\"  \z{AI/}    &C$\rightarrow$S    &---        &yes&\acronym{JSON}&Filter saved image definitions\\
 '\"  \z{BATCH}  &C$\leftrightarrow$S&---	&no &\acronym{JSON}&Send large message in batches\\
-'\"  \z{CC}     &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Clear the chat history\\
+'\"  \z{CC}     &C$\leftrightarrow$S&---        &maybe &\acronym{JSON}&Clear the chat history\\
 '\"  \z{CLR}    &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Remove objects from client\\
 '\"  \z{CLR@}   &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Remove elements from a map file\\
 '\"  \z{CO}     &C$\leftrightarrow$S&---        &yes&\acronym{JSON}&Turn on/off combat mode\\
@@ -262,7 +262,8 @@ since all communications are asynchronous.
 '\"  \z{TMRQ}   &C$\leftrightarrow$S&\z{TMACK}/\z{FAILED}&no&\acronym{JSON}&Request a timer\\
 '\"  \z{TO}     &C$\leftrightarrow$S&---        &no &\acronym{JSON}&Send chat message\\
 '\"  \z{UPDATES}&C$\leftarrow$S     &---        &N/A&\acronym{JSON}&Advertise software updates\\
-'\"  \z{WORLD}  &C$\leftarrow$S     &---        &N/A&\acronym{JSON}&Campaign world info\\\bottomrule
+'\"  \z{WORLD}  &C$\leftarrow$S     &---        &N/A&\acronym{JSON}&Campaign world info\\
+'\"  \z{Y2} & C$\leftarrow$S&---&	N/A&\acronym{JSON}&Server state information\\\bottomrule
 '\" \end{tabular}
 '\" \caption{Summary of Client/Server Messages (continued)}\label{tbl:mapper:6:messages2}
 '\"\end{table}
@@ -286,7 +287,7 @@ Challenge	OK	C\[<-]S	AUTH	N/A	JSON	Ask client to authenticate
 CharacterName	AKA	C\[<>]S	\fR\(em\fP	no	JSON	Declare character name for a player
 ChatMessage	TO	C\[<>]S	\fR\(em\fP	no	JSON	Send chat message
 Clear	CLR	C\[<>]S	\fR\(em\fP	no	JSON	Remove objects from client
-ClearChat	CC	C\[<>]S	\fR\(em\fP	no	JSON	Clear the chat history
+ClearChat	CC	C\[<>]S	\fR\(em\fP	maybe	JSON	Clear the chat history
 ClearFrom	CLR@	C\[<>]S	\fR\(em\fP	no	JSON	Remove elements from a map file
 CombatMode	CO	C\[<>]S	\fR\(em\fP	yes	JSON	Turn on/off combat mode
 Comment	//	C\[<>]S	\fR\(em\fP	no	any	Human-readable comment
@@ -331,6 +332,7 @@ Redirect	REDIRECT	C\[<-]S	\fR\(em\fP	N/A	JSON	Instruct client to use a different
 RemoveObjAttributes	OA-	C\[<>]S	\fR\(em\fP	no	JSON	Remove values from an attribute
 RollDice	D	C\[->]S	ROLL	no	JSON	Initiate a die roll
 RollResult	ROLL	C\[<-]S	\fR\(em\fP	N/A	JSON	Result of a die roll
+ServerState	Y2	C\[<-]S	\fR\(em\fP	N/A	JSON	Server state information
 Sync	SYNC	C\[->]S	\fRany\fP	no	none	Request replay of commands
 SyncChat	SYNC-CHAT	C\[->]S	CC	no	JSON	Request replay of messages
 \^	\^	\^	ROLL	\^	\^	\^
@@ -1157,6 +1159,7 @@ numbers from the history. In this case, the
 field MUST be ignored by the receiver; it SHOULD be set to
 .B 0
 (zero) or omitted.
+.I "Only the GM or the user who originally posted each message may request that it be deleted."
 '\" <</New>>
 .TP
 .BI Target " (int)"
@@ -1171,8 +1174,11 @@ value. If negative, clear all but the most recent
 messages (e.g., a
 .I target
 of \-50 clears all but the most recent 50 messages).
-.TP
 '\" <</ital-is-var>>
+'\" <<New>>
+.I "Only the GM may request this form of sweeping history change to the server."
+'\" <</New>>
+.TP
 .BI MessageID " (int)"
 '\" <<ital-is-var>>
 This message counts the same as a chat message and is included in the history
@@ -5096,39 +5102,6 @@ The name of the calendar system in play, as known to the GMA game clock.
 prior to protocol version 400.)
 
 Declares which calendaring system the various dates and times are based upon.
-'\" <</ital-is-var>>
-'\" <<New>>
-.TP
-.BI MinimumMessageID " (int)"
-This provides the minimum
-.B MessageID
-known to the server. Any history the client was holding onto relating
-to messages with IDs less than this number SHOULD be discarded by the
-client.
-This field is not included in the
-.B WORLD
-command as configured into the server's initialization file; the
-server will add it when sending the
-.B WORLD
-message out to the client.
-.TP
-.BI MaximumMessageID " (int)"
-This provides the maximum
-.B MessageID
-known to the server. From this point forward, new messages arriving
-to the client will have IDs larger than this, but if the client happened
-to be holding information relating to any such message at the 
-time this message is received, it SHOULD be
-discarded by the client since it can't refer to any message currently
-in play from the server's point of view, and will conflict with new
-messages which will have that ID in the future.
-This field is not included in the
-.B WORLD
-command as configured into the server's initialization file; the
-server will add it when sending the
-.B WORLD
-message out to the client.
-'\" <</New>>
 .TP
 .BI "ClientSettings " (object)
 Any of the following settings will override the client's own settings. Clients SHOULD
@@ -5164,6 +5137,37 @@ Example:
 .B "WORLD {\[dq]Calendar\[dq]:\[dq]golarion\[dq]}"
 .RE
 '\" <</>>
+.TP
+'\" <<New>>
+.B Y2
+This message provides current system-wide state information to clients.
+Clients MUST NOT send this message. Servers SHOULD send this once at the
+start of a client's session.
+The message payload is a JSON object with the following fields:
+'\" <</ital-is-var>>
+'\" <<list>>
+.RS
+.TP
+.BI MinimumMessageID " (int)"
+This provides the minimum
+.B MessageID
+known to the server. Any history the client was holding onto relating
+to messages with IDs less than this number SHOULD be discarded by the
+client.
+.TP
+.BI MaximumMessageID " (int)"
+This provides the maximum
+.B MessageID
+known to the server. From this point forward, new messages arriving
+to the client will have IDs larger than this, but if the client happened
+to be holding information relating to any such message at the 
+time this message is received, it SHOULD be
+discarded by the client since it can't refer to any message currently
+in play from the server's point of view, and will conflict with new
+messages which will have that ID in the future.
+.RE
+'\" <</>>
+'\" <</New>>
 '\" <<TeX>>
 '\" \label{manpage:mapper:6:protocol:end}
 '\" <</TeX>>
@@ -5182,7 +5186,9 @@ John Mechalas (elevation and movement modes).
 This document defines map protocol version 424,
 which adds the capability to clear specific, individual messages
 from the chat history and reports the extreme range of valid message
-IDs upon connection to the server.
+IDs upon connection to the server in the new
+.B Y2
+message.
 .LP
 Historically, protocol version 423
 added the
@@ -5419,5 +5425,9 @@ numbered version) by the addition of the
 and
 .B M@ 
 commands.
+.LP
+If you don't know what the message name
+.B Y2
+refers to, you didn't grow up playing the right adventure games.
 .SH COPYRIGHT
 Part of the GMA software suite, copyright \(co 1992\-2026 by Steven L. Willoughby, Aloha, Oregon, USA. All Rights Reserved. Distributed under BSD-3-Clause License. \"@m(c)@

@@ -73,6 +73,10 @@ set SERVER_MKDIRpath /bin/mkdir
 set ModuleID {}
 set UpgradeNotice false
 set CurrentCombatants {}
+set ServerState [dict create \
+	MinimumMessageID 0 \
+	MaximumMessageID 0 \
+]
 #
 # convert spaces to something else for dictionary keys to prevent needless data structure nesting
 proc S_ {s} {
@@ -10566,6 +10570,27 @@ proc BackgroundConnectToServer {tries} {
 }
 
 #
+# message history maintenance
+#
+
+#
+# prune message from our tracking info that we know aren't on the server anymore
+# TODO
+proc TriggerMessageHistoryPurge {} {
+	global ServerState
+	puts "** purge ** min=[dict get $ServerState MinimumMessageID] max=[dict get $ServerState MaximumMessageID]"
+}
+
+#
+# TODO keep list of message IDs to suppress from view
+# TODO save/restore message suppression list
+# TODO filter ignored ones out of any load of our message cache
+# TODO remove ignored ones from the actual display in real time
+# TODO add button to delete a message I AUTHORED from the chat history altogether
+# TODO add button to unpin (delete and suppress) pinned messages from anyone
+#
+
+#
 # Server interaction
 #
 #
@@ -10577,6 +10602,7 @@ proc DoCommandCLR   {d} { ClearObjectById [dict get $d ObjID] }
 proc DoCommandCO    {d} { setCombatMode [dict get $d Enabled] }
 proc DoCommandMARCO {d} { ::gmaproto::polo }
 proc DoCommandMARK  {d} { global canvas; start_ping_marker $canvas [dict get $d X] [dict get $d Y] 0 }
+proc DoCommandY2    {d} { global ServerState; set ServerState $d; TriggerMessageHistoryPurge }
 
 proc DoCommandDENIED {d} {
 	tk_messageBox -parent . -type ok -icon error -title "Server Closed Connection" \

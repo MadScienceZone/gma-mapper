@@ -56,9 +56,9 @@ package require base64 2.4.2
 package require uuid 1.0.1
 
 namespace eval ::gmaproto {
-	variable protocol 423
+	variable protocol 424
 	variable min_protocol 400
-	variable max_protocol 423
+	variable max_protocol 424
 	variable max_max_protocol 499
 	variable maximum_message_length 61440 
 	variable frag_size 32768
@@ -116,6 +116,7 @@ namespace eval ::gmaproto {
 		query_audio               AA?
 		remove_obj_attributes     OA-
 		roll_result               ROLL
+		server_state		  Y2
 		toolbar                   TB
 		update_clock              CS
 		update_core_data          CORE=
@@ -140,7 +141,7 @@ namespace eval ::gmaproto {
 		AUTH    {Client s Response b User s Platform s}
 		AV      {Grid s XView f YView f}
 		BATCH	{ID s Command s Part i Of i Data s Error s}
-		CC      {RequestedBy s DoSilently ? Target i MessageID i}
+		CC      {RequestedBy s DoSilently ? Target i TargetMessages l MessageID i}
 		CLR     {ObjID s}
 		CLR@    {File s IsLocalFile ?}
 		CO      {Enabled ?}
@@ -199,6 +200,7 @@ namespace eval ::gmaproto {
 		UPDATES {Packages {a {Name s Instances {a {OS s Arch s Version s Token s}}}}}
 		WORLD   {Calendar s ClientSettings {o {MkdirPath s ImageBaseURL s ModuleCode s SCPDestination s ServerHostname s}}}
 		/CONN   {}
+		Y2      {MinimumMessageID i MaximumMessageID i}
 		Animation {Frames i FrameSpeed i Loops i}
 		Health  {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}
 		Font	{Family s Size f Weight i Slant i}
@@ -1470,6 +1472,9 @@ proc ::gmaproto::clear {obj_id} {
 }
 proc ::gmaproto::clear_chat {silent target} {
 	::gmaproto::_protocol_send CC DoSilently $silent Target $target
+}
+proc ::gmaproto::clear_chat_list {silent targets} {
+	::gmaproto::_protocol_send CC DoSilently $silent TargetMessages $targets
 }
 proc ::gmaproto::clear_from {server_id} {
 	::gmaproto::_protocol_send CLR@ File $server_id
