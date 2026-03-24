@@ -14826,10 +14826,27 @@ proc DisplayChatMessage {d for_user args} {
 				$wpc.1.text tag configure $tag {*}$options
 				DEBUG 3 "Configure tag $tag as $options"
 			}
-			$wc.1.text tag configure pushpin 
-			$wpc.1.text tag configure pushpin 
-			$wc.1.text tag configure delmsg
-			$wpc.1.text tag configure delmsg
+			if {[catch {
+				global tcl_platform
+				if {$tcl_platform(platform) eq "windows"} {
+					set symbolfont [font create "Segoe UI Emoji 16"]
+				} elseif {$tcl_platform(os) eq "darwin"} {
+					set symbolfont [font create "Apple Color Emoji 16"]
+				} else {
+					set symbolfont [font create "Noto Color Emoji 16"]
+				}
+			} err]} {
+				DEBUG 0 "warning: font selection: $err"
+				catch {
+					set symbolfont [::gmaprofile::lookup_font $_preferences [dict get $_preferences styles dierolls components normal font]]
+				} err
+				DEBUG 0 "fallback to $symbolfont $err"
+			}
+			$wc.1.text tag configure pushpin -font $symbolfont
+			$wpc.1.text tag configure pushpin -font $symbolfont 
+			$wc.1.text tag configure delmsg -font $symbolfont
+			$wpc.1.text tag configure delmsg -font $symbolfont
+			DEBUG 0 [$wpc.1.text tag cget pushpin -font]
 			$wc.1.text tag configure .msgid -elide true
 			$wpc.1.text tag configure .msgid -elide true
 			$wpc.1.text tag bind pushpin <1> [list ChatMessageUnpin $wpc.1.text %x %y]
@@ -14978,7 +14995,12 @@ proc _render_chat_message {w system message recipientlist from toall togm {date_
 			}
 			#$w image create end -image $icon_delete
 			if {$pinned && $msgid ne {}} {
-				$w insert end "📌" pushpin $msgid .msgid
+				set pp "📌"
+				if {[string bytelength $pp] != 6} {
+					set pp "\u2bbf"
+				}
+				DEBUG 0 "[encoding system] $pp [string bytelength $pp]"
+				$w insert end $pp pushpin $msgid .msgid
 			}
 			ChatAttribution $w $from $recipientlist $toall $togm
 			if {$markup} {
@@ -14989,7 +15011,7 @@ proc _render_chat_message {w system message recipientlist from toall togm {date_
 				$w insert end $message normal
 			}
 			if {[lsearch -exact $me $from] >= 0 && $msgid ne {}} {
-				$w insert end " ⌫" delmsg $msgid .msgid
+				$w insert end "\u232b" delmsg $msgid .msgid
 			}
 			$w insert end "\n"
 		}
