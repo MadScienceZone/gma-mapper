@@ -3,7 +3,7 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.38.0          <!-- @@##@@ -->
+ * This Package Version: 4.38.1          <!-- @@##@@ -->
  * Effective Date: 24-Mar-2026               <!-- @@##@@ -->
 
 ## Compatibility
@@ -16,6 +16,10 @@
 The support for old server protocols (<400) has ended.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.38.1
+## Fixes
+ * Corrected error where it wasn't expecting a `Y2` protocol message during the login process.
 
 # 4.38
 ## Fixes

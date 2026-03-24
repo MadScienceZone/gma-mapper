@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       ______    _____      _______     #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ___ \    (  __   )    #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \( (___) )   | (  )  |    #
-# | |      | || || || (___) | Assistant  / (_) (_       ___) / \     /    | | /   |    #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ (  / ___ \    | (/ /) |    #
-# | | \_  )| |   | || (   ) | VTT            ) (           ) \( (   ) )   |   / | |    #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /( (___) ) _ |  (__) |    #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/  \_____/ (_)(_______)    #
+#  _______  _______  _______                ___       ______    _____       __         #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ___ \     /  \        #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \( (___) )    \/) )       #
+# | |      | || || || (___) | Assistant  / (_) (_       ___) / \     /       | |       #
+# | | ____ | |(_)| ||  ___  |           (____   _)     (___ (  / ___ \       | |       #
+# | | \_  )| |   | || (   ) | VTT            ) (           ) \( (   ) )      | |       #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /( (___) ) _  __) (_      #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/  \_____/ (_) \____/      #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -17,7 +17,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.38.0}     ;# @@##@@
+set GMAMapperVersion {4.38.1}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {424}         ;# @@##@@
 set CoreVersionNumber {6.44}            ;# @@##@@
@@ -18256,7 +18256,7 @@ proc CustomCondPerson {mob_id condition targeter marker_data} {
 #
 #  called when rendering somone or advancing the initiative turn or updating target attribute
 #
-# @[00]@| GMA-Mapper 4.38.0
+# @[00]@| GMA-Mapper 4.38.1
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2026 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

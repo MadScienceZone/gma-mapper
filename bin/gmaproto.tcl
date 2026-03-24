@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___       ______    _____      _______     #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ___ \    (  __   )    #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \( (___) )   | (  )  |    #
-# | |      | || || || (___) | Assistant  / (_) (_       ___) / \     /    | | /   |    #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ (  / ___ \    | (/ /) |    #
-# | | \_  )| |   | || (   ) | VTT            ) (           ) \( (   ) )   |   / | |    #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /( (___) ) _ |  (__) |    #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/  \_____/ (_)(_______)    #
+#  _______  _______  _______                ___       ______    _____       __         #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ___ \     /  \        #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \( (___) )    \/) )       #
+# | |      | || || || (___) | Assistant  / (_) (_       ___) / \     /       | |       #
+# | | ____ | |(_)| ||  ___  |           (____   _)     (___ (  / ___ \       | |       #
+# | | \_  )| |   | || (   ) | VTT            ) (           ) \( (   ) )      | |       #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /( (___) ) _  __) (_      #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/  \_____/ (_) \____/      #
 #                                                                                      #
 ########################################################################################
 #
@@ -2150,6 +2150,7 @@ proc ::gmaproto::_login {} {
 			}
 			AC	{ ::gmaproto::_dispatch_to_app AC $params }
 			DSM	{ ::gmaproto::_dispatch_to_app DSM $params }
+			Y2	{ ::gmaproto::_dispatch_to_app Y2 $params }
 			REDIRECT {
 				::gmautil::dassign $params Host newhost Port newport Reason reason
 				::INFO "Server ${::gmaproto::host}:${::gmaproto::port} asked us to connect instead to the server at ${newhost}:${newport}"
@@ -2482,7 +2483,7 @@ proc ::gmaproto::normalize_dict {cmd d} {
 	return [::gmaproto::new_dict_from_json $cmd [::gmaproto::json_from_dict $cmd $d]]
 }
 
-# @[00]@| GMA-Mapper 4.38.0
+# @[00]@| GMA-Mapper 4.38.1
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2026 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
