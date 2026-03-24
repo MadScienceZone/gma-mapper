@@ -14871,7 +14871,6 @@ proc ChatMessageUnpin {w x y args} {
 		return
 	}
 	set msgid [lindex $mid 0]
-	DEBUG 0 "unpin $msgid"
 	$w configure -state normal
 	$w delete [lindex $mid 2] [lindex $mid 4]
 	$w configure -state disabled
@@ -14890,7 +14889,7 @@ proc ChatMessageRequestDeletion {w x y args} {
 			-message "This will delete the chat mesage for all players. Are you sure?" \
 			-detail [lindex $mid 1] \
 			-default yes] eq yes} {
-		DEBUG 0 "delete $msgid [lindex $mid 2] [lindex $mid 3]"
+		DEBUG 1 "delete $msgid [lindex $mid 2] [lindex $mid 3]"
 		$w configure -state normal
 		$w delete [lindex $mid 2] [lindex $mid 4]
 		$w configure -state disabled
