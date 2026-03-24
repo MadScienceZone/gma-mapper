@@ -141,7 +141,7 @@ namespace eval ::gmaproto {
 		AUTH    {Client s Response b User s Platform s}
 		AV      {Grid s XView f YView f}
 		BATCH	{ID s Command s Part i Of i Data s Error s}
-		CC      {RequestedBy s DoSilently ? Target i TargetMessages l MessageID i}
+		CC      {RequestedBy s DoSilently ? Target i TargetMessages L MessageID i}
 		CLR     {ObjID s}
 		CLR@    {File s IsLocalFile ?}
 		CO      {Enabled ?}
@@ -1119,6 +1119,20 @@ proc ::gmaproto::_transmit {} {
 }
 
 
+# create a JSON payload string from a Tcl dict value and our protocol definition.
+# The definition (itself a dict) consists of a series of JSON field names mapped to a type descriptor. These may be:
+#	{a T}	array of dictionary objects with type definition T
+# 	b	base-64 encoded binary value
+# 	?	bool value
+#	d	dict value of string key/value pairs
+#	{D T}	dict value mapping of string keys to dict values of type T
+# 	f	float value
+# 	i	integer value
+# 	l 	list of string values
+# 	L	list of integer values
+# 	{o T}	dictionary object with its own "payload" definition dictionary T
+# 	s 	string value
+#
 proc ::gmaproto::_encode_payload {input_dict type_dict} {
 	set a [dict create]
 	foreach {f t} $type_dict {
@@ -1139,6 +1153,15 @@ proc ::gmaproto::_encode_payload {input_dict type_dict} {
 						set ss {}
 						foreach s $v {
 							lappend ss [::json::write string $s]
+						}
+						dict set a $f [::json::write array {*}$ss]
+					}
+				}
+				L {
+					if {[llength $v] > 0} {
+						set ss {}
+						foreach s $v {
+							lappend ss [expr int($s)]
 						}
 						dict set a $f [::json::write array {*}$ss]
 					}
@@ -1326,6 +1349,17 @@ proc ::gmaproto::_construct {input types} {
 					}
 				} else {
 					dict set input $field ""
+				}
+			}
+			L {
+				if {[dict exists $input $field]} {
+					if {[dict get $input $field] eq "null"} {
+						dict set input $field {}
+					} elseif {[catch {llength [dict get $input $field]} err]} {
+						error "value for $field is not a valid list: $err"
+					}
+				} else {
+					dict set input $field {}
 				}
 			}
 			i {
