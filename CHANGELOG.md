@@ -3,19 +3,28 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.37.0          <!-- @@##@@ -->
- * Effective Date: 09-Mar-2026               <!-- @@##@@ -->
+ * This Package Version: 4.38.0          <!-- @@##@@ -->
+ * Effective Date: 24-Mar-2026               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.43 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.44 <!-- @@##@@ -->
  * GMA Mapper File Format: 23	     <!-- @@##@@ -->
- * GMA Mapper Protocol: 423        <!-- @@##@@ -->
+ * GMA Mapper Protocol: 424        <!-- @@##@@ -->
  * GMA Mapper Preferences File Format: 13 <!-- @@##@@ -->
 
 ## DEPRECATION NOTICE
 The support for old server protocols (<400) has ended.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.38
+## Fixes
+## Enhancements
+ * Implements server protocol 424
+   * Adds ability to remove individual chat messages from history.
+   * Adds ability for client to track purged message ranges on the server.
+ * Added "unpin" button for pinned chat messages which allows you to dismiss them permanently from your view when no longer needed.
+ * Added "delete" button to chat messages (but not [yet] die rolls) that you sent, in case you need to delete one that was sent by mistake. This deletes the chat message from history for all users.
 
 # 4.37
 ## Fixes
