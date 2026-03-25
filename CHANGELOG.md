@@ -17,6 +17,10 @@ The support for old server protocols (<400) has ended.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
+# 4.38.3 (unreleased)
+## Fixes
+ * When closing the chat window and opening a new one, it tried creating a font that was already there, causing a "mostly harmless" error message.
+
 # 4.38.2
 ## Fixes
  * Unicode support in Tcl/Tk isn't 100% on all platforms, and testing found that on Windows in particular the pushpin symbol wasn't showing reliably. To address this, the mapper now has a "Styles/Symbols" preference setting which allows you to choose the symbols used for the un-pin button and the one to delete your chat messages. Just pick one you like that displays correctly on your system.
