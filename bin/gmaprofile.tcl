@@ -67,6 +67,8 @@ namespace eval ::gmaprofile {
 		remove   "\u229d"
 		square-x "\u22a0"
 		ballot-x "\u2718"
+		up-arrow "\u2191"
+		add      "\u2295"
 		__default__ "\u22a0"
 	}
 	array set _default_color_table {
@@ -1116,6 +1118,7 @@ namespace eval ::gmaprofile {
 		foreach {mn key title items} {
 			1 pushpin {Un-Pin Message} {pin triangle arrow bullet circle-x ref-mk remove square-x ballot-x}
 			2 delmsg  {Delete Message} {del                       circle-x ref-mk remove square-x ballot-x}
+			3 localpin {Locally Pin Message} {up-arrow add pin ref-mk bullet triangle}
 		} {
 			menu $st.ch.chmenu$mn -type normal -title $title
 			foreach choice $items {
@@ -1877,6 +1880,7 @@ namespace eval ::gmaprofile {
 		  characters [dict create \
 		  	pushpin [dict create name pin] \
 			delmsg  [dict create name del] \
+			localpin [dict create name up-arrow] \
 		  ] \
 		  dialogs [dict create \
 		    heading_fg   [dict create dark cyan   light blue] \

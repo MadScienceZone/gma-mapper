@@ -79,6 +79,7 @@ set ServerState [dict create \
 ]
 set HideBefore -1
 array unset HideList
+array unset PinList
 #
 # convert spaces to something else for dictionary keys to prevent needless data structure nesting
 proc S_ {s} {
@@ -804,7 +805,7 @@ proc InitializeChatHistory {{force_rewrite false}} {
 	global ChatHistoryFile ChatHistory ChatHistoryFileHandle ChatHistoryLastMessageID
 	global path_cache IThost ITport ChatHistoryLimit local_user
 	global ChatHistoryFileDirection ICH_tries
-	global LastDisplayedChatDate HideList HideBefore
+	global LastDisplayedChatDate HideList PinList HideBefore
 	set LastDisplayedChatDate {}
 
 	if {$IThost ne {}} {
@@ -858,6 +859,14 @@ proc InitializeChatHistory {{force_rewrite false}} {
 						} elseif {$ctype eq {-unpin}} {
 							set HideList($c_id) {}
 							continue
+						} elseif {$ctype eq {-pin}} {
+							if {$d eq {out}} {
+								DEBUG 1 "un-pinning locally-pinned message $c_id; before: [array names PinList]"
+								array unset PinList $c_id
+								DEBUG 1 "...after: [array names PinList]"
+							} else {
+								set PinList($c_id) {}
+							}
 						} else {
 							set mid [dict get $d MessageID]
 							if {$mid ne {} && [string is digit -strict $mid] && $mid > 0} {
@@ -903,6 +912,10 @@ proc InitializeChatHistory {{force_rewrite false}} {
 								DEBUG 1 "skipping unpin $msg"
 								continue
 							}
+							if {[lindex $msg 0] eq {-pin}} {
+								DEBUG 1 "skipping pin $msg"
+								continue
+							}
 							update
 							puts $ChatHistoryFileHandle [MarshalChatHistoryEntry $msg]
 						}
@@ -922,17 +935,21 @@ proc InitializeChatHistory {{force_rewrite false}} {
 			}
 		}
 		global ServerState
-		foreach msg [array names HideList] {
-			update
-			if {[set mmid [dict get $ServerState MinimumMessageID]] > 0 && $msg < $mmid} {
-				DEBUG 1 "removing -unpin record $msg earlier than min ID $mmid"
-				continue
+		set mmid [dict get $ServerState MinimumMessageID]
+		set mxmid [dict get $ServerState MaximumMessageID]
+		foreach {src type a1} {HideList -unpin {} PinList -pin in} {
+			foreach msg [array names $src] {
+				update
+				if {$mmid > 0 && $msg < $mmid} {
+					DEBUG 1 "removing $type record $msg earlier than min ID $mmid"
+					continue
+				}
+				if {$mxmid > 0 && $msg > $mxmid} {
+					DEBUG 1 "removing $type record $msg past max ID $mxmid"
+					continue
+				}
+				puts $ChatHistoryFileHandle [MarshalChatHistoryEntry [list $type $a1 $msg]]
 			}
-			if {[set mxmid [dict get $ServerState MaximumMessageID]] > 0 && $msg > $mxmid} {
-				DEBUG 1 "removing -unpin record $msg past max ID $mxmid"
-				continue
-			}
-			puts $ChatHistoryFileHandle [MarshalChatHistoryEntry [list -unpin {} $msg]]
 		}
 		DEBUG 1 "Chat history now has [llength $ChatHistory] items."
 		if {$ChatHistoryLastMessageID <= 0} {
@@ -956,7 +973,7 @@ proc InitializeChatHistory {{force_rewrite false}} {
 set _last_known_message_id 0
 
 #
-# {CC|TO|ROLL|-unpin|-system d|msg id} -> CHAT type jsonified-d
+# {CC|TO|ROLL|-pin|-unpin|-system d|msg id} -> CHAT type jsonified-d|list
 #
 proc MarshalChatHistoryEntry {m} {
 	if {[lindex $m 0] eq {-system}} {
@@ -964,6 +981,9 @@ proc MarshalChatHistoryEntry {m} {
 	}
 	if {[lindex $m 0] eq {-unpin}} {
 		return [list CHAT -unpin [lindex $m 2]]
+	}
+	if {[lindex $m 0] eq {-pin}} {
+		return [list CHAT -pin [list [lindex $m 1] [lindex $m 2]]]
 	}
 	if {[catch {
 		set retval [list CHAT [lindex $m 0] [::gmaproto::_encode_payload [lindex $m 1] [::gmaproto::payload_format [lindex $m 0]]]]
@@ -974,7 +994,7 @@ proc MarshalChatHistoryEntry {m} {
 }
 
 #
-# {CHAT type json} -> {CC|TO|ROLL|-unpin|-system d|msg id}
+# {CHAT type json} -> {CC|TO|ROLL|-pin|-unpin|-system d|msg id}
 #
 proc UnmarshalChatHistoryEntry {m} {
 	if {[lindex $m 1] eq {-system}} {
@@ -982,6 +1002,9 @@ proc UnmarshalChatHistoryEntry {m} {
 	}
 	if {[lindex $m 1] eq {-unpin}} {
 		return [list {-unpin} {} [lindex $m 2]]
+	}
+	if {[lindex $m 1] eq {-pin}} {
+		return [list {-pin} [lindex [lindex $m 2] 0] [lindex [lindex $m 2] 1]]
 	}
 	DEBUG 2 "unmarshal $m"
 	if {[catch {
@@ -995,7 +1018,7 @@ proc UnmarshalChatHistoryEntry {m} {
 
 # ChatHistoryAppend {CC|ROLL|TO d mid}
 # ChatHistoryAppend {-system msg -1}
-# ChatHistoryAppend {-unpin {} mid}
+# ChatHistoryAppend {-unpin in|out mid}
 proc ChatHistoryAppend {event} {
 	global ChatHistory ChatHistoryFileHandle _last_known_message_id ChatHistoryFileDirection
 
@@ -1509,15 +1532,20 @@ proc _setMyTargets {tlist args} {
 
 proc ClearPinnedChats {} {
 	global dice_preset_data
-	global HideList
+	global HideList PinList
 
 	set tkey [root_user_key] 
 	set w $dice_preset_data(cw,$tkey)
 	if {[catch {
 		foreach {start end} [$w.p.pinnedchat.1.text tag ranges .msgid] {
 			set id [$w.p.pinnedchat.1.text get $start $end]
-			set HideList($id) {}
-			ChatHistoryAppend [list -unpin {} $id]
+			if {[info exists PinList($id)]} {
+				array unset PinList $id
+				ChatHistoryAppend [list -pin out $id]
+			} else {
+				set HideList($id) {}
+				ChatHistoryAppend [list -unpin {} $id]
+			}
 			_log_transcription "\[---unpinned message $id---\]"
 		}
 
@@ -10644,16 +10672,17 @@ proc IsMessageHidden {id} {
 }
 
 proc PruneHideList {minid maxid} {
-	global HideList HideBefore
+	global HideList HideBefore PinList
 	if {$HideBefore < $minid} {
 		set HideBefore [expr $minid - 1]
 	}
-	# TODO actually remove all < minid and > maxid from history
-	set hlist [array names HideList]
-	foreach hid $hlist {
-		if {$hid < $minid || $hid > $maxid} {
-			DEBUG 1 "pruned message $hid (out of range $minid-$maxid)"
-			array unset HideList $hid
+	foreach {arr} {HideList PinList} {
+		set hlist [array names $arr]
+		foreach hid $hlist {
+			if {$hid < $minid || $hid > $maxid} {
+				DEBUG 1 "pruned message $hid from $arr (out of range $minid-$maxid)"
+				array unset $arr $hid
+			}
 		}
 	}
 }
@@ -14848,14 +14877,16 @@ proc DisplayChatMessage {d for_user args} {
 				}
 			}
 			$wc.1.text tag configure pushpin -font $symbolfont
+			$wc.1.text tag configure localpin -font $symbolfont
 			$wpc.1.text tag configure pushpin -font $symbolfont 
 			$wc.1.text tag configure delmsg -font $symbolfont
 			$wpc.1.text tag configure delmsg -font $symbolfont
 			$wc.1.text tag configure .msgid -elide true
 			$wpc.1.text tag configure .msgid -elide true
-			$wpc.1.text tag bind pushpin <1> [list ChatMessageUnpin $wpc.1.text %x %y]
+			$wpc.1.text tag bind pushpin <1> [list ChatMessageUnpin $wpc.1.text %x %y $for_user]
 			$wc.1.text tag bind delmsg <1> [list ChatMessageRequestDeletion $wc.1.text %x %y]
 			$wpc.1.text tag bind delmsg <1> [list ChatMessageRequestDeletion $wpc.1.text %x %y]
+			$wc.1.text tag bind localpin <1> [list ChatMessageLocalPin $wc.1.text %x %y $for_user]
 		}
 
 		if {!$no_dice} {
@@ -14886,8 +14917,30 @@ proc DisplayChatMessage {d for_user args} {
 	}
 }
 
-proc ChatMessageUnpin {w x y args} { 
-	global HideList
+proc ChatMessageLocalPin {w x y for_user} {
+	global HideList PinList ChatHistory
+	if {[set mid [_GetHiddenChatMessageID $w $x $y]] eq {}} {
+		return
+	}
+	set msgid [lindex $mid 0]
+	foreach entry $ChatHistory {
+		# <type> <data> <msgid>
+		if {[llength $entry] >= 3 && [lindex $entry 0] eq {TO} && [lindex $entry 2] == $msgid} {
+			set d [lindex $entry 1]
+			set PinList($msgid) {}
+			ChatHistoryAppend [list -pin in $msgid]
+			DisplayChatMessage $d $for_user
+			$w configure -state normal
+			$w delete [lindex $mid 2] [lindex $mid 4]
+			$w configure -state disabled
+			return
+		}
+	}
+	DEBUG 0 "Can't locate message $msgid in chat history."
+}
+
+proc ChatMessageUnpin {w x y for_user} { 
+	global HideList PinList ChatHistory
 	if {[set mid [_GetHiddenChatMessageID $w $x $y]] eq {}} {
 		return
 	}
@@ -14895,8 +14948,24 @@ proc ChatMessageUnpin {w x y args} {
 	$w configure -state normal
 	$w delete [lindex $mid 2] [lindex $mid 4]
 	$w configure -state disabled
-	ChatHistoryAppend [list -unpin {} $msgid]
-	set HideList($msgid) {}
+	if {[info exists PinList($msgid)]} {
+		# locally pinned message, just remove the pin
+		array unset PinList $msgid
+		ChatHistoryAppend [list -pin out $msgid]
+		foreach entry $ChatHistory {
+			# <type> <data> <msgid>
+			if {[llength $entry] >= 3 && [lindex $entry 0] eq {TO} && [lindex $entry 2] == $msgid} {
+				set d [lindex $entry 1]
+				DisplayChatMessage $d $for_user
+				return
+			}
+		}
+		DEBUG 0 "Can't locate message $msgid in chat history."
+	} else {
+		# globally pinned, so this means to suppress it completely
+		ChatHistoryAppend [list -unpin {} $msgid]
+		set HideList($msgid) {}
+	}
 }
 
 proc ChatMessageRequestDeletion {w x y args} {
@@ -14916,6 +14985,10 @@ proc ChatMessageRequestDeletion {w x y args} {
 		$w configure -state disabled
 		global HideList
 		set HideList($msgid) {}
+		if {[info exists PinList($msgid)]} {
+			array unset PinList $msgid
+			ChatHistoryAppend [list -pin out $msgid]
+		}
 		ClearChatHistory [set d [::gmaproto::_construct [dict create TargetMessages [list $msgid] RequestedBy $local_user] [::gmaproto::payload_format CC]]]
 		ChatHistoryAppend [list CC $d -1]
 		::gmaproto::clear_chat_list false [list $msgid]
@@ -14958,13 +15031,16 @@ proc _GetHiddenChatMessageID {w x y} {
 
 proc _render_chat_message {w system message recipientlist from toall togm {date_sent {}} {markup false} {pinned false} {msgid {}}} {
 	global SuppressChat _preferences LastDisplayedChatDate dice_preset_data
-	global icon_delete icon_cross HideList
+	global icon_delete icon_cross HideList PinList
 
 	if {$msgid ne {} && [string is digit -strict $msgid] && $msgid > 0 && [IsMessageHidden $msgid]} {
 		DEBUG 1 "suppressing hidden chat message $msgid ($message)"
 		return
 	}
 
+	if {[info exists PinList($msgid)]} {
+		set pinned true
+	}
 	if {$pinned} {
 		if {[set start [string first .chat.1 $w]] >= 0} {
 			set w [string replace $w $start $start+6 .pinnedchat.1]
@@ -14999,8 +15075,12 @@ proc _render_chat_message {w system message recipientlist from toall togm {date_
 			}
 			#$w image create end -image $icon_delete
 			
-			if {$pinned && $msgid ne {}} {
-				$w insert end [::gmaprofile::SymbolCodeString [dict get $_preferences styles characters pushpin name]] pushpin $msgid .msgid
+			if {$msgid ne {}} {
+				if {$pinned} {
+					$w insert end [::gmaprofile::SymbolCodeString [dict get $_preferences styles characters pushpin name]] pushpin $msgid .msgid
+				} else {
+					$w insert end [::gmaprofile::SymbolCodeString [dict get $_preferences styles characters localpin name]] localpin $msgid .msgid
+				}
 			}
 			ChatAttribution $w $from $recipientlist $toall $togm
 			if {$markup} {
@@ -15065,7 +15145,7 @@ proc ValidateChatHistoryEntry {e} {
 	}
 
 	switch -exact -- [lindex $e 0] {
-		-unpin	{
+		-unpin - -pin {
 			return $e
 		}
 		ROLL {
@@ -15178,7 +15258,7 @@ proc ClearChatHistory {d} {
 		#DEBUG 0 "XXX $details"
 		foreach c $src {
 			switch -exact -- [lindex $c 0] {
-				-system	- -unpin { 
+				-system	- -unpin - -pin { 
 					lappend ChatHistory $c 
 					#DEBUG 0 "retained $c"
 				}
@@ -15244,7 +15324,7 @@ proc PruneChatHistory {minid maxid} {
 			set chat [UnmarshalChatHistoryEntry $c]
 			switch -exact -- [lindex $chat 0] {
 				-system	{ lappend ChatHistory $c }
-				-unpin - ROLL - TO - CC { 
+				-unpin - -pin - ROLL - TO - CC { 
 					if {[set ch_id [lindex $chat 2]] <= 0 || ($ch_id >= $minid && $ch_id <= $maxid)} {
 						lappend ChatHistory $c 
 					}
@@ -15337,7 +15417,7 @@ proc LoadChatHistory {} {
                         _render_chat_message $w 1 "Chat history cleared by $by." {} {} false false
                     }
                 }
-		-unpin {
+		-unpin - -pin {
 			# ignore
 		}
             }
