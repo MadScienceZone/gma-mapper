@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___       ______    _____       __         #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ___ \     /  \        #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \( (___) )    \/) )       #
-# | |      | || || || (___) | Assistant  / (_) (_       ___) / \     /       | |       #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ (  / ___ \       | |       #
-# | | \_  )| |   | || (   ) | VTT            ) (           ) \( (   ) )      | |       #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /( (___) ) _  __) (_      #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/  \_____/ (_) \____/      #
+#  _______  _______  _______                ___       ______    _____      _______     #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ___ \    / ___   )    #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \( (___) )   \/   )  |    #
+# | |      | || || || (___) | Assistant  / (_) (_       ___) / \     /        /   )    #
+# | | ____ | |(_)| ||  ___  |           (____   _)     (___ (  / ___ \      _/   /     #
+# | | \_  )| |   | || (   ) | VTT            ) (           ) \( (   ) )    /   _/      #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /( (___) ) _ (   (__/\    #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/  \_____/ (_)\_______/    #
 #                                                                                      #
 ########################################################################################
 # Profile editor
@@ -53,7 +53,22 @@ namespace eval ::gmaprofile {
 	variable font_repository
 	variable _default_color_table
 	variable minimum_file_version 1
-	variable maximum_file_version 13
+	variable maximum_file_version 14
+	variable _current_file_version 14
+	variable _symbols 
+	array set _symbols {
+		pin      "📌"
+		del      "\u232b"
+		triangle "\u2023"
+		arrow    "\u2199"
+		bullet   "\u23fa"
+		circle-x "\u2bbf"
+		ref-mk   "\u203b"
+		remove   "\u229d"
+		square-x "\u22a0"
+		ballot-x "\u2718"
+		__default__ "\u22a0"
+	}
 	array set _default_color_table {
 		fg,light           #000000
 		normal_fg,light    #000000
@@ -211,6 +226,7 @@ namespace eval ::gmaprofile {
 				grid_major     {o {dark s light s}}
 				preset_name    {o {dark s light s}}
 			}}
+			characters {*D {name s}}
 			dierolls {o {
 				compact_recents ?
 				components {D {
@@ -572,15 +588,25 @@ namespace eval ::gmaprofile {
 	}
 	proc save {filename data} {
 		variable _file_format
+		variable _current_file_version
 
 		json::write indented true
 		json::write aligned true
-		dict set data GMA_Mapper_preferences_version 13
+		dict set data GMA_Mapper_preferences_version $_current_file_version
 		set f [open $filename w]
 		puts $f [::gmaproto::_encode_payload $data $_file_format]
 		close $f
 		json::write indented false
 		json::write aligned false
+	}
+
+	proc _set_symbol_example {var lab val key} {
+		global $var
+		variable _profile
+		variable _symbols
+		set $var $val
+		dict set _profile styles characters $key name $val
+		$lab configure -text $_symbols($val)
 	}
 
 	proc load {filename} {
@@ -612,6 +638,14 @@ namespace eval ::gmaprofile {
 		if {![dict exists $data a11y colorize_die_labels]} {
 			dict set data a11y colorize_die_labels false
 		}
+		set dsty [default_styles]
+		dict for {symbol desc} [dict get $dsty characters] {
+			if {![dict exists $data styles characters $symbol]} {
+				puts "** Preferences data is missing symbol $symbol; setting to default $desc **"
+				dict set data styles characters $symbol $desc
+			}
+		}
+
 		return $data
 	}
 	# ::gmaproto::_construct input types	types={fieldname s|i|f|?|b|a types|o types|d|l}	-> dict
@@ -955,9 +989,11 @@ namespace eval ::gmaprofile {
 		frame $st.c
 		frame $st.cl
 		frame $st.m
+		frame $st.ch
 		$st add $st.f -state normal -sticky news -text Fonts
 		$st add $st.d -state normal -sticky news -text Dialogs
 		$st add $st.r -state normal -sticky news -text {Die Rolls/Chat}
+		$st add $st.ch -state normal -sticky news -text Symbols
 		$st add $st.c -state normal -sticky news -text Colors
 		$st add $st.cl -state normal -sticky news -text Clocks
 		$st add $st.m -state disabled -sticky news -text Markers
@@ -970,6 +1006,9 @@ namespace eval ::gmaprofile {
 #		$st.m.dashmenu add command -label {} -command {::gmaprofile::_marker_dashpattern {}}
 #		$st.m.dashmenu add command -label {--} -command {::gmaprofile::_marker_dashpattern {--}}
 #		$st.m.dashmenu add command -label {..} -command {::gmaprofile::_marker_dashpattern {..}}
+
+
+
 
 		global marker mods marker_desc marker_shape marker_dash marker_color
 		set marker_mods {}
@@ -1072,6 +1111,25 @@ namespace eval ::gmaprofile {
 #	 	grid ^ ^ [label $st.r.ften -text "Font:"] \
 #			 [ttk::menubutton $st.r.ft -menu $st.r.ftmenu -textvariable PEsFT] - - - -sticky w
 		
+
+		# XXX@@@XXXX
+		foreach {mn key title items} {
+			1 pushpin {Un-Pin Message} {pin triangle arrow bullet circle-x ref-mk remove square-x ballot-x}
+			2 delmsg  {Delete Message} {del                       circle-x ref-mk remove square-x ballot-x}
+		} {
+			menu $st.ch.chmenu$mn -type normal -title $title
+			foreach choice $items {
+				$st.ch.chmenu$mn add radiobutton -value $choice \
+					-label $choice \
+					-variable PREF__CH$mn \
+					-command [list ::gmaprofile::_set_symbol_example PREF__CH$mn $st.ch.chex$mn $choice $key]
+			}
+			grid [label $st.ch.chlab$mn -text $title] \
+			     [ttk::menubutton $st.ch.chbtn$mn -menu $st.ch.chmenu$mn -textvariable PREF__CH$mn] \
+			     [label $st.ch.chex$mn] \
+			     -sticky w
+		     	_set_symbol_example PREF__CH$mn $st.ch.chex$mn [dict get $_profile styles characters $key name] $key
+		}
 		grid x [label $st.cl.tl -text {Light Mode}] [label $st.cl.td -text {Dark Mode}]
 		set row 1
 		foreach {wp name fld} {
@@ -1816,6 +1874,10 @@ namespace eval ::gmaprofile {
 		    default_font   "ClockList"\
 		  ] \
 		  markers {} \
+		  characters [dict create \
+		  	pushpin [dict create name pin] \
+			delmsg  [dict create name del] \
+		  ] \
 		  dialogs [dict create \
 		    heading_fg   [dict create dark cyan   light blue] \
 		    normal_fg    [dict create dark [default_color fg dark] light [default_color fg light]] \
@@ -2411,6 +2473,13 @@ namespace eval ::gmaprofile {
 			$s.pass configure -show {}
 			$s.passvis configure -text hide
 		}
+	}
+	proc SymbolCodeString {name} {
+		variable _symbols
+		if {[info exists _symbols($name)]} {
+			return $_symbols($name)
+		}
+		return $_symbols(__default__)
 	}
 }
 

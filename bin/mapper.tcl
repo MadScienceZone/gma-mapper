@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       ______    _____       __         #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ___ \     /  \        #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \( (___) )    \/) )       #
-# | |      | || || || (___) | Assistant  / (_) (_       ___) / \     /       | |       #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ (  / ___ \       | |       #
-# | | \_  )| |   | || (   ) | VTT            ) (           ) \( (   ) )      | |       #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /( (___) ) _  __) (_      #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/  \_____/ (_) \____/      #
+#  _______  _______  _______                ___       ______    _____      _______     #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ___ \    / ___   )    #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \( (___) )   \/   )  |    #
+# | |      | || || || (___) | Assistant  / (_) (_       ___) / \     /        /   )    #
+# | | ____ | |(_)| ||  ___  |           (____   _)     (___ (  / ___ \      _/   /     #
+# | | \_  )| |   | || (   ) | VTT            ) (           ) \( (   ) )    /   _/      #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /( (___) ) _ (   (__/\    #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/  \_____/ (_)\_______/    #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -17,7 +17,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.38.1}     ;# @@##@@
+set GMAMapperVersion {4.38.2}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {424}         ;# @@##@@
 set CoreVersionNumber {6.44}            ;# @@##@@
@@ -14846,7 +14846,6 @@ proc DisplayChatMessage {d for_user args} {
 			$wpc.1.text tag configure pushpin -font $symbolfont 
 			$wc.1.text tag configure delmsg -font $symbolfont
 			$wpc.1.text tag configure delmsg -font $symbolfont
-			DEBUG 0 [$wpc.1.text tag cget pushpin -font]
 			$wc.1.text tag configure .msgid -elide true
 			$wpc.1.text tag configure .msgid -elide true
 			$wpc.1.text tag bind pushpin <1> [list ChatMessageUnpin $wpc.1.text %x %y]
@@ -14994,13 +14993,9 @@ proc _render_chat_message {w system message recipientlist from toall togm {date_
 				}
 			}
 			#$w image create end -image $icon_delete
+			
 			if {$pinned && $msgid ne {}} {
-				set pp "📌"
-				if {[string bytelength $pp] != 6} {
-					set pp "\u2bbf"
-				}
-				DEBUG 0 "[encoding system] $pp [string bytelength $pp]"
-				$w insert end $pp pushpin $msgid .msgid
+				$w insert end [::gmaprofile::SymbolCodeString [dict get $_preferences styles characters pushpin name]] pushpin $msgid .msgid
 			}
 			ChatAttribution $w $from $recipientlist $toall $togm
 			if {$markup} {
@@ -15011,7 +15006,7 @@ proc _render_chat_message {w system message recipientlist from toall togm {date_
 				$w insert end $message normal
 			}
 			if {[lsearch -exact $me $from] >= 0 && $msgid ne {}} {
-				$w insert end "\u232b" delmsg $msgid .msgid
+				$w insert end " [::gmaprofile::SymbolCodeString [dict get $_preferences styles characters delmsg name]]" delmsg $msgid .msgid
 			}
 			$w insert end "\n"
 		}
@@ -18278,7 +18273,7 @@ proc CustomCondPerson {mob_id condition targeter marker_data} {
 #
 #  called when rendering somone or advancing the initiative turn or updating target attribute
 #
-# @[00]@| GMA-Mapper 4.38.1
+# @[00]@| GMA-Mapper 4.38.2
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2026 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
