@@ -135,6 +135,7 @@ set CreatureGridSnap nil
 set suppress_aka false
 set suppress_var false
 set im_not_playing false
+set symbolfont {}
 proc begin_progress { id title max args } {
     if {[catch {
         DEBUG 1 "begin_progress [list $id $title $max $args]"
@@ -14826,21 +14827,25 @@ proc DisplayChatMessage {d for_user args} {
 				$wpc.1.text tag configure $tag {*}$options
 				DEBUG 3 "Configure tag $tag as $options"
 			}
-			if {[catch {
-				global tcl_platform
-				if {$tcl_platform(platform) eq "windows"} {
-					set symbolfont [font create "Segoe UI Emoji 16"]
-				} elseif {$tcl_platform(os) eq "darwin"} {
-					set symbolfont [font create "Apple Color Emoji 16"]
-				} else {
-					set symbolfont [font create "Noto Color Emoji 16"]
+
+			global symbolfont
+			if {$symbolfont eq {}} {
+				if {[catch {
+					global tcl_platform
+					if {$tcl_platform(platform) eq "windows"} {
+						set symbolfont [font create "Segoe UI Emoji 16"]
+					} elseif {$tcl_platform(os) eq "darwin"} {
+						set symbolfont [font create "Apple Color Emoji 16"]
+					} else {
+						set symbolfont [font create "Noto Color Emoji 16"]
+					}
+				} err]} {
+					DEBUG 0 "warning: font selection: $err"
+					catch {
+						set symbolfont [::gmaprofile::lookup_font $_preferences [dict get $_preferences styles dierolls components normal font]]
+					} err
+					DEBUG 0 "fallback to $symbolfont $err"
 				}
-			} err]} {
-				DEBUG 0 "warning: font selection: $err"
-				catch {
-					set symbolfont [::gmaprofile::lookup_font $_preferences [dict get $_preferences styles dierolls components normal font]]
-				} err
-				DEBUG 0 "fallback to $symbolfont $err"
 			}
 			$wc.1.text tag configure pushpin -font $symbolfont
 			$wpc.1.text tag configure pushpin -font $symbolfont 
