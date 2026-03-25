@@ -3,11 +3,11 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.38.2          <!-- @@##@@ -->
- * Effective Date: 24-Mar-2026               <!-- @@##@@ -->
+ * This Package Version: 4.38.3          <!-- @@##@@ -->
+ * Effective Date: 25-Mar-2026               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.44 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.44.1 <!-- @@##@@ -->
  * GMA Mapper File Format: 23	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 424        <!-- @@##@@ -->
  * GMA Mapper Preferences File Format: 13 <!-- @@##@@ -->
@@ -17,9 +17,10 @@ The support for old server protocols (<400) has ended.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
-# 4.38.3 (unreleased)
+# 4.38.3
 ## Fixes
  * When closing the chat window and opening a new one, it tried creating a font that was already there, causing a "mostly harmless" error message.
+ * You can now locally pin regular chat messages to temporarily move them to the pinned message area to keep track of them. Un-pinning these returns them to the regular chat display again. (As opposed to messages sent as pinned messages by their creator, which *only* exist in that area, so when *those* are un-pinned, they disappear entirely.)
 
 # 4.38.2
 ## Fixes
