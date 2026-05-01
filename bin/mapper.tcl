@@ -807,6 +807,7 @@ proc InitializeChatHistory {{force_rewrite false}} {
 	global ChatHistoryFileDirection ICH_tries
 	global LastDisplayedChatDate HideList PinList HideBefore
 	set LastDisplayedChatDate {}
+	set zz 0
 
 	if {$IThost ne {}} {
 		if {$ChatHistoryFileDirection ne {}} {
@@ -836,7 +837,9 @@ proc InitializeChatHistory {{force_rewrite false}} {
 				if {[catch {
 					while {[gets $ChatHistoryFileHandle msg] >= 0} {
 						DEBUG 2 "read $msg from cache"
-						update 
+						if {[incr zz] % 100 == 0} {
+							update 
+						}
 						if {[lindex $msg 0] eq {CHAT}} {
 							# new-style entry:	{CHAT ROLL|TO|CC|-system json-dict}
 							DEBUG 3 "parsing new style message"
@@ -916,7 +919,9 @@ proc InitializeChatHistory {{force_rewrite false}} {
 								DEBUG 1 "skipping pin $msg"
 								continue
 							}
-							update
+							if {[incr zz] % 100 == 0} {
+								update
+							}
 							puts $ChatHistoryFileHandle [MarshalChatHistoryEntry $msg]
 						}
 						flush $ChatHistoryFileHandle
@@ -939,7 +944,9 @@ proc InitializeChatHistory {{force_rewrite false}} {
 		set mxmid [dict get $ServerState MaximumMessageID]
 		foreach {src type a1} {HideList -unpin {} PinList -pin in} {
 			foreach msg [array names $src] {
-				update
+				if {[incr zz] % 100 == 0} {
+					update
+				}
 				if {$mmid > 0 && $msg < $mmid} {
 					DEBUG 1 "removing $type record $msg earlier than min ID $mmid"
 					continue
@@ -5883,10 +5890,10 @@ proc LastAoePoint {w x y} {
 	}
 	ClearAoeGrids $OBJ_CURRENT
 	DrawAoeZone $canvas $OBJ_CURRENT "$X $Y $Points" -grids
-	puts "**********************"
+	#puts "**********************"
 	parray RawAoeGrids
 	dict set OBJdata($OBJ_CURRENT) AoEGrids [DigestRawGridList $gridX $gridY $OBJ_CURRENT]
-	puts "AoEGrids $OBJ_CURRENT [dict get $OBJdata($OBJ_CURRENT) AoEGrids]"
+	#puts "AoEGrids $OBJ_CURRENT [dict get $OBJdata($OBJ_CURRENT) AoEGrids]"
 	aoe_target_prompt [GetAreaZoneTargets $OBJ_CURRENT]
 	
 	EndObj $w 
@@ -10850,7 +10857,7 @@ proc animation_read_metadata {cachedir name zoom} {
 	set f [open [file join $cachedir "${name}@[normalize_zoom ${zoom}].meta"] r]
 	set data [read $f]
 	close $f
-	puts "calling new_dict_from_json command=AI data=($data)"
+	#puts "calling new_dict_from_json command=AI data=($data)"
 	return [::gmaproto::new_dict_from_json AI $data]
 }
 
@@ -12329,10 +12336,10 @@ proc _render_die_roller {w width height type for_user tkey args} {
 	global dice_preset_data last_known_size icon_delete icon_die16 icon_die16g
 	global dark_mode _preferences colortheme icon_blank
 	global DieRollPresetState
-	puts "RDR::start dice_preset_data=[array get dice_preset_data en,*]"
-	puts "RDR::start dice_preset_data=[array get dice_preset_data sys,gvar_on,*]"
-	puts "RDR::start DieRollPresetState=[array get DieRollPresetState *,*on,*]"
-	puts "RDR::start DieRollPresetState=[array get DieRollPresetState *,apply_order]"
+#	puts "RDR::start dice_preset_data=[array get dice_preset_data en,*]"
+#	puts "RDR::start dice_preset_data=[array get dice_preset_data sys,gvar_on,*]"
+#	puts "RDR::start DieRollPresetState=[array get DieRollPresetState *,*on,*]"
+#	puts "RDR::start DieRollPresetState=[array get DieRollPresetState *,apply_order]"
 
 	assert_last_known_size $tkey
 	if {$width <= 0} {
