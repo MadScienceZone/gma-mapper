@@ -7497,6 +7497,7 @@ proc RenderSomeone {w id {norecurse false} args} {
 		# mob_size	grids across/down
 		# iscale	multiplier to turn grids to pixels
 		# is anyone below me?
+		dict set MOBdata($id) _condition $condition
 		set pull_up_bar false
 		set look_y [expr $y + $mob_size]
 		for {set look_x $x} {$look_x < [expr $x+$mob_size]} {set look_x [expr $look_x + 1]} {
@@ -7788,7 +7789,21 @@ proc RenderSomeone {w id {norecurse false} args} {
 			RenderSomeone $w $neighbor true
 		}
 	}
+	RestackMobs $w
 	RefreshTargets
+}
+
+# Run through the creature tokens on the display, and push any of them which are killed or
+# dying under any living creature tokens.
+proc RestackMobs {w} {
+	global MOBdata
+	foreach mob_id [array names MOBdata] {
+		if {![dict get $MOBdata($mob_id) Killed] && ![dict get $MOBdata($mob_id) Hidden] &&
+		 [dict exists $MOBdata($mob_id) _condition] && 
+		 [set c [dict get $MOBdata($mob_id) _condition]] ne "dying"} {
+			 $w raise "M#$mob_id"
+		}
+	}
 }
 
 # returns the MOB id associated with a map element or empty string
