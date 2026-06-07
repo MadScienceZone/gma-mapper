@@ -136,6 +136,7 @@ set CreatureGridSnap nil
 set suppress_aka false
 set suppress_var false
 set im_not_playing false
+set AlreadyWarnedAboutNoTarget false
 set symbolfont {}
 proc begin_progress { id title max args } {
     if {[catch {
@@ -1485,14 +1486,19 @@ proc toggleCombatTargets {mousex mousey args} {
 
 proc EnsureTargetSourceFirst {} {
 	global ActiveTargetSource is_GM
+	global AlreadyWarnedAboutNoTarget
 	
 	if {$is_GM} {
 		if {[llength $ActiveTargetSource] != 0 && [lindex $ActiveTargetSource 0] ne {}} {
 			# The GM can set the target of the creature whose turn it is now
 			set me $ActiveTargetSource
+			set AlreadyWarnedAboutNoTarget false
 		} else {
-			tk_messageBox -type ok -icon error -title "Specify targetting character" \
-				-message "There isn't a current combatant. You need to select one first by pressing shift-T with the mouse over that creature's token."
+			if {!$AlreadyWarnedAboutNoTarget} {
+				tk_messageBox -type ok -icon error -title "Specify targetting character" \
+					-message "There isn't a current combatant. You need to select one first by pressing shift-T with the mouse over that creature's token."
+				set AlreadyWarnedAboutNoTarget true
+			}
 			return {}
 		}
 	} else {
