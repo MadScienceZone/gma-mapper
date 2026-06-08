@@ -3,11 +3,11 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.38.3          <!-- @@##@@ -->
- * Effective Date: 25-Mar-2026               <!-- @@##@@ -->
+ * This Package Version: 4.39          <!-- @@##@@ -->
+ * Effective Date: 07-Jun-2026               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.44.1 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.46.1 <!-- @@##@@ -->
  * GMA Mapper File Format: 23	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 424        <!-- @@##@@ -->
  * GMA Mapper Preferences File Format: 13 <!-- @@##@@ -->
@@ -16,6 +16,14 @@
 The support for old server protocols (<400) has ended.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.39
+## Fixes
+ * Improves chat history updates and display
+   * When updating the full chat history, the display loads faster.
+   * When deleting chat messages, now they are directly removed from display instead of focing a full redraw of the entire list.
+ * Doesn't prompt as often about lack of target when creating context menu.
+ * Forces living creature tokens to be displayed on top of living and dying ones.
 
 # 4.38.3
 ## Fixes
