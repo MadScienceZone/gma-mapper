@@ -1,13 +1,13 @@
 #!/usr/bin/env wish
 ########################################################################################
-#  _______  _______  _______                ___       ______    _____      ______      #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ___ \    / ___  \     #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \( (___) )   \/   \  \    #
-# | |      | || || || (___) | Assistant  / (_) (_       ___) / \     /       ___) /    #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ (  / ___ \      (___ (     #
-# | | \_  )| |   | || (   ) | VTT            ) (           ) \( (   ) )         ) \    #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  /( (___) ) _ /\___/  /    #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/  \_____/ (_)\______/     #
+#  _______  _______  _______                ___       ______    _____                  #
+# (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ___ \                 #
+# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \( (   ) )                #
+# | |      | || || || (___) | Assistant  / (_) (_       ___) /( (___) |                #
+# | | ____ | |(_)| ||  ___  |           (____   _)     (___ (  \____  |                #
+# | | \_  )| |   | || (   ) | VTT            ) (           ) \      ) |                #
+# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  //\____) )                #
+# (_______)|/     \||/     \| Client         (_)  (_)\______/ \______/                 #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -17,10 +17,10 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.38.3}     ;# @@##@@
+set GMAMapperVersion {4.39}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {424}         ;# @@##@@
-set CoreVersionNumber {6.44.1}            ;# @@##@@
+set CoreVersionNumber {6.46.1}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -136,6 +136,7 @@ set CreatureGridSnap nil
 set suppress_aka false
 set suppress_var false
 set im_not_playing false
+set AlreadyWarnedAboutNoTarget false
 set symbolfont {}
 proc begin_progress { id title max args } {
     if {[catch {
@@ -807,6 +808,7 @@ proc InitializeChatHistory {{force_rewrite false}} {
 	global ChatHistoryFileDirection ICH_tries
 	global LastDisplayedChatDate HideList PinList HideBefore
 	set LastDisplayedChatDate {}
+	set zz 0
 
 	if {$IThost ne {}} {
 		if {$ChatHistoryFileDirection ne {}} {
@@ -836,7 +838,9 @@ proc InitializeChatHistory {{force_rewrite false}} {
 				if {[catch {
 					while {[gets $ChatHistoryFileHandle msg] >= 0} {
 						DEBUG 2 "read $msg from cache"
-						update 
+						if {[incr zz] % 100 == 0} {
+							update 
+						}
 						if {[lindex $msg 0] eq {CHAT}} {
 							# new-style entry:	{CHAT ROLL|TO|CC|-system json-dict}
 							DEBUG 3 "parsing new style message"
@@ -916,7 +920,9 @@ proc InitializeChatHistory {{force_rewrite false}} {
 								DEBUG 1 "skipping pin $msg"
 								continue
 							}
-							update
+							if {[incr zz] % 100 == 0} {
+								update
+							}
 							puts $ChatHistoryFileHandle [MarshalChatHistoryEntry $msg]
 						}
 						flush $ChatHistoryFileHandle
@@ -939,7 +945,9 @@ proc InitializeChatHistory {{force_rewrite false}} {
 		set mxmid [dict get $ServerState MaximumMessageID]
 		foreach {src type a1} {HideList -unpin {} PinList -pin in} {
 			foreach msg [array names $src] {
-				update
+				if {[incr zz] % 100 == 0} {
+					update
+				}
 				if {$mmid > 0 && $msg < $mmid} {
 					DEBUG 1 "removing $type record $msg earlier than min ID $mmid"
 					continue
@@ -1478,14 +1486,19 @@ proc toggleCombatTargets {mousex mousey args} {
 
 proc EnsureTargetSourceFirst {} {
 	global ActiveTargetSource is_GM
+	global AlreadyWarnedAboutNoTarget
 	
 	if {$is_GM} {
 		if {[llength $ActiveTargetSource] != 0 && [lindex $ActiveTargetSource 0] ne {}} {
 			# The GM can set the target of the creature whose turn it is now
 			set me $ActiveTargetSource
+			set AlreadyWarnedAboutNoTarget false
 		} else {
-			tk_messageBox -type ok -icon error -title "Specify targetting character" \
-				-message "There isn't a current combatant. You need to select one first by pressing shift-T with the mouse over that creature's token."
+			if {!$AlreadyWarnedAboutNoTarget} {
+				tk_messageBox -type ok -icon error -title "Specify targetting character" \
+					-message "There isn't a current combatant. You need to select one first by pressing shift-T with the mouse over that creature's token."
+				set AlreadyWarnedAboutNoTarget true
+			}
 			return {}
 		}
 	} else {
@@ -5883,10 +5896,10 @@ proc LastAoePoint {w x y} {
 	}
 	ClearAoeGrids $OBJ_CURRENT
 	DrawAoeZone $canvas $OBJ_CURRENT "$X $Y $Points" -grids
-	puts "**********************"
+	#puts "**********************"
 	parray RawAoeGrids
 	dict set OBJdata($OBJ_CURRENT) AoEGrids [DigestRawGridList $gridX $gridY $OBJ_CURRENT]
-	puts "AoEGrids $OBJ_CURRENT [dict get $OBJdata($OBJ_CURRENT) AoEGrids]"
+	#puts "AoEGrids $OBJ_CURRENT [dict get $OBJdata($OBJ_CURRENT) AoEGrids]"
 	aoe_target_prompt [GetAreaZoneTargets $OBJ_CURRENT]
 	
 	EndObj $w 
@@ -7484,6 +7497,7 @@ proc RenderSomeone {w id {norecurse false} args} {
 		# mob_size	grids across/down
 		# iscale	multiplier to turn grids to pixels
 		# is anyone below me?
+		dict set MOBdata($id) _condition $condition
 		set pull_up_bar false
 		set look_y [expr $y + $mob_size]
 		for {set look_x $x} {$look_x < [expr $x+$mob_size]} {set look_x [expr $look_x + 1]} {
@@ -7775,7 +7789,21 @@ proc RenderSomeone {w id {norecurse false} args} {
 			RenderSomeone $w $neighbor true
 		}
 	}
+	RestackMobs $w
 	RefreshTargets
+}
+
+# Run through the creature tokens on the display, and push any of them which are killed or
+# dying under any living creature tokens.
+proc RestackMobs {w} {
+	global MOBdata
+	foreach mob_id [array names MOBdata] {
+		if {![dict get $MOBdata($mob_id) Killed] && ![dict get $MOBdata($mob_id) Hidden] &&
+		 [dict exists $MOBdata($mob_id) _condition] && 
+		 [set c [dict get $MOBdata($mob_id) _condition]] ne "dying"} {
+			 $w raise "M#$mob_id"
+		}
+	}
 }
 
 # returns the MOB id associated with a map element or empty string
@@ -10850,7 +10878,7 @@ proc animation_read_metadata {cachedir name zoom} {
 	set f [open [file join $cachedir "${name}@[normalize_zoom ${zoom}].meta"] r]
 	set data [read $f]
 	close $f
-	puts "calling new_dict_from_json command=AI data=($data)"
+	#puts "calling new_dict_from_json command=AI data=($data)"
 	return [::gmaproto::new_dict_from_json AI $data]
 }
 
@@ -11153,9 +11181,7 @@ proc DoCommandCC {d} {
 
 	ClearChatHistory $d
 	ChatHistoryAppend [list CC $d [dict get $d MessageID]]
-	# TODO: this isn't efficient
-	BlankChatHistoryDisplay
-	LoadChatHistory
+	ReviseChatHistoryDisplay $d
 }
 
 proc DoCommandCLR@ {d} {
@@ -12329,10 +12355,10 @@ proc _render_die_roller {w width height type for_user tkey args} {
 	global dice_preset_data last_known_size icon_delete icon_die16 icon_die16g
 	global dark_mode _preferences colortheme icon_blank
 	global DieRollPresetState
-	puts "RDR::start dice_preset_data=[array get dice_preset_data en,*]"
-	puts "RDR::start dice_preset_data=[array get dice_preset_data sys,gvar_on,*]"
-	puts "RDR::start DieRollPresetState=[array get DieRollPresetState *,*on,*]"
-	puts "RDR::start DieRollPresetState=[array get DieRollPresetState *,apply_order]"
+#	puts "RDR::start dice_preset_data=[array get dice_preset_data en,*]"
+#	puts "RDR::start dice_preset_data=[array get dice_preset_data sys,gvar_on,*]"
+#	puts "RDR::start DieRollPresetState=[array get DieRollPresetState *,*on,*]"
+#	puts "RDR::start DieRollPresetState=[array get DieRollPresetState *,apply_order]"
 
 	assert_last_known_size $tkey
 	if {$width <= 0} {
@@ -14997,18 +15023,21 @@ proc ChatMessageRequestDeletion {w x y args} {
 	}
 }
 
+
 proc _GetHiddenChatMessageID {w x y} {
 	set idx [$w index "@$x,$y"]
+	return [_GetChatMessageIDByLine $w $idx]
+}
+
+proc _GetChatMessageIDByLine {w idx} {
 	if {[catch {
 		set eol [expr int($idx)].end
 		set sol [expr int($idx)].0
 		set nsol [expr int($idx+1)].0
 	} err ]} {
-		DEBUG 0 "Unable to locate message (eol: $err)"
 		return {}
 	}
-	if {[set msgid_idx [$w tag nextrange .msgid $idx $eol]] eq {}} {
-		DEBUG 0 "Unable to locate message (no embedded ID found in range $idx-$eol)"
+	if {[set msgid_idx [$w tag nextrange .msgid $sol $eol]] eq {}} {
 		return {}
 	}
 	return [list [$w get {*}$msgid_idx] [$w get -displaychars $sol $eol] $sol $eol $nsol] 
@@ -15336,6 +15365,72 @@ proc PruneChatHistory {minid maxid} {
 			}
 		}
 		_log_transcription "\[---chat history pruned to $minid-$maxid---\]"
+	}
+}
+
+proc ReviseChatHistoryDisplay {d} {
+	global dice_preset_data local_user
+	set tkey [root_user_key]
+	if {![info exists dice_preset_data(cw,$tkey)] || ![winfo exists $dice_preset_data(cw,$tkey)]} {
+		# we don't have one yet, just start fresh
+		LoadChatHistory
+		return
+	}
+	# Make live updates as directed by the CC reply in dictionary d.
+	# RequestedBy <name>
+	# DoSilently <bool>
+	# TargetMessages [<int> ...]
+	# Target 0=all | -<n>=all but most recent <n> | <n>=all up to message number <n>
+	# MessageID <id of the message ordering this change>
+	# $dice_preset_data(cw,$tkey).p.[pinned]chat.1.text
+	# 	tags 
+	# 		pushpin 	-> ChatMessageUnpin
+	# 		localpin 	-> ChatMessageLocalPin
+	# 		delmsg 		->ChatMessagerequestDeletion
+	# 		.msgid		elided
+	# w search -elide -regexp|-exact -- pat fromindex [stopindex] -> indexoffirstchar|""
+	# _GetHiddenChatMessageID w x y -> messageID of message at screen coords (x,y) or {}
+	foreach w [list $dice_preset_data(cw,$tkey).p.pinnedchat.1.text $dice_preset_data(cw,$tkey).p.chat.1.text] {
+		$w configure -state normal
+		if {[dict exists $d TargetMessages] && [llength [set targets [dict get $d TargetMessages]]] > 0} {
+			# remove messages in the target list
+			set maxlines [$w count -lines 1.0 end]
+			for {set i 1} {$i <= $maxlines} {incr i} {
+				set mid [_GetChatMessageIDByLine $w $i]
+				if {$mid ne {} && [lsearch -exact $targets [lindex $mid 0]] >= 0} {
+					$w delete $i.0 [expr $i+1].0
+					incr i -1
+					incr maxlines -1
+				}
+			}
+		} else {
+			if {[dict exists $d Target] && [set target [dict get $d Target]] < 0} {
+				# remove every message except the most recent n
+				# Probably best left to be reloaded from scratch
+				BlankChatHistoryDisplay
+				LoadChatHistory
+				# this covers all displays, so quit now
+				return
+			} elseif {$target > 0} {
+				# remove every message with id less than n
+				set maxlines [$w count -lines 1 end]
+				for {set i 1} {$i <= $maxlines} {incr i} {
+					set mid [_GetChatMessageIDByLine $w $i]
+					if {$mid ne {} && [lindex $mid 0] < $target} {
+						$w delete $i.0 [expr $i+1].0
+						incr i -1
+						incr maxlines -1
+					}
+				}
+			} else {
+				# remove everything
+				BlankChatHistoryDisplay
+				LoadChatHistory
+				# this covers all displays, so quit now
+				return
+			}
+		}
+		$w configure -state disabled
 	}
 }
 
@@ -18358,7 +18453,7 @@ proc CustomCondPerson {mob_id condition targeter marker_data} {
 #
 #  called when rendering somone or advancing the initiative turn or updating target attribute
 #
-# @[00]@| GMA-Mapper 4.38.3
+# @[00]@| GMA-Mapper 4.39
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2026 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
