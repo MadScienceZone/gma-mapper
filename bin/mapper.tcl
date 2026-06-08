@@ -7497,6 +7497,7 @@ proc RenderSomeone {w id {norecurse false} args} {
 		# mob_size	grids across/down
 		# iscale	multiplier to turn grids to pixels
 		# is anyone below me?
+		dict set MOBdata($id) _condition $condition
 		set pull_up_bar false
 		set look_y [expr $y + $mob_size]
 		for {set look_x $x} {$look_x < [expr $x+$mob_size]} {set look_x [expr $look_x + 1]} {
@@ -7788,7 +7789,21 @@ proc RenderSomeone {w id {norecurse false} args} {
 			RenderSomeone $w $neighbor true
 		}
 	}
+	RestackMobs $w
 	RefreshTargets
+}
+
+# Run through the creature tokens on the display, and push any of them which are killed or
+# dying under any living creature tokens.
+proc RestackMobs {w} {
+	global MOBdata
+	foreach mob_id [array names MOBdata] {
+		if {![dict get $MOBdata($mob_id) Killed] && ![dict get $MOBdata($mob_id) Hidden] &&
+		 [dict exists $MOBdata($mob_id) _condition] && 
+		 [set c [dict get $MOBdata($mob_id) _condition]] ne "dying"} {
+			 $w raise "M#$mob_id"
+		}
+	}
 }
 
 # returns the MOB id associated with a map element or empty string
@@ -11166,9 +11181,7 @@ proc DoCommandCC {d} {
 
 	ClearChatHistory $d
 	ChatHistoryAppend [list CC $d [dict get $d MessageID]]
-	# TODO: this isn't efficient
-	BlankChatHistoryDisplay
-	LoadChatHistory
+	ReviseChatHistoryDisplay $d
 }
 
 proc DoCommandCLR@ {d} {
@@ -15010,18 +15023,21 @@ proc ChatMessageRequestDeletion {w x y args} {
 	}
 }
 
+
 proc _GetHiddenChatMessageID {w x y} {
 	set idx [$w index "@$x,$y"]
+	return [_GetChatMessageIDByLine $w $idx]
+}
+
+proc _GetChatMessageIDByLine {w idx} {
 	if {[catch {
 		set eol [expr int($idx)].end
 		set sol [expr int($idx)].0
 		set nsol [expr int($idx+1)].0
 	} err ]} {
-		DEBUG 0 "Unable to locate message (eol: $err)"
 		return {}
 	}
-	if {[set msgid_idx [$w tag nextrange .msgid $idx $eol]] eq {}} {
-		DEBUG 0 "Unable to locate message (no embedded ID found in range $idx-$eol)"
+	if {[set msgid_idx [$w tag nextrange .msgid $sol $eol]] eq {}} {
 		return {}
 	}
 	return [list [$w get {*}$msgid_idx] [$w get -displaychars $sol $eol] $sol $eol $nsol] 
@@ -15349,6 +15365,72 @@ proc PruneChatHistory {minid maxid} {
 			}
 		}
 		_log_transcription "\[---chat history pruned to $minid-$maxid---\]"
+	}
+}
+
+proc ReviseChatHistoryDisplay {d} {
+	global dice_preset_data local_user
+	set tkey [root_user_key]
+	if {![info exists dice_preset_data(cw,$tkey)] || ![winfo exists $dice_preset_data(cw,$tkey)]} {
+		# we don't have one yet, just start fresh
+		LoadChatHistory
+		return
+	}
+	# Make live updates as directed by the CC reply in dictionary d.
+	# RequestedBy <name>
+	# DoSilently <bool>
+	# TargetMessages [<int> ...]
+	# Target 0=all | -<n>=all but most recent <n> | <n>=all up to message number <n>
+	# MessageID <id of the message ordering this change>
+	# $dice_preset_data(cw,$tkey).p.[pinned]chat.1.text
+	# 	tags 
+	# 		pushpin 	-> ChatMessageUnpin
+	# 		localpin 	-> ChatMessageLocalPin
+	# 		delmsg 		->ChatMessagerequestDeletion
+	# 		.msgid		elided
+	# w search -elide -regexp|-exact -- pat fromindex [stopindex] -> indexoffirstchar|""
+	# _GetHiddenChatMessageID w x y -> messageID of message at screen coords (x,y) or {}
+	foreach w [list $dice_preset_data(cw,$tkey).p.pinnedchat.1.text $dice_preset_data(cw,$tkey).p.chat.1.text] {
+		$w configure -state normal
+		if {[dict exists $d TargetMessages] && [llength [set targets [dict get $d TargetMessages]]] > 0} {
+			# remove messages in the target list
+			set maxlines [$w count -lines 1.0 end]
+			for {set i 1} {$i <= $maxlines} {incr i} {
+				set mid [_GetChatMessageIDByLine $w $i]
+				if {$mid ne {} && [lsearch -exact $targets [lindex $mid 0]] >= 0} {
+					$w delete $i.0 [expr $i+1].0
+					incr i -1
+					incr maxlines -1
+				}
+			}
+		} else {
+			if {[dict exists $d Target] && [set target [dict get $d Target]] < 0} {
+				# remove every message except the most recent n
+				# Probably best left to be reloaded from scratch
+				BlankChatHistoryDisplay
+				LoadChatHistory
+				# this covers all displays, so quit now
+				return
+			} elseif {$target > 0} {
+				# remove every message with id less than n
+				set maxlines [$w count -lines 1 end]
+				for {set i 1} {$i <= $maxlines} {incr i} {
+					set mid [_GetChatMessageIDByLine $w $i]
+					if {$mid ne {} && [lindex $mid 0] < $target} {
+						$w delete $i.0 [expr $i+1].0
+						incr i -1
+						incr maxlines -1
+					}
+				}
+			} else {
+				# remove everything
+				BlankChatHistoryDisplay
+				LoadChatHistory
+				# this covers all displays, so quit now
+				return
+			}
+		}
+		$w configure -state disabled
 	}
 }
 
