@@ -3,8 +3,8 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.39          <!-- @@##@@ -->
- * Effective Date: 07-Jun-2026               <!-- @@##@@ -->
+ * This Package Version: 4.39.1          <!-- @@##@@ -->
+ * Effective Date: 10-Jun-2026               <!-- @@##@@ -->
 
 ## Compatibility
  * GMA Core API Library Version: 6.46.1 <!-- @@##@@ -->
@@ -16,6 +16,10 @@
 The support for old server protocols (<400) has ended.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.39.1
+## Fixes
+ * Corrected minor error in loading chat message cache.
 
 # 4.39
 ## Fixes
