@@ -17,7 +17,7 @@ The support for old server protocols (<400) has ended.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
-# 4.39.1
+# 4.39.1 -2
 ## Fixes
  * Corrected minor error in loading chat message cache.
 

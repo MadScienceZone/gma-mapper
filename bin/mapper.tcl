@@ -81,7 +81,9 @@ set HideBefore -1
 array unset HideList
 array unset PinList
 #
-# convert spaces to something else for dictionary keys to prevent needless data structure nesting
+# convert spaces to something else as needed for marshaling strings
+# (turns out we didn't need this but we'll keep the functions around)
+#
 proc S_ {s} {
 	return [string map {{ } "\u203b"} $s]
 }
@@ -7528,8 +7530,8 @@ proc RenderSomeone {w id {norecurse false} args} {
 	tooltip::tooltip $w -items MN#$id [CreateHealthStatsToolTip $id $condition]
 	set customList {}
 	global PreferencesData
-	if {[set tname [CurrentTargetSource]] ne {} && [info exists MOBdata([set tmid [GetBaseMobID $tname]])] && [dict exists $MOBdata($tmid) TargetedModifiers [S_ $mob_name]] && [dict exists $PreferencesData styles markers] && [set marker_data [dict get $PreferencesData styles markers]] ne {}} {
-		foreach ccond [dict keys [dict get $MOBdata($tmid) TargetedModifiers [S_ $mob_name]]] {
+	if {[set tname [CurrentTargetSource]] ne {} && [info exists MOBdata([set tmid [GetBaseMobID $tname]])] && [dict exists $MOBdata($tmid) TargetedModifiers $mob_name] && [dict exists $PreferencesData styles markers] && [set marker_data [dict get $PreferencesData styles markers]] ne {}} {
+		foreach ccond [dict keys [dict get $MOBdata($tmid) TargetedModifiers $mob_name]] {
 			if {[dict exists $marker_data $ccond]} {
 				lappend customList [list [dict get $marker_data $ccond shape] [dict get $marker_data $ccond color] [dict get $marker_data $ccond dashpattern ]]
 			}
@@ -8873,11 +8875,11 @@ proc CreateConditionSubMenu {args} {
 		if {[set targeter [EnsureTargetSourceFirst]] ne {}} {
 			$mid add separator
 			foreach {name d} $marker_data {
-				set display_name [_S $name]
+				set display_name $name
 				if {[AreMobsInCustomList $mob_list $name $targeter]} {
-					$mid add command -command [list Custom$cmd $mob_list $name $targeter $marker_data] -label $display_name -foreground #ff0000 -state disabled
+					$mid add command -command [list Custom$cmd $mob_list $name $targeter $marker_data] -label $display_name -foreground #ff0000
 				} else {
-					$mid add command -command [list Custom$cmd $mob_list $name $targeter $marker_data] -label $display_name -state disabled
+					$mid add command -command [list Custom$cmd $mob_list $name $targeter $marker_data] -label $display_name
 				}
 			}
 		}
@@ -16313,9 +16315,9 @@ proc SetObjectAttribute {id kvlist} {
 				dict for {monster conds} $dd {
 					dict for {condition details} $conds {
 						if {[dict exists $details Modifiers]} {
-							dict set v TargetedModifiers [S_ $monster] [S_ $condition] Modifiers [dict get $details Modifiers]
+							dict set v TargetedModifiers $monster $condition Modifiers [dict get $details Modifiers]
 						} else {
-							dict set v TargetedModifiers [S_ $monster] [S_ $condition] Modifiers {}
+							dict set v TargetedModifiers $monster $condition Modifiers {}
 						}
 					}
 				}
@@ -18326,7 +18328,7 @@ proc AreMobsInCustomList {mob_list condition targeter} {
 	}
 	set id [GetBaseMobID [lindex $targeter 0]]
 	foreach m $mob_list {
-		if {[info exists MOBdata($id)] && [dict exists $MOBdata($id) TargetedModifiers [S_ [GetMobName $m]] [S_ $condition]]} {
+		if {[info exists MOBdata($id)] && [dict exists $MOBdata($id) TargetedModifiers [GetMobName $m] $condition]} {
 			return true
 		}
 	}
@@ -18358,19 +18360,19 @@ proc CustomCondPerson {mob_id condition targeter marker_data} {
 		return
 	}
 	# toggle presence of this condition for this target
-	if {[dict exists $MOBdata($id) TargetedModifiers [S_ $mob_name] [S_ $condition]]} {
+	if {[dict exists $MOBdata($id) TargetedModifiers $mob_name $condition]} {
 #		DEBUG 0 "removing $condition from $mob_name d=[dict get $MOBdata($id) TargetedModifiers]"
 		# we are targeting them with this condition; remove it
-		dict unset MOBdata($id) TargetedModifiers [S_ $mob_name] [S_ $condition]
+		dict unset MOBdata($id) TargetedModifiers $mob_name $condition
 #		DEBUG 0 "d=[dict get $MOBdata($id) TargetedModifiers]"
-		if {[dict size [dict get $MOBdata($id) TargetedModifiers [S_ $mob_name]]] == 0} {
-			dict unset MOBdata($id) TargetedModifiers [S_ $mob_name]
+		if {[dict size [dict get $MOBdata($id) TargetedModifiers $mob_name]] == 0} {
+			dict unset MOBdata($id) TargetedModifiers $mob_name
 #			DEBUG 0 "removed inner dict; d=[dict get $MOBdata($id) TargetedModifiers]"
 		}
 	} else {
 		# we don't, so set it now
 #		DEBUG 0 "adding $condition to $mob_name d=[dict get $MOBdata($id) TargetedModifiers]"
-		dict set MOBdata($id) TargetedModifiers [S_ $mob_name] [S_ $condition] [dict create \
+		dict set MOBdata($id) TargetedModifiers $mob_name $condition [dict create \
 			Modifiers [dict get $marker_data $condition modifiers] \
 		]
 #		DEBUG 0 "d=[dict get $MOBdata($id) TargetedModifiers]"
