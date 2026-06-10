@@ -3,7 +3,7 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.39.1          <!-- @@##@@ -->
+ * This Package Version: 4.39.2          <!-- @@##@@ -->
  * Effective Date: 10-Jun-2026               <!-- @@##@@ -->
 
 ## Compatibility
