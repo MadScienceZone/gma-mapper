@@ -15413,7 +15413,7 @@ proc ReviseChatHistoryDisplay {d} {
 				return
 			} elseif {$target > 0} {
 				# remove every message with id less than n
-				set maxlines [$w count -lines 1 end]
+				set maxlines [$w count -lines 1.0 end]
 				for {set i 1} {$i <= $maxlines} {incr i} {
 					set mid [_GetChatMessageIDByLine $w $i]
 					if {$mid ne {} && [lindex $mid 0] < $target} {
