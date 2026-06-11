@@ -1,4 +1,12 @@
 #!/usr/bin/env wish
+# TODO not showing description of custom targets (gm and user)
+# TODO not showing custom target info/desc in target's popup info (gm and user)
+# TODO not updating markers when receiving attributes via OA about ourselves from the outside
+#	(such as upon reconnect)
+# TODO implement tracking in socket lib
+# TODO not OA @<char> NewAttrs TargetedModifiers {<target> {<name> {Modifiers [<list>]}}}
+# TODO we need to track who is targeting who w/conditions
+# TODO if that's us, show those markers
 ########################################################################################
 #  _______  _______  _______                ___       ______    _____      _______     #
 # (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ___ \    / ___   )    #
