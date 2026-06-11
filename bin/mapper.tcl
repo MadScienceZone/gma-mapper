@@ -7,6 +7,8 @@
 # TODO not OA @<char> NewAttrs TargetedModifiers {<target> {<name> {Modifiers [<list>]}}}
 # TODO we need to track who is targeting who w/conditions
 # TODO if that's us, show those markers
+# TODO make sure that clearing all the targets can transmit a "clear the list to nil" signal that doesn't get cleared to something empty that looks like "there's nothing here to read at all".
+# TODO die roller tracks these in its own handler
 ########################################################################################
 #  _______  _______  _______                ___       ______    _____      _______     #
 # (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ___ \    / ___   )    #
