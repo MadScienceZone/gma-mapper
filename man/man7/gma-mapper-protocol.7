@@ -1,5 +1,5 @@
 '\" t
-'\" *** 424 ***
+'\" *** 425 ***
 '\" <<ital-is-var>>
 .TH GMA-MAPPER-PROTOCOL 7 "GMA-Mapper 4.39.2" 10-Jun-2026 "Protocols" \" @@mp@@
 .SH NAME
@@ -79,7 +79,7 @@ be implemented to wait synchronously for a server
 response during the authentication negotiation stage.
 .LP
 '\" <</bold-is-fixed>>
-.B "This describes protocol version 424."
+.B "This describes protocol version 425."
 '\" <<bold-is-fixed>>
 These notes are intended to be 
 detailed enough to implement a client from and should be considered
@@ -4489,6 +4489,19 @@ attribute) to an object describing the nature of how that creature is being targ
 with this attribute:
 '\" <<list>>
 .RS
+'\" <<New>>
+.TP
+.BI Tracer " (bool)"
+If present and true, a line should be drawn between the targeting
+creature and the target on the map.
+.TP
+.B Description
+Free-form description of the effect the custom condition has
+on the targeted creature. This SHOULD be displayed on the map
+for the player's reference along with other conditions in effect
+on the creature. (For example, if the mouse is hovered over
+the creature's token.)
+'\" <</New>>
 .TP
 .B Type
 The custom target type, as a free-form string, typically something like \*(lqstudied\*(rq or \*(lqsmite evil\*(rq, etc.
@@ -5185,14 +5198,21 @@ Steve Willoughby / steve@madscience.zone;
 John Mechalas (elevation and movement modes).
 .SH HISTORY
 .LP
-This document defines map protocol version 424,
-which adds the capability to clear specific, individual messages
+This document defines map protocol version 425,
+which adds the
+.B Tracer
+and
+.B Description
+fields to targeted condition markers.
+.LP
+Historically, protocol version 424
+added the capability to clear specific, individual messages
 from the chat history and reports the extreme range of valid message
 IDs upon connection to the server in the new
 .B Y2
 message.
 .LP
-Historically, protocol version 423
+Protocol version 423
 added the
 .B TargetedModifiers
 attribute to creatures and introduced the concept of payload splitting for large data sizes via the

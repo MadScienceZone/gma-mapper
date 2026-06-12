@@ -53,8 +53,8 @@ namespace eval ::gmaprofile {
 	variable font_repository
 	variable _default_color_table
 	variable minimum_file_version 1
-	variable maximum_file_version 14
-	variable _current_file_version 14
+	variable maximum_file_version 15
+	variable _current_file_version 15
 	variable _symbols 
 	array set _symbols {
 		pin      "📌"
@@ -247,6 +247,7 @@ namespace eval ::gmaprofile {
 				shape s
 				dashpattern s
 				description s
+				tracer ?
 			}}
 		}}
 	}
@@ -1012,12 +1013,13 @@ namespace eval ::gmaprofile {
 
 
 
-		global marker mods marker_desc marker_shape marker_dash marker_color
+		global marker mods marker_desc marker_shape marker_dash marker_color marker_tracer_en
 		set marker_mods {}
 		set marker_desc {}
 		set marker_shape circle
 		set marker_dash {}
 		set marker_color black
+		set marker_tracer_en false
 
 		grid [label $st.m.title -text "Define custom markers you can place on creatures to denote things like studied or smite evil targets, etc."] - -
 		grid [listbox $st.m.markers -yscrollcommand "$st.m.scroll set" -selectmode browse \
@@ -1047,7 +1049,7 @@ Any die rolls made against a creature targeted with this marker on it will be ma
 		grid [button $st.m.color -bg $marker_color -text [::gmacolors::rgb_name $marker_color] -state disabled \
 			-highlightcolor $marker_color -highlightbackground $marker_color -highlightthickness 2 \
 			-command "::gmaprofile::_set_marker_color $st.m $st.m.color"] -row 8 -column 2 -sticky we -padx 1 -pady 1
-		
+		grid ^ ^ [ttk::checkbutton $st.m.tracer -text "Draw tracer line" -variable marker_tracer_en -command "::gmaprofile::_set_marker_tracer $st.m" -state disabled] -sticky w
 
 		#XXX
 		#XXX modifiers color shape description dashpattern
@@ -1558,18 +1560,20 @@ Any die rolls made against a creature targeted with this marker on it will be ma
 	proc _push_marker {w name} {
 		DEBUG 0 "_push_marker $w $name"
 		variable _profile
-		global marker_mods marker_desc marker_shape marker_dash marker_color
+		global marker_mods marker_desc marker_shape marker_dash marker_color marker_tracer_en
 		if {$name eq {} || ![dict exists $_profile styles markers $name]} {
 			$w.mods configure -state disabled
 			$w.desc configure -state disabled
 			$w.shape configure -state disabled
 			$w.dash configure -state disabled
 			$w.color configure -state disabled
+			$w.tracer configure -state disabled
 			set marker_mods {}
 			set marker_desc {}
 			set marker_shape O
 			set marker_dash {}
 			set marker_color black
+			set marker_tracer_en false
 			#_draw_marker
 			::gmaprofile::_marker_dashpattern $w {}
 			::gmaprofile::_marker_shape $w O
@@ -1581,9 +1585,11 @@ Any die rolls made against a creature targeted with this marker on it will be ma
 			$w.shape configure -state normal
 			$w.dash configure -state normal
 			$w.color configure -state normal
-			::gmautil::dassign [dict get $_profile styles markers $name] modifiers marker_mods description marker_desc shape m_shape dashpattern m_dash color marker_color
+			$w.tracer configure -state normal
+			::gmautil::dassign [dict get $_profile styles markers $name] modifiers marker_mods description marker_desc shape m_shape dashpattern m_dash color marker_color tracer marker_tracer_en
 			::gmaprofile::_marker_dashpattern $w $m_dash $name
 			::gmaprofile::_marker_shape $w $m_shape $name
+			::gmaprofile::_set_marker_tracer $w
 			::gmaprofile::_set_marker_color $w $w.color $marker_color
 		}
 	}
@@ -1599,15 +1605,30 @@ Any die rolls made against a creature targeted with this marker on it will be ma
 		}
 	}
 
+	proc _set_marker_tracer {s} {
+		global marker_tracer_en
+		if {[set markername [_selected_marker_name $s.markers]] ne {}} {
+			dict set _profile styles markers $markername tracer $marker_tracer_en 
+		}
+		_draw_marker $s $markername
+	}
+
 	proc _draw_marker {tab name} {
 		$tab.c delete Sample__Marker
 		if {$name ne {}} {
 			global marker_dash
 			global marker_color
 			global marker_shape
+			global marker_tracer_en
 			variable _profile
 			set shape [dict get $_profile styles markers $name shape]
+			catch {
+				$tab.c delete markertracer
+			}
 			::_DrawCreatureStatusMarkers $tab.c 25 25 100 [list Sample__Marker] {} {} [list [list $shape $marker_color $marker_dash]]
+			if {$marker_tracer_en} {
+				$tab.c create line 0 25 50 25 -width 5 -fill {..} -dash $marker_dash -tags markertracer
+			}
 		}
 	}
 

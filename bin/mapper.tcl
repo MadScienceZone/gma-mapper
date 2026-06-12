@@ -1,4 +1,7 @@
 #!/usr/bin/env wish
+# TODO CustomCondPerson	 from DoContext
+# TODO CustomCondAll	 from DoContext
+#
 # TODO not showing description of custom targets (gm and user)
 # TODO not showing custom target info/desc in target's popup info (gm and user)
 # TODO not updating markers when receiving attributes via OA about ourselves from the outside
@@ -7540,6 +7543,7 @@ proc RenderSomeone {w id {norecurse false} args} {
 	tooltip::tooltip $w -items MN#$id [CreateHealthStatsToolTip $id $condition]
 	set customList {}
 	global PreferencesData
+	# TODO setting up custom list here 
 	if {[set tname [CurrentTargetSource]] ne {} && [info exists MOBdata([set tmid [GetBaseMobID $tname]])] && [dict exists $MOBdata($tmid) TargetedModifiers $mob_name] && [dict exists $PreferencesData styles markers] && [set marker_data [dict get $PreferencesData styles markers]] ne {}} {
 		foreach ccond [dict keys [dict get $MOBdata($tmid) TargetedModifiers $mob_name]] {
 			if {[dict exists $marker_data $ccond]} {
@@ -16318,7 +16322,7 @@ proc SetObjectAttribute {id kvlist} {
 		if {$datatype eq "PS" && $k eq "CustomReach"} {
 			set v [::gmaproto::new_dict CustomReach {*}$v]
 		}
-		if {$datatype eq "PS" && $k eq "TargetedModifiers"} {
+		if {$datatype eq "PS" && $k eq "TargetedModifiers"} {	;# TODO
 			set dd $v
 			if {[catch {
 				set v {}
@@ -18339,18 +18343,25 @@ proc AreMobsInCustomList {mob_list condition targeter} {
 	set id [GetBaseMobID [lindex $targeter 0]]
 	foreach m $mob_list {
 		if {[info exists MOBdata($id)] && [dict exists $MOBdata($id) TargetedModifiers [GetMobName $m] $condition]} {
+			# TODO
 			return true
 		}
 	}
 	return false
 }
 
+# Apply a custom marker to a list of creatures
 proc CustomCondAll {mob_list condition targeter marker_data} {
 	foreach mob_id $mob_list {
 		CustomCondPerson $mob_id $condition $targeter $marker_data
 	}
 }
 
+# Apply a custom marker to a creature
+# mob_id and targeter can be a creature ID, @name, name, or PC name
+# condition the custom-defined name for a condition from our preferences
+# targeter is forced to be first element if given as a list
+# marker_data is the source of all marker data from our preferences data (dict keyed by conditionname)
 proc CustomCondPerson {mob_id condition targeter marker_data} {
 	global MOBdata
 	if {[llength $targeter] == 0} {
@@ -18382,8 +18393,14 @@ proc CustomCondPerson {mob_id condition targeter marker_data} {
 	} else {
 		# we don't, so set it now
 #		DEBUG 0 "adding $condition to $mob_name d=[dict get $MOBdata($id) TargetedModifiers]"
+		set mdata [dict get $marker_data $condition]
 		dict set MOBdata($id) TargetedModifiers $mob_name $condition [dict create \
-			Modifiers [dict get $marker_data $condition modifiers] \
+			Modifiers [dict get $mdata modifiers] \
+			Type $condition \
+			Shape [dict get $mdata shape] \
+			Color "[dict get $mdata dashpattern][dict get $mdata color]" \
+			Tracer [dict get $mdata tracer] \
+			Description [dict get $mdata description] \
 		]
 #		DEBUG 0 "d=[dict get $MOBdata($id) TargetedModifiers]"
 	}

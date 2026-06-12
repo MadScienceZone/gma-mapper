@@ -48,7 +48,7 @@
 # 	::report_progress message
 # 	::say message
 
-package provide gmaproto 1.4.2
+package provide gmaproto 1.4.3
 package require Tcl 8.5
 package require json 1.3.3
 package require json::write 1.0.3
@@ -56,9 +56,9 @@ package require base64 2.4.2
 package require uuid 1.0.1
 
 namespace eval ::gmaproto {
-	variable protocol 424
+	variable protocol 425
 	variable min_protocol 400
-	variable max_protocol 424
+	variable max_protocol 425
 	variable max_max_protocol 499
 	variable maximum_message_length 61440 
 	variable frag_size 32768
@@ -186,7 +186,7 @@ namespace eval ::gmaproto {
 		PRIV    {Command s Reason s}
 		POLO    {}
 		PROGRESS {OperationID s Title s Value i MaxValue i IsDone ? Targets l IsTimer ?}
-		PS      {ID s Name s Health {o {MaxHP i TmpHP i TmpDamage i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i AC i FlatFootedAC i TouchAC i CMD i}} Gx f Gy f Skin i SkinSize l PolyGM ? Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}} Targets l TargetedModifiers {D {D {o {Modifiers l}}}}}
+		PS      {ID s Name s Health {o {MaxHP i TmpHP i TmpDamage i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i AC i FlatFootedAC i TouchAC i CMD i}} Gx f Gy f Skin i SkinSize l PolyGM ? Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}} Targets l TargetedModifiers {D {D {o {Tracer ? Type s Modifiers l Shape s Color s Description s}}}}}
 		READY   {}
 		REDIRECT {Host s Port i Reason s}
 		ROLL    {Replay ? Sender s Recipients l MessageID i ToAll ? ToGM ? Title s Result {o {InvalidRequest ? ResultSuppressed ? Result i Details {a {Type s Value s}}}} RequestID s MoreResults ? Sent s Origin ? Targets l Type s}
