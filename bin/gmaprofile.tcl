@@ -228,7 +228,7 @@ namespace eval ::gmaprofile {
 				grid_major     {o {dark s light s}}
 				preset_name    {o {dark s light s}}
 			}}
-			characters {*D {name s}}
+			characters {D {name s}}
 			dierolls {o {
 				compact_recents ?
 				components {D {
@@ -241,7 +241,7 @@ namespace eval ::gmaprofile {
 					offset i
 				}}
 			}}
-			markers {*D {
+			markers {D {
 				modifiers l
 				color s
 				shape s
@@ -1049,7 +1049,7 @@ Any die rolls made against a creature targeted with this marker on it will be ma
 		grid [button $st.m.color -bg $marker_color -text [::gmacolors::rgb_name $marker_color] -state disabled \
 			-highlightcolor $marker_color -highlightbackground $marker_color -highlightthickness 2 \
 			-command "::gmaprofile::_set_marker_color $st.m $st.m.color"] -row 8 -column 2 -sticky we -padx 1 -pady 1
-		grid ^ ^ [ttk::checkbutton $st.m.tracer -text "Draw tracer line" -variable marker_tracer_en -command "::gmaprofile::_set_marker_tracer $st.m" -state disabled] -sticky w
+		grid [ttk::checkbutton $st.m.tracer -text "Draw tracer line" -variable marker_tracer_en -command "::gmaprofile::_set_marker_tracer $st.m" -state disabled] - -sticky w
 
 		#XXX
 		#XXX modifiers color shape description dashpattern
@@ -1607,6 +1607,7 @@ Any die rolls made against a creature targeted with this marker on it will be ma
 
 	proc _set_marker_tracer {s} {
 		global marker_tracer_en
+		variable _profile
 		if {[set markername [_selected_marker_name $s.markers]] ne {}} {
 			dict set _profile styles markers $markername tracer $marker_tracer_en 
 		}
@@ -1627,7 +1628,7 @@ Any die rolls made against a creature targeted with this marker on it will be ma
 			}
 			::_DrawCreatureStatusMarkers $tab.c 25 25 100 [list Sample__Marker] {} {} [list [list $shape $marker_color $marker_dash]]
 			if {$marker_tracer_en} {
-				$tab.c create line 0 25 50 25 -width 5 -fill {..} -dash $marker_dash -tags markertracer
+				$tab.c create line 0 25 50 25 -width 5 -fill $marker_color -dash {..} -tags markertracer
 			}
 		}
 	}

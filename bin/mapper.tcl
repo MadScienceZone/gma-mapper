@@ -1,7 +1,4 @@
 #!/usr/bin/env wish
-# TODO CustomCondPerson	 from DoContext
-# TODO CustomCondAll	 from DoContext
-#
 # TODO not showing description of custom targets (gm and user)
 # TODO not showing custom target info/desc in target's popup info (gm and user)
 # TODO not updating markers when receiving attributes via OA about ourselves from the outside
@@ -10,7 +7,7 @@
 # TODO not OA @<char> NewAttrs TargetedModifiers {<target> {<name> {Modifiers [<list>]}}}
 # TODO we need to track who is targeting who w/conditions
 # TODO if that's us, show those markers
-# TODO make sure that clearing all the targets can transmit a "clear the list to nil" signal that doesn't get cleared to something empty that looks like "there's nothing here to read at all".
+# DONE make sure that clearing all the targets can transmit a "clear the list to nil" signal that doesn't get cleared to something empty that looks like "there's nothing here to read at all".
 # TODO die roller tracks these in its own handler
 ########################################################################################
 #  _______  _______  _______                ___       ______    _____      _______     #
@@ -98,11 +95,13 @@ array unset PinList
 # (turns out we didn't need this but we'll keep the functions around)
 #
 proc S_ {s} {
+	DEBUG 0 "WARNING: obsolete function S_ called"
 	return [string map {{ } "\u203b"} $s]
 }
 
 # and the inverse
 proc _S {s} {
+	DEBUG 0 "WARNING: obsolete function _S called"
 	return [string map {"\u203b" { }} $s]
 }
 #
@@ -6599,6 +6598,7 @@ proc CreatureStatusMarker {w id x y s calc_condition {customList {}}} {
 
 proc _DrawCreatureStatusMarkers {w x y s tags conditions id {customlist {}}} {
 	global MOBdata MarkerColor MarkerShape
+	# TODO add to tooltip and draw tracers
 
 	set Vo   0; # V triangle around token full size
 	set To   0; # ^ triangle around token full size
@@ -6635,13 +6635,13 @@ proc _DrawCreatureStatusMarkers {w x y s tags conditions id {customlist {}}} {
 			} else {
 				set dashpattern {}
 			}
-			lappend customlist [list $shape $color $dashpattern]
+			lappend customlist [list $shape $color $dashpattern {} {}]
 		}
 	}
 	#DEBUG 0 "draw $w $x $y $s $tags $conditions -> $customlist"
 
 	foreach marker $customlist {
-			lassign $marker shape color dashpattern
+			lassign $marker shape color dashpattern description tracer_id
 			#DEBUG 0 "shape=$shape color=$color dash=$dashpattern"
 			# calculate border color
 			lassign [winfo rgb . $color] fillR fillG fillB
@@ -7078,6 +7078,7 @@ proc RenderSomeone {w id {norecurse false} args} {
 	global MOBdata ThreatLineWidth iscale SelectLineWidth ThreatLineHatchWidth ReachLineColor
 	global HealthBarWidth HealthBarFrameWidth HealthBarConditionFrameWidth
 	global ShowHealthStats is_GM
+	global LocalMarker
 	set lower_neighbors {}
 
 	#
@@ -7544,11 +7545,25 @@ proc RenderSomeone {w id {norecurse false} args} {
 	set customList {}
 	global PreferencesData
 	# TODO setting up custom list here 
-	if {[set tname [CurrentTargetSource]] ne {} && [info exists MOBdata([set tmid [GetBaseMobID $tname]])] && [dict exists $MOBdata($tmid) TargetedModifiers $mob_name] && [dict exists $PreferencesData styles markers] && [set marker_data [dict get $PreferencesData styles markers]] ne {}} {
+	if {[set tname [CurrentTargetSource]] ne {} && [info exists MOBdata([set tmid [GetBaseMobID $tname]])] && [dict exists $MOBdata($tmid) TargetedModifiers $mob_name]} {
+		if {[dict exists $PreferencesData styles markers]} {
+			set marker_data [dict get $PreferencesData styles markers]
+		} else {
+			set marker_data {}
+		}
 		foreach ccond [dict keys [dict get $MOBdata($tmid) TargetedModifiers $mob_name]] {
 			if {[dict exists $marker_data $ccond]} {
-				lappend customList [list [dict get $marker_data $ccond shape] [dict get $marker_data $ccond color] [dict get $marker_data $ccond dashpattern ]]
+				set mdata [dict get $marker_data $ccond]
+			} else {
+				set mdata [dict get $MOBdata($tmid) TargetedModifiers $mob_name $ccond]
 			}
+
+			if {[dict get $mdata tracer]} {
+				set tracer_id $tmid
+			} else {
+				set tracer_id {}
+			}
+			lappend customList [list [dict get $mdata shape] [dict get $mdata color] [dict get $mdata dashpattern] [dict get $mdata description] $tracer_id]
 		}
 	}
 	CreatureStatusMarker $w $id [expr $x*$iscale] [expr $y*$iscale] [expr $mob_size*$iscale] $condition $customList
@@ -18396,7 +18411,6 @@ proc CustomCondPerson {mob_id condition targeter marker_data} {
 		set mdata [dict get $marker_data $condition]
 		dict set MOBdata($id) TargetedModifiers $mob_name $condition [dict create \
 			Modifiers [dict get $mdata modifiers] \
-			Type $condition \
 			Shape [dict get $mdata shape] \
 			Color "[dict get $mdata dashpattern][dict get $mdata color]" \
 			Tracer [dict get $mdata tracer] \

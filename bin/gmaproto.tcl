@@ -130,7 +130,7 @@ namespace eval ::gmaproto {
 		update_turn               I
 	}
 	array set _message_payload {
-		AC      {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l PolyGM ? Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}} Targets l TargetedModifiers {D {D {o {Modifiers l}}}}}
+		AC      {ID s Name s Health {o {MaxHP i TmpHP i TmpDamage i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i AC i FlatFootedAC i TouchAC i CMD i}} Gx f Gy f Skin i SkinSize l PolyGM ? Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}} Targets l TargetedModifiers {D {D {o {Tracer ? Type s Modifiers l Shape s Color s Description s}}}}}
 		ACCEPT  {Messages l}
 		AA      {Name s Format s File s IsLocalFile ?}
 		AA?     {Name s}
@@ -615,10 +615,8 @@ proc ::gmaproto::_attribute_encode {k v} {
 
 		TargetedModifiers {
 			return [json::write object {*}[dict map {dk dv} $v {
-				set dk [::_S $dk]
 				set dv [json::write object {*}[dict map {dkk dvv} $dv {
-					set dkk [::_S $dkk]
-					set dvv [::gmaproto::_encode_payload $dvv {Modifiers l}]
+					set dvv [::gmaproto::_encode_payload $dvv {Tracer ? Type s Modifiers l Shape s Color s Description s}]
 				}]]
 			}]]
 		}
@@ -1136,10 +1134,11 @@ proc ::gmaproto::_transmit {} {
 proc ::gmaproto::_encode_payload {input_dict type_dict} {
 	set a [dict create]
 	foreach {f t} $type_dict {
-		if {[string range $t 0 0] eq "*"} {
-			set f [::_S $f]
-			set t [string range $t 1 end]
-		}
+# obsolete
+#		if {[string range $t 0 0] eq "*"} {
+#			set f [::_S $f]
+#			set t [string range $t 1 end]
+#		}
 		if {[dict exists $input_dict $f]} {
 			set v [dict get $input_dict $f]
 			switch -exact -- [lindex $t 0] {
@@ -1437,7 +1436,6 @@ proc ::gmaproto::_construct {input types} {
 					dict set input $field {}
 				}
 			}
-			*D -
 			D {
 				if {[dict exists $input $field]} {
 					if {[set srcdata [dict get $input $field]] eq "null"} {
@@ -1452,14 +1450,14 @@ proc ::gmaproto::_construct {input types} {
 					dict set input $field {}
 				}
 
-				# TODO this isn't a perfect solution, should refactor
-				if {[string range [lindex $t 0] 0 0] eq "*"} {
-					set newname [::S_ $field]
-					if {$newname ne $field} {
-						dict set input $newname [dict get $input $field]
-						dict unset input $field
-					}
-				}
+#obsolete
+#				if {[string range [lindex $t 0] 0 0] eq "*"} {
+#					set newname [::S_ $field]
+#					if {$newname ne $field} {
+#						dict set input $newname [dict get $input $field]
+#						dict unset input $field
+#					}
+#				}
 			}
 			d {
 				if {[dict exists $input $field] && [dict get $input $field] ne "null"} {
