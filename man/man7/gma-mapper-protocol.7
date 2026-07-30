@@ -4002,10 +4002,12 @@ client itself does this correctly starting with version 3.39.
 Attribute names may be hierarchical, where an attribute is actually a complex structure
 containing sub-fields. In this case, the attribute name as specified in the keys of the
 .B NewAttrs
-field object use dot notation to separate each level of name to indicate the nested level
-of field names within the attribute. For example, You can use the
+field object uses dot notation to separate each level of 
+.B name 
+to indicate the nested level
+of field names within the attribute. For example, you can use the
 .B OA
-server message to set a creture's 
+server message to set a creature's 
 .B Health
 attribute by naming just the attribute as 
 .RB \*(lq Health \*(rq,
@@ -4504,7 +4506,12 @@ the creature's token.)
 '\" <</New>>
 .TP
 .B Type
-The custom target type, as a free-form string, typically something like \*(lqstudied\*(rq or \*(lqsmite evil\*(rq, etc.
+The custom target type, as a free-form string, typically something like 
+.RB \*(lq studied \*(rq 
+or 
+.RB \*(lq smite 
+.BR evil \*(rq, 
+etc.
 .TP
 .BI Modifiers " (list)"
 A list of modifier names. When this creature name appears in the creature's
