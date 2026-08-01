@@ -6898,7 +6898,7 @@ proc RefreshTargets {} {
 
 	$canvas delete SRCTARG
 	if {[catch {
-		if {$ActiveTargetSource ne {} && [info exists MOBid($ActiveTargetSource)] && [info exists MOBdata([set tid $MOBid($ActiveTargetSource)])]} {
+		if {$ActiveTargetSource ne {} && [info exists MOBid([lindex $ActiveTargetSource 0])] && [info exists MOBdata([set tid $MOBid([lindex $ActiveTargetSource 0])])]} {
 #			DEBUG 0 "src id $tid -> [dict get $MOBdata($tid)]"
 			::gmautil::dassign [dict get $MOBdata($tid)] Gx gx Gy gy Hidden h
 			set sz [_mob_size $tid]
@@ -6936,8 +6936,9 @@ proc RefreshTargets {} {
 	set ActiveTargetList {}
 	if {$is_GM} {
 		# ... unless we said otherwise
-		if {$ExplicitTargetSource ne {} && [info exists MOBid($ExplicitTargetSource)] && [info exists MOBdata([set tid $MOBid($ExplicitTargetSource)])]} {
-			if {[dict exists [set d $MOBdata($tid)]] Targets} {
+		set tid {n/a}
+		if {$ExplicitTargetSource ne {} && [info exists MOBid([lindex $ExplicitTargetSource 0])] && [info exists MOBdata([set tid $MOBid([lindex $ExplicitTargetSource 0])])]} {
+			if {[dict exists [set d $MOBdata($tid)] Targets]} {
 				set ActiveTargetList [dict get $d Targets]
 			}
 			set ActiveTargetSource $ExplicitTargetSource
@@ -6950,7 +6951,7 @@ proc RefreshTargets {} {
 		}
 		$canvas delete SRCTARG
 		if {[catch {
-			if {$ActiveTargetSource ne {} && [info exists MOBid($ActiveTargetSource)] && [info exists MOBdata([set tid $MOBid($ActiveTargetSource)])]} {
+			if {$ActiveTargetSource ne {} && [info exists MOBid([lindex $ActiveTargetSource 0])] && [info exists MOBdata([set tid $MOBid([lindex $ActiveTargetSource 0])])]} {
 				::gmautil::dassign [dict get $MOBdata($tid)] Gx gx Gy gy
 				set sz [_mob_size $tid]
 				$canvas create rect [expr $gx*$iscale] [expr $gy*$iscale] [expr ($gx+$sz)*$iscale] [expr ($gy+$sz)*$iscale] -outline green -width 4 -tags SRCTARG -dash .
@@ -10915,6 +10916,8 @@ proc DoCommandCS {d} {
 }
 
 proc DoCommandIL {d} {
+	global ExplicitTargetSource
+	set ExplicitTargetSource {}
 	if {[::gmaclock::exists .initiative.clock]} {
 		::gmaclock::set_initiative_slots .initiative.clock [dict get $d InitiativeList]
 	}
@@ -11440,6 +11443,8 @@ proc DoCommandI {d} {
 	global MOB_COMBATMODE canvas MOB_BLINK NextMOBID MOBdata MOBid
 	global CombatantScrollEnabled is_GM
 	set ITlist {}
+	global ExplicitTargetSource
+	set ExplicitTargetSource {}
 
 	ondeck_advance $d
 
