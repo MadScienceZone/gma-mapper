@@ -1444,7 +1444,7 @@ proc mobsAtXY {x y args} {
 # somewhat misnamed but this allows you to select the source of the targeted attack
 # if you control more than one character
 proc toggleCombatSource {mousex mousey args} {
-	global canvas ActiveTargetSource is_GM
+	global canvas ActiveTargetSource is_GM ExplicitTargetSource
 	set me [my_map_names]
 	if {!$is_GM && [llength $me] == 1} {
 		tk_messageBox -type ok -icon error -title "Can't Choose Target Source" \
@@ -1477,12 +1477,17 @@ proc toggleCombatSource {mousex mousey args} {
 	}
 
 	set ActiveTargetSource $mob_list
+	set ExplicitTargetSource $mob_list
 	RefreshTargets
 }
 
 # returns the map name of the targeting creature or the empty string if unknown or unset.
 proc CurrentTargetSource {} {
-	global ActiveTargetSource
+	global ActiveTargetSource ExplicitTargetSource
+	# if we set one explicitly instead of the system choosing one, prefer that instead.
+	if {$ExplicitTargetSource ne {}} {
+		return [lindex $ExplicitTargetSource 0]
+	}
 	if {$ActiveTargetSource ne {}} {
 		return [lindex $ActiveTargetSource 0]
 	}
@@ -1499,7 +1504,7 @@ proc toggleCombatTargets {mousex mousey args} {
 }
 
 proc EnsureTargetSourceFirst {} {
-	global ActiveTargetSource is_GM
+	global ActiveTargetSource is_GM ExplicitTargetSource
 	global AlreadyWarnedAboutNoTarget
 	
 	if {$is_GM} {
@@ -6893,10 +6898,11 @@ proc _mob_size {id} {
 
 set ActiveTargetList {}
 set ActiveTargetSource {}
+set ExplicitTargetSource {}
 set TargetColor blue
 proc RefreshTargets {} {
 #	DEBUG 0 "RefreshTargets"
-	global MOBdata MOBid canvas iscale ActiveTargetList ActiveTargetSource CurrentCombatants TargetColor
+	global MOBdata MOBid canvas iscale ActiveTargetList ActiveTargetSource CurrentCombatants TargetColor ExplicitTargetSource
 	global is_GM show_all_targets
 
 	set me [my_map_names]
@@ -6907,7 +6913,7 @@ proc RefreshTargets {} {
 
 	$canvas delete SRCTARG
 	if {[catch {
-		if {$ActiveTargetSource ne {} && [info exists MOBid($ActiveTargetSource)] && [info exists MOBdata([set tid $MOBid($ActiveTargetSource)])]} {
+		if {$ActiveTargetSource ne {} && [info exists MOBid([lindex $ActiveTargetSource 0])] && [info exists MOBdata([set tid $MOBid([lindex $ActiveTargetSource 0])])]} {
 #			DEBUG 0 "src id $tid -> [dict get $MOBdata($tid)]"
 			::gmautil::dassign [dict get $MOBdata($tid)] Gx gx Gy gy Hidden h
 			set sz [_mob_size $tid]
@@ -6944,17 +6950,23 @@ proc RefreshTargets {} {
 	# of damage being dealt
 	set ActiveTargetList {}
 	if {$is_GM} {
-		if {$current_actor ne {} && [info exists MOBdata([set tid [GetBaseMobID $current_actor]])]} {
+		# ... unless we said otherwise
+		set tid {n/a}
+		if {$ExplicitTargetSource ne {} && [info exists MOBid([lindex $ExplicitTargetSource 0])] && [info exists MOBdata([set tid $MOBid([lindex $ExplicitTargetSource 0])])]} {
+			if {[dict exists [set d $MOBdata($tid)] Targets]} {
+				set ActiveTargetList [dict get $d Targets]
+			}
+			set ActiveTargetSource $ExplicitTargetSource
+		} elseif {$current_actor ne {} && [info exists MOBdata([set tid [GetBaseMobID $current_actor]])]} { 
 			if {[dict exists [set d $MOBdata($tid)] Targets]} {
 				set ActiveTargetList [dict get $d Targets]
 			}
 			# set them as the target source as well so we can designate (new) targets for them
 			set ActiveTargetSource [list [dict get $d Name]]
 		}
-
 		$canvas delete SRCTARG
 		if {[catch {
-			if {$ActiveTargetSource ne {} && [info exists MOBid($ActiveTargetSource)] && [info exists MOBdata([set tid $MOBid($ActiveTargetSource)])]} {
+			if {$ActiveTargetSource ne {} && [info exists MOBid([lindex $ActiveTargetSource 0])] && [info exists MOBdata([set tid $MOBid([lindex $ActiveTargetSource 0])])]} {
 				::gmautil::dassign [dict get $MOBdata($tid)] Gx gx Gy gy
 				set sz [_mob_size $tid]
 				$canvas create rect [expr $gx*$iscale] [expr $gy*$iscale] [expr ($gx+$sz)*$iscale] [expr ($gy+$sz)*$iscale] -outline green -width 4 -tags SRCTARG -dash .
@@ -10935,6 +10947,8 @@ proc DoCommandCS {d} {
 }
 
 proc DoCommandIL {d} {
+	global ExplicitTargetSource
+	set ExplicitTargetSource {}
 	if {[::gmaclock::exists .initiative.clock]} {
 		::gmaclock::set_initiative_slots .initiative.clock [dict get $d InitiativeList]
 	}
@@ -11460,6 +11474,8 @@ proc DoCommandI {d} {
 	global MOB_COMBATMODE canvas MOB_BLINK NextMOBID MOBdata MOBid
 	global CombatantScrollEnabled is_GM
 	set ITlist {}
+	global ExplicitTargetSource
+	set ExplicitTargetSource {}
 
 	ondeck_advance $d
 
