@@ -27,7 +27,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.40.0-alpha.1}     ;# @@##@@
+set GMAMapperVersion {4.40.0-alpha.2}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {424}         ;# @@##@@
 set CoreVersionNumber {6.46.1}            ;# @@##@@
@@ -8007,12 +8007,16 @@ proc RefreshMOBs {} {
 }
 
 proc ScreenXYToMOBID {w x y} {
-	global MOBdata
+	global MOBdata is_GM
 	lassign [ScreenXYToGridXY $x $y -exact] gx gy
 
 	DEBUG 3 "Looking for object at $x,$y (grid $gx,$gy)..."
 	set mob_list {}
 	foreach id [array names MOBdata] {
+		if {!$is_GM && [dict get $MOBdata($id) Hidden]} {
+			DEBUG 3 "skipping hidden mob $id here"
+			continue
+		}
 		set msz [expr max(1, [MonsterSizeValue [CreatureDisplayedSize $id]])]
 		set mx0 [expr int([dict get $MOBdata($id) Gx])]
 		set mx1 [expr $mx0 + $msz]
