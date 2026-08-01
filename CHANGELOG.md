@@ -17,7 +17,16 @@ The support for old server protocols (<400) has ended.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
-# 4.39.1 -2
+# 4.40 (unreleased)
+## Enhancements
+ * Adds capability to mark a creature's spell or aura area of effect just like with spell area emanation but this "local aura" is not propagated to other mapper clients (just displayed locally) and is not stored server-side. This allows (for example) the GM to mark a creature's aura zone and know accurately when characters step into it when players don't know where that boundary is and it would break immersion to explicitly mark it on the map where they can see it.
+
+# 4.39.2
+## Fixes
+ * Release issues
+ * Chat message loading bug
+
+# 4.39.1
 ## Fixes
  * Corrected minor error in loading chat message cache.
 

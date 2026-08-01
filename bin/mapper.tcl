@@ -27,7 +27,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.39.2}     ;# @@##@@
+set GMAMapperVersion {4.40.0-alpha.1}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {424}         ;# @@##@@
 set CoreVersionNumber {6.46.1}            ;# @@##@@
@@ -5428,6 +5428,12 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags args} {
 		set record_grids false
 	}
 
+	if {[lsearch -exact $args -aura] >= 0} {
+		set local_aura true
+	} else {
+		set local_aura false
+	}
+
 	$w delete AoEZoneCrossHatch$id
 	$w delete REF$id
 	switch $shape {
@@ -5458,34 +5464,34 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags args} {
 							# I
 							DrawAoeGrid $w [expr $x0 + $is] [expr $y0 - $js] \
 							               [expr $x0 + $is1] [expr $y0 - $js1] \
-										   $color $id $tags $record_grids
+										   $color $id $tags $record_grids $local_aura
 							DrawAoeGrid $w [expr $x0 + $js - $iscale] [expr $y0 - $is - $iscale] \
 										   [expr $x0 + $js] [expr $y0 - $is] \
-										   $color $id $tags $record_grids
+										   $color $id $tags $record_grids $local_aura
 
 							# IV
 							DrawAoeGrid $w [expr $x0 + $is] [expr $y0 + $js1] \
 							               [expr $x0 + $is1] [expr $y0 + $js] \
-										   $color $id $tags $record_grids
+										   $color $id $tags $record_grids $local_aura
 							DrawAoeGrid $w [expr $x0 + $js - $iscale] [expr $y0 + $is] \
 										   [expr $x0 + $js] [expr $y0 + $is + $iscale] \
-										   $color $id $tags $record_grids
+										   $color $id $tags $record_grids $local_aura
 
 							# II
 							DrawAoeGrid $w [expr $x0 - $is1] [expr $y0 - $js] \
 										   [expr $x0 - $is] [expr $y0 - $js1] \
-										   $color $id $tags $record_grids
+										   $color $id $tags $record_grids $local_aura
 							DrawAoeGrid $w [expr $x0 - $js] [expr $y0 - $is - $iscale] \
 										   [expr $x0 - $js + $iscale] [expr $y0 - $is] \
-										   $color $id $tags $record_grids
+										   $color $id $tags $record_grids $local_aura
 
 							# III
 							DrawAoeGrid $w [expr $x0 - $is1] [expr $y0 + $js1] \
 										[expr $x0 - $is] [expr $y0 + $js] \
-										   $color $id $tags $record_grids
+										   $color $id $tags $record_grids $local_aura
 							DrawAoeGrid $w [expr $x0 - $js] [expr $y0 + $is] \
 										   [expr $x0 - $js + $iscale] [expr $y0 + $is1] \
-										   $color $id $tags $record_grids
+										   $color $id $tags $record_grids $local_aura
 						}
 					}
 				}
@@ -5502,7 +5508,7 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags args} {
 							set by [expr $y + $iscale]
 							foreach wid [$w find overlapping [expr $x+1] [expr $y+1] [expr $bx-1] [expr $by-1]] {
 								if {[lsearch -exact [$w gettags $wid] REF$id] >= 0} {
-									DrawAoeGrid $w $x $y $bx $by $color $id $tags $record_grids
+									DrawAoeGrid $w $x $y $bx $by $color $id $tags $record_grids $local_aura
 									break
 								}
 							}
@@ -5518,7 +5524,7 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags args} {
 							set by [expr $y + $iscale]
 							foreach wid [$w find overlapping [expr $x+1] [expr $y+1] [expr $bx-1] [expr $by-1]] {
 								if {[lsearch -exact [$w gettags $wid] REF$id] >= 0} {
-									DrawAoeGrid $w $x $y $bx $by $color $id $tags $record_grids
+									DrawAoeGrid $w $x $y $bx $by $color $id $tags $record_grids $local_aura
 									break
 								}
 							}
@@ -5535,7 +5541,7 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags args} {
 							set by [expr $y + $iscale]
 							foreach wid [$w find overlapping [expr $x+1] [expr $y+1] [expr $bx-1] [expr $by-1]] {
 								if {[lsearch -exact [$w gettags $wid] REF$id] >= 0} {
-									DrawAoeGrid $w $x $y $bx $by $color $id $tags $record_grids
+									DrawAoeGrid $w $x $y $bx $by $color $id $tags $record_grids $local_aura
 									break
 								}
 							}
@@ -5551,7 +5557,7 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags args} {
 							set by [expr $y + $iscale]
 							foreach wid [$w find overlapping [expr $x+1] [expr $y+1] [expr $bx-1] [expr $by-1]] {
 								if {[lsearch -exact [$w gettags $wid] REF$id] >= 0} {
-									DrawAoeGrid $w $x $y $bx $by $color $id $tags $record_grids
+									DrawAoeGrid $w $x $y $bx $by $color $id $tags $record_grids $local_aura
 									break
 								}
 							}
@@ -5583,7 +5589,7 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags args} {
 						if {($x < 0 && $x >= $y) || ($x >=0 && $x < -$y)} {
 							foreach wid [$w find overlapping [expr $x0+$x+$fuzz] [expr $y0+$y] [expr $x0+$x+$iscale-$fuzz] [expr $y0+$y]] {
 								if {[lsearch -exact [$w gettags $wid] REF$id] >= 0} {
-									DrawAoeGrid $w [expr $x0+$x] [expr $y0+$y] [expr $x0+$x+$iscale] [expr $y0+$y+$iscale] $color $id $tags $record_grids
+									DrawAoeGrid $w [expr $x0+$x] [expr $y0+$y] [expr $x0+$x+$iscale] [expr $y0+$y+$iscale] $color $id $tags $record_grids $local_aura
 									break
 								}
 							}
@@ -5600,7 +5606,7 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags args} {
 						if {($y < 0 && $y >= $x) || ($y >= 0 && $y < -$x)} {
 							foreach wid [$w find overlapping [expr $x0+$x] [expr $y0+$y+$fuzz] [expr $x0+$x] [expr $y0+$y+$iscale-$fuzz]] {
 								if {[lsearch -exact [$w gettags $wid] REF$id] >= 0} {
-									DrawAoeGrid $w [expr $x0+$x] [expr $y0+$y] [expr $x0+$x+$iscale] [expr $y0+$y+$iscale] $color $id $tags $record_grids
+									DrawAoeGrid $w [expr $x0+$x] [expr $y0+$y] [expr $x0+$x+$iscale] [expr $y0+$y+$iscale] $color $id $tags $record_grids $local_aura
 									break
 								}
 							}
@@ -5618,7 +5624,7 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags args} {
 							foreach wid [$w find overlapping [expr $x0+$x+$fuzz] [expr $y0+$y+$iscale] [expr $x0+$x+$iscale-$fuzz] [expr $y0+$y+$iscale]] {
 
 								if {[lsearch -exact [$w gettags $wid] REF$id] >= 0} {
-									DrawAoeGrid $w [expr $x0+$x] [expr $y0+$y] [expr $x0+$x+$iscale] [expr $y0+$y+$iscale] $color $id $tags $record_grids
+									DrawAoeGrid $w [expr $x0+$x] [expr $y0+$y] [expr $x0+$x+$iscale] [expr $y0+$y+$iscale] $color $id $tags $record_grids $local_aura
 									break
 								}
 							}
@@ -5636,7 +5642,7 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags args} {
 							foreach wid [$w find overlapping [expr $x0+$x+$iscale] [expr $y0+$y+$fuzz] [expr $x0+$x+$iscale] [expr $y0+$y+$iscale-$fuzz]] {
 
 								if {[lsearch -exact [$w gettags $wid] REF$id] >= 0} {
-									DrawAoeGrid $w [expr $x0+$x] [expr $y0+$y] [expr $x0+$x+$iscale] [expr $y0+$y+$iscale] $color $id $tags $record_grids
+									DrawAoeGrid $w [expr $x0+$x] [expr $y0+$y] [expr $x0+$x+$iscale] [expr $y0+$y+$iscale] $color $id $tags $record_grids $local_aura
 									break
 								}
 							}
@@ -5804,7 +5810,7 @@ proc NeighborsOf {c1 r1} {
 	return $neighbors
 }
 
-proc DrawAoeGrid {w x1 y1 x2 y2 color id tags {record_grids false}} {
+proc DrawAoeGrid {w x1 y1 x2 y2 color id tags {record_grids false} {local_aura false}} {
 	global AoeHatchWidth
 	global RawAoeGrids
 	#DEBUG 0 "DrawAoEGrid $w $x1=[CanvasToGrid $x1] $y1=[CanvasToGrid $y1] $x2=[CanvasToGrid $x2] $y2=[CanvasToGrid $y2] $color $id $tags"
@@ -5815,10 +5821,18 @@ proc DrawAoeGrid {w x1 y1 x2 y2 color id tags {record_grids false}} {
 		set RawAoeGrids($id:$GX:$GY) [list $GX $GY]
 	}
 
+	if {$local_aura} {
+		set dash .
+		set o 5
+	} else {
+		set dash {}
+		set o 0
+	}
+
 	for {set x $x1; set y $y2} {$x < $x2} {set x [expr $x + ($x2-$x1)/4.0]; set y [expr $y - ($y2-$y1)/4.0]} {
-		$w create line $x $y1 $x2 $y -fill $color -width $AoeHatchWidth -tags $tags
+		$w create line [expr $x+$o] [expr $y1+$o] [expr $x2+$o] [expr $y+$o] -fill $color -width $AoeHatchWidth -tags $tags -dash $dash
 		if {$x > $x1} {
-			$w create line $x1 $y $x $y2 -fill $color -width $AoeHatchWidth -tags $tags
+			$w create line [expr $x1+$o] [expr $y+$o] [expr $x+$o] [expr $y2+$o] -fill $color -width $AoeHatchWidth -tags $tags -dash $dash
 		}
 	}
 }
@@ -7077,8 +7091,8 @@ proc RenderSomeone {w id {norecurse false} args} {
 	DEBUG 3 "RenderSomeone $w $id"
 	global MOBdata ThreatLineWidth iscale SelectLineWidth ThreatLineHatchWidth ReachLineColor
 	global HealthBarWidth HealthBarFrameWidth HealthBarConditionFrameWidth
-	global ShowHealthStats is_GM
 	global LocalMarker
+	global ShowHealthStats is_GM LocalSpellAura
 	set lower_neighbors {}
 
 	#
@@ -7159,6 +7173,39 @@ proc RenderSomeone {w id {norecurse false} args} {
 				for {set AoEy 1} {$AoEy < $sz} {incr AoEy} {
 					_DrawAoeZone $w $id $GX0 [expr $GY0+$AoEy] $GXX [expr $GYY+$AoEy] $aoe_radius $aoe_color radius [list M#$id MA#$id allMOB MAzone] {*}$args
 					_DrawAoeZone $w $id [expr $GX0+$sz] [expr $GY0+$AoEy] [expr $GXX+$sz] [expr $GYY+$AoEy] $aoe_radius $aoe_color radius [list M#$id MA#$id allMOB MAzone] {*}$args
+				}
+			}
+		}
+	}
+	# locally-displayed aura or spell area of effect
+	if {[dict exists $MOBdata($id) .AoE] && [set AoE [dict get $MOBdata($id) .AoE]] ne {}} {
+		set aoe_type radius
+		::gmautil::dassign $AoE Radius aoe_radius Color aoe_color
+		set aoe_radius [expr $aoe_radius * $iscale]; #convert to canvas units for rendering
+		switch $aoe_type {
+			radius {
+				set GX0 [dict get $MOBdata($id) Gx]
+				set GY0 [dict get $MOBdata($id) Gy]
+				set GXX [expr $GX0 * $iscale]
+				set GYY [expr $GY0 * $iscale]
+				#
+				# In order to get the spell to be "centered on you" but adapted reasonably to
+				# creatures of whatever size, we will take the optional rule of having the spell
+				# emanate from the perimeter of the creature. In practical terms, we will draw
+				# a zone around each grid intersection around the occupied area of the creature.
+				# this makes some overlapping draw calls, but gets the job done.
+				#
+				# Our (GX,GY) reference point is already at the upper left of the occupied space.
+				set sz [MonsterSizeValue [CreatureDisplayedSize $id]]
+				for {set AoEx 0} {$AoEx <= $sz} {incr AoEx} {
+					_DrawAoeZone $w $id [expr $GX0+$AoEx] $GY0 [expr $GXX+$AoEx] $GYY $aoe_radius $aoe_color radius [list M#$id MA#$id allMOB MAzone] -aura {*}$args
+					if {$sz >= 1} {
+						_DrawAoeZone $w $id [expr $GX0+$AoEx] [expr $GY0+$sz] [expr $GXX+$AoEx] [expr $GYY+$sz] $aoe_radius $aoe_color radius [list M#$id MA#$id allMOB MAzone]	-aura {*}$args
+					}
+				}
+				for {set AoEy 1} {$AoEy < $sz} {incr AoEy} {
+					_DrawAoeZone $w $id $GX0 [expr $GY0+$AoEy] $GXX [expr $GYY+$AoEy] $aoe_radius $aoe_color radius [list M#$id MA#$id allMOB MAzone] -aura {*}$args
+					_DrawAoeZone $w $id [expr $GX0+$sz] [expr $GY0+$AoEy] [expr $GXX+$sz] [expr $GYY+$AoEy] $aoe_radius $aoe_color radius [list M#$id MA#$id allMOB MAzone] -aura {*}$args
 				}
 			}
 		}
@@ -9306,20 +9353,21 @@ proc DoContext {x y} {
 	set CTXdead 5
 	set CTXreac 6
 	set CTXsaoe 7
-	set CTXpoly 8
-	set CTXsize 9
-	set CTXcond 10
-	set CTXtags 11
-	set CTXelev 12
-	set CTXmmod 13
-	set CTXSEP1 14
-	set CTXdgrd 15
-	set CTXdfrm 16
-	set CTXSEP2 17
-	set CTXtsel 18
-	set CTXdsel 19
-	set CTXSEP3 20
-	set CTX_pcs 21
+	set CTXaura 8
+	set CTXpoly 9
+	set CTXsize 10
+	set CTXcond 11
+	set CTXtags 12
+	set CTXelev 13
+	set CTXmmod 14
+	set CTXSEP1 15
+	set CTXdgrd 16
+	set CTXdfrm 17
+	set CTXSEP2 18
+	set CTXtsel 19
+	set CTXdsel 20
+	set CTXSEP3 21
+	set CTX_pcs 22
 
 	.contextMenu delete $CTXdgrd
 	.contextMenu insert $CTXdgrd command -command "DistanceFromGrid $x $y 0" -label "Distance from [LetterLabel $Gx]$Gy"
@@ -9337,6 +9385,8 @@ proc DoContext {x y} {
 		.contextMenu insert $CTXreac command -command "" -label "Set Reach" -state disabled
 		.contextMenu delete $CTXsaoe
 		.contextMenu insert $CTXsaoe command -command "" -label "Toggle Spell Area" -state disabled
+		.contextMenu delete $CTXaura
+		.contextMenu insert $CTXaura command -command "" -label "Toggle Local Aura" -state disabled
 		.contextMenu delete $CTXpoly
 		.contextMenu insert $CTXpoly command -command "" -label "Polymorph" -state disabled
 		.contextMenu delete $CTXsize
@@ -9369,7 +9419,9 @@ proc DoContext {x y} {
 #		.contextMenu insert $CTXreac command -command "ToggleReach $mob_id" -label "Cycle Reach for $mob_name"
 		.contextMenu insert $CTXreac cascade -menu [CreateReachSubMenu -shallow $mob_id] -label "Set Reach for $mob_disp_name"
 		.contextMenu delete $CTXsaoe
-		.contextMenu insert $CTXsaoe command -command "ToggleSpellArea $mob_id" -label "Toggle Spell Area for $mob_disp_name"
+		.contextMenu insert $CTXsaoe command -command [list ToggleSpellArea $mob_id false] -label "Toggle Spell Area for $mob_disp_name"
+		.contextMenu delete $CTXaura
+		.contextMenu insert $CTXaura command -command [list ToggleSpellArea $mob_id true] -label "Toggle Local Aura for $mob_disp_name"
 		.contextMenu delete $CTXpoly
 		if {[AllowedToPolymorph $mob_id]} {
 			.contextMenu insert $CTXpoly cascade -menu [CreatePolySubMenu -shallow $mob_id] -label "Polymorph $mob_disp_name"
@@ -9396,6 +9448,7 @@ proc DoContext {x y} {
 		.contextMenu.kill delete 0 end
 		.contextMenu.reach delete 0 end
 		.contextMenu.aoe delete 0 end
+		.contextMenu.aur delete 0 end
 		.contextMenu.poly delete 0 end
 		.contextMenu.size delete 0 end
 		.contextMenu.tag delete 0 end
@@ -9413,7 +9466,8 @@ proc DoContext {x y} {
 			.contextMenu.kill add command -command "KillPerson $mob_id" -label $mob_disp_name
 #			.contextMenu.reach add command -command "ToggleReach $mob_id" -label $mob_name
 			.contextMenu.reach add cascade -menu [CreateReachSubMenu -deep $mob_id] -label $mob_disp_name
-			.contextMenu.aoe add command -command "ToggleSpellArea $mob_id" -label $mob_disp_name
+			.contextMenu.aoe add command -command [list ToggleSpellArea $mob_id false] -label $mob_disp_name
+			.contextMenu.aur add command -command [list ToggleSpellArea $mob_id true] -label $mob_disp_name
 			if {[AllowedToPolymorph $mob_id]} {
 				.contextMenu.poly add cascade -menu [CreatePolySubMenu -deep $mob_id] -label $mob_disp_name
 				incr polymorph_qty
@@ -9455,6 +9509,8 @@ proc DoContext {x y} {
 		.contextMenu insert $CTXreac cascade -menu .contextMenu.reach -label "Set Reach"
 		.contextMenu delete $CTXsaoe
 		.contextMenu insert $CTXsaoe cascade -menu .contextMenu.aoe -label "Toggle Spell Area"
+		.contextMenu delete $CTXaura
+		.contextMenu insert $CTXaura cascade -menu .contextMenu.aur -label "Toggle Local Aura"
 		.contextMenu delete $CTXpoly
 		.contextMenu insert $CTXpoly cascade -menu .contextMenu.poly -label "Polymorph"
 		.contextMenu delete $CTXsize
@@ -9499,6 +9555,7 @@ menu .contextMenu.del -tearoff 0
 menu .contextMenu.kill -tearoff 0
 menu .contextMenu.reach -tearoff 0
 menu .contextMenu.aoe -tearoff 0
+menu .contextMenu.aur -tearoff 0
 menu .contextMenu.poly -tearoff 0
 menu .contextMenu.size -tearoff 0
 menu .contextMenu.tag -tearoff 0
@@ -9509,26 +9566,27 @@ menu .contextMenu.dist -tearoff 0
 menu .contextMenu.tsel -tearoff 0
 #menu .addPlayerMenu
 .contextMenu add command -command "" -label Target -state disabled               			;# 0
-.contextMenu add command -command "" -label {Randomly Target} -state disabled              		;# 0
-.contextMenu add command -command "" -label Remove -state disabled					;# 1
-.contextMenu add command -command {AddPlayerMenu player} -label {Add Player...}				;# 2
-.contextMenu add command -command {AddPlayerMenu monster} -label {Add Monster...}			;# 3
-.contextMenu add command -command "" -label {Toggle Death} -state disabled				;# 4
-.contextMenu add command -command "" -label {Set Reach} -state disabled					;# 5
-.contextMenu add command -command "" -label {Toggle Spell Area} -state disabled				;# 6
-.contextMenu add command -command "" -label {Polymorph} -state disabled					;# 7
-.contextMenu add command -command "" -label {Change Size} -state disabled				;# 8
-.contextMenu add command -command "" -label {Toggle Condition} -state disabled				;# 9 
-.contextMenu add command -command "" -label {Tag} -state disabled					;# 10 
-.contextMenu add command -command "" -label {Elevation} -state disabled					;# 11
-.contextMenu add command -command "" -label {Movement Mode} -state disabled				;# 12
-.contextMenu add separator										;# 13
-.contextMenu add command -command "" -label {Distance from...} -state disabled		 		;# 14 
-.contextMenu add command -command "" -label {Distance from...} -state disabled				;# 15 
-.contextMenu add separator										;# 16 
-.contextMenu add command -command "" -label {Toggle Selection} -state disabled				;# 17 
-.contextMenu add command -command "ClearSelection" -label {Deselect All} -state disabled		;# 18
-.contextMenu add separator										;# 19
+.contextMenu add command -command "" -label {Randomly Target} -state disabled              		;# 1
+.contextMenu add command -command "" -label Remove -state disabled					;# 2
+.contextMenu add command -command {AddPlayerMenu player} -label {Add Player...}				;# 3
+.contextMenu add command -command {AddPlayerMenu monster} -label {Add Monster...}			;# 4
+.contextMenu add command -command "" -label {Toggle Death} -state disabled				;# 5
+.contextMenu add command -command "" -label {Set Reach} -state disabled					;# 6
+.contextMenu add command -command "" -label {Toggle Spell Area} -state disabled				;# 7
+.contextMenu add command -command "" -label {Toggle Local Aura} -state disabled				;# 8
+.contextMenu add command -command "" -label {Polymorph} -state disabled					;# 9
+.contextMenu add command -command "" -label {Change Size} -state disabled				;# 10
+.contextMenu add command -command "" -label {Toggle Condition} -state disabled				;# 11 
+.contextMenu add command -command "" -label {Tag} -state disabled					;# 12 
+.contextMenu add command -command "" -label {Elevation} -state disabled					;# 13
+.contextMenu add command -command "" -label {Movement Mode} -state disabled				;# 14
+.contextMenu add separator										;# 15
+.contextMenu add command -command "" -label {Distance from...} -state disabled		 		;# 16 
+.contextMenu add command -command "" -label {Distance from...} -state disabled				;# 17 
+.contextMenu add separator										;# 18 
+.contextMenu add command -command "" -label {Toggle Selection} -state disabled				;# 19 
+.contextMenu add command -command "ClearSelection" -label {Deselect All} -state disabled		;# 20
+.contextMenu add separator										;# 21
 
 # AddPlayer name color ?area? ?size? ?id?  defaults to 1x1, generated ID
 #
@@ -9792,13 +9850,22 @@ proc ChangeDispSizeAll {mob_list code} {
 # if a mob has a spell area highlighted, kill it.
 # otherwise, set it now
 #
-proc ToggleSpellArea id {
-	global MOBdata canvas
+proc ToggleSpellArea {id {isLocal false}} {
+	global MOBdata canvas LocalSpellAura
 
-	if {[dict get $MOBdata($id) AoE] ne {}} {
-		dict set MOBdata($id) AoE {}
+	set LocalSpellAura $isLocal
+	if {$isLocal} {
+		set key .AoE
+	} else {
+		set key AoE
+	}
+
+	if {[dict exists $MOBdata($id) $key] && [dict get $MOBdata($id) $key] ne {}} {
+		dict set MOBdata($id) $key {}
 		RenderSomeone $canvas $id
-		SendMobChanges $id AoE
+		if {! $isLocal} {
+			SendMobChanges $id $key
+		}
 	} else {
 		canceltool
 		bind $canvas <1> "CompleteMOBAoE $id $canvas %x %y"
@@ -9809,23 +9876,33 @@ proc ToggleSpellArea id {
 }
 
 proc CompleteMOBAoE {id w x y} {
-	aoe_target_prompt [GetAreaZoneTargets $id -mob]
+	global LocalSpellAura
+	if {!$LocalSpellAura} {
+		aoe_target_prompt [GetAreaZoneTargets $id -mob]
+	}
 	canceltool
 	$w delete AoElocator#$id
-	SendMobChanges $id AoE
+	if {!$LocalSpellAura} {
+		SendMobChanges $id AoE
+	}
 	clear_message
 }
 
 proc DragMOBAoE {id w x y} {
-	global MOBdata iscale OBJ_COLOR
+	global MOBdata iscale OBJ_COLOR LocalSpellAura
+	if {$LocalSpellAura} {
+		set key .AoE
+	} else {
+		set key AoE
+	}
 
 	set xx [SnapCoordAlways [$w canvasx $x]]
 	set yy [SnapCoordAlways [$w canvasy $y]]
 	set gx [CanvasToGrid $xx]
 	set gy [CanvasToGrid $yy]
 	set r  [GridDistance [dict get $MOBdata($id) Gx] [dict get $MOBdata($id) Gy] $gx $gy]
-	display_only [format "Spell radius %d square%s / %d feet" $r [expr $r==1 ? {{}} : {{s}}] [expr $r * 5]]
-	dict set MOBdata($id) AoE [dict create Radius $r Color $OBJ_COLOR(fill)]
+	display_only [format "%s radius %d square%s / %d feet" [expr $LocalSpellAura ? {{Local-display aura}} : {{Spell}}] $r [expr $r==1 ? {{}} : {{s}}] [expr $r * 5]]
+	dict set MOBdata($id) $key [dict create Radius $r Color $OBJ_COLOR(fill)]
 	RenderSomeone $w $id
 	$w create line [expr [dict get $MOBdata($id) Gx] * $iscale] [expr [dict get $MOBdata($id) Gy] * $iscale] \
 		[expr $gx * $iscale] [expr $gy * $iscale] \
@@ -16440,9 +16517,13 @@ proc SendMobChanges {id attrlist} {
 	global MOBdata
 	set alist [dict create]
 	foreach attr $attrlist {
-		dict set alist $attr [dict get $MOBdata($id) $attr]
+		if {[string index $attr 0] ne "."} {
+			dict set alist $attr [dict get $MOBdata($id) $attr]
+		}
 	}
-	::gmaproto::update_obj_attributes $id $alist
+	if {[llength $alist] > 0} {
+		::gmaproto::update_obj_attributes $id $alist
+	}
 }
 
 proc SendObjChanges {id attrlist} {
@@ -18544,3 +18625,11 @@ proc CustomCondPerson {mob_id condition targeter marker_data} {
 #	
 #
 # TILE_SET([tile_id name zoom]) = image_object
+#
+# [x] ToggleSpellArea id ?isLocal?
+# [x] CompleteMOBAoE	use .AoE / LocalSpellAura
+# [x] DragMOBAoE	use .AoE / LocalSpellAura
+# [x] RenderSomeone	use .AoE / LocalSpellAura
+# [x] SendMobChanges	use .AoE / LocalSpellAura
+# [x] _DrawAoeZone	add -aura option
+# [x] DrawAoeGrid	add aura arg at end
