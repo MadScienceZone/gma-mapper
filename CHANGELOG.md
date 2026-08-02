@@ -3,23 +3,32 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.39.2          <!-- @@##@@ -->
- * Effective Date: 10-Jun-2026               <!-- @@##@@ -->
+ * This Package Version: 4.40          <!-- @@##@@ -->
+ * Effective Date: 02-Aug-2026               <!-- @@##@@ -->
 
 ## Compatibility
  * GMA Core API Library Version: 6.46.1 <!-- @@##@@ -->
  * GMA Mapper File Format: 23	     <!-- @@##@@ -->
- * GMA Mapper Protocol: 424        <!-- @@##@@ -->
- * GMA Mapper Preferences File Format: 13 <!-- @@##@@ -->
+ * GMA Mapper Protocol: 426        <!-- @@##@@ -->
+ * GMA Mapper Preferences File Format: 15 <!-- @@##@@ -->
 
 ## DEPRECATION NOTICE
 The support for old server protocols (<400) has ended.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
-# 4.40 (unreleased)
+# 4.40
 ## Enhancements
+ * Implements server protocol 426.
  * Adds capability to mark a creature's spell or aura area of effect just like with spell area emanation but this "local aura" is not propagated to other mapper clients (just displayed locally) and is not stored server-side. This allows (for example) the GM to mark a creature's aura zone and know accurately when characters step into it when players don't know where that boundary is and it would break immersion to explicitly mark it on the map where they can see it.
+ * changes preferences file format.
+ * Adds ability to create custom condition markers for the local player's view (only), to mark things like smite evil and studied targets, etc.
+   * Attaches reminder note to the creature token about the mechanical effects of the condition in addition to a visual marker.
+   * Automatically enables modifiers and variables to the die roller to streamline die rolls affected by those conditions.
+## Fixes
+ * Corrected bug where the GM was unable to use shift-T to designate a combat target source. The mapper just always took the current actor as the source anyway. Now if shift-T is pressed that overrides the current actor until combat advances again to someone else.
+## Housekeeping
+ * Deprecated `S_` and `_S` string marshaling procedures.
 
 # 4.39.2
 ## Fixes
