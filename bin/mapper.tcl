@@ -27,7 +27,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.40.0-alpha.2}     ;# @@##@@
+set GMAMapperVersion {4.40.0-beta.0}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
 set GMAMapperProtocol {424}         ;# @@##@@
 set CoreVersionNumber {6.46.1}            ;# @@##@@
@@ -1359,8 +1359,9 @@ proc create_main_menu {use_button} {
 
 	menu $mm.help
 	$mm.help add command -command {aboutMapper} -label "About Mapper..." -accelerator F1
-	$mm.help add command -command {ShowDiceSyntax} -label "Die roller syntax ..." -accelerator ?
-	$mm.help add command -command {gma::minimarkup::ShowMarkupSyntax} -label "Text markup syntax ..." -accelerator Alt-?
+	$mm.help add command -command {ShowDiceSyntax} -label "Die roller syntax..." -accelerator ?
+	$mm.help add command -command {ShowDiceModifierHelp} -label "Die modifiers and conditions..."
+	$mm.help add command -command {gma::minimarkup::ShowMarkupSyntax} -label "Text markup syntax..." -accelerator Alt-?
 
 	#
 	# set up key bindings
@@ -5032,6 +5033,80 @@ proc ShowDiceSyntax {} {
 		{p {See gma-dice-syntax(7) for more (run } b {gma man dice-syntax} p {).}}
 		{p {}}
 		{p {Why } b {$} p { for variable names and } b {#} p { for table names? Just because there's a long standing tradition of using the former as a variable prefix in scripting languages such as Unix and Linux shell scripts and scripting languages such as perl, awk, and tcl. In the latter case, because the octothorpe or pound sign visually resembles the horizontal and vertical rules that separate the rows and columns of a table which struck my imagination at the time and I just ran with that idea.}}
+	} {
+		foreach {f t} $line {
+			$w.text insert end $t $f
+		}
+		$w.text insert end "\n"
+	}
+	$w.text configure -state disabled
+}
+
+proc ShowDiceModifierHelp {} {
+	set w .dicemodhelpsyntax
+	create_dialog $w
+	wm title $w "Condition Modifiers and Dice Roller Information"
+	grid [text $w.text -yscrollcommand "$w.sb set"] \
+	     [scrollbar $w.sb -orient vertical -command "$w.text yview"]\
+		 	-sticky news
+	grid columnconfigure $w 0 -weight 1
+	grid rowconfigure $w 0 -weight 1
+	$w.text tag configure h1 -justify center -font Tf14
+	$w.text tag configure p -font Nf12 -wrap word
+	$w.text tag configure i -font If12 -wrap word
+	$w.text tag configure b -font Tf12 -wrap word
+
+	foreach line {
+		{h1 {Custom Conditions and the Dice Roller}}
+		{p {}}
+		{p {Set up your own custom condition markers in }
+		 b {Edit > Preferences > Styles > Markers}
+		 p .}
+		{p {}}
+		{p {Manage your collection of personal condition markers here. The names you define them under will be how you'll see them in the pop-up menu on the battle map.}}
+		{p {}}
+		{b {Modifiers: } p {This is a comma-separated list of die-roll variables (like }
+		   b {$foo} p {, }
+		   b {$bar} p {, etc., for your own variables or }
+		   b {$$baz} p { for GM-defined game-wide ones; or un-prefixed names like }
+		   b {mod1} p {, }
+		   b {mod2} p {, etc., for your own modifiers (using their display names in this case); or }
+		   b {/mod3} p {, }
+		   b {/mod4} p {, etc., for GM-defined game-wide named modifiers.}}
+		 {p {}}
+		 {b {Description: } p {The text summary of the modifier. This will appear in the mouse-over text of the creature token when the condition marker is placed on them.}}
+		 {p {}}
+		 {b {Marker shape, pattern, color: } p {These control the visual appearance of the marker on the creature token.}}
+		 {p {}}
+		 {b {Draw tracer line: } p {If you select this option, a line will be drawn between the creature tagged with this condition and your token.}}
+		 {p {}}
+		 {h1 {Setting Up the Presets}}
+		 {p {}}
+		 {p {When setting up your die-roll presets, just create variables with the appropriate modifiers and include them in the die-roll presets where they might be used. For example, if your class has a Smite Evil ability which allows her to add her Charisma bonus to attack rolls and her paladin level to damage rolls against any target designated as the unfortunate recipient of this ability. So let's set up a few variables in our die-roll presets:}}
+		 {p {}}
+		 {b {$LVL} p = b 10 p { (on)}}
+		 {p {}}
+		 {b {$Cha} p = b +5 p { (on)}}
+		 {p {}}
+		 {b {$SmiteAttk} p = b {+$LVL smite evil} p { (off)}}
+		 {p {}}
+		 {b {$SmiteDmg} p = b {$Cha smite evil} p { (off)}}
+		 {p {}}
+		 {p {The } b {$SmiteAttk} p { and } b {$SmiteDmg} p { variables are disabled by default because you don't want them added to all the die rolls you make. When they } i are p { enabled, they'll add their contents to their die rolls. Now create a variable that wraps together all the attack modifiers we'll ever potentially have (for the sake of the example, let's say there are a few others we didn't show above as well):}}
+		 {p {}}
+		 {b {$AttackMods} p = b {$SmiteAttk $StudiedAttk}}
+		 {p {}}
+		 {b {$DamageMods} p = b {$SmiteDmg $StudiedDmg}}
+		 {p {}}
+		 {p {Now we just include those in our definition of all our attack and damage presets, such as:}}
+		 {p {}}
+		 {b {Gladius= d20 + 15 $AttackMods|c}}
+		 {p {}}
+		 {b {GladiusDmg= 1d6+6 $DamageMods}}
+		 {p {}}
+		 {h1 {Using the Conditions}}
+		 {p {}}
+		 {p {Now, normally when making an attack the } b {$AttackMods} p { variable will expand to nothing, so the normal roll of } b {d20+15|c} p { is just made. However, if we place the Smite Evil condition on a creature and they are our current target on the battle map, then the } b {$SmiteAttk} p { variable activates, so the die roll expands to } b {d20+15+10 smite evil} p {. We can just modify the } b {$LVL} p { and } b {$Cha} p { variables as our level and Charisma values change over time.}}
 	} {
 		foreach {f t} $line {
 			$w.text insert end $t $f
