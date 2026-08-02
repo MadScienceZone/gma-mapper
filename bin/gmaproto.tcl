@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___       ______    _____      _______     #
-# (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ___ \    / ___   )    #
-# | (    \/| () () || (   ) | Master's    / /) |     \/   \  \( (   ) )   \/   )  |    #
-# | |      | || || || (___) | Assistant  / (_) (_       ___) /( (___) |       /   )    #
-# | | ____ | |(_)| ||  ___  |           (____   _)     (___ (  \____  |     _/   /     #
-# | | \_  )| |   | || (   ) | VTT            ) (           ) \      ) |    /   _/      #
-# | (___) || )   ( || )   ( | Mapper         | |   _ /\___/  //\____) ) _ (   (__/\    #
-# (_______)|/     \||/     \| Client         (_)  (_)\______/ \______/ (_)\_______/    #
+#  _______  _______  _______                ___          ___    _______                #
+# (  ____ \(       )(  ___  ) Game         /   )        /   )  (  __   )               #
+# | (    \/| () () || (   ) | Master's    / /) |       / /) |  | (  )  |               #
+# | |      | || || || (___) | Assistant  / (_) (_     / (_) (_ | | /   |               #
+# | | ____ | |(_)| ||  ___  |           (____   _)   (____   _)| (/ /) |               #
+# | | \_  )| |   | || (   ) | VTT            ) (          ) (  |   / | |               #
+# | (___) || )   ( || )   ( | Mapper         | |   _      | |  |  (__) |               #
+# (_______)|/     \||/     \| Client         (_)  (_)     (_)  (_______)               #
 #                                                                                      #
 ########################################################################################
 #
@@ -48,7 +48,7 @@
 # 	::report_progress message
 # 	::say message
 
-package provide gmaproto 1.4.2
+package provide gmaproto 1.4.3
 package require Tcl 8.5
 package require json 1.3.3
 package require json::write 1.0.3
@@ -56,9 +56,9 @@ package require base64 2.4.2
 package require uuid 1.0.1
 
 namespace eval ::gmaproto {
-	variable protocol 424
+	variable protocol 426
 	variable min_protocol 400
-	variable max_protocol 424
+	variable max_protocol 426
 	variable max_max_protocol 499
 	variable maximum_message_length 61440 
 	variable frag_size 32768
@@ -130,7 +130,7 @@ namespace eval ::gmaproto {
 		update_turn               I
 	}
 	array set _message_payload {
-		AC      {ID s Name s Health {o {MaxHP i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i}} Gx f Gy f Skin i SkinSize l PolyGM ? Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}} Targets l TargetedModifiers {D {D {o {Modifiers l}}}}}
+		AC      {ID s Name s Health {o {MaxHP i TmpHP i TmpDamage i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i AC i FlatFootedAC i TouchAC i CMD i}} Gx f Gy f Skin i SkinSize l PolyGM ? Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}} Targets l TargetedModifiers {D {D {o {Tracer ? Modifiers l Shape s Color s Description s}}}}}
 		ACCEPT  {Messages l}
 		AA      {Name s Format s File s IsLocalFile ?}
 		AA?     {Name s}
@@ -186,7 +186,7 @@ namespace eval ::gmaproto {
 		PRIV    {Command s Reason s}
 		POLO    {}
 		PROGRESS {OperationID s Title s Value i MaxValue i IsDone ? Targets l IsTimer ?}
-		PS      {ID s Name s Health {o {MaxHP i TmpHP i TmpDamage i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i AC i FlatFootedAC i TouchAC i CMD i}} Gx f Gy f Skin i SkinSize l PolyGM ? Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}} Targets l TargetedModifiers {D {D {o {Modifiers l}}}}}
+		PS      {ID s Name s Health {o {MaxHP i TmpHP i TmpDamage i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i AC i FlatFootedAC i TouchAC i CMD i}} Gx f Gy f Skin i SkinSize l PolyGM ? Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}} Targets l TargetedModifiers {D {D {o {Tracer ? Modifiers l Shape s Color s Description s}}}}}
 		READY   {}
 		REDIRECT {Host s Port i Reason s}
 		ROLL    {Replay ? Sender s Recipients l MessageID i ToAll ? ToGM ? Title s Result {o {InvalidRequest ? ResultSuppressed ? Result i Details {a {Type s Value s}}}} RequestID s MoreResults ? Sent s Origin ? Targets l Type s}
@@ -615,10 +615,8 @@ proc ::gmaproto::_attribute_encode {k v} {
 
 		TargetedModifiers {
 			return [json::write object {*}[dict map {dk dv} $v {
-				set dk [::_S $dk]
 				set dv [json::write object {*}[dict map {dkk dvv} $dv {
-					set dkk [::_S $dkk]
-					set dvv [::gmaproto::_encode_payload $dvv {Modifiers l}]
+					set dvv [::gmaproto::_encode_payload $dvv {Tracer ? Modifiers l Shape s Color s Description s}]
 				}]]
 			}]]
 		}
@@ -1136,10 +1134,11 @@ proc ::gmaproto::_transmit {} {
 proc ::gmaproto::_encode_payload {input_dict type_dict} {
 	set a [dict create]
 	foreach {f t} $type_dict {
-		if {[string range $t 0 0] eq "*"} {
-			set f [::_S $f]
-			set t [string range $t 1 end]
-		}
+# obsolete
+#		if {[string range $t 0 0] eq "*"} {
+#			set f [::_S $f]
+#			set t [string range $t 1 end]
+#		}
 		if {[dict exists $input_dict $f]} {
 			set v [dict get $input_dict $f]
 			switch -exact -- [lindex $t 0] {
@@ -1437,7 +1436,6 @@ proc ::gmaproto::_construct {input types} {
 					dict set input $field {}
 				}
 			}
-			*D -
 			D {
 				if {[dict exists $input $field]} {
 					if {[set srcdata [dict get $input $field]] eq "null"} {
@@ -1452,14 +1450,14 @@ proc ::gmaproto::_construct {input types} {
 					dict set input $field {}
 				}
 
-				# TODO this isn't a perfect solution, should refactor
-				if {[string range [lindex $t 0] 0 0] eq "*"} {
-					set newname [::S_ $field]
-					if {$newname ne $field} {
-						dict set input $newname [dict get $input $field]
-						dict unset input $field
-					}
-				}
+#obsolete
+#				if {[string range [lindex $t 0] 0 0] eq "*"} {
+#					set newname [::S_ $field]
+#					if {$newname ne $field} {
+#						dict set input $newname [dict get $input $field]
+#						dict unset input $field
+#					}
+#				}
 			}
 			d {
 				if {[dict exists $input $field] && [dict get $input $field] ne "null"} {
@@ -2483,7 +2481,7 @@ proc ::gmaproto::normalize_dict {cmd d} {
 	return [::gmaproto::new_dict_from_json $cmd [::gmaproto::json_from_dict $cmd $d]]
 }
 
-# @[00]@| GMA-Mapper 4.39.2
+# @[00]@| GMA-Mapper 4.40
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2026 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

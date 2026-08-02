@@ -1,4 +1,14 @@
 #!/usr/bin/env wish
+# TODO not showing description of custom targets (gm and user)
+# TODO not showing custom target info/desc in target's popup info (gm and user)
+# TODO not updating markers when receiving attributes via OA about ourselves from the outside
+#	(such as upon reconnect)
+# TODO implement tracking in socket lib
+# TODO not OA @<char> NewAttrs TargetedModifiers {<target> {<name> {Modifiers [<list>]}}}
+# TODO we need to track who is targeting who w/conditions
+# TODO if that's us, show those markers
+# DONE make sure that clearing all the targets can transmit a "clear the list to nil" signal that doesn't get cleared to something empty that looks like "there's nothing here to read at all".
+# TODO die roller tracks these in its own handler
 ########################################################################################
 #  _______  _______  _______                ___       ______    _____      _______     #
 # (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ___ \    / ___   )    #
@@ -17,9 +27,9 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.39.2}     ;# @@##@@
+set GMAMapperVersion {4.40}     ;# @@##@@
 set GMAMapperFileFormat {23}        ;# @@##@@
-set GMAMapperProtocol {424}         ;# @@##@@
+set GMAMapperProtocol {426}         ;# @@##@@
 set CoreVersionNumber {6.46.1}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
@@ -81,13 +91,17 @@ set HideBefore -1
 array unset HideList
 array unset PinList
 #
-# convert spaces to something else for dictionary keys to prevent needless data structure nesting
+# convert spaces to something else as needed for marshaling strings
+# (turns out we didn't need this but we'll keep the functions around)
+#
 proc S_ {s} {
+	DEBUG 0 "WARNING: obsolete function S_ called"
 	return [string map {{ } "\u203b"} $s]
 }
 
 # and the inverse
 proc _S {s} {
+	DEBUG 0 "WARNING: obsolete function _S called"
 	return [string map {"\u203b" { }} $s]
 }
 #
@@ -1345,8 +1359,9 @@ proc create_main_menu {use_button} {
 
 	menu $mm.help
 	$mm.help add command -command {aboutMapper} -label "About Mapper..." -accelerator F1
-	$mm.help add command -command {ShowDiceSyntax} -label "Die roller syntax ..." -accelerator ?
-	$mm.help add command -command {gma::minimarkup::ShowMarkupSyntax} -label "Text markup syntax ..." -accelerator Alt-?
+	$mm.help add command -command {ShowDiceSyntax} -label "Die roller syntax..." -accelerator ?
+	$mm.help add command -command {ShowDiceModifierHelp} -label "Die modifiers and conditions..."
+	$mm.help add command -command {gma::minimarkup::ShowMarkupSyntax} -label "Text markup syntax..." -accelerator Alt-?
 
 	#
 	# set up key bindings
@@ -1430,7 +1445,7 @@ proc mobsAtXY {x y args} {
 # somewhat misnamed but this allows you to select the source of the targeted attack
 # if you control more than one character
 proc toggleCombatSource {mousex mousey args} {
-	global canvas ActiveTargetSource is_GM
+	global canvas ActiveTargetSource is_GM ExplicitTargetSource
 	set me [my_map_names]
 	if {!$is_GM && [llength $me] == 1} {
 		tk_messageBox -type ok -icon error -title "Can't Choose Target Source" \
@@ -1463,12 +1478,17 @@ proc toggleCombatSource {mousex mousey args} {
 	}
 
 	set ActiveTargetSource $mob_list
+	set ExplicitTargetSource $mob_list
 	RefreshTargets
 }
 
 # returns the map name of the targeting creature or the empty string if unknown or unset.
 proc CurrentTargetSource {} {
-	global ActiveTargetSource
+	global ActiveTargetSource ExplicitTargetSource
+	# if we set one explicitly instead of the system choosing one, prefer that instead.
+	if {$ExplicitTargetSource ne {}} {
+		return [lindex $ExplicitTargetSource 0]
+	}
 	if {$ActiveTargetSource ne {}} {
 		return [lindex $ActiveTargetSource 0]
 	}
@@ -1485,7 +1505,7 @@ proc toggleCombatTargets {mousex mousey args} {
 }
 
 proc EnsureTargetSourceFirst {} {
-	global ActiveTargetSource is_GM
+	global ActiveTargetSource is_GM ExplicitTargetSource
 	global AlreadyWarnedAboutNoTarget
 	
 	if {$is_GM} {
@@ -3383,12 +3403,21 @@ proc CreateHealthStatsToolTip {mob_id {extra_condition {}}} {
 		}
 	}
 
-#TODO
-#	if {[dict exists $MOBdata($mob_id) TargetedModifiers]} {
-#		dict map {tname details} [dict get $MOBdata($mob_id) TargetedModifiers] {
-#			append tiptext "\nCustom condition on [_S $tname] ([join [dict keys $details] {, }])"
-#		}
-#	}
+	foreach for_player [my_map_names] {
+		if {[info exists MOBdata([set myID [GetBaseMobID $for_player]])]} {
+			set my_mob $MOBdata($myID)
+			if {[dict exists $my_mob TargetedModifiers]} {
+				dict map {tname details} [dict get $my_mob TargetedModifiers] {
+					if {[GetBaseMobID $tname] eq $mob_id} {
+						dict map {cname cdetails} $details {
+							append tiptext [format "\nCustom Marker \"%s\": %s" $cname \
+								[dict get $cdetails Description]]
+						}
+					} 
+				}
+			}
+		}
+	}
 
 	return $tiptext
 }
@@ -5013,6 +5042,80 @@ proc ShowDiceSyntax {} {
 	$w.text configure -state disabled
 }
 
+proc ShowDiceModifierHelp {} {
+	set w .dicemodhelpsyntax
+	create_dialog $w
+	wm title $w "Condition Modifiers and Dice Roller Information"
+	grid [text $w.text -yscrollcommand "$w.sb set"] \
+	     [scrollbar $w.sb -orient vertical -command "$w.text yview"]\
+		 	-sticky news
+	grid columnconfigure $w 0 -weight 1
+	grid rowconfigure $w 0 -weight 1
+	$w.text tag configure h1 -justify center -font Tf14
+	$w.text tag configure p -font Nf12 -wrap word
+	$w.text tag configure i -font If12 -wrap word
+	$w.text tag configure b -font Tf12 -wrap word
+
+	foreach line {
+		{h1 {Custom Conditions and the Dice Roller}}
+		{p {}}
+		{p {Set up your own custom condition markers in }
+		 b {Edit > Preferences > Styles > Markers}
+		 p .}
+		{p {}}
+		{p {Manage your collection of personal condition markers here. The names you define them under will be how you'll see them in the pop-up menu on the battle map.}}
+		{p {}}
+		{b {Modifiers: } p {This is a comma-separated list of die-roll variables (like }
+		   b {$foo} p {, }
+		   b {$bar} p {, etc., for your own variables or }
+		   b {$$baz} p { for GM-defined game-wide ones; or un-prefixed names like }
+		   b {mod1} p {, }
+		   b {mod2} p {, etc., for your own modifiers (using their display names in this case); or }
+		   b {/mod3} p {, }
+		   b {/mod4} p {, etc., for GM-defined game-wide named modifiers.}}
+		 {p {}}
+		 {b {Description: } p {The text summary of the modifier. This will appear in the mouse-over text of the creature token when the condition marker is placed on them.}}
+		 {p {}}
+		 {b {Marker shape, pattern, color: } p {These control the visual appearance of the marker on the creature token.}}
+		 {p {}}
+		 {b {Draw tracer line: } p {If you select this option, a line will be drawn between the creature tagged with this condition and your token.}}
+		 {p {}}
+		 {h1 {Setting Up the Presets}}
+		 {p {}}
+		 {p {When setting up your die-roll presets, just create variables with the appropriate modifiers and include them in the die-roll presets where they might be used. For example, if your class has a Smite Evil ability which allows her to add her Charisma bonus to attack rolls and her paladin level to damage rolls against any target designated as the unfortunate recipient of this ability. So let's set up a few variables in our die-roll presets:}}
+		 {p {}}
+		 {b {$LVL} p = b 10 p { (on)}}
+		 {p {}}
+		 {b {$Cha} p = b +5 p { (on)}}
+		 {p {}}
+		 {b {$SmiteAttk} p = b {+$LVL smite evil} p { (off)}}
+		 {p {}}
+		 {b {$SmiteDmg} p = b {$Cha smite evil} p { (off)}}
+		 {p {}}
+		 {p {The } b {$SmiteAttk} p { and } b {$SmiteDmg} p { variables are disabled by default because you don't want them added to all the die rolls you make. When they } i are p { enabled, they'll add their contents to their die rolls. Now create a variable that wraps together all the attack modifiers we'll ever potentially have (for the sake of the example, let's say there are a few others we didn't show above as well):}}
+		 {p {}}
+		 {b {$AttackMods} p = b {$SmiteAttk $StudiedAttk}}
+		 {p {}}
+		 {b {$DamageMods} p = b {$SmiteDmg $StudiedDmg}}
+		 {p {}}
+		 {p {Now we just include those in our definition of all our attack and damage presets, such as:}}
+		 {p {}}
+		 {b {Gladius= d20 + 15 $AttackMods|c}}
+		 {p {}}
+		 {b {GladiusDmg= 1d6+6 $DamageMods}}
+		 {p {}}
+		 {h1 {Using the Conditions}}
+		 {p {}}
+		 {p {Now, normally when making an attack the } b {$AttackMods} p { variable will expand to nothing, so the normal roll of } b {d20+15|c} p { is just made. However, if we place the Smite Evil condition on a creature and they are our current target on the battle map, then the } b {$SmiteAttk} p { variable activates, so the die roll expands to } b {d20+15+10 smite evil} p {. We can just modify the } b {$LVL} p { and } b {$Cha} p { variables as our level and Charisma values change over time.}}
+	} {
+		foreach {f t} $line {
+			$w.text insert end $t $f
+		}
+		$w.text insert end "\n"
+	}
+	$w.text configure -state disabled
+}
+
 # Begin drawing a new object of some type on the screen
 # OBJ_MODE will be nil, line, rect, poly, circ, arc, kill, aoe, move, text, tile, aoebound, ruler
 proc StartObj {w x y} {
@@ -5414,6 +5517,12 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags args} {
 		set record_grids false
 	}
 
+	if {[lsearch -exact $args -aura] >= 0} {
+		set local_aura true
+	} else {
+		set local_aura false
+	}
+
 	$w delete AoEZoneCrossHatch$id
 	$w delete REF$id
 	switch $shape {
@@ -5444,34 +5553,34 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags args} {
 							# I
 							DrawAoeGrid $w [expr $x0 + $is] [expr $y0 - $js] \
 							               [expr $x0 + $is1] [expr $y0 - $js1] \
-										   $color $id $tags $record_grids
+										   $color $id $tags $record_grids $local_aura
 							DrawAoeGrid $w [expr $x0 + $js - $iscale] [expr $y0 - $is - $iscale] \
 										   [expr $x0 + $js] [expr $y0 - $is] \
-										   $color $id $tags $record_grids
+										   $color $id $tags $record_grids $local_aura
 
 							# IV
 							DrawAoeGrid $w [expr $x0 + $is] [expr $y0 + $js1] \
 							               [expr $x0 + $is1] [expr $y0 + $js] \
-										   $color $id $tags $record_grids
+										   $color $id $tags $record_grids $local_aura
 							DrawAoeGrid $w [expr $x0 + $js - $iscale] [expr $y0 + $is] \
 										   [expr $x0 + $js] [expr $y0 + $is + $iscale] \
-										   $color $id $tags $record_grids
+										   $color $id $tags $record_grids $local_aura
 
 							# II
 							DrawAoeGrid $w [expr $x0 - $is1] [expr $y0 - $js] \
 										   [expr $x0 - $is] [expr $y0 - $js1] \
-										   $color $id $tags $record_grids
+										   $color $id $tags $record_grids $local_aura
 							DrawAoeGrid $w [expr $x0 - $js] [expr $y0 - $is - $iscale] \
 										   [expr $x0 - $js + $iscale] [expr $y0 - $is] \
-										   $color $id $tags $record_grids
+										   $color $id $tags $record_grids $local_aura
 
 							# III
 							DrawAoeGrid $w [expr $x0 - $is1] [expr $y0 + $js1] \
 										[expr $x0 - $is] [expr $y0 + $js] \
-										   $color $id $tags $record_grids
+										   $color $id $tags $record_grids $local_aura
 							DrawAoeGrid $w [expr $x0 - $js] [expr $y0 + $is] \
 										   [expr $x0 - $js + $iscale] [expr $y0 + $is1] \
-										   $color $id $tags $record_grids
+										   $color $id $tags $record_grids $local_aura
 						}
 					}
 				}
@@ -5488,7 +5597,7 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags args} {
 							set by [expr $y + $iscale]
 							foreach wid [$w find overlapping [expr $x+1] [expr $y+1] [expr $bx-1] [expr $by-1]] {
 								if {[lsearch -exact [$w gettags $wid] REF$id] >= 0} {
-									DrawAoeGrid $w $x $y $bx $by $color $id $tags $record_grids
+									DrawAoeGrid $w $x $y $bx $by $color $id $tags $record_grids $local_aura
 									break
 								}
 							}
@@ -5504,7 +5613,7 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags args} {
 							set by [expr $y + $iscale]
 							foreach wid [$w find overlapping [expr $x+1] [expr $y+1] [expr $bx-1] [expr $by-1]] {
 								if {[lsearch -exact [$w gettags $wid] REF$id] >= 0} {
-									DrawAoeGrid $w $x $y $bx $by $color $id $tags $record_grids
+									DrawAoeGrid $w $x $y $bx $by $color $id $tags $record_grids $local_aura
 									break
 								}
 							}
@@ -5521,7 +5630,7 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags args} {
 							set by [expr $y + $iscale]
 							foreach wid [$w find overlapping [expr $x+1] [expr $y+1] [expr $bx-1] [expr $by-1]] {
 								if {[lsearch -exact [$w gettags $wid] REF$id] >= 0} {
-									DrawAoeGrid $w $x $y $bx $by $color $id $tags $record_grids
+									DrawAoeGrid $w $x $y $bx $by $color $id $tags $record_grids $local_aura
 									break
 								}
 							}
@@ -5537,7 +5646,7 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags args} {
 							set by [expr $y + $iscale]
 							foreach wid [$w find overlapping [expr $x+1] [expr $y+1] [expr $bx-1] [expr $by-1]] {
 								if {[lsearch -exact [$w gettags $wid] REF$id] >= 0} {
-									DrawAoeGrid $w $x $y $bx $by $color $id $tags $record_grids
+									DrawAoeGrid $w $x $y $bx $by $color $id $tags $record_grids $local_aura
 									break
 								}
 							}
@@ -5569,7 +5678,7 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags args} {
 						if {($x < 0 && $x >= $y) || ($x >=0 && $x < -$y)} {
 							foreach wid [$w find overlapping [expr $x0+$x+$fuzz] [expr $y0+$y] [expr $x0+$x+$iscale-$fuzz] [expr $y0+$y]] {
 								if {[lsearch -exact [$w gettags $wid] REF$id] >= 0} {
-									DrawAoeGrid $w [expr $x0+$x] [expr $y0+$y] [expr $x0+$x+$iscale] [expr $y0+$y+$iscale] $color $id $tags $record_grids
+									DrawAoeGrid $w [expr $x0+$x] [expr $y0+$y] [expr $x0+$x+$iscale] [expr $y0+$y+$iscale] $color $id $tags $record_grids $local_aura
 									break
 								}
 							}
@@ -5586,7 +5695,7 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags args} {
 						if {($y < 0 && $y >= $x) || ($y >= 0 && $y < -$x)} {
 							foreach wid [$w find overlapping [expr $x0+$x] [expr $y0+$y+$fuzz] [expr $x0+$x] [expr $y0+$y+$iscale-$fuzz]] {
 								if {[lsearch -exact [$w gettags $wid] REF$id] >= 0} {
-									DrawAoeGrid $w [expr $x0+$x] [expr $y0+$y] [expr $x0+$x+$iscale] [expr $y0+$y+$iscale] $color $id $tags $record_grids
+									DrawAoeGrid $w [expr $x0+$x] [expr $y0+$y] [expr $x0+$x+$iscale] [expr $y0+$y+$iscale] $color $id $tags $record_grids $local_aura
 									break
 								}
 							}
@@ -5604,7 +5713,7 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags args} {
 							foreach wid [$w find overlapping [expr $x0+$x+$fuzz] [expr $y0+$y+$iscale] [expr $x0+$x+$iscale-$fuzz] [expr $y0+$y+$iscale]] {
 
 								if {[lsearch -exact [$w gettags $wid] REF$id] >= 0} {
-									DrawAoeGrid $w [expr $x0+$x] [expr $y0+$y] [expr $x0+$x+$iscale] [expr $y0+$y+$iscale] $color $id $tags $record_grids
+									DrawAoeGrid $w [expr $x0+$x] [expr $y0+$y] [expr $x0+$x+$iscale] [expr $y0+$y+$iscale] $color $id $tags $record_grids $local_aura
 									break
 								}
 							}
@@ -5622,7 +5731,7 @@ proc _DrawAoeZone {w id gx0 gy0 gxx gyy r color shape tags args} {
 							foreach wid [$w find overlapping [expr $x0+$x+$iscale] [expr $y0+$y+$fuzz] [expr $x0+$x+$iscale] [expr $y0+$y+$iscale-$fuzz]] {
 
 								if {[lsearch -exact [$w gettags $wid] REF$id] >= 0} {
-									DrawAoeGrid $w [expr $x0+$x] [expr $y0+$y] [expr $x0+$x+$iscale] [expr $y0+$y+$iscale] $color $id $tags $record_grids
+									DrawAoeGrid $w [expr $x0+$x] [expr $y0+$y] [expr $x0+$x+$iscale] [expr $y0+$y+$iscale] $color $id $tags $record_grids $local_aura
 									break
 								}
 							}
@@ -5790,7 +5899,7 @@ proc NeighborsOf {c1 r1} {
 	return $neighbors
 }
 
-proc DrawAoeGrid {w x1 y1 x2 y2 color id tags {record_grids false}} {
+proc DrawAoeGrid {w x1 y1 x2 y2 color id tags {record_grids false} {local_aura false}} {
 	global AoeHatchWidth
 	global RawAoeGrids
 	#DEBUG 0 "DrawAoEGrid $w $x1=[CanvasToGrid $x1] $y1=[CanvasToGrid $y1] $x2=[CanvasToGrid $x2] $y2=[CanvasToGrid $y2] $color $id $tags"
@@ -5801,10 +5910,18 @@ proc DrawAoeGrid {w x1 y1 x2 y2 color id tags {record_grids false}} {
 		set RawAoeGrids($id:$GX:$GY) [list $GX $GY]
 	}
 
+	if {$local_aura} {
+		set dash .
+		set o 5
+	} else {
+		set dash {}
+		set o 0
+	}
+
 	for {set x $x1; set y $y2} {$x < $x2} {set x [expr $x + ($x2-$x1)/4.0]; set y [expr $y - ($y2-$y1)/4.0]} {
-		$w create line $x $y1 $x2 $y -fill $color -width $AoeHatchWidth -tags $tags
+		$w create line [expr $x+$o] [expr $y1+$o] [expr $x2+$o] [expr $y+$o] -fill $color -width $AoeHatchWidth -tags $tags -dash $dash
 		if {$x > $x1} {
-			$w create line $x1 $y $x $y2 -fill $color -width $AoeHatchWidth -tags $tags
+			$w create line [expr $x1+$o] [expr $y+$o] [expr $x+$o] [expr $y2+$o] -fill $color -width $AoeHatchWidth -tags $tags -dash $dash
 		}
 	}
 }
@@ -6584,6 +6701,7 @@ proc CreatureStatusMarker {w id x y s calc_condition {customList {}}} {
 
 proc _DrawCreatureStatusMarkers {w x y s tags conditions id {customlist {}}} {
 	global MOBdata MarkerColor MarkerShape
+	# TODO add to tooltip and draw tracers
 
 	set Vo   0; # V triangle around token full size
 	set To   0; # ^ triangle around token full size
@@ -6620,13 +6738,24 @@ proc _DrawCreatureStatusMarkers {w x y s tags conditions id {customlist {}}} {
 			} else {
 				set dashpattern {}
 			}
-			lappend customlist [list $shape $color $dashpattern]
+			lappend customlist [list $shape $color $dashpattern {} {}]
 		}
 	}
 	#DEBUG 0 "draw $w $x $y $s $tags $conditions -> $customlist"
 
 	foreach marker $customlist {
-			lassign $marker shape color dashpattern
+			lassign $marker shape color dashpattern description tracer_id
+			#DEBUG 0 "marker $tracer_id $id $color $dashpattern $description"
+			global MOBdata iscale
+			if {$tracer_id ne {}
+			&& [info exists MOBdata($id)]
+			&& [info exists MOBdata($tracer_id)]} {
+				::gmautil::dassign $MOBdata($id) Gx targ_x Gy targ_y
+				::gmautil::dassign $MOBdata($tracer_id) Gx att_x Gy att_y
+				set att_sz [_mob_size $tracer_id]
+				set targ_sz [_mob_size $id]
+				$w create line [expr ($att_x+($att_sz/2.0))*$iscale] [expr ($att_y+($att_sz/2.0))*$iscale] [expr ($targ_x+($targ_sz/2.0))*$iscale] [expr ($targ_y+($targ_sz/2.0))*$iscale] -fill $color -width 4 -tags $tags -dash -
+			}
 			#DEBUG 0 "shape=$shape color=$color dash=$dashpattern"
 			# calculate border color
 			lassign [winfo rgb . $color] fillR fillG fillB
@@ -6864,10 +6993,11 @@ proc _mob_size {id} {
 
 set ActiveTargetList {}
 set ActiveTargetSource {}
+set ExplicitTargetSource {}
 set TargetColor blue
 proc RefreshTargets {} {
 #	DEBUG 0 "RefreshTargets"
-	global MOBdata MOBid canvas iscale ActiveTargetList ActiveTargetSource CurrentCombatants TargetColor
+	global MOBdata MOBid canvas iscale ActiveTargetList ActiveTargetSource CurrentCombatants TargetColor ExplicitTargetSource
 	global is_GM show_all_targets
 
 	set me [my_map_names]
@@ -6878,7 +7008,7 @@ proc RefreshTargets {} {
 
 	$canvas delete SRCTARG
 	if {[catch {
-		if {$ActiveTargetSource ne {} && [info exists MOBid($ActiveTargetSource)] && [info exists MOBdata([set tid $MOBid($ActiveTargetSource)])]} {
+		if {$ActiveTargetSource ne {} && [info exists MOBid([lindex $ActiveTargetSource 0])] && [info exists MOBdata([set tid $MOBid([lindex $ActiveTargetSource 0])])]} {
 #			DEBUG 0 "src id $tid -> [dict get $MOBdata($tid)]"
 			::gmautil::dassign [dict get $MOBdata($tid)] Gx gx Gy gy Hidden h
 			set sz [_mob_size $tid]
@@ -6915,17 +7045,23 @@ proc RefreshTargets {} {
 	# of damage being dealt
 	set ActiveTargetList {}
 	if {$is_GM} {
-		if {$current_actor ne {} && [info exists MOBdata([set tid [GetBaseMobID $current_actor]])]} {
+		# ... unless we said otherwise
+		set tid {n/a}
+		if {$ExplicitTargetSource ne {} && [info exists MOBid([lindex $ExplicitTargetSource 0])] && [info exists MOBdata([set tid $MOBid([lindex $ExplicitTargetSource 0])])]} {
+			if {[dict exists [set d $MOBdata($tid)] Targets]} {
+				set ActiveTargetList [dict get $d Targets]
+			}
+			set ActiveTargetSource $ExplicitTargetSource
+		} elseif {$current_actor ne {} && [info exists MOBdata([set tid [GetBaseMobID $current_actor]])]} { 
 			if {[dict exists [set d $MOBdata($tid)] Targets]} {
 				set ActiveTargetList [dict get $d Targets]
 			}
 			# set them as the target source as well so we can designate (new) targets for them
 			set ActiveTargetSource [list [dict get $d Name]]
 		}
-
 		$canvas delete SRCTARG
 		if {[catch {
-			if {$ActiveTargetSource ne {} && [info exists MOBid($ActiveTargetSource)] && [info exists MOBdata([set tid $MOBid($ActiveTargetSource)])]} {
+			if {$ActiveTargetSource ne {} && [info exists MOBid([lindex $ActiveTargetSource 0])] && [info exists MOBdata([set tid $MOBid([lindex $ActiveTargetSource 0])])]} {
 				::gmautil::dassign [dict get $MOBdata($tid)] Gx gx Gy gy
 				set sz [_mob_size $tid]
 				$canvas create rect [expr $gx*$iscale] [expr $gy*$iscale] [expr ($gx+$sz)*$iscale] [expr ($gy+$sz)*$iscale] -outline green -width 4 -tags SRCTARG -dash .
@@ -7062,7 +7198,8 @@ proc RenderSomeone {w id {norecurse false} args} {
 	DEBUG 3 "RenderSomeone $w $id"
 	global MOBdata ThreatLineWidth iscale SelectLineWidth ThreatLineHatchWidth ReachLineColor
 	global HealthBarWidth HealthBarFrameWidth HealthBarConditionFrameWidth
-	global ShowHealthStats is_GM
+	global LocalMarker
+	global ShowHealthStats is_GM LocalSpellAura
 	set lower_neighbors {}
 
 	#
@@ -7143,6 +7280,39 @@ proc RenderSomeone {w id {norecurse false} args} {
 				for {set AoEy 1} {$AoEy < $sz} {incr AoEy} {
 					_DrawAoeZone $w $id $GX0 [expr $GY0+$AoEy] $GXX [expr $GYY+$AoEy] $aoe_radius $aoe_color radius [list M#$id MA#$id allMOB MAzone] {*}$args
 					_DrawAoeZone $w $id [expr $GX0+$sz] [expr $GY0+$AoEy] [expr $GXX+$sz] [expr $GYY+$AoEy] $aoe_radius $aoe_color radius [list M#$id MA#$id allMOB MAzone] {*}$args
+				}
+			}
+		}
+	}
+	# locally-displayed aura or spell area of effect
+	if {[dict exists $MOBdata($id) _AoE] && [set AoE [dict get $MOBdata($id) _AoE]] ne {}} {
+		set aoe_type radius
+		::gmautil::dassign $AoE Radius aoe_radius Color aoe_color
+		set aoe_radius [expr $aoe_radius * $iscale]; #convert to canvas units for rendering
+		switch $aoe_type {
+			radius {
+				set GX0 [dict get $MOBdata($id) Gx]
+				set GY0 [dict get $MOBdata($id) Gy]
+				set GXX [expr $GX0 * $iscale]
+				set GYY [expr $GY0 * $iscale]
+				#
+				# In order to get the spell to be "centered on you" but adapted reasonably to
+				# creatures of whatever size, we will take the optional rule of having the spell
+				# emanate from the perimeter of the creature. In practical terms, we will draw
+				# a zone around each grid intersection around the occupied area of the creature.
+				# this makes some overlapping draw calls, but gets the job done.
+				#
+				# Our (GX,GY) reference point is already at the upper left of the occupied space.
+				set sz [MonsterSizeValue [CreatureDisplayedSize $id]]
+				for {set AoEx 0} {$AoEx <= $sz} {incr AoEx} {
+					_DrawAoeZone $w $id [expr $GX0+$AoEx] $GY0 [expr $GXX+$AoEx] $GYY $aoe_radius $aoe_color radius [list M#$id MA#$id allMOB MAzone] -aura {*}$args
+					if {$sz >= 1} {
+						_DrawAoeZone $w $id [expr $GX0+$AoEx] [expr $GY0+$sz] [expr $GXX+$AoEx] [expr $GYY+$sz] $aoe_radius $aoe_color radius [list M#$id MA#$id allMOB MAzone]	-aura {*}$args
+					}
+				}
+				for {set AoEy 1} {$AoEy < $sz} {incr AoEy} {
+					_DrawAoeZone $w $id $GX0 [expr $GY0+$AoEy] $GXX [expr $GYY+$AoEy] $aoe_radius $aoe_color radius [list M#$id MA#$id allMOB MAzone] -aura {*}$args
+					_DrawAoeZone $w $id [expr $GX0+$sz] [expr $GY0+$AoEy] [expr $GXX+$sz] [expr $GYY+$AoEy] $aoe_radius $aoe_color radius [list M#$id MA#$id allMOB MAzone] -aura {*}$args
 				}
 			}
 		}
@@ -7528,11 +7698,26 @@ proc RenderSomeone {w id {norecurse false} args} {
 	tooltip::tooltip $w -items MN#$id [CreateHealthStatsToolTip $id $condition]
 	set customList {}
 	global PreferencesData
-	if {[set tname [CurrentTargetSource]] ne {} && [info exists MOBdata([set tmid [GetBaseMobID $tname]])] && [dict exists $MOBdata($tmid) TargetedModifiers [S_ $mob_name]] && [dict exists $PreferencesData styles markers] && [set marker_data [dict get $PreferencesData styles markers]] ne {}} {
-		foreach ccond [dict keys [dict get $MOBdata($tmid) TargetedModifiers [S_ $mob_name]]] {
+	# TODO setting up custom list here 
+	if {[set tname [CurrentTargetSource]] ne {} && [info exists MOBdata([set tmid [GetBaseMobID $tname]])] && [dict exists $MOBdata($tmid) TargetedModifiers $mob_name]} {
+		if {[dict exists $PreferencesData styles markers]} {
+			set marker_data [dict get $PreferencesData styles markers]
+		} else {
+			set marker_data {}
+		}
+		foreach ccond [dict keys [dict get $MOBdata($tmid) TargetedModifiers $mob_name]] {
 			if {[dict exists $marker_data $ccond]} {
-				lappend customList [list [dict get $marker_data $ccond shape] [dict get $marker_data $ccond color] [dict get $marker_data $ccond dashpattern ]]
+				set mdata [dict get $marker_data $ccond]
+			} else {
+				set mdata [dict get $MOBdata($tmid) TargetedModifiers $mob_name $ccond]
 			}
+
+			if {[dict get $mdata tracer]} {
+				set tracer_id $tmid
+			} else {
+				set tracer_id {}
+			}
+			lappend customList [list [dict get $mdata shape] [dict get $mdata color] [dict get $mdata dashpattern] [dict get $mdata description] $tracer_id]
 		}
 	}
 	CreatureStatusMarker $w $id [expr $x*$iscale] [expr $y*$iscale] [expr $mob_size*$iscale] $condition $customList
@@ -7917,12 +8102,16 @@ proc RefreshMOBs {} {
 }
 
 proc ScreenXYToMOBID {w x y} {
-	global MOBdata
+	global MOBdata is_GM
 	lassign [ScreenXYToGridXY $x $y -exact] gx gy
 
 	DEBUG 3 "Looking for object at $x,$y (grid $gx,$gy)..."
 	set mob_list {}
 	foreach id [array names MOBdata] {
+		if {!$is_GM && [dict get $MOBdata($id) Hidden]} {
+			DEBUG 3 "skipping hidden mob $id here"
+			continue
+		}
 		set msz [expr max(1, [MonsterSizeValue [CreatureDisplayedSize $id]])]
 		set mx0 [expr int([dict get $MOBdata($id) Gx])]
 		set mx1 [expr $mx0 + $msz]
@@ -8873,11 +9062,11 @@ proc CreateConditionSubMenu {args} {
 		if {[set targeter [EnsureTargetSourceFirst]] ne {}} {
 			$mid add separator
 			foreach {name d} $marker_data {
-				set display_name [_S $name]
+				set display_name $name
 				if {[AreMobsInCustomList $mob_list $name $targeter]} {
-					$mid add command -command [list Custom$cmd $mob_list $name $targeter $marker_data] -label $display_name -foreground #ff0000 -state disabled
+					$mid add command -command [list Custom$cmd $mob_list $name $targeter $marker_data] -label $display_name -foreground #ff0000
 				} else {
-					$mid add command -command [list Custom$cmd $mob_list $name $targeter $marker_data] -label $display_name -state disabled
+					$mid add command -command [list Custom$cmd $mob_list $name $targeter $marker_data] -label $display_name
 				}
 			}
 		}
@@ -9275,20 +9464,21 @@ proc DoContext {x y} {
 	set CTXdead 5
 	set CTXreac 6
 	set CTXsaoe 7
-	set CTXpoly 8
-	set CTXsize 9
-	set CTXcond 10
-	set CTXtags 11
-	set CTXelev 12
-	set CTXmmod 13
-	set CTXSEP1 14
-	set CTXdgrd 15
-	set CTXdfrm 16
-	set CTXSEP2 17
-	set CTXtsel 18
-	set CTXdsel 19
-	set CTXSEP3 20
-	set CTX_pcs 21
+	set CTXaura 8
+	set CTXpoly 9
+	set CTXsize 10
+	set CTXcond 11
+	set CTXtags 12
+	set CTXelev 13
+	set CTXmmod 14
+	set CTXSEP1 15
+	set CTXdgrd 16
+	set CTXdfrm 17
+	set CTXSEP2 18
+	set CTXtsel 19
+	set CTXdsel 20
+	set CTXSEP3 21
+	set CTX_pcs 22
 
 	.contextMenu delete $CTXdgrd
 	.contextMenu insert $CTXdgrd command -command "DistanceFromGrid $x $y 0" -label "Distance from [LetterLabel $Gx]$Gy"
@@ -9306,6 +9496,8 @@ proc DoContext {x y} {
 		.contextMenu insert $CTXreac command -command "" -label "Set Reach" -state disabled
 		.contextMenu delete $CTXsaoe
 		.contextMenu insert $CTXsaoe command -command "" -label "Toggle Spell Area" -state disabled
+		.contextMenu delete $CTXaura
+		.contextMenu insert $CTXaura command -command "" -label "Toggle Local Aura" -state disabled
 		.contextMenu delete $CTXpoly
 		.contextMenu insert $CTXpoly command -command "" -label "Polymorph" -state disabled
 		.contextMenu delete $CTXsize
@@ -9338,7 +9530,9 @@ proc DoContext {x y} {
 #		.contextMenu insert $CTXreac command -command "ToggleReach $mob_id" -label "Cycle Reach for $mob_name"
 		.contextMenu insert $CTXreac cascade -menu [CreateReachSubMenu -shallow $mob_id] -label "Set Reach for $mob_disp_name"
 		.contextMenu delete $CTXsaoe
-		.contextMenu insert $CTXsaoe command -command "ToggleSpellArea $mob_id" -label "Toggle Spell Area for $mob_disp_name"
+		.contextMenu insert $CTXsaoe command -command [list ToggleSpellArea $mob_id false] -label "Toggle Spell Area for $mob_disp_name"
+		.contextMenu delete $CTXaura
+		.contextMenu insert $CTXaura command -command [list ToggleSpellArea $mob_id true] -label "Toggle Local Aura for $mob_disp_name"
 		.contextMenu delete $CTXpoly
 		if {[AllowedToPolymorph $mob_id]} {
 			.contextMenu insert $CTXpoly cascade -menu [CreatePolySubMenu -shallow $mob_id] -label "Polymorph $mob_disp_name"
@@ -9365,6 +9559,7 @@ proc DoContext {x y} {
 		.contextMenu.kill delete 0 end
 		.contextMenu.reach delete 0 end
 		.contextMenu.aoe delete 0 end
+		.contextMenu.aur delete 0 end
 		.contextMenu.poly delete 0 end
 		.contextMenu.size delete 0 end
 		.contextMenu.tag delete 0 end
@@ -9382,7 +9577,8 @@ proc DoContext {x y} {
 			.contextMenu.kill add command -command "KillPerson $mob_id" -label $mob_disp_name
 #			.contextMenu.reach add command -command "ToggleReach $mob_id" -label $mob_name
 			.contextMenu.reach add cascade -menu [CreateReachSubMenu -deep $mob_id] -label $mob_disp_name
-			.contextMenu.aoe add command -command "ToggleSpellArea $mob_id" -label $mob_disp_name
+			.contextMenu.aoe add command -command [list ToggleSpellArea $mob_id false] -label $mob_disp_name
+			.contextMenu.aur add command -command [list ToggleSpellArea $mob_id true] -label $mob_disp_name
 			if {[AllowedToPolymorph $mob_id]} {
 				.contextMenu.poly add cascade -menu [CreatePolySubMenu -deep $mob_id] -label $mob_disp_name
 				incr polymorph_qty
@@ -9424,6 +9620,8 @@ proc DoContext {x y} {
 		.contextMenu insert $CTXreac cascade -menu .contextMenu.reach -label "Set Reach"
 		.contextMenu delete $CTXsaoe
 		.contextMenu insert $CTXsaoe cascade -menu .contextMenu.aoe -label "Toggle Spell Area"
+		.contextMenu delete $CTXaura
+		.contextMenu insert $CTXaura cascade -menu .contextMenu.aur -label "Toggle Local Aura"
 		.contextMenu delete $CTXpoly
 		.contextMenu insert $CTXpoly cascade -menu .contextMenu.poly -label "Polymorph"
 		.contextMenu delete $CTXsize
@@ -9468,6 +9666,7 @@ menu .contextMenu.del -tearoff 0
 menu .contextMenu.kill -tearoff 0
 menu .contextMenu.reach -tearoff 0
 menu .contextMenu.aoe -tearoff 0
+menu .contextMenu.aur -tearoff 0
 menu .contextMenu.poly -tearoff 0
 menu .contextMenu.size -tearoff 0
 menu .contextMenu.tag -tearoff 0
@@ -9478,26 +9677,27 @@ menu .contextMenu.dist -tearoff 0
 menu .contextMenu.tsel -tearoff 0
 #menu .addPlayerMenu
 .contextMenu add command -command "" -label Target -state disabled               			;# 0
-.contextMenu add command -command "" -label {Randomly Target} -state disabled              		;# 0
-.contextMenu add command -command "" -label Remove -state disabled					;# 1
-.contextMenu add command -command {AddPlayerMenu player} -label {Add Player...}				;# 2
-.contextMenu add command -command {AddPlayerMenu monster} -label {Add Monster...}			;# 3
-.contextMenu add command -command "" -label {Toggle Death} -state disabled				;# 4
-.contextMenu add command -command "" -label {Set Reach} -state disabled					;# 5
-.contextMenu add command -command "" -label {Toggle Spell Area} -state disabled				;# 6
-.contextMenu add command -command "" -label {Polymorph} -state disabled					;# 7
-.contextMenu add command -command "" -label {Change Size} -state disabled				;# 8
-.contextMenu add command -command "" -label {Toggle Condition} -state disabled				;# 9 
-.contextMenu add command -command "" -label {Tag} -state disabled					;# 10 
-.contextMenu add command -command "" -label {Elevation} -state disabled					;# 11
-.contextMenu add command -command "" -label {Movement Mode} -state disabled				;# 12
-.contextMenu add separator										;# 13
-.contextMenu add command -command "" -label {Distance from...} -state disabled		 		;# 14 
-.contextMenu add command -command "" -label {Distance from...} -state disabled				;# 15 
-.contextMenu add separator										;# 16 
-.contextMenu add command -command "" -label {Toggle Selection} -state disabled				;# 17 
-.contextMenu add command -command "ClearSelection" -label {Deselect All} -state disabled		;# 18
-.contextMenu add separator										;# 19
+.contextMenu add command -command "" -label {Randomly Target} -state disabled              		;# 1
+.contextMenu add command -command "" -label Remove -state disabled					;# 2
+.contextMenu add command -command {AddPlayerMenu player} -label {Add Player...}				;# 3
+.contextMenu add command -command {AddPlayerMenu monster} -label {Add Monster...}			;# 4
+.contextMenu add command -command "" -label {Toggle Death} -state disabled				;# 5
+.contextMenu add command -command "" -label {Set Reach} -state disabled					;# 6
+.contextMenu add command -command "" -label {Toggle Spell Area} -state disabled				;# 7
+.contextMenu add command -command "" -label {Toggle Local Aura} -state disabled				;# 8
+.contextMenu add command -command "" -label {Polymorph} -state disabled					;# 9
+.contextMenu add command -command "" -label {Change Size} -state disabled				;# 10
+.contextMenu add command -command "" -label {Toggle Condition} -state disabled				;# 11 
+.contextMenu add command -command "" -label {Tag} -state disabled					;# 12 
+.contextMenu add command -command "" -label {Elevation} -state disabled					;# 13
+.contextMenu add command -command "" -label {Movement Mode} -state disabled				;# 14
+.contextMenu add separator										;# 15
+.contextMenu add command -command "" -label {Distance from...} -state disabled		 		;# 16 
+.contextMenu add command -command "" -label {Distance from...} -state disabled				;# 17 
+.contextMenu add separator										;# 18 
+.contextMenu add command -command "" -label {Toggle Selection} -state disabled				;# 19 
+.contextMenu add command -command "ClearSelection" -label {Deselect All} -state disabled		;# 20
+.contextMenu add separator										;# 21
 
 # AddPlayer name color ?area? ?size? ?id?  defaults to 1x1, generated ID
 #
@@ -9761,13 +9961,22 @@ proc ChangeDispSizeAll {mob_list code} {
 # if a mob has a spell area highlighted, kill it.
 # otherwise, set it now
 #
-proc ToggleSpellArea id {
-	global MOBdata canvas
+proc ToggleSpellArea {id {isLocal false}} {
+	global MOBdata canvas LocalSpellAura
 
-	if {[dict get $MOBdata($id) AoE] ne {}} {
-		dict set MOBdata($id) AoE {}
+	set LocalSpellAura $isLocal
+	if {$isLocal} {
+		set key _AoE
+	} else {
+		set key AoE
+	}
+
+	if {[dict exists $MOBdata($id) $key] && [dict get $MOBdata($id) $key] ne {}} {
+		dict set MOBdata($id) $key {}
 		RenderSomeone $canvas $id
-		SendMobChanges $id AoE
+		if {! $isLocal} {
+			SendMobChanges $id $key
+		}
 	} else {
 		canceltool
 		bind $canvas <1> "CompleteMOBAoE $id $canvas %x %y"
@@ -9778,23 +9987,33 @@ proc ToggleSpellArea id {
 }
 
 proc CompleteMOBAoE {id w x y} {
-	aoe_target_prompt [GetAreaZoneTargets $id -mob]
+	global LocalSpellAura
+	if {!$LocalSpellAura} {
+		aoe_target_prompt [GetAreaZoneTargets $id -mob]
+	}
 	canceltool
 	$w delete AoElocator#$id
-	SendMobChanges $id AoE
+	if {!$LocalSpellAura} {
+		SendMobChanges $id AoE
+	}
 	clear_message
 }
 
 proc DragMOBAoE {id w x y} {
-	global MOBdata iscale OBJ_COLOR
+	global MOBdata iscale OBJ_COLOR LocalSpellAura
+	if {$LocalSpellAura} {
+		set key _AoE
+	} else {
+		set key AoE
+	}
 
 	set xx [SnapCoordAlways [$w canvasx $x]]
 	set yy [SnapCoordAlways [$w canvasy $y]]
 	set gx [CanvasToGrid $xx]
 	set gy [CanvasToGrid $yy]
 	set r  [GridDistance [dict get $MOBdata($id) Gx] [dict get $MOBdata($id) Gy] $gx $gy]
-	display_only [format "Spell radius %d square%s / %d feet" $r [expr $r==1 ? {{}} : {{s}}] [expr $r * 5]]
-	dict set MOBdata($id) AoE [dict create Radius $r Color $OBJ_COLOR(fill)]
+	display_only [format "%s radius %d square%s / %d feet" [expr $LocalSpellAura ? {{Local-display aura}} : {{Spell}}] $r [expr $r==1 ? {{}} : {{s}}] [expr $r * 5]]
+	dict set MOBdata($id) $key [dict create Radius $r Color $OBJ_COLOR(fill)]
 	RenderSomeone $w $id
 	$w create line [expr [dict get $MOBdata($id) Gx] * $iscale] [expr [dict get $MOBdata($id) Gy] * $iscale] \
 		[expr $gx * $iscale] [expr $gy * $iscale] \
@@ -10827,6 +11046,8 @@ proc DoCommandCS {d} {
 }
 
 proc DoCommandIL {d} {
+	global ExplicitTargetSource
+	set ExplicitTargetSource {}
 	if {[::gmaclock::exists .initiative.clock]} {
 		::gmaclock::set_initiative_slots .initiative.clock [dict get $d InitiativeList]
 	}
@@ -11352,6 +11573,8 @@ proc DoCommandI {d} {
 	global MOB_COMBATMODE canvas MOB_BLINK NextMOBID MOBdata MOBid
 	global CombatantScrollEnabled is_GM
 	set ITlist {}
+	global ExplicitTargetSource
+	set ExplicitTargetSource {}
 
 	ondeck_advance $d
 
@@ -12382,7 +12605,7 @@ proc _render_die_roller {w width height type for_user tkey args} {
 			assert_recent_die_rolls $tkey
 			for {set i 0} {$i < [llength $dice_preset_data(recent_die_rolls,$tkey)] && $i < 10} {incr i} {
 				$w.$i.spec configure -text [lindex [lindex $dice_preset_data(recent_die_rolls,$tkey) $i] 0]
-				$w.$i.extra configure -width [expr max(3,[string length [lindex [lindex $dice_preset_data(recent_die_rolls,$tkey) $i] 1]])] -state normal
+$w.$i.extra configure -width [expr max(3,[string length [lindex [lindex $dice_preset_data(recent_die_rolls,$tkey) $i] 1]])] -state normal
 				$w.$i.extra delete 0 end
 				$w.$i.extra insert end [lindex [lindex $dice_preset_data(recent_die_rolls,$tkey) $i] 1]
 				if {$last_known_size($tkey,recent,$i) eq {blank}} {
@@ -14306,6 +14529,11 @@ proc PresetLists {arrayname tkey args} {
         set pkeylen [string length "preset,$tkey,"]
 	foreach pkey [lsort [array names presets "preset,$tkey,*"]] {
 		set pname [string range $pkey $pkeylen end]
+		#  _                    _   _____     _     _      
+		# | |    ___   ___ __ _| | |_   _|_ _| |__ | | ___ 
+		# | |   / _ \ / __/ _` | |   | |/ _` | '_ \| |/ _ \
+		# | |__| (_) | (_| (_| | |   | | (_| | |_) | |  __/
+		# |_____\___/ \___\__,_|_|   |_|\__,_|_.__/|_|\___|
 		if {[regexp {^#(.*?);(.*?)(?:;([^|]*))?(?:\|(.*))?$} $pname _ sequence flags client dname]} {
 			set d $presets($pkey)
 			if {$dname eq {}} {
@@ -14344,6 +14572,11 @@ proc PresetLists {arrayname tkey args} {
 
 			lappend tables $d
 		} elseif {[regexp {^§(.*?);(.*?);(.*?)(?:;([^|]*))?(?:\|(.*))?$} $pname _ sequence varname flags client dname]} {
+			#  _                    _  __     __          ____  __           _ 
+			# | |    ___   ___ __ _| | \ \   / /_ _ _ __ / /  \/  | ___   __| |
+			# | |   / _ \ / __/ _` | |  \ \ / / _` | '__/ /| |\/| |/ _ \ / _` |
+			# | |__| (_) | (_| (_| | |   \ V / (_| | | / / | |  | | (_) | (_| |
+			# |_____\___/ \___\__,_|_|    \_/ \__,_|_|/_/  |_|  |_|\___/ \__,_|
 			set d $presets($pkey)
 			if {$dname eq {}} {
 				dict set d DisplayName {unnamed modifier}
@@ -14389,6 +14622,9 @@ proc PresetLists {arrayname tkey args} {
 					if {[string is alpha -strict [string range $varname 0 0]] &&
 					([string length $varname] == 1 ||
 					[string is alnum -strict [string range $varname 1 end]])} {
+						#
+						# Varible
+						#
 						set DieRollPresetState($tkey,var,$varname) [dict get $d DieRollSpec]
 						if {[info exists dice_preset_data(en,$tkey,v:$varname)]} {
 							set DieRollPresetState($tkey,on,v:$varname) $dice_preset_data(en,$tkey,v:$varname)
@@ -14396,34 +14632,35 @@ proc PresetLists {arrayname tkey args} {
 							set DieRollPresetState($tkey,on,v:$varname) [::gmaproto::json_bool [dict get $d Enabled]]
 						}
 						set DieRollPresetState($tkey,g,$varname) false
-						#DEBUG 0 "QQ export DRPS $tkey,on,v:$varname=$DieRollPresetState($tkey,on,v:$varname)"
-						#trace add variable DieRollPresetState($tkey,on,$varname) {array read write unset} TRACEvar
-						#trace add variable DieRollPresetState($tkey,var,$varname) {array read write unset} TRACEvar
-						#trace add variable DieRollPresetState($tkey,g,$varname) {array read write unset} TRACEvar
 					} else {
 						DEBUG 0 "Invalid modifier variable name <$varname>. This variable will be ignored."
 						DEBUG 0 "Variables must begin with a letter and include only letters and numbers."
 					}
 				} else {
+					#
+					# Modifier
+					#
 					set id [dict get $d DisplaySeq]
+					if {[dict get $d DisplayName] ne {}} {
+						set DieRollPresetState($tkey,modsym,[dict get $d DisplayName]) u$id
+					}
 					set DieRollPresetState($tkey,global,u$id) [dict get $d DieRollSpec]
-					#puts "=== $d"
 					if {[info exists dice_preset_data(en,$tkey,$u_piname)]} {
 						set DieRollPresetState($tkey,on,u$id) $dice_preset_data(en,$tkey,$u_piname)
-						#puts "*** set value for u$id to $DieRollPresetState($tkey,on,u$id) from $dice_preset_data(en,$tkey,$u_piname)"
 						lappend DieRollPresetState($tkey,apply_order) u$id
 					} else {
-						set DieRollPresetState($tkey,on,u$id) [dict get $d Enabled]
-						#puts "*** set value for u$id to $DieRollPresetState($tkey,on,u$id) because no var in $d"
+					set DieRollPresetState($tkey,on,u$id) [dict get $d Enabled]
 						lappend DieRollPresetState($tkey,apply_order) u$id
 					}
 					set DieRollPresetState($tkey,g,u$id) [dict get $d Global]
-					#trace add variable DieRollPresetState($tkey,on,u$id) {array read write unset} TRACEvar
-					#trace add variable DieRollPresetState($tkey,global,u$id) {array read write unset} TRACEvar
-					#trace add variable DieRollPresetState($tkey,g,u$id) {array read write unset} TRACEvar
 				}
 			}
 		} else {
+			#  _                    _   ____                     _   
+			# | |    ___   ___ __ _| | |  _ \ _ __ ___  ___  ___| |_ 
+			# | |   / _ \ / __/ _` | | | |_) | '__/ _ \/ __|/ _ \ __|
+			# | |__| (_) | (_| (_| | | |  __/| | |  __/\__ \  __/ |_ 
+			# |_____\___/ \___\__,_|_| |_|   |_|  \___||___/\___|\__|
 			set pieces [split $pname |]
 			set d $presets($pkey)
 
@@ -14471,6 +14708,11 @@ proc PresetLists {arrayname tkey args} {
 	foreach pkey [lsort [array names presets "sys,preset,*"]] {
 		set pname [string range $pkey $pkeylen end]
 		if {[regexp {^#(.*?);(.*?)(?:;([^|]*))?(?:\|(.*))?$} $pname _ sequence flags client dname]} {
+			#   ____ _       _           _   _____     _     _      
+			#  / ___| | ___ | |__   __ _| | |_   _|_ _| |__ | | ___ 
+			# | |  _| |/ _ \| '_ \ / _` | |   | |/ _` | '_ \| |/ _ \
+			# | |_| | | (_) | |_) | (_| | |   | | (_| | |_) | |  __/
+			#  \____|_|\___/|_.__/ \__,_|_|   |_|\__,_|_.__/|_|\___|
 			set d $presets($pkey)
 			if {$dname eq {}} {
 				dict set d DisplayName {unnamed table}
@@ -14508,6 +14750,11 @@ proc PresetLists {arrayname tkey args} {
 
 			lappend gtables $d
 		} elseif {[regexp {^§(.*?);(.*?);(.*?)(?:;([^|]*))?(?:\|(.*))?$} $pname _ sequence varname flags client dname]} {
+			#   ____ _       _           _  __     __          ____  __           _ 
+			#  / ___| | ___ | |__   __ _| | \ \   / /_ _ _ __ / /  \/  | ___   __| |
+			# | |  _| |/ _ \| '_ \ / _` | |  \ \ / / _` | '__/ /| |\/| |/ _ \ / _` |
+			# | |_| | | (_) | |_) | (_| | |   \ V / (_| | | / / | |  | | (_) | (_| |
+			#  \____|_|\___/|_.__/ \__,_|_|    \_/ \__,_|_|/_/  |_|  |_|\___/ \__,_|
 			set d $presets($pkey)
 			if {$dname eq {}} {
 				dict set d DisplayName {unnamed modifier}
@@ -14564,6 +14811,9 @@ proc PresetLists {arrayname tkey args} {
 					}
 				} else {
 					set id [dict get $d DisplaySeq]
+					if {[dict get $d DisplayName] ne {}} {
+						set DieRollPresetState($tkey,modsym,/[dict get $d DisplayName]) g$id
+					}
 					set DieRollPresetState($tkey,global,g$id) [dict get $d DieRollSpec]
 					if {[info exists dice_preset_data(en,$tkey,$g_piname)]} {
 						set DieRollPresetState($tkey,on,g$id) $dice_preset_data(en,$tkey,$g_piname)
@@ -14575,6 +14825,11 @@ proc PresetLists {arrayname tkey args} {
 				}
 			}
 		} else {
+			#   ____ _       _           _   ____                     _   
+			#  / ___| | ___ | |__   __ _| | |  _ \ _ __ ___  ___  ___| |_ 
+			# | |  _| |/ _ \| '_ \ / _` | | | |_) | '__/ _ \/ __|/ _ \ __|
+			# | |_| | | (_) | |_) | (_| | | |  __/| | |  __/\__ \  __/ |_ 
+			#  \____|_|\___/|_.__/ \__,_|_| |_|   |_|  \___||___/\___|\__|
 			set pieces [split $pname |]
 			set d $presets($pkey)
 
@@ -15966,7 +16221,7 @@ proc _apply_die_roll_mods {spec extra label {g false}} {
 	return $newspec
 }
 
-proc _apply_die_roll_variables {rollspec for_user tkey} {
+proc _apply_die_roll_variables {rollspec for_user tkey {cond_vars_to_apply {}}} {
 	global DieRollPresetState
 	set it 0
 	foreach {vartype varform} {
@@ -15989,7 +16244,7 @@ proc _apply_die_roll_variables {rollspec for_user tkey} {
 			set onkey "$tkey,on,v:$varname"
 		}
 		if {[info exists DieRollPresetState($vkey)]} {
-			if {$DieRollPresetState($onkey)} {
+			if {$DieRollPresetState($onkey) || [lsearch -exact $cond_vars_to_apply $vkey] >= 0} {
 				set rollspec [string replace $rollspec {*}$fieldidx $DieRollPresetState($vkey)]
 			} else {
 				set rollspec [string replace $rollspec {*}$fieldidx]
@@ -16007,8 +16262,95 @@ proc _apply_die_roll_variables {rollspec for_user tkey} {
 
 proc _do_roll {roll_string extra w for_user tkey} {
 	global dice_preset_data local_user
-	global DieRollPresetState
+	global DieRollPresetState MOBdata
 	DEBUG 1 "_do_roll($roll_string, $extra, $w, $for_user, $tkey)"
+
+	set attacking_mob [GetBaseMobID $for_user]
+	DEBUG 1 "attacker $attacking_mob for $for_user"
+	set temporary_mod_names {}
+   	set temporary_cond_names {}
+	set target_qty 0
+	DEBUG 1 "$MOBdata($attacking_mob)"
+	DEBUG 1 "[dict get $MOBdata($attacking_mob) Targets]"
+	DEBUG 1 "[dict get $MOBdata($attacking_mob) TargetedModifiers]"
+	if {[info exists MOBdata($attacking_mob)] 
+	   && [dict exists [set amob $MOBdata($attacking_mob)] Targets] 
+	   && [llength [set target_list [dict get $amob Targets]]] > 0
+	   && [dict exists $amob TargetedModifiers]
+	   && [llength [set tcond_list [dict get $amob TargetedModifiers]]] > 0} {
+		   foreach targ_name $target_list {
+			   set found false
+			   dict for {ctarg_name tconds} $tcond_list {
+				   if {$targ_name eq $ctarg_name} {
+					   if {[incr target_qty] == 1} {
+					       # first match, record all the modifiers we need to activate
+					       dict for {cond_name details} $tconds {
+						       DEBUG 1 "adding $cond_name"
+						       lappend temporary_mod_names {*}[dict get $details Modifiers]
+						       lappend temporary_cond_names $cond_name
+					       }
+					   } else {
+					       # subsequent matches, just make sure they have identical
+					       # conditions to the first one.
+						if {[lsort [dict keys $tconds]] ne [lsort $temporary_cond_names]} {
+							tk_messageBox -type ok -icon error -title "Unable to apply custom modifiers."\
+							-message "Multiple targets with unequal custom markers." \
+							-detail "You are targeting multiple creatures, but they don't all have exactly the same custom modifiers, so I can't apply the modifiers to them all at the same time in the same way, so I'm just going to leave it up to you to turn on/off the modifiers on your own on this one. Good luck!"
+							set temporary_mod_names {}
+							set temporary_cond_names {}
+							break
+						}
+					   }
+					   set found true
+					   break
+				   }
+			  }
+			  if {!$found} {
+				  # this target has no special markers
+				  if {[incr target_qty] == 1} {
+					  # no problem so far, as long as no other targets do either
+				  } else {
+					  if {[llength $temporary_mod_names] > 0} {
+						tk_messageBox -type ok -icon error -title "Unable to apply custom modifiers."\
+						-message "Multiple targets with unequal custom markers." \
+						-detail "You are targeting multiple creatures, but some have custom modifiers and some do not. I can't apply the modifiers to them all at the same time in the same way under those circumstances (obviously) so you're going to have to sort it out manually."
+						set temporary_mod_names {}
+						set temporary_cond_names {}
+						break
+					}
+				}
+			}
+		}
+	}
+
+	DEBUG 1 " after targeted calculation: target qty $target_qty"
+	DEBUG 1 " mods: $temporary_mod_names"
+	DEBUG 1 " conditions: $temporary_cond_names"
+	set cond_mods_to_apply {}
+	set cond_vars_to_apply {}
+	foreach custom_condition $temporary_mod_names {
+		if {[string range $custom_condition 0 1] eq {$$}} {
+			set v [string range $custom_condition 2 end]
+			if {[info exists DieRollPresetState(sys,gvar,$v)]} {
+				lappend cond_vars_to_apply sys,gvar,$v
+			} else {
+				DEBUG 0 "WARNING: Your custom condition asked to have global variable \$\$$v activated but no such variable exists. (ignoring this variable for now)"
+			}
+		} elseif {[string range $custom_condition 0 0] eq {$}} {
+			set v [string range $custom_condition 1 end]
+			if {[info exists DieRollPresetState($tkey,var,$v)]} {
+				lappend cond_vars_to_apply $tkey,var,$v
+			} else {
+				DEBUG 0 "WARNING: Your custom condition asked to have local variable \$$v activated but no such variable exists. (ignoring this variable for now)"
+			}
+		} else {
+			if {[info exists DieRollPresetState($tkey,modsym,$custom_condition)]} {
+				lappend cond_mods_to_apply $DieRollPresetState($tkey,modsym,$custom_condition)
+			} else {
+				DEBUG 0 "WARNING: Your custom condition asked to have modifier $custom_condition activated but no such modifier name exists. (ignoring this modifier for now)"
+			}
+		}
+	}
 
 	if {[catch {
 		set rollspec [_apply_die_roll_mods $roll_string $extra { ad hoc}]
@@ -16016,13 +16358,13 @@ proc _do_roll {roll_string extra w for_user tkey} {
 		if {[info exists DieRollPresetState($tkey,apply_order)]} {
 			foreach id $DieRollPresetState($tkey,apply_order) {
 				DEBUG 1 "  apply $id $DieRollPresetState($tkey,on,$id):$DieRollPresetState($tkey,global,$id):$DieRollPresetState($tkey,g,$id)"
-				if {$DieRollPresetState($tkey,on,$id)} {
+				if {$DieRollPresetState($tkey,on,$id) || [lsearch -exact $cond_mods_to_apply $id] >= 0} {
 					set rollspec [_apply_die_roll_mods $rollspec $DieRollPresetState($tkey,global,$id) {} $DieRollPresetState($tkey,g,$id)]
 					DEBUG 1 " after $DieRollPresetState($tkey,global,$id): $rollspec"
 				}
 			}
 		}
-		set rollspec [_apply_die_roll_variables $rollspec $for_user $tkey]
+		set rollspec [_apply_die_roll_variables $rollspec $for_user $tkey $cond_vars_to_apply]
 	} err]} {
 		tk_messageBox -type ok -icon error -title "Unable to complete die roll"\
 			-message "There was a problem with your die-roll request. It was not sent to the server."\
@@ -16306,25 +16648,25 @@ proc SetObjectAttribute {id kvlist} {
 		if {$datatype eq "PS" && $k eq "CustomReach"} {
 			set v [::gmaproto::new_dict CustomReach {*}$v]
 		}
-		if {$datatype eq "PS" && $k eq "TargetedModifiers"} {
-			set dd $v
-			if {[catch {
-				set v {}
-				dict for {monster conds} $dd {
-					dict for {condition details} $conds {
-						if {[dict exists $details Modifiers]} {
-							dict set v TargetedModifiers [S_ $monster] [S_ $condition] Modifiers [dict get $details Modifiers]
-						} else {
-							dict set v TargetedModifiers [S_ $monster] [S_ $condition] Modifiers {}
-						}
-					}
-				}
-			} err]} {
-				set v {}
-				DEBUG 0 "Rejecting object update for $id TargetedModifiers: $err"
-			}
-			continue
-		}
+#		if {$datatype eq "PS" && $k eq "TargetedModifiers"} {
+#			set dd $v
+#			DEBUG 0 "setting $v"
+#			if {[catch {
+#				set v {}
+#				dict for {monster conds} $dd {
+#					dict for {condition details} $conds {
+#						if {[dict exists $details Modifiers]} {
+#							dict set v TargetedModifiers $monster $condition Modifiers [dict get $details Modifiers]
+#						} else {
+#							dict set v TargetedModifiers $monster $condition Modifiers {}
+#						}
+#					}
+#				}
+#			} err]} {
+#				set v {}
+#				DEBUG 0 "Rejecting object update for $id TargetedModifiers: $err"
+#			}
+#		}
 
 		if {$datatype eq "PS" && $k eq "Gx"} {
 			set move_to_Gx $v
@@ -16409,9 +16751,13 @@ proc SendMobChanges {id attrlist} {
 	global MOBdata
 	set alist [dict create]
 	foreach attr $attrlist {
-		dict set alist $attr [dict get $MOBdata($id) $attr]
+		if {[string index $attr 0] ne "_"} {
+			dict set alist $attr [dict get $MOBdata($id) $attr]
+		}
 	}
-	::gmaproto::update_obj_attributes $id $alist
+	if {[llength $alist] > 0} {
+		::gmaproto::update_obj_attributes $id $alist
+	}
 }
 
 proc SendObjChanges {id attrlist} {
@@ -17746,6 +18092,30 @@ proc ConnectToServerByIdx {idx} {
 # 		DieRollPresetState <tkey>,apply_order	{}
 # 		for modifiers
 # 			with variable names
+# 				local	
+#	 				<tkey>,var,<varname>		stored value
+# 					<tkey>,on,v:<varname>		bool: currently enabled?
+# 					<tkey>,g,<varname>		bool: false (not used)
+# 				global
+# 					sys,gvar_on,<varname>		bool: currently enabled?
+# 					sys,gvar,<varname>		stored value
+#			unnamed
+#				local
+#					<tkey>,modsym,<dispname>	u<id>		(if there's a DisplayName)
+#					<tkey>,global,u<id>		dierollspec
+#					<tkey>,on,u<id>			bool: currently enabled?
+#					<tkey>,g,u<id>			bool: group?
+#					<tkey>,apply_order		<<append u<id>
+#				global
+#					<tkey>,modsym,/<dispname>	g<id>		(if there's a DisplayName)
+#					<tkey>,global,g<id>		dierollspec
+#					<tkey>,on,g<id>			bool: currently enabled?
+#					<tkey>,g,g<id>			bool: group?
+#					<tkey>,apply_order		<<append g<id>
+#
+#
+#
+#
 #	 			DieRollPresetState(<tkey>,var,<name>) = dierollspec
 #	 **NEW**		DieRollPresetState(sys,gvar,<name>) = dierollspec
 #	 **NEW**		DieRollPresetState(sys,gvar_on,<name>) = enabled (bool)
@@ -17756,6 +18126,11 @@ proc ConnectToServerByIdx {idx} {
 #	 			DieRollPresetState(<tkey>,on,<name>) = enabled (bool)
 #	 			DieRollPresetState(<tkey>,g,<name>) = global (bool)
 #	 			DieRollPresetState(<tkey>,apply_order) {...,<seq>}	(append to list)
+#	**NEW**			DieRollPresetState(<tkey>,name,<seq>) = displayname
+#	**NEW**			DieRollPresetState(<tkey>,modsym,<name>) = <seq>
+#	**NEW**			DieRollPresetState(<tkey>,modsym,/<name>) = <seq>
+#	**NEW**			DieRollPresetState(<tkey>,modsym,$<name>) = <seq>
+#	**NEW**			DieRollPresetState(<tkey>,modsym,$$<name>) = <seq>
 #
 #
 # _render_die_roller
@@ -18326,19 +18701,26 @@ proc AreMobsInCustomList {mob_list condition targeter} {
 	}
 	set id [GetBaseMobID [lindex $targeter 0]]
 	foreach m $mob_list {
-		if {[info exists MOBdata($id)] && [dict exists $MOBdata($id) TargetedModifiers [S_ [GetMobName $m]] [S_ $condition]]} {
+		if {[info exists MOBdata($id)] && [dict exists $MOBdata($id) TargetedModifiers [GetMobName $m] $condition]} {
+			# TODO
 			return true
 		}
 	}
 	return false
 }
 
+# Apply a custom marker to a list of creatures
 proc CustomCondAll {mob_list condition targeter marker_data} {
 	foreach mob_id $mob_list {
 		CustomCondPerson $mob_id $condition $targeter $marker_data
 	}
 }
 
+# Apply a custom marker to a creature
+# mob_id and targeter can be a creature ID, @name, name, or PC name
+# condition the custom-defined name for a condition from our preferences
+# targeter is forced to be first element if given as a list
+# marker_data is the source of all marker data from our preferences data (dict keyed by conditionname)
 proc CustomCondPerson {mob_id condition targeter marker_data} {
 	global MOBdata
 	if {[llength $targeter] == 0} {
@@ -18358,20 +18740,25 @@ proc CustomCondPerson {mob_id condition targeter marker_data} {
 		return
 	}
 	# toggle presence of this condition for this target
-	if {[dict exists $MOBdata($id) TargetedModifiers [S_ $mob_name] [S_ $condition]]} {
+	if {[dict exists $MOBdata($id) TargetedModifiers $mob_name $condition]} {
 #		DEBUG 0 "removing $condition from $mob_name d=[dict get $MOBdata($id) TargetedModifiers]"
 		# we are targeting them with this condition; remove it
-		dict unset MOBdata($id) TargetedModifiers [S_ $mob_name] [S_ $condition]
+		dict unset MOBdata($id) TargetedModifiers $mob_name $condition
 #		DEBUG 0 "d=[dict get $MOBdata($id) TargetedModifiers]"
-		if {[dict size [dict get $MOBdata($id) TargetedModifiers [S_ $mob_name]]] == 0} {
-			dict unset MOBdata($id) TargetedModifiers [S_ $mob_name]
+		if {[dict size [dict get $MOBdata($id) TargetedModifiers $mob_name]] == 0} {
+			dict unset MOBdata($id) TargetedModifiers $mob_name
 #			DEBUG 0 "removed inner dict; d=[dict get $MOBdata($id) TargetedModifiers]"
 		}
 	} else {
 		# we don't, so set it now
 #		DEBUG 0 "adding $condition to $mob_name d=[dict get $MOBdata($id) TargetedModifiers]"
-		dict set MOBdata($id) TargetedModifiers [S_ $mob_name] [S_ $condition] [dict create \
-			Modifiers [dict get $marker_data $condition modifiers] \
+		set mdata [dict get $marker_data $condition]
+		dict set MOBdata($id) TargetedModifiers $mob_name $condition [dict create \
+			Modifiers [dict get $mdata modifiers] \
+			Shape [dict get $mdata shape] \
+			Color "[dict get $mdata dashpattern][dict get $mdata color]" \
+			Tracer [dict get $mdata tracer] \
+			Description [dict get $mdata description] \
 		]
 #		DEBUG 0 "d=[dict get $MOBdata($id) TargetedModifiers]"
 	}
@@ -18454,7 +18841,7 @@ proc CustomCondPerson {mob_id condition targeter marker_data} {
 #
 #  called when rendering somone or advancing the initiative turn or updating target attribute
 #
-# @[00]@| GMA-Mapper 4.39.2
+# @[00]@| GMA-Mapper 4.40
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2026 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
@@ -18501,3 +18888,22 @@ proc CustomCondPerson {mob_id condition targeter marker_data} {
 #	
 #
 # TILE_SET([tile_id name zoom]) = image_object
+#
+# [x] ToggleSpellArea id ?isLocal?
+# [x] CompleteMOBAoE	use _AoE / LocalSpellAura
+# [x] DragMOBAoE	use _AoE / LocalSpellAura
+# [x] RenderSomeone	use _AoE / LocalSpellAura
+# [x] SendMobChanges	use _AoE / LocalSpellAura
+# [x] _DrawAoeZone	add -aura option
+# [x] DrawAoeGrid	add aura arg at end
+#
+# [x] local marker description tooltop on creatrure
+# [ ] die rolls check for current target, and if they have a condition -> turn on named modifiers for that roll only
+#	SendDieRollFromWindow -> _do_roll <str> "" <w> <for_user> <tkey>
+#	RollTable  -> SendDieRollFromWindow <w> <wr> <for_user> <tkey>
+#	RollPreset -> _do_roll <spec-string> <extra-str> <w> <for_user> <tkey>
+#	_do_roll 
+#
+#	_apply_die_roll_mods
+#	_apply_die_roll_variables
+# [x] receiving OA signal to update TargetedModifiers doesn't affect visible display

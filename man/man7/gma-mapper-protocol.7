@@ -1,7 +1,7 @@
 '\" t
-'\" *** 424 ***
+'\" *** 426 ***
 '\" <<ital-is-var>>
-.TH GMA-MAPPER-PROTOCOL 7 "GMA-Mapper 4.39.2" 10-Jun-2026 "Protocols" \" @@mp@@
+.TH GMA-MAPPER-PROTOCOL 7 "GMA-Mapper 4.40" 02-Aug-2026 "Protocols" \" @@mp@@
 .SH NAME
 gma-mapper-protocol \- GMA client/server protocol specification
 .SH EXPERIMENTAL
@@ -79,7 +79,7 @@ be implemented to wait synchronously for a server
 response during the authentication negotiation stage.
 .LP
 '\" <</bold-is-fixed>>
-.B "This describes protocol version 424."
+.B "This describes protocol version 426."
 '\" <<bold-is-fixed>>
 These notes are intended to be 
 detailed enough to implement a client from and should be considered
@@ -356,7 +356,6 @@ UpdateVersions	UPDATES	C\[<-]S	\fR\(em\fP	N/A	JSON	Advertise software updates
 World	WORLD	C\[<-]S	\fR\(em\fP	N/A	JSON	Campaign world info
 .TE
 '\"<</TeX>>
-'\" <<New>>
 .SS "Payload Size Limits"
 '\" <<TeX>>
 '\" \label{batches}
@@ -372,7 +371,6 @@ To mitigate these cases, the server implements a data continuation protocol whic
 into multiple \*(lqbatches\*(rq and sent separately then reassembled on the other end. These fragments are each sent inside the payload of
 .B BATCH
 messages (see below).
-'\" <</New>>
 .SS "Command Details"
 .LP
 The client/server messages and their parameters are detailed below, ordered by the server
@@ -1026,7 +1024,6 @@ axis.
 '\" <<ital-is-var>>
 .RE
 '\" <</>>
-'\" <<New>>
 .TP
 .B BATCH
 If a message would exceed the maximum allowed size for a server message, it
@@ -1131,7 +1128,6 @@ the definition of \*(lqreasonable\*(rq is up to the receiver to determine
 based on the resources it has to devote to storing partial messages as they
 are being collected).
 .RE
-'\" <</New>>
 .TP
 .B CC
 Clear the chat history. The payload is a JSON object with the following fields:
@@ -1175,9 +1171,7 @@ messages (e.g., a
 .I target
 of \-50 clears all but the most recent 50 messages).
 '\" <</ital-is-var>>
-'\" <<New>>
 .I "Only the GM may request this form of sweeping history change to the server."
-'\" <</New>>
 .TP
 .BI MessageID " (int)"
 '\" <<ital-is-var>>
@@ -3997,15 +3991,16 @@ attribute, including
 The 
 .B mapper
 client itself does this correctly starting with version 3.39.
-'\" <<New>>
 .LP
 Attribute names may be hierarchical, where an attribute is actually a complex structure
 containing sub-fields. In this case, the attribute name as specified in the keys of the
 .B NewAttrs
-field object use dot notation to separate each level of name to indicate the nested level
-of field names within the attribute. For example, You can use the
+field object uses dot notation to separate each level of 
+.B name 
+to indicate the nested level
+of field names within the attribute. For example, you can use the
 .B OA
-server message to set a creture's 
+server message to set a creature's 
 .B Health
 attribute by naming just the attribute as 
 .RB \*(lq Health \*(rq,
@@ -4027,7 +4022,6 @@ fields of the
 and
 .B OA\-
 server messages.
-'\" <</New>>
 .RE
 .TP
 .B OA+
@@ -4481,17 +4475,39 @@ The list of designated combat targets. If non-empty, the first creature named in
 is the target of attack die rolls and all creatures named are the targets of any damage die rolls
 made by this creature.
 .TP
+'\" <<New>>
 .BI TargetedModifiers " (object)"
 The value of this attribute is a dictionary object mapping creature names as they appear on the
 map (as is the case with the
 .B Targets
-attribute) to an object describing the nature of how that creature is being targeted by the creature
-with this attribute:
+attribute) to a dictionary of arbitrary custom condition names, which in turn each map to
+an object describing the nature of how that creature is being targeted by the creature
+with this attribute. The custom condition name should be short and descriptive, such as
+.RB \*(lq "studied target" \*(rq
+or
+.RB \*(lq "smite" \*(rq.
+The fields in this innermost dictionary are as follows:
 '\" <<list>>
 .RS
 .TP
-.B Type
-The custom target type, as a free-form string, typically something like \*(lqstudied\*(rq or \*(lqsmite evil\*(rq, etc.
+.BI Tracer " (bool)"
+If present and true, a line should be drawn between the targeting
+creature and the target on the map.
+.TP
+.B Description
+Free-form description of the effect the custom condition has
+on the targeted creature. This SHOULD be displayed on the map
+for the player's reference along with other conditions in effect
+on the creature. (For example, if the mouse is hovered over
+the creature's token.)
+.\".TP
+.\".B Type
+.\"The custom target type, as a free-form string, typically something like 
+.\".RB \*(lq studied \*(rq 
+.\"or 
+.\".RB \*(lq smite 
+.\".BR evil \*(rq, 
+.\"etc.
 .TP
 .BI Modifiers " (list)"
 A list of modifier names. When this creature name appears in the creature's
@@ -4500,6 +4516,27 @@ attribute, then the die-roller SHOULD also enable the modifiers named in this at
 It NEED NOT disable the modifiers in other cases. The assumption is that the user might manually activate them at their
 discretion if they are applicable globally, but otherwise would leave them off but this feature would selectively
 turn them on as needed for specifically designated targets where they narrowly and circumstantially apply.
+.RS
+.LP
+If a modifier name starts with a dollar sign, as in
+.RB \*(lq $smite \*(rq,
+then it refers to the name of a user-defined variable which should be included any die-roll expressions while
+the designated creature is being targeted. If the name begins with two dollar signs, as in
+.RB \*(lq $$super \*(rq,
+then it refers to a globally-defined variable name. A name without any such prefix
+(i.e.,
+.RB \*(lq special \*(rq),
+refers to a user-defined modifier name to be enabled for all die rolls. Modifier names prefixed with a leading 
+.RB \*(lq / \*(rq,
+as in
+.RB \*(lq "/extra special" \*(rq,
+are globally-defined modifier names to be enabled for all die rolls.  Generally speaking, variables are more appropriate
+to the use case for targeted modifiers than named modifiers are, since they can be more carefully introduced into
+individual die roll expressions on a case-by-case basis, and therefore can be placed into only those rolls where they
+actually apply to the target in question. By contrast, modifiers apply to all die rolls being made, which is probably
+more of a broad brush to paint with than is needed here.
+.RE
+'\" <</New>>
 .TP
 .B Shape
 The shape of the local marker used by the player to mark the target on their map, using the format documented
@@ -5185,14 +5222,26 @@ Steve Willoughby / steve@madscience.zone;
 John Mechalas (elevation and movement modes).
 .SH HISTORY
 .LP
-This document defines map protocol version 424,
-which adds the capability to clear specific, individual messages
+This document defines map protocol version 426,
+which corrects the format of the
+.B TargetedModifiers
+field for creatures.
+.LP
+Protocol version 425
+added the
+.B Tracer
+and
+.B Description
+fields to targeted condition markers.
+.LP
+Protocol version 424
+added the capability to clear specific, individual messages
 from the chat history and reports the extreme range of valid message
 IDs upon connection to the server in the new
 .B Y2
 message.
 .LP
-Historically, protocol version 423
+Protocol version 423
 added the
 .B TargetedModifiers
 attribute to creatures and introduced the concept of payload splitting for large data sizes via the
