@@ -1458,6 +1458,7 @@ Modifier names have a leading slash (like "/super") if global.}
 				shape {O}\
 				dashpattern {}\
 				description {}\
+				tracer false\
 			]
 			$w.n.s.n.m.markers selection clear 0 end
 			$w.n.s.n.m.markers selection set end

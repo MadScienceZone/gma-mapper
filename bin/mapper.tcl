@@ -6745,6 +6745,17 @@ proc _DrawCreatureStatusMarkers {w x y s tags conditions id {customlist {}}} {
 
 	foreach marker $customlist {
 			lassign $marker shape color dashpattern description tracer_id
+			#DEBUG 0 "marker $tracer_id $id $color $dashpattern $description"
+			global MOBdata iscale
+			if {$tracer_id ne {}
+			&& [info exists MOBdata($id)]
+			&& [info exists MOBdata($tracer_id)]} {
+				::gmautil::dassign $MOBdata($id) Gx targ_x Gy targ_y
+				::gmautil::dassign $MOBdata($tracer_id) Gx att_x Gy att_y
+				set att_sz [_mob_size $tracer_id]
+				set targ_sz [_mob_size $id]
+				$w create line [expr ($att_x+($att_sz/2.0))*$iscale] [expr ($att_y+($att_sz/2.0))*$iscale] [expr ($targ_x+($targ_sz/2.0))*$iscale] [expr ($targ_y+($targ_sz/2.0))*$iscale] -fill $color -width 4 -tags $tags -dash -
+			}
 			#DEBUG 0 "shape=$shape color=$color dash=$dashpattern"
 			# calculate border color
 			lassign [winfo rgb . $color] fillR fillG fillB
