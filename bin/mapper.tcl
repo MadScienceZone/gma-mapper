@@ -3407,17 +3407,12 @@ proc CreateHealthStatsToolTip {mob_id {extra_condition {}}} {
 			set my_mob $MOBdata($myID)
 			if {[dict exists $my_mob TargetedModifiers]} {
 				dict map {tname details} [dict get $my_mob TargetedModifiers] {
-					DEBUG 0 "for $for_player; found target $tname"
 					if {[GetBaseMobID $tname] eq $mob_id} {
-						DEBUG 0 "proceeding"
 						dict map {cname cdetails} $details {
 							append tiptext [format "\nCustom Marker \"%s\": %s" $cname \
 								[dict get $cdetails Description]]
-							DEBUG 0 "added $cname:$cdetails"
 						}
-					} else {
-						DEBUG 0 "but that's not me"
-					}
+					} 
 				}
 			}
 		}
@@ -10893,7 +10888,6 @@ proc DoCommandECHO  {d} {
 	}
 }
 proc DoCommandOA    {d} { 
-	DEBUG 0 "DoCommandOA $d"
 	SetObjectAttribute [dict get $d ObjID] [dict get $d NewAttrs] 
 	if {[::gmaclock::exists .initiative.clock]} {
 		::gmaclock::track_health_change .initiative.clock $d
@@ -16248,7 +16242,7 @@ proc _do_roll {roll_string extra w for_user tkey} {
 	DEBUG 1 " conditions: $temporary_cond_names"
 	set cond_mods_to_apply {}
 	set cond_vars_to_apply {}
-	foreach custom_condition $temporary_cond_names {
+	foreach custom_condition $temporary_mod_names {
 		if {[string range $custom_condition 0 1] eq {$$}} {
 			set v [string range $custom_condition 2 end]
 			if {[info exists DieRollPresetState(sys,gvar,$v)]} {

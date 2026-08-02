@@ -56,9 +56,9 @@ package require base64 2.4.2
 package require uuid 1.0.1
 
 namespace eval ::gmaproto {
-	variable protocol 425
+	variable protocol 426
 	variable min_protocol 400
-	variable max_protocol 425
+	variable max_protocol 426
 	variable max_max_protocol 499
 	variable maximum_message_length 61440 
 	variable frag_size 32768
