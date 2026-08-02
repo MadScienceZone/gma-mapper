@@ -130,7 +130,7 @@ namespace eval ::gmaproto {
 		update_turn               I
 	}
 	array set _message_payload {
-		AC      {ID s Name s Health {o {MaxHP i TmpHP i TmpDamage i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i AC i FlatFootedAC i TouchAC i CMD i}} Gx f Gy f Skin i SkinSize l PolyGM ? Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}} Targets l TargetedModifiers {D {D {o {Tracer ? Type s Modifiers l Shape s Color s Description s}}}}}
+		AC      {ID s Name s Health {o {MaxHP i TmpHP i TmpDamage i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i AC i FlatFootedAC i TouchAC i CMD i}} Gx f Gy f Skin i SkinSize l PolyGM ? Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}} Targets l TargetedModifiers {D {D {o {Tracer ? Modifiers l Shape s Color s Description s}}}}}
 		ACCEPT  {Messages l}
 		AA      {Name s Format s File s IsLocalFile ?}
 		AA?     {Name s}
@@ -186,7 +186,7 @@ namespace eval ::gmaproto {
 		PRIV    {Command s Reason s}
 		POLO    {}
 		PROGRESS {OperationID s Title s Value i MaxValue i IsDone ? Targets l IsTimer ?}
-		PS      {ID s Name s Health {o {MaxHP i TmpHP i TmpDamage i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i AC i FlatFootedAC i TouchAC i CMD i}} Gx f Gy f Skin i SkinSize l PolyGM ? Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}} Targets l TargetedModifiers {D {D {o {Tracer ? Type s Modifiers l Shape s Color s Description s}}}}}
+		PS      {ID s Name s Health {o {MaxHP i TmpHP i TmpDamage i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i AC i FlatFootedAC i TouchAC i CMD i}} Gx f Gy f Skin i SkinSize l PolyGM ? Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}} Targets l TargetedModifiers {D {D {o {Tracer ? Modifiers l Shape s Color s Description s}}}}}
 		READY   {}
 		REDIRECT {Host s Port i Reason s}
 		ROLL    {Replay ? Sender s Recipients l MessageID i ToAll ? ToGM ? Title s Result {o {InvalidRequest ? ResultSuppressed ? Result i Details {a {Type s Value s}}}} RequestID s MoreResults ? Sent s Origin ? Targets l Type s}
@@ -616,7 +616,7 @@ proc ::gmaproto::_attribute_encode {k v} {
 		TargetedModifiers {
 			return [json::write object {*}[dict map {dk dv} $v {
 				set dv [json::write object {*}[dict map {dkk dvv} $dv {
-					set dvv [::gmaproto::_encode_payload $dvv {Tracer ? Type s Modifiers l Shape s Color s Description s}]
+					set dvv [::gmaproto::_encode_payload $dvv {Tracer ? Modifiers l Shape s Color s Description s}]
 				}]]
 			}]]
 		}

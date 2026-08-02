@@ -3402,12 +3402,26 @@ proc CreateHealthStatsToolTip {mob_id {extra_condition {}}} {
 		}
 	}
 
-#TODO
-#	if {[dict exists $MOBdata($mob_id) TargetedModifiers]} {
-#		dict map {tname details} [dict get $MOBdata($mob_id) TargetedModifiers] {
-#			append tiptext "\nCustom condition on [_S $tname] ([join [dict keys $details] {, }])"
-#		}
-#	}
+	foreach for_player [my_map_names] {
+		if {[info exists MOBdata([set myID [GetBaseMobID $for_player]])]} {
+			set my_mob $MOBdata($myID)
+			if {[dict exists $my_mob TargetedModifiers]} {
+				dict map {tname details} [dict get $my_mob TargetedModifiers] {
+					DEBUG 0 "for $for_player; found target $tname"
+					if {[GetBaseMobID $tname] eq $mob_id} {
+						DEBUG 0 "proceeding"
+						dict map {cname cdetails} $details {
+							append tiptext [format "\nCustom Marker \"%s\": %s" $cname \
+								[dict get $cdetails Description]]
+							DEBUG 0 "added $cname:$cdetails"
+						}
+					} else {
+						DEBUG 0 "but that's not me"
+					}
+				}
+			}
+		}
+	}
 
 	return $tiptext
 }
@@ -7190,7 +7204,7 @@ proc RenderSomeone {w id {norecurse false} args} {
 		}
 	}
 	# locally-displayed aura or spell area of effect
-	if {[dict exists $MOBdata($id) .AoE] && [set AoE [dict get $MOBdata($id) .AoE]] ne {}} {
+	if {[dict exists $MOBdata($id) _AoE] && [set AoE [dict get $MOBdata($id) _AoE]] ne {}} {
 		set aoe_type radius
 		::gmautil::dassign $AoE Radius aoe_radius Color aoe_color
 		set aoe_radius [expr $aoe_radius * $iscale]; #convert to canvas units for rendering
@@ -9871,7 +9885,7 @@ proc ToggleSpellArea {id {isLocal false}} {
 
 	set LocalSpellAura $isLocal
 	if {$isLocal} {
-		set key .AoE
+		set key _AoE
 	} else {
 		set key AoE
 	}
@@ -9907,7 +9921,7 @@ proc CompleteMOBAoE {id w x y} {
 proc DragMOBAoE {id w x y} {
 	global MOBdata iscale OBJ_COLOR LocalSpellAura
 	if {$LocalSpellAura} {
-		set key .AoE
+		set key _AoE
 	} else {
 		set key AoE
 	}
@@ -10879,6 +10893,7 @@ proc DoCommandECHO  {d} {
 	}
 }
 proc DoCommandOA    {d} { 
+	DEBUG 0 "DoCommandOA $d"
 	SetObjectAttribute [dict get $d ObjID] [dict get $d NewAttrs] 
 	if {[::gmaclock::exists .initiative.clock]} {
 		::gmaclock::track_health_change .initiative.clock $d
@@ -12510,7 +12525,7 @@ proc _render_die_roller {w width height type for_user tkey args} {
 			assert_recent_die_rolls $tkey
 			for {set i 0} {$i < [llength $dice_preset_data(recent_die_rolls,$tkey)] && $i < 10} {incr i} {
 				$w.$i.spec configure -text [lindex [lindex $dice_preset_data(recent_die_rolls,$tkey) $i] 0]
-				$w.$i.extra configure -width [expr max(3,[string length [lindex [lindex $dice_preset_data(recent_die_rolls,$tkey) $i] 1]])] -state normal
+$w.$i.extra configure -width [expr max(3,[string length [lindex [lindex $dice_preset_data(recent_die_rolls,$tkey) $i] 1]])] -state normal
 				$w.$i.extra delete 0 end
 				$w.$i.extra insert end [lindex [lindex $dice_preset_data(recent_die_rolls,$tkey) $i] 1]
 				if {$last_known_size($tkey,recent,$i) eq {blank}} {
@@ -14434,6 +14449,11 @@ proc PresetLists {arrayname tkey args} {
         set pkeylen [string length "preset,$tkey,"]
 	foreach pkey [lsort [array names presets "preset,$tkey,*"]] {
 		set pname [string range $pkey $pkeylen end]
+		#  _                    _   _____     _     _      
+		# | |    ___   ___ __ _| | |_   _|_ _| |__ | | ___ 
+		# | |   / _ \ / __/ _` | |   | |/ _` | '_ \| |/ _ \
+		# | |__| (_) | (_| (_| | |   | | (_| | |_) | |  __/
+		# |_____\___/ \___\__,_|_|   |_|\__,_|_.__/|_|\___|
 		if {[regexp {^#(.*?);(.*?)(?:;([^|]*))?(?:\|(.*))?$} $pname _ sequence flags client dname]} {
 			set d $presets($pkey)
 			if {$dname eq {}} {
@@ -14472,6 +14492,11 @@ proc PresetLists {arrayname tkey args} {
 
 			lappend tables $d
 		} elseif {[regexp {^§(.*?);(.*?);(.*?)(?:;([^|]*))?(?:\|(.*))?$} $pname _ sequence varname flags client dname]} {
+			#  _                    _  __     __          ____  __           _ 
+			# | |    ___   ___ __ _| | \ \   / /_ _ _ __ / /  \/  | ___   __| |
+			# | |   / _ \ / __/ _` | |  \ \ / / _` | '__/ /| |\/| |/ _ \ / _` |
+			# | |__| (_) | (_| (_| | |   \ V / (_| | | / / | |  | | (_) | (_| |
+			# |_____\___/ \___\__,_|_|    \_/ \__,_|_|/_/  |_|  |_|\___/ \__,_|
 			set d $presets($pkey)
 			if {$dname eq {}} {
 				dict set d DisplayName {unnamed modifier}
@@ -14517,6 +14542,9 @@ proc PresetLists {arrayname tkey args} {
 					if {[string is alpha -strict [string range $varname 0 0]] &&
 					([string length $varname] == 1 ||
 					[string is alnum -strict [string range $varname 1 end]])} {
+						#
+						# Varible
+						#
 						set DieRollPresetState($tkey,var,$varname) [dict get $d DieRollSpec]
 						if {[info exists dice_preset_data(en,$tkey,v:$varname)]} {
 							set DieRollPresetState($tkey,on,v:$varname) $dice_preset_data(en,$tkey,v:$varname)
@@ -14524,34 +14552,35 @@ proc PresetLists {arrayname tkey args} {
 							set DieRollPresetState($tkey,on,v:$varname) [::gmaproto::json_bool [dict get $d Enabled]]
 						}
 						set DieRollPresetState($tkey,g,$varname) false
-						#DEBUG 0 "QQ export DRPS $tkey,on,v:$varname=$DieRollPresetState($tkey,on,v:$varname)"
-						#trace add variable DieRollPresetState($tkey,on,$varname) {array read write unset} TRACEvar
-						#trace add variable DieRollPresetState($tkey,var,$varname) {array read write unset} TRACEvar
-						#trace add variable DieRollPresetState($tkey,g,$varname) {array read write unset} TRACEvar
 					} else {
 						DEBUG 0 "Invalid modifier variable name <$varname>. This variable will be ignored."
 						DEBUG 0 "Variables must begin with a letter and include only letters and numbers."
 					}
 				} else {
+					#
+					# Modifier
+					#
 					set id [dict get $d DisplaySeq]
+					if {[dict get $d DisplayName] ne {}} {
+						set DieRollPresetState($tkey,modsym,[dict get $d DisplayName]) u$id
+					}
 					set DieRollPresetState($tkey,global,u$id) [dict get $d DieRollSpec]
-					#puts "=== $d"
 					if {[info exists dice_preset_data(en,$tkey,$u_piname)]} {
 						set DieRollPresetState($tkey,on,u$id) $dice_preset_data(en,$tkey,$u_piname)
-						#puts "*** set value for u$id to $DieRollPresetState($tkey,on,u$id) from $dice_preset_data(en,$tkey,$u_piname)"
 						lappend DieRollPresetState($tkey,apply_order) u$id
 					} else {
-						set DieRollPresetState($tkey,on,u$id) [dict get $d Enabled]
-						#puts "*** set value for u$id to $DieRollPresetState($tkey,on,u$id) because no var in $d"
+					set DieRollPresetState($tkey,on,u$id) [dict get $d Enabled]
 						lappend DieRollPresetState($tkey,apply_order) u$id
 					}
 					set DieRollPresetState($tkey,g,u$id) [dict get $d Global]
-					#trace add variable DieRollPresetState($tkey,on,u$id) {array read write unset} TRACEvar
-					#trace add variable DieRollPresetState($tkey,global,u$id) {array read write unset} TRACEvar
-					#trace add variable DieRollPresetState($tkey,g,u$id) {array read write unset} TRACEvar
 				}
 			}
 		} else {
+			#  _                    _   ____                     _   
+			# | |    ___   ___ __ _| | |  _ \ _ __ ___  ___  ___| |_ 
+			# | |   / _ \ / __/ _` | | | |_) | '__/ _ \/ __|/ _ \ __|
+			# | |__| (_) | (_| (_| | | |  __/| | |  __/\__ \  __/ |_ 
+			# |_____\___/ \___\__,_|_| |_|   |_|  \___||___/\___|\__|
 			set pieces [split $pname |]
 			set d $presets($pkey)
 
@@ -14599,6 +14628,11 @@ proc PresetLists {arrayname tkey args} {
 	foreach pkey [lsort [array names presets "sys,preset,*"]] {
 		set pname [string range $pkey $pkeylen end]
 		if {[regexp {^#(.*?);(.*?)(?:;([^|]*))?(?:\|(.*))?$} $pname _ sequence flags client dname]} {
+			#   ____ _       _           _   _____     _     _      
+			#  / ___| | ___ | |__   __ _| | |_   _|_ _| |__ | | ___ 
+			# | |  _| |/ _ \| '_ \ / _` | |   | |/ _` | '_ \| |/ _ \
+			# | |_| | | (_) | |_) | (_| | |   | | (_| | |_) | |  __/
+			#  \____|_|\___/|_.__/ \__,_|_|   |_|\__,_|_.__/|_|\___|
 			set d $presets($pkey)
 			if {$dname eq {}} {
 				dict set d DisplayName {unnamed table}
@@ -14636,6 +14670,11 @@ proc PresetLists {arrayname tkey args} {
 
 			lappend gtables $d
 		} elseif {[regexp {^§(.*?);(.*?);(.*?)(?:;([^|]*))?(?:\|(.*))?$} $pname _ sequence varname flags client dname]} {
+			#   ____ _       _           _  __     __          ____  __           _ 
+			#  / ___| | ___ | |__   __ _| | \ \   / /_ _ _ __ / /  \/  | ___   __| |
+			# | |  _| |/ _ \| '_ \ / _` | |  \ \ / / _` | '__/ /| |\/| |/ _ \ / _` |
+			# | |_| | | (_) | |_) | (_| | |   \ V / (_| | | / / | |  | | (_) | (_| |
+			#  \____|_|\___/|_.__/ \__,_|_|    \_/ \__,_|_|/_/  |_|  |_|\___/ \__,_|
 			set d $presets($pkey)
 			if {$dname eq {}} {
 				dict set d DisplayName {unnamed modifier}
@@ -14692,6 +14731,9 @@ proc PresetLists {arrayname tkey args} {
 					}
 				} else {
 					set id [dict get $d DisplaySeq]
+					if {[dict get $d DisplayName] ne {}} {
+						set DieRollPresetState($tkey,modsym,/[dict get $d DisplayName]) g$id
+					}
 					set DieRollPresetState($tkey,global,g$id) [dict get $d DieRollSpec]
 					if {[info exists dice_preset_data(en,$tkey,$g_piname)]} {
 						set DieRollPresetState($tkey,on,g$id) $dice_preset_data(en,$tkey,$g_piname)
@@ -14703,6 +14745,11 @@ proc PresetLists {arrayname tkey args} {
 				}
 			}
 		} else {
+			#   ____ _       _           _   ____                     _   
+			#  / ___| | ___ | |__   __ _| | |  _ \ _ __ ___  ___  ___| |_ 
+			# | |  _| |/ _ \| '_ \ / _` | | | |_) | '__/ _ \/ __|/ _ \ __|
+			# | |_| | | (_) | |_) | (_| | | |  __/| | |  __/\__ \  __/ |_ 
+			#  \____|_|\___/|_.__/ \__,_|_| |_|   |_|  \___||___/\___|\__|
 			set pieces [split $pname |]
 			set d $presets($pkey)
 
@@ -16094,7 +16141,7 @@ proc _apply_die_roll_mods {spec extra label {g false}} {
 	return $newspec
 }
 
-proc _apply_die_roll_variables {rollspec for_user tkey} {
+proc _apply_die_roll_variables {rollspec for_user tkey {cond_vars_to_apply {}}} {
 	global DieRollPresetState
 	set it 0
 	foreach {vartype varform} {
@@ -16117,7 +16164,7 @@ proc _apply_die_roll_variables {rollspec for_user tkey} {
 			set onkey "$tkey,on,v:$varname"
 		}
 		if {[info exists DieRollPresetState($vkey)]} {
-			if {$DieRollPresetState($onkey)} {
+			if {$DieRollPresetState($onkey) || [lsearch -exact $cond_vars_to_apply $vkey] >= 0} {
 				set rollspec [string replace $rollspec {*}$fieldidx $DieRollPresetState($vkey)]
 			} else {
 				set rollspec [string replace $rollspec {*}$fieldidx]
@@ -16135,8 +16182,95 @@ proc _apply_die_roll_variables {rollspec for_user tkey} {
 
 proc _do_roll {roll_string extra w for_user tkey} {
 	global dice_preset_data local_user
-	global DieRollPresetState
+	global DieRollPresetState MOBdata
 	DEBUG 1 "_do_roll($roll_string, $extra, $w, $for_user, $tkey)"
+
+	set attacking_mob [GetBaseMobID $for_user]
+	DEBUG 1 "attacker $attacking_mob for $for_user"
+	set temporary_mod_names {}
+   	set temporary_cond_names {}
+	set target_qty 0
+	DEBUG 1 "$MOBdata($attacking_mob)"
+	DEBUG 1 "[dict get $MOBdata($attacking_mob) Targets]"
+	DEBUG 1 "[dict get $MOBdata($attacking_mob) TargetedModifiers]"
+	if {[info exists MOBdata($attacking_mob)] 
+	   && [dict exists [set amob $MOBdata($attacking_mob)] Targets] 
+	   && [llength [set target_list [dict get $amob Targets]]] > 0
+	   && [dict exists $amob TargetedModifiers]
+	   && [llength [set tcond_list [dict get $amob TargetedModifiers]]] > 0} {
+		   foreach targ_name $target_list {
+			   set found false
+			   dict for {ctarg_name tconds} $tcond_list {
+				   if {$targ_name eq $ctarg_name} {
+					   if {[incr target_qty] == 1} {
+					       # first match, record all the modifiers we need to activate
+					       dict for {cond_name details} $tconds {
+						       DEBUG 1 "adding $cond_name"
+						       lappend temporary_mod_names {*}[dict get $details Modifiers]
+						       lappend temporary_cond_names $cond_name
+					       }
+					   } else {
+					       # subsequent matches, just make sure they have identical
+					       # conditions to the first one.
+						if {[lsort [dict keys $tconds]] ne [lsort $temporary_cond_names]} {
+							tk_messageBox -type ok -icon error -title "Unable to apply custom modifiers."\
+							-message "Multiple targets with unequal custom markers." \
+							-detail "You are targeting multiple creatures, but they don't all have exactly the same custom modifiers, so I can't apply the modifiers to them all at the same time in the same way, so I'm just going to leave it up to you to turn on/off the modifiers on your own on this one. Good luck!"
+							set temporary_mod_names {}
+							set temporary_cond_names {}
+							break
+						}
+					   }
+					   set found true
+					   break
+				   }
+			  }
+			  if {!$found} {
+				  # this target has no special markers
+				  if {[incr target_qty] == 1} {
+					  # no problem so far, as long as no other targets do either
+				  } else {
+					  if {[llength $temporary_mod_names] > 0} {
+						tk_messageBox -type ok -icon error -title "Unable to apply custom modifiers."\
+						-message "Multiple targets with unequal custom markers." \
+						-detail "You are targeting multiple creatures, but some have custom modifiers and some do not. I can't apply the modifiers to them all at the same time in the same way under those circumstances (obviously) so you're going to have to sort it out manually."
+						set temporary_mod_names {}
+						set temporary_cond_names {}
+						break
+					}
+				}
+			}
+		}
+	}
+
+	DEBUG 1 " after targeted calculation: target qty $target_qty"
+	DEBUG 1 " mods: $temporary_mod_names"
+	DEBUG 1 " conditions: $temporary_cond_names"
+	set cond_mods_to_apply {}
+	set cond_vars_to_apply {}
+	foreach custom_condition $temporary_cond_names {
+		if {[string range $custom_condition 0 1] eq {$$}} {
+			set v [string range $custom_condition 2 end]
+			if {[info exists DieRollPresetState(sys,gvar,$v)]} {
+				lappend cond_vars_to_apply sys,gvar,$v
+			} else {
+				DEBUG 0 "WARNING: Your custom condition asked to have global variable \$\$$v activated but no such variable exists. (ignoring this variable for now)"
+			}
+		} elseif {[string range $custom_condition 0 0] eq {$}} {
+			set v [string range $custom_condition 1 end]
+			if {[info exists DieRollPresetState($tkey,var,$v)]} {
+				lappend cond_vars_to_apply $tkey,var,$v
+			} else {
+				DEBUG 0 "WARNING: Your custom condition asked to have local variable \$$v activated but no such variable exists. (ignoring this variable for now)"
+			}
+		} else {
+			if {[info exists DieRollPresetState($tkey,modsym,$custom_condition)]} {
+				lappend cond_mods_to_apply $DieRollPresetState($tkey,modsym,$custom_condition)
+			} else {
+				DEBUG 0 "WARNING: Your custom condition asked to have modifier $custom_condition activated but no such modifier name exists. (ignoring this modifier for now)"
+			}
+		}
+	}
 
 	if {[catch {
 		set rollspec [_apply_die_roll_mods $roll_string $extra { ad hoc}]
@@ -16144,13 +16278,13 @@ proc _do_roll {roll_string extra w for_user tkey} {
 		if {[info exists DieRollPresetState($tkey,apply_order)]} {
 			foreach id $DieRollPresetState($tkey,apply_order) {
 				DEBUG 1 "  apply $id $DieRollPresetState($tkey,on,$id):$DieRollPresetState($tkey,global,$id):$DieRollPresetState($tkey,g,$id)"
-				if {$DieRollPresetState($tkey,on,$id)} {
+				if {$DieRollPresetState($tkey,on,$id) || [lsearch -exact $cond_mods_to_apply $id] >= 0} {
 					set rollspec [_apply_die_roll_mods $rollspec $DieRollPresetState($tkey,global,$id) {} $DieRollPresetState($tkey,g,$id)]
 					DEBUG 1 " after $DieRollPresetState($tkey,global,$id): $rollspec"
 				}
 			}
 		}
-		set rollspec [_apply_die_roll_variables $rollspec $for_user $tkey]
+		set rollspec [_apply_die_roll_variables $rollspec $for_user $tkey $cond_vars_to_apply]
 	} err]} {
 		tk_messageBox -type ok -icon error -title "Unable to complete die roll"\
 			-message "There was a problem with your die-roll request. It was not sent to the server."\
@@ -16434,25 +16568,25 @@ proc SetObjectAttribute {id kvlist} {
 		if {$datatype eq "PS" && $k eq "CustomReach"} {
 			set v [::gmaproto::new_dict CustomReach {*}$v]
 		}
-		if {$datatype eq "PS" && $k eq "TargetedModifiers"} {	;# TODO
-			set dd $v
-			if {[catch {
-				set v {}
-				dict for {monster conds} $dd {
-					dict for {condition details} $conds {
-						if {[dict exists $details Modifiers]} {
-							dict set v TargetedModifiers $monster $condition Modifiers [dict get $details Modifiers]
-						} else {
-							dict set v TargetedModifiers $monster $condition Modifiers {}
-						}
-					}
-				}
-			} err]} {
-				set v {}
-				DEBUG 0 "Rejecting object update for $id TargetedModifiers: $err"
-			}
-			continue
-		}
+#		if {$datatype eq "PS" && $k eq "TargetedModifiers"} {
+#			set dd $v
+#			DEBUG 0 "setting $v"
+#			if {[catch {
+#				set v {}
+#				dict for {monster conds} $dd {
+#					dict for {condition details} $conds {
+#						if {[dict exists $details Modifiers]} {
+#							dict set v TargetedModifiers $monster $condition Modifiers [dict get $details Modifiers]
+#						} else {
+#							dict set v TargetedModifiers $monster $condition Modifiers {}
+#						}
+#					}
+#				}
+#			} err]} {
+#				set v {}
+#				DEBUG 0 "Rejecting object update for $id TargetedModifiers: $err"
+#			}
+#		}
 
 		if {$datatype eq "PS" && $k eq "Gx"} {
 			set move_to_Gx $v
@@ -16537,7 +16671,7 @@ proc SendMobChanges {id attrlist} {
 	global MOBdata
 	set alist [dict create]
 	foreach attr $attrlist {
-		if {[string index $attr 0] ne "."} {
+		if {[string index $attr 0] ne "_"} {
 			dict set alist $attr [dict get $MOBdata($id) $attr]
 		}
 	}
@@ -17878,6 +18012,30 @@ proc ConnectToServerByIdx {idx} {
 # 		DieRollPresetState <tkey>,apply_order	{}
 # 		for modifiers
 # 			with variable names
+# 				local	
+#	 				<tkey>,var,<varname>		stored value
+# 					<tkey>,on,v:<varname>		bool: currently enabled?
+# 					<tkey>,g,<varname>		bool: false (not used)
+# 				global
+# 					sys,gvar_on,<varname>		bool: currently enabled?
+# 					sys,gvar,<varname>		stored value
+#			unnamed
+#				local
+#					<tkey>,modsym,<dispname>	u<id>		(if there's a DisplayName)
+#					<tkey>,global,u<id>		dierollspec
+#					<tkey>,on,u<id>			bool: currently enabled?
+#					<tkey>,g,u<id>			bool: group?
+#					<tkey>,apply_order		<<append u<id>
+#				global
+#					<tkey>,modsym,/<dispname>	g<id>		(if there's a DisplayName)
+#					<tkey>,global,g<id>		dierollspec
+#					<tkey>,on,g<id>			bool: currently enabled?
+#					<tkey>,g,g<id>			bool: group?
+#					<tkey>,apply_order		<<append g<id>
+#
+#
+#
+#
 #	 			DieRollPresetState(<tkey>,var,<name>) = dierollspec
 #	 **NEW**		DieRollPresetState(sys,gvar,<name>) = dierollspec
 #	 **NEW**		DieRollPresetState(sys,gvar_on,<name>) = enabled (bool)
@@ -17888,6 +18046,11 @@ proc ConnectToServerByIdx {idx} {
 #	 			DieRollPresetState(<tkey>,on,<name>) = enabled (bool)
 #	 			DieRollPresetState(<tkey>,g,<name>) = global (bool)
 #	 			DieRollPresetState(<tkey>,apply_order) {...,<seq>}	(append to list)
+#	**NEW**			DieRollPresetState(<tkey>,name,<seq>) = displayname
+#	**NEW**			DieRollPresetState(<tkey>,modsym,<name>) = <seq>
+#	**NEW**			DieRollPresetState(<tkey>,modsym,/<name>) = <seq>
+#	**NEW**			DieRollPresetState(<tkey>,modsym,$<name>) = <seq>
+#	**NEW**			DieRollPresetState(<tkey>,modsym,$$<name>) = <seq>
 #
 #
 # _render_die_roller
@@ -18647,9 +18810,20 @@ proc CustomCondPerson {mob_id condition targeter marker_data} {
 # TILE_SET([tile_id name zoom]) = image_object
 #
 # [x] ToggleSpellArea id ?isLocal?
-# [x] CompleteMOBAoE	use .AoE / LocalSpellAura
-# [x] DragMOBAoE	use .AoE / LocalSpellAura
-# [x] RenderSomeone	use .AoE / LocalSpellAura
-# [x] SendMobChanges	use .AoE / LocalSpellAura
+# [x] CompleteMOBAoE	use _AoE / LocalSpellAura
+# [x] DragMOBAoE	use _AoE / LocalSpellAura
+# [x] RenderSomeone	use _AoE / LocalSpellAura
+# [x] SendMobChanges	use _AoE / LocalSpellAura
 # [x] _DrawAoeZone	add -aura option
 # [x] DrawAoeGrid	add aura arg at end
+#
+# [x] local marker description tooltop on creatrure
+# [ ] die rolls check for current target, and if they have a condition -> turn on named modifiers for that roll only
+#	SendDieRollFromWindow -> _do_roll <str> "" <w> <for_user> <tkey>
+#	RollTable  -> SendDieRollFromWindow <w> <wr> <for_user> <tkey>
+#	RollPreset -> _do_roll <spec-string> <extra-str> <w> <for_user> <tkey>
+#	_do_roll 
+#
+#	_apply_die_roll_mods
+#	_apply_die_roll_variables
+# [x] receiving OA signal to update TargetedModifiers doesn't affect visible display

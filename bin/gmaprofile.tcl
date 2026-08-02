@@ -1035,9 +1035,11 @@ namespace eval ::gmaprofile {
 		$st.m.c create oval 25 25 125 125 -width 3 -outline "#aaaaaa"
 	        grid [label $st.m.l1 -text Modifiers:] -row 5 -column 0 -sticky w
 		grid [ttk::entry $st.m.mods -textvariable marker_mods -width 30 -state disabled -validate key -validatecommand "::gmaprofile::_set_marker_mods [list $st %W %P]"] - - -sticky we -row 5 -column 1
-		::tooltip::tooltip $st.m.mods {Space separated list of roll modifier names (if any).
+		::tooltip::tooltip $st.m.mods {Comma-separated list of roll modifier names (if any).
 Any die rolls made against a creature targeted with this marker on it will be made as if these modifiers were already turned on, regardless of whether or not they were manually checked.
-(Note that this doesn't affect whether they're otherwise turned on/off manually.)}
+(Note that this doesn't affect whether they're otherwise turned on/off manually.)
+Variable names should have a dollar prefix like "$foo" (or "$$foo" if global).
+Modifier names have a leading slash (like "/super") if global.}
 
 	        grid [label $st.m.l2 -text Description:] -row 6 -column 0 -sticky w 
 		grid [ttk::entry $st.m.desc -textvariable marker_desc -width 30 -state disabled -validate key -validatecommand "::gmaprofile::_set_marker_desc [list $st %W %P]"] - - -sticky we -row 6 -column 1
@@ -1533,7 +1535,7 @@ Any die rolls made against a creature targeted with this marker on it will be ma
 	proc _set_marker_mods {st e v} {
 		variable _profile
 		if {[set markername [_selected_marker_name $st.m.markers]] ne {}} {
-			dict set _profile styles markers $markername modifiers $v 
+			dict set _profile styles markers $markername modifiers [split $v ,]
 		}
 		return 1
 	}
@@ -1545,9 +1547,7 @@ Any die rolls made against a creature targeted with this marker on it will be ma
 		return 1
 	}
 	proc _select_marker_by_name {st name} {
-		DEBUG 0 "_select_marker_by_name $st $name"
 		if {$name eq {}} {
-			DEBUG 0 "no name, clearing selection"
 			$st.m.copy configure -state disabled -text Copy
 			$st.m.del configure -state disabled -text Delete
 			$st.m.markers selection clear 0 end
@@ -1558,7 +1558,6 @@ Any die rolls made against a creature targeted with this marker on it will be ma
 		_push_marker $st.m $name
 	}
 	proc _push_marker {w name} {
-		DEBUG 0 "_push_marker $w $name"
 		variable _profile
 		global marker_mods marker_desc marker_shape marker_dash marker_color marker_tracer_en
 		if {$name eq {} || ![dict exists $_profile styles markers $name]} {
@@ -1579,14 +1578,14 @@ Any die rolls made against a creature targeted with this marker on it will be ma
 			::gmaprofile::_marker_shape $w O
 			::gmaprofile::_set_marker_color $w $w.color black
 		} else {
-			DEBUG 0 "pushing values"
 			$w.mods configure -state normal
 			$w.desc configure -state normal
 			$w.shape configure -state normal
 			$w.dash configure -state normal
 			$w.color configure -state normal
 			$w.tracer configure -state normal
-			::gmautil::dassign [dict get $_profile styles markers $name] modifiers marker_mods description marker_desc shape m_shape dashpattern m_dash color marker_color tracer marker_tracer_en
+			::gmautil::dassign [dict get $_profile styles markers $name] modifiers mm description marker_desc shape m_shape dashpattern m_dash color marker_color tracer marker_tracer_en
+			set marker_mods [join $mm ,]
 			::gmaprofile::_marker_dashpattern $w $m_dash $name
 			::gmaprofile::_marker_shape $w $m_shape $name
 			::gmaprofile::_set_marker_tracer $w
@@ -1595,12 +1594,9 @@ Any die rolls made against a creature targeted with this marker on it will be ma
 	}
 
 	proc _select_marker_by_idx {st idx} {
-		DEBUG 0 "_select_marker_by_idx $st $idx"
 		if {$idx eq {}} {
-			DEBUG 0 "no index"
 			_select_marker_by_name $st {}
 		} else {
-			DEBUG 0 "picking marker [$st.m.markers get $idx]"
 			_select_marker_by_name $st [$st.m.markers get $idx]
 		}
 	}
