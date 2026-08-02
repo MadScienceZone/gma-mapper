@@ -1,16 +1,16 @@
 ########################################################################################
-#  _______  _______  _______                ___          ___    _______                #
-# (  ____ \(       )(  ___  ) Game         /   )        /   )  (  __   )               #
-# | (    \/| () () || (   ) | Master's    / /) |       / /) |  | (  )  |               #
-# | |      | || || || (___) | Assistant  / (_) (_     / (_) (_ | | /   |               #
-# | | ____ | |(_)| ||  ___  |           (____   _)   (____   _)| (/ /) |               #
-# | | \_  )| |   | || (   ) | VTT            ) (          ) (  |   / | |               #
-# | (___) || )   ( || )   ( | Mapper         | |   _      | |  |  (__) |               #
-# (_______)|/     \||/     \| Client         (_)  (_)     (_)  (_______)               #
+#  _______  _______  _______                ___          ___    _______      __        #
+# (  ____ \(       )(  ___  ) Game         /   )        /   )  (  __   )    /  \       #
+# | (    \/| () () || (   ) | Master's    / /) |       / /) |  | (  )  |    \/) )      #
+# | |      | || || || (___) | Assistant  / (_) (_     / (_) (_ | | /   |      | |      #
+# | | ____ | |(_)| ||  ___  |           (____   _)   (____   _)| (/ /) |      | |      #
+# | | \_  )| |   | || (   ) | VTT            ) (          ) (  |   / | |      | |      #
+# | (___) || )   ( || )   ( | Mapper         | |   _      | |  |  (__) | _  __) (_     #
+# (_______)|/     \||/     \| Client         (_)  (_)     (_)  (_______)(_) \____/     #
 #                                                                                      #
 ########################################################################################
 #
-# @[00]@| GMA-Mapper 4.40
+# @[00]@| GMA-Mapper 4.40.1
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2026 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
@@ -63,19 +63,19 @@ package require gmaproto 1.0
 package require Tcl 8.5
 
 namespace eval ::gmafile {
-	variable version 23
+	variable version 24
 	variable dice_version 2
 	variable min_dice_version 1
 	variable max_dice_version 2
 	variable min_version 16
-	variable max_version 23
+	variable max_version 24
 
 	array set _data_payload {
 		__META__ {Timestamp i DateTime s Comment s Location s}
 		__DMETA__ {Timestamp i DateTime s Comment s}
 		ARC      {ArcMode i Start f Extent f ID s X f Y f Points {a {X f Y f}} Z i Line s Stipple s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		CIRC     {ArcMode i Start f Extent f ID s X f Y f Points {a {X f Y f}} Z i Line s Stipple s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
-		CREATURE {ID s Name s Health {o {MaxHP i TmpHP i TmpDamage i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i AC i FlatFootedAC i TouchAC i CMD i}} Gx f Gy f Skin i SkinSize l PolyGM ? Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}} Targets l}
+		CREATURE {ID s Name s Health {o {MaxHP i TmpHP i TmpDamage i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i AC i FlatFootedAC i TouchAC i CMD i}} Gx f Gy f Skin i SkinSize l PolyGM ? Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}} Targets l TargetedModifiers AE}
 		IMG      {Name s Sizes {a {File s ImageData b IsLocalFile ? Zoom f}} Animation {o {Frames i FrameSpeed i Loops i}}}
 		LINE     {Arrow i ID s X f Y f Points {a {X f Y f}} Z i Line s Stipple s Fill s Width i Layer s Level i Group s Dash i Hidden ? Locked ?}
 		MAP      {File s IsLocalFile ? CacheOnly ? Merge ?}
@@ -722,7 +722,7 @@ proc ::gmafile::load_legacy_preset_file {f vid oldmeta} {
 	}
 	return [list $meta $plist]
 }
-# @[00]@| GMA-Mapper 4.40
+# @[00]@| GMA-Mapper 4.40.1
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2026 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
