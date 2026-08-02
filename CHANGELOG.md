@@ -27,6 +27,7 @@ versions.
    * Automatically enables modifiers and variables to the die roller to streamline die rolls affected by those conditions.
 ## Fixes
  * Corrected bug where the GM was unable to use shift-T to designate a combat target source. The mapper just always took the current actor as the source anyway. Now if shift-T is pressed that overrides the current actor until combat advances again to someone else.
+ * Corrects a bug where hidden creature tokens aren't quite hidden enough. They can still be grabbed and dragged on the map anyway and show up in context menus.
 ## Housekeeping
  * Deprecated `S_` and `_S` string marshaling procedures.
 
