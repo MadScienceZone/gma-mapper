@@ -3,12 +3,12 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.40          <!-- @@##@@ -->
+ * This Package Version: 4.40.1          <!-- @@##@@ -->
  * Effective Date: 02-Aug-2026               <!-- @@##@@ -->
 
 ## Compatibility
  * GMA Core API Library Version: 6.46.1 <!-- @@##@@ -->
- * GMA Mapper File Format: 23	     <!-- @@##@@ -->
+ * GMA Mapper File Format: 24	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 426        <!-- @@##@@ -->
  * GMA Mapper Preferences File Format: 15 <!-- @@##@@ -->
 
@@ -16,6 +16,10 @@
 The support for old server protocols (<400) has ended.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.40.1
+## Fixes
+ * Corrected protocol encoding bug that prevented custom condition marker info from fully propagating to the server across reboots.
 
 # 4.40
 ## Enhancements
