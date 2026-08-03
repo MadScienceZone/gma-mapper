@@ -27,10 +27,10 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.40.1}     ;# @@##@@
+set GMAMapperVersion {4.40.2}     ;# @@##@@
 set GMAMapperFileFormat {24}        ;# @@##@@
 set GMAMapperProtocol {426}         ;# @@##@@
-set CoreVersionNumber {6.46.1}            ;# @@##@@
+set CoreVersionNumber {6.47}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -7709,16 +7709,21 @@ proc RenderSomeone {w id {norecurse false} args} {
 			if {[dict exists $marker_data $ccond]} {
 				set mdata [dict get $marker_data $ccond]
 			} else {
-				set d [dict get $MOBdata($tmid) TargetedModifiers $mob_name $ccond]
-				set dc [dashcolorsplit [dict get $d Color]]
-				set mdata [dict create \
-					modifiers   [dict get $d Modifiers]\
-					color       [lindex $dc 1]\
-					shape       [dict get $d Shape]\
-					dashpattern [lindex $dc 0]\
-					description [dict get $d Description]\
-					tracer      [dict get $d Tracer]\
-				]
+				if {[catch {
+					set d [dict get $MOBdata($tmid) TargetedModifiers $mob_name $ccond]
+					set dc [dashcolorsplit [dict get $d Color]]
+					set mdata [dict create \
+						modifiers   [dict get $d Modifiers]\
+						color       [lindex $dc 1]\
+						shape       [dict get $d Shape]\
+						dashpattern [lindex $dc 0]\
+						description [dict get $d Description]\
+						tracer      [dict get $d Tracer]\
+					]
+				} err]} {
+					DEBUG 0 "unable to find custom marker to mark $mob_name with $ccond in profile and I ran into an error trying to get it from the object itself: $err"
+					continue
+				}
 			}
 
 			if {[dict get $mdata tracer]} {
@@ -7726,7 +7731,7 @@ proc RenderSomeone {w id {norecurse false} args} {
 			} else {
 				set tracer_id {}
 			}
-			lappend customList [list [dict get $mdata Shape] [dict get $mdata color] [dict get $mdata dashpattern] [dict get $mdata description] $tracer_id]
+			lappend customList [list [dict get $mdata shape] [dict get $mdata color] [dict get $mdata dashpattern] [dict get $mdata description] $tracer_id]
 		}
 	}
 	CreatureStatusMarker $w $id [expr $x*$iscale] [expr $y*$iscale] [expr $mob_size*$iscale] $condition $customList
@@ -16673,25 +16678,11 @@ proc SetObjectAttribute {id kvlist} {
 		if {$datatype eq "PS" && $k eq "CustomReach"} {
 			set v [::gmaproto::new_dict CustomReach {*}$v]
 		}
-#		if {$datatype eq "PS" && $k eq "TargetedModifiers"} {
-#			set dd $v
+		if {$datatype eq "PS" && $k eq "TargetedModifiers"} {
 #			DEBUG 0 "setting $v"
-#			if {[catch {
-#				set v {}
-#				dict for {monster conds} $dd {
-#					dict for {condition details} $conds {
-#						if {[dict exists $details Modifiers]} {
-#							dict set v TargetedModifiers $monster $condition Modifiers [dict get $details Modifiers]
-#						} else {
-#							dict set v TargetedModifiers $monster $condition Modifiers {}
-#						}
-#					}
-#				}
-#			} err]} {
-#				set v {}
-#				DEBUG 0 "Rejecting object update for $id TargetedModifiers: $err"
-#			}
-#		}
+			set v [::gmaproto::json_decode_special TM $v]
+#			DEBUG 0 "result is $v"
+		}
 
 		if {$datatype eq "PS" && $k eq "Gx"} {
 			set move_to_Gx $v
@@ -16729,6 +16720,9 @@ proc SetObjectAttribute {id kvlist} {
 				set v {}
 			}
 			dict set ${a}($id) {*}$keys $v
+#			if {$k eq {TargetedModifiers}} {
+#				DEBUG 0 "Set $a $id $k $v -> [set ${a}($id)]"
+#			}
 			DEBUG 5 "-$a $id $k <- $v"
 		}
 	}
@@ -18866,7 +18860,7 @@ proc CustomCondPerson {mob_id condition targeter marker_data} {
 #
 #  called when rendering somone or advancing the initiative turn or updating target attribute
 #
-# @[00]@| GMA-Mapper 4.40.1
+# @[00]@| GMA-Mapper 4.40.2
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2026 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

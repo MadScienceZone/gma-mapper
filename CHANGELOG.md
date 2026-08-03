@@ -3,11 +3,11 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.40.1          <!-- @@##@@ -->
- * Effective Date: 02-Aug-2026               <!-- @@##@@ -->
+ * This Package Version: 4.40.2          <!-- @@##@@ -->
+ * Effective Date: 03-Aug-2026               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.46.1 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.47 <!-- @@##@@ -->
  * GMA Mapper File Format: 24	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 426        <!-- @@##@@ -->
  * GMA Mapper Preferences File Format: 15 <!-- @@##@@ -->
@@ -16,6 +16,10 @@
 The support for old server protocols (<400) has ended.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.40.2
+## Fixes
+ * Corrected bugs in the protocol data handler for the `TargetedModifier` data structures and how the visual definition for the markers are pulled from the profiles.
 
 # 4.40.1
 ## Fixes
