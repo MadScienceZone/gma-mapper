@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___          ___    _______      __        #
-# (  ____ \(       )(  ___  ) Game         /   )        /   )  (  __   )    /  \       #
-# | (    \/| () () || (   ) | Master's    / /) |       / /) |  | (  )  |    \/) )      #
-# | |      | || || || (___) | Assistant  / (_) (_     / (_) (_ | | /   |      | |      #
-# | | ____ | |(_)| ||  ___  |           (____   _)   (____   _)| (/ /) |      | |      #
-# | | \_  )| |   | || (   ) | VTT            ) (          ) (  |   / | |      | |      #
-# | (___) || )   ( || )   ( | Mapper         | |   _      | |  |  (__) | _  __) (_     #
-# (_______)|/     \||/     \| Client         (_)  (_)     (_)  (_______)(_) \____/     #
+#  _______  _______  _______                ___          ___    _______     _______    #
+# (  ____ \(       )(  ___  ) Game         /   )        /   )  (  __   )   / ___   )   #
+# | (    \/| () () || (   ) | Master's    / /) |       / /) |  | (  )  |   \/   )  |   #
+# | |      | || || || (___) | Assistant  / (_) (_     / (_) (_ | | /   |       /   )   #
+# | | ____ | |(_)| ||  ___  |           (____   _)   (____   _)| (/ /) |     _/   /    #
+# | | \_  )| |   | || (   ) | VTT            ) (          ) (  |   / | |    /   _/     #
+# | (___) || )   ( || )   ( | Mapper         | |   _      | |  |  (__) | _ (   (__/\   #
+# (_______)|/     \||/     \| Client         (_)  (_)     (_)  (_______)(_)\_______/   #
 #                                                                                      #
 ########################################################################################
 #
@@ -130,7 +130,7 @@ namespace eval ::gmaproto {
 		update_turn               I
 	}
 	array set _message_payload {
-		AC      {ID s Name s Health {o {MaxHP i TmpHP i TmpDamage i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i AC i FlatFootedAC i TouchAC i CMD i}} Gx f Gy f Skin i SkinSize l PolyGM ? Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}} Targets l TargetedModifiers AE}
+		AC      {ID s Name s Health {o {MaxHP i TmpHP i TmpDamage i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i AC i FlatFootedAC i TouchAC i CMD i}} Gx f Gy f Skin i SkinSize l PolyGM ? Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}} Targets l TargetedModifiers TM}
 		ACCEPT  {Messages l}
 		AA      {Name s Format s File s IsLocalFile ?}
 		AA?     {Name s}
@@ -186,7 +186,7 @@ namespace eval ::gmaproto {
 		PRIV    {Command s Reason s}
 		POLO    {}
 		PROGRESS {OperationID s Title s Value i MaxValue i IsDone ? Targets l IsTimer ?}
-		PS      {ID s Name s Health {o {MaxHP i TmpHP i TmpDamage i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i AC i FlatFootedAC i TouchAC i CMD i}} Gx f Gy f Skin i SkinSize l PolyGM ? Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}} Targets l TargetedModifiers AE}
+		PS      {ID s Name s Health {o {MaxHP i TmpHP i TmpDamage i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i AC i FlatFootedAC i TouchAC i CMD i}} Gx f Gy f Skin i SkinSize l PolyGM ? Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}} Targets l TargetedModifiers TM}
 		READY   {}
 		REDIRECT {Host s Port i Reason s}
 		ROLL    {Replay ? Sender s Recipients l MessageID i ToAll ? ToGM ? Title s Result {o {InvalidRequest ? ResultSuppressed ? Result i Details {a {Type s Value s}}}} RequestID s MoreResults ? Sent s Origin ? Targets l Type s}
@@ -1213,8 +1213,8 @@ proc ::gmaproto::_encode_payload {input_dict type_dict} {
 						}]]
 					}
 				}
-				AE {
-					dict set a $f [::gmaproto::_attribute_encode $f $v]
+				TM {
+					dict set a $f [::gmaproto::_json_encode_special TM $v]
 				}
 				default {
 					error "bug: unrecognized type code \"$t\""
@@ -1274,6 +1274,7 @@ proc ::gmaproto::_parse_data_packet {raw_line} {
 		::gmaproto::DEBUG "falling back to UNDEFINED for $command ($raw_line)"
 		return [list UNDEFINED $raw_line]
 	} else {
+		#::DEBUG 0 "constructing $json_payload with format $pfmt"
 		return [list $command [::gmaproto::_construct $json_payload $pfmt]]
 	}
 
@@ -1452,15 +1453,6 @@ proc ::gmaproto::_construct {input types} {
 				} else {
 					dict set input $field {}
 				}
-
-#obsolete
-#				if {[string range [lindex $t 0] 0 0] eq "*"} {
-#					set newname [::S_ $field]
-#					if {$newname ne $field} {
-#						dict set input $newname [dict get $input $field]
-#						dict unset input $field
-#					}
-#				}
 			}
 			d {
 				if {[dict exists $input $field] && [dict get $input $field] ne "null"} {
@@ -1474,15 +1466,13 @@ proc ::gmaproto::_construct {input types} {
 					dict set input $field {}
 				}
 			}
-			AE {
-				if {$field eq "TargetedModifiers"} {
-					set t {D {D {o {Tracer ? Modifiers l Shape s Color s Description s}}}}
-					dict set a input $field [::gmaproto::_construct $input $t]
+			TM {
+				if {[dict exists $input $field]} {
+					dict set input $field [::gmaproto::json_decode_special TM [dict get $input $field]]
 				} else {
-					error "bug: unrecognized attribute type $t to decode"
+					dict set input $field [::gmaproto::json_decode_special TM {}]
 				}
 			}
-
 			default {
 				error "bug: unrecognized type code \"$t\""
 			}
@@ -2492,7 +2482,50 @@ proc ::gmaproto::normalize_dict {cmd d} {
 	return [::gmaproto::new_dict_from_json $cmd [::gmaproto::json_from_dict $cmd $d]]
 }
 
-# @[00]@| GMA-Mapper 4.40.1
+proc ::gmaproto::json_encode_special {special_type d} {
+	switch -exact -- $special_type {
+		TM {
+			return [::gmaproto::_attribute_encode TargetedModifiers $d]
+		}
+		default {
+			error "unknown special data type for json_encode_special: $special_type"
+		}
+	}
+}
+
+#
+# given a dictionary d, return a new copy of it, fully formed
+# with all the data fields even if they were missing from the original JSON
+# this was decoded from. Also, look for "null" in string values which our
+# JSON decoder doesn't know how to cope with correctly.
+#
+proc ::gmaproto::json_decode_special {special_type d} {
+	switch -exact -- $special_type {
+		TM {
+			if {[dict size $d] == 0 || $d == "null"} {
+				return {}
+			}
+			return [dict map {creature conds} $d {
+				if {[dict size $conds] == 0} {
+					continue
+				}
+				dict map {cond details} $conds {
+					dict create \
+						Modifiers [expr {[dict exists $details Modifiers] ? [dict get $details Modifiers] : {}}]\
+						Shape [expr {[dict exists $details Shape] ? [dict get $details Shape] : {O}}]\
+						Color [expr {[dict exists $details Color] ? [dict get $details Color] : {black}}]\
+						Tracker [expr {[dict exists $details Tracker] ? [dict get $details Tracker] : false}]\
+						Description [expr {[dict exists $details Description] ? [dict get $details Description] : {}}]
+				}
+			}]
+		}
+		default {
+			error "unknown special data type for json_decode_special: $special_type"
+		}
+	}
+}
+
+# @[00]@| GMA-Mapper 4.40.2
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2026 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
