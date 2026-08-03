@@ -7711,13 +7711,14 @@ proc RenderSomeone {w id {norecurse false} args} {
 			} else {
 				set mdata [dict get $MOBdata($tmid) TargetedModifiers $mob_name $ccond]
 			}
+			DEBUG 0 "ccond $ccond mdata [dict keys $mdata]"
 
-			if {[dict get $mdata tracer]} {
+			if {[dict exists $mdata Tracer] && [dict get $mdata Tracer]} {
 				set tracer_id $tmid
 			} else {
 				set tracer_id {}
 			}
-			lappend customList [list [dict get $mdata shape] [dict get $mdata color] [dict get $mdata dashpattern] [dict get $mdata description] $tracer_id]
+			#lappend customList [list [dict get $mdata Shape] [dict get $mdata color] [dict get $mdata dashpattern] [dict get $mdata description] $tracer_id]
 		}
 	}
 	CreatureStatusMarker $w $id [expr $x*$iscale] [expr $y*$iscale] [expr $mob_size*$iscale] $condition $customList

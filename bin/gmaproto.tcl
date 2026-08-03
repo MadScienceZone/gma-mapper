@@ -1215,6 +1215,7 @@ proc ::gmaproto::_encode_payload {input_dict type_dict} {
 				}
 				AE {
 					dict set a $f [::gmaproto::_attribute_encode $f $v]
+					::DEBUG 0 "AE -> [dict get $a $f]"
 				}
 				default {
 					error "bug: unrecognized type code \"$t\""
@@ -1452,15 +1453,6 @@ proc ::gmaproto::_construct {input types} {
 				} else {
 					dict set input $field {}
 				}
-
-#obsolete
-#				if {[string range [lindex $t 0] 0 0] eq "*"} {
-#					set newname [::S_ $field]
-#					if {$newname ne $field} {
-#						dict set input $newname [dict get $input $field]
-#						dict unset input $field
-#					}
-#				}
 			}
 			d {
 				if {[dict exists $input $field] && [dict get $input $field] ne "null"} {
@@ -1476,10 +1468,26 @@ proc ::gmaproto::_construct {input types} {
 			}
 			AE {
 				if {$field eq "TargetedModifiers"} {
-					set t {D {D {o {Tracer ? Modifiers l Shape s Color s Description s}}}}
-					dict set a input $field [::gmaproto::_construct $input $t]
+					::DEBUG 0 "AE starts $input"
+					if {[dict exists $input $field]} {
+						::DEBUG 0 "the field exists"
+						if {[set srcdata [dict get $input $field]] eq "null"} {
+							dict set input $field {}
+						} else {
+							::DEBUG 0 "not null; unsetting and rebuilding from $srcdata"
+							dict unset input $field
+							dict for {targname details} $srcdata {
+								::DEBUG 0 "setting $field $targname to $details"
+								dict set input $field $targname [::gmaproto::_construct $details {D {o {Tracer ? Modifiers l Shape s Color s Description s}}}]
+								::DEBUG 0 "input ($input $field $targname) now [dict get $input $field $targname]"
+							}
+						}
+					} else {
+						::DEBUG 0 "no such field, creating empty $field"
+						dict set input $field {}
+					}
 				} else {
-					error "bug: unrecognized attribute type $t to decode"
+					error "bug: unrecognized attribute type $field to decode"
 				}
 			}
 
