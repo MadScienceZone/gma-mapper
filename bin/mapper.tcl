@@ -7709,16 +7709,24 @@ proc RenderSomeone {w id {norecurse false} args} {
 			if {[dict exists $marker_data $ccond]} {
 				set mdata [dict get $marker_data $ccond]
 			} else {
-				set mdata [dict get $MOBdata($tmid) TargetedModifiers $mob_name $ccond]
+				set d [dict get $MOBdata($tmid) TargetedModifiers $mob_name $ccond]
+				set dc [dashcolorsplit [dict get $d Color]]
+				set mdata [dict create \
+					modifiers   [dict get $d Modifiers]\
+					color       [lindex $dc 1]\
+					shape       [dict get $d Shape]\
+					dashpattern [lindex $dc 0]\
+					description [dict get $d Description]\
+					tracer      [dict get $d Tracer]\
+				]
 			}
-			DEBUG 0 "ccond $ccond mdata [dict keys $mdata]"
 
-			if {[dict exists $mdata Tracer] && [dict get $mdata Tracer]} {
+			if {[dict get $mdata tracer]} {
 				set tracer_id $tmid
 			} else {
 				set tracer_id {}
 			}
-			#lappend customList [list [dict get $mdata Shape] [dict get $mdata color] [dict get $mdata dashpattern] [dict get $mdata description] $tracer_id]
+			lappend customList [list [dict get $mdata Shape] [dict get $mdata color] [dict get $mdata dashpattern] [dict get $mdata description] $tracer_id]
 		}
 	}
 	CreatureStatusMarker $w $id [expr $x*$iscale] [expr $y*$iscale] [expr $mob_size*$iscale] $condition $customList
@@ -7990,6 +7998,22 @@ proc RestackMobs {w} {
 			 $w raise "M#$mob_id"
 		}
 	}
+}
+
+# for some of our protocol fields we represent color with the dashpattern as a prefix in front
+# of the color name like "--blue" or "..red"
+proc dashcolorsplit {combined} {
+	if {[string range $combined 0 1] eq ".."} {
+		return [list {..} [string range $combined 2 end]]
+	}
+	if {[string range $combined 0 1] eq "--"} {
+		return [list {--} [string range $combined 2 end]]
+	}
+	return [list {} $combined]
+}
+
+proc dashcolorjoin {dashpattern color} {
+	return "$dashpattern$color"
 }
 
 # returns the MOB id associated with a map element or empty string
