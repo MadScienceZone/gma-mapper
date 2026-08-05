@@ -27,7 +27,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.40.3-alpha.1}     ;# @@##@@
+set GMAMapperVersion {4.40.3-alpha.2}     ;# @@##@@
 set GMAMapperFileFormat {24}        ;# @@##@@
 set GMAMapperProtocol {426}         ;# @@##@@
 set CoreVersionNumber {6.47}            ;# @@##@@
@@ -16315,9 +16315,9 @@ proc _do_roll {roll_string extra w for_user tkey} {
 	set temporary_mod_names {}
    	set temporary_cond_names {}
 	set target_qty 0
-	DEBUG 1 "$MOBdata($attacking_mob)"
-	DEBUG 1 "[dict get $MOBdata($attacking_mob) Targets]"
-	DEBUG 1 "[dict get $MOBdata($attacking_mob) TargetedModifiers]"
+	#DEBUG 1 "$MOBdata($attacking_mob)"
+	#DEBUG 1 "[dict get $MOBdata($attacking_mob) Targets]"
+	#DEBUG 1 "[dict get $MOBdata($attacking_mob) TargetedModifiers]"
 	if {[info exists MOBdata($attacking_mob)] 
 	   && [dict exists [set amob $MOBdata($attacking_mob)] Targets] 
 	   && [llength [set target_list [dict get $amob Targets]]] > 0
