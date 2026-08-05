@@ -1051,7 +1051,7 @@ Modifier names have a leading slash (like "/super") if global.}
 		grid [button $st.m.color -bg $marker_color -text [::gmacolors::rgb_name $marker_color] -state disabled \
 			-highlightcolor $marker_color -highlightbackground $marker_color -highlightthickness 2 \
 			-command "::gmaprofile::_set_marker_color $st.m $st.m.color"] -row 8 -column 2 -sticky we -padx 1 -pady 1
-		grid [ttk::checkbutton $st.m.tracer -text "Draw tracer line" -variable marker_tracer_en -command "::gmaprofile::_set_marker_tracer $st.m" -state disabled] - -sticky w
+		grid [ttk::checkbutton $st.m.tracer -text "Draw tracer line" -onvalue true -offvalue false -variable marker_tracer_en -command "::gmaprofile::_set_marker_tracer $st.m" -state disabled] - -sticky w
 
 		#XXX
 		#XXX modifiers color shape description dashpattern
