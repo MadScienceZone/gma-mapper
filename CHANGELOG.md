@@ -3,8 +3,8 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.40.2          <!-- @@##@@ -->
- * Effective Date: 03-Aug-2026               <!-- @@##@@ -->
+ * This Package Version: 4.40.3          <!-- @@##@@ -->
+ * Effective Date: 05-Aug-2026               <!-- @@##@@ -->
 
 ## Compatibility
  * GMA Core API Library Version: 6.47 <!-- @@##@@ -->
@@ -17,6 +17,13 @@ The support for old server protocols (<400) has ended.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
+# 4.40.3
+## Fixes
+ * Corrected bug in preferences setting for marker editor that incorrectly tracked checkbox value
+ * Corrected typos in n protocol handler `json_encode_special` and `json_decode_special`
+ * Corrected rendering bug where marker tracer lines didn't followe the targeter token when it's moved on the map canvas.
+ * Corrected use-before-define error when die rolls are made by player whose character token isn't actually on the map.
+  
 # 4.40.2
 ## Fixes
  * Corrected bugs in the protocol data handler for the `TargetedModifier` data structures and how the visual definition for the markers are pulled from the profiles.

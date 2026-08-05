@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___          ___    _______     _______    #
-# (  ____ \(       )(  ___  ) Game         /   )        /   )  (  __   )   / ___   )   #
-# | (    \/| () () || (   ) | Master's    / /) |       / /) |  | (  )  |   \/   )  |   #
-# | |      | || || || (___) | Assistant  / (_) (_     / (_) (_ | | /   |       /   )   #
-# | | ____ | |(_)| ||  ___  |           (____   _)   (____   _)| (/ /) |     _/   /    #
-# | | \_  )| |   | || (   ) | VTT            ) (          ) (  |   / | |    /   _/     #
-# | (___) || )   ( || )   ( | Mapper         | |   _      | |  |  (__) | _ (   (__/\   #
-# (_______)|/     \||/     \| Client         (_)  (_)     (_)  (_______)(_)\_______/   #
+#  _______  _______  _______                ___          ___    _______     ______     #
+# (  ____ \(       )(  ___  ) Game         /   )        /   )  (  __   )   / ___  \    #
+# | (    \/| () () || (   ) | Master's    / /) |       / /) |  | (  )  |   \/   \  \   #
+# | |      | || || || (___) | Assistant  / (_) (_     / (_) (_ | | /   |      ___) /   #
+# | | ____ | |(_)| ||  ___  |           (____   _)   (____   _)| (/ /) |     (___ (    #
+# | | \_  )| |   | || (   ) | VTT            ) (          ) (  |   / | |         ) \   #
+# | (___) || )   ( || )   ( | Mapper         | |   _      | |  |  (__) | _ /\___/  /   #
+# (_______)|/     \||/     \| Client         (_)  (_)     (_)  (_______)(_)\______/    #
 #                                                                                      #
 ########################################################################################
 #
@@ -1214,7 +1214,7 @@ proc ::gmaproto::_encode_payload {input_dict type_dict} {
 					}
 				}
 				TM {
-					dict set a $f [::gmaproto::_json_encode_special TM $v]
+					dict set a $f [::gmaproto::json_encode_special TM $v]
 				}
 				default {
 					error "bug: unrecognized type code \"$t\""
@@ -2514,7 +2514,7 @@ proc ::gmaproto::json_decode_special {special_type d} {
 						Modifiers [expr {[dict exists $details Modifiers] ? [dict get $details Modifiers] : {}}]\
 						Shape [expr {[dict exists $details Shape] ? [dict get $details Shape] : {O}}]\
 						Color [expr {[dict exists $details Color] ? [dict get $details Color] : {black}}]\
-						Tracker [expr {[dict exists $details Tracker] ? [dict get $details Tracker] : false}]\
+						Tracer [expr {[dict exists $details Tracer] ? [dict get $details Tracer] : false}]\
 						Description [expr {[dict exists $details Description] ? [dict get $details Description] : {}}]
 				}
 			}]
@@ -2525,7 +2525,7 @@ proc ::gmaproto::json_decode_special {special_type d} {
 	}
 }
 
-# @[00]@| GMA-Mapper 4.40.2
+# @[00]@| GMA-Mapper 4.40.3
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2026 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

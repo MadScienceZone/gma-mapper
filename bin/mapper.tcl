@@ -27,7 +27,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.40.2}     ;# @@##@@
+set GMAMapperVersion {4.40.3}     ;# @@##@@
 set GMAMapperFileFormat {24}        ;# @@##@@
 set GMAMapperProtocol {426}         ;# @@##@@
 set CoreVersionNumber {6.47}            ;# @@##@@
@@ -7990,6 +7990,21 @@ proc RenderSomeone {w id {norecurse false} args} {
 	}
 	RestackMobs $w
 	RefreshTargets
+	#
+	# If I have any TargetedModifiers with tracer lines on anyone, we need to refresh those
+	#
+	if {!$norecurse} {
+		if {[dict exists $MOBdata($id) TargetedModifiers]
+		&& [llength [set hit_list [dict get $MOBdata($id) TargetedModifiers]]] > 0} {
+			dict for {htname condlist} $hit_list {
+				dict for {cname htattrs} $condlist {
+					if {[dict exists $htattrs Tracer] && [dict get $htattrs Tracer]} {
+						RenderSomeone $w [GetBaseMobID $htname] true {*}$args
+					}
+				}
+			}
+		}
+	}
 }
 
 # Run through the creature tokens on the display, and push any of them which are killed or
@@ -16300,9 +16315,9 @@ proc _do_roll {roll_string extra w for_user tkey} {
 	set temporary_mod_names {}
    	set temporary_cond_names {}
 	set target_qty 0
-	DEBUG 1 "$MOBdata($attacking_mob)"
-	DEBUG 1 "[dict get $MOBdata($attacking_mob) Targets]"
-	DEBUG 1 "[dict get $MOBdata($attacking_mob) TargetedModifiers]"
+	#DEBUG 1 "$MOBdata($attacking_mob)"
+	#DEBUG 1 "[dict get $MOBdata($attacking_mob) Targets]"
+	#DEBUG 1 "[dict get $MOBdata($attacking_mob) TargetedModifiers]"
 	if {[info exists MOBdata($attacking_mob)] 
 	   && [dict exists [set amob $MOBdata($attacking_mob)] Targets] 
 	   && [llength [set target_list [dict get $amob Targets]]] > 0
@@ -18860,7 +18875,7 @@ proc CustomCondPerson {mob_id condition targeter marker_data} {
 #
 #  called when rendering somone or advancing the initiative turn or updating target attribute
 #
-# @[00]@| GMA-Mapper 4.40.2
+# @[00]@| GMA-Mapper 4.40.3
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2026 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
