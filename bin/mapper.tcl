@@ -27,7 +27,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.40.3-alpha.2}     ;# @@##@@
+set GMAMapperVersion {4.40.3}     ;# @@##@@
 set GMAMapperFileFormat {24}        ;# @@##@@
 set GMAMapperProtocol {426}         ;# @@##@@
 set CoreVersionNumber {6.47}            ;# @@##@@
@@ -18875,7 +18875,7 @@ proc CustomCondPerson {mob_id condition targeter marker_data} {
 #
 #  called when rendering somone or advancing the initiative turn or updating target attribute
 #
-# @[00]@| GMA-Mapper 4.40.2
+# @[00]@| GMA-Mapper 4.40.3
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2026 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
