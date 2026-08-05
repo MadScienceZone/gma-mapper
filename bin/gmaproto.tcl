@@ -1214,7 +1214,7 @@ proc ::gmaproto::_encode_payload {input_dict type_dict} {
 					}
 				}
 				TM {
-					dict set a $f [::gmaproto::_json_encode_special TM $v]
+					dict set a $f [::gmaproto::json_encode_special TM $v]
 				}
 				default {
 					error "bug: unrecognized type code \"$t\""
