@@ -27,7 +27,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.40.3-alpha.0}     ;# @@##@@
+set GMAMapperVersion {4.40.3-alpha.1}     ;# @@##@@
 set GMAMapperFileFormat {24}        ;# @@##@@
 set GMAMapperProtocol {426}         ;# @@##@@
 set CoreVersionNumber {6.47}            ;# @@##@@
@@ -7990,6 +7990,21 @@ proc RenderSomeone {w id {norecurse false} args} {
 	}
 	RestackMobs $w
 	RefreshTargets
+	#
+	# If I have any TargetedModifiers with tracer lines on anyone, we need to refresh those
+	#
+	if {!$norecurse} {
+		if {[dict exists $MOBdata($id) TargetedModifiers]
+		&& [llength [set hit_list [dict get $MOBdata($id) TargetedModifiers]]] > 0} {
+			dict for {htname condlist} $hit_list {
+				dict for {cname htattrs} $condlist {
+					if {[dict exists $htattrs Tracer] && [dict get $htattrs Tracer]} {
+						RenderSomeone $w [GetBaseMobID $htname] true {*}$args
+					}
+				}
+			}
+		}
+	}
 }
 
 # Run through the creature tokens on the display, and push any of them which are killed or

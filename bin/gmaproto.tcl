@@ -2514,7 +2514,7 @@ proc ::gmaproto::json_decode_special {special_type d} {
 						Modifiers [expr {[dict exists $details Modifiers] ? [dict get $details Modifiers] : {}}]\
 						Shape [expr {[dict exists $details Shape] ? [dict get $details Shape] : {O}}]\
 						Color [expr {[dict exists $details Color] ? [dict get $details Color] : {black}}]\
-						Tracker [expr {[dict exists $details Tracker] ? [dict get $details Tracker] : false}]\
+						Tracer [expr {[dict exists $details Tracer] ? [dict get $details Tracer] : false}]\
 						Description [expr {[dict exists $details Description] ? [dict get $details Description] : {}}]
 				}
 			}]
