@@ -3697,9 +3697,9 @@ proc loadfile {file args} {
 					set image_id [dict get $d Name]
 					foreach instance [dict get $d Sizes] {
 						DEBUG 2 "... $instance"
+						::gmautil::dassign $instance Zoom image_zoom File image_filename
 						if {![dict get $instance IsLocalFile]} {
 							DEBUG 3 "Image is supposed to be on the server. Retrieving..."
-							::gmautil::dassign $instance Zoom image_zoom File image_filename
 							if {[dict get $d Animation] ne {} && [dict get $d Animation Frames] > 0} {
 								DEBUG 3 "Image is animated"
 								::gmautil::dassign $d {Animation Frames} aframes \
@@ -4758,7 +4758,7 @@ proc RefreshGrid {show} {
 						global TILE_ATTR
 						::gmautil::dassign $OBJdata($id) BBHeight BBHeight BBWidth BBWidth Image bbti
 						if {$BBHeight > 0 && $BBWidth > 0} {
-							set bbxx [expr $X + $BBwidth]
+							set bbxx [expr $X + $BBWidth]
 							set bbyy [expr $Y + $BBHeight]
 							$canvas create polygon "$X $Y $bbxx $Y $bbxx $bbyy $X $bbyy $X $Y $bbxx $bbyy $X $bbyy $bbxx $Y" \
 								-fill {} -outline red -width 5 -tags [list obj$id allOBJ bbox$id]

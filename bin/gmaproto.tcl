@@ -580,7 +580,7 @@ proc ::gmaproto::_attribute_encode {k v} {
 		Locked   { return [::gmaproto::json_bool $v] }
 
 		BBHeight -
-		BBwidth  -
+		BBWidth  -
 		Elev     -
 		Extent   -
 		Gx       -
