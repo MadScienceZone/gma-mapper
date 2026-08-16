@@ -17,6 +17,11 @@ The support for old server protocols (<400) has ended.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
+# (unreleased)
+## Fixes
+ * Corrected typo in `BBWidth` field
+ * Corrected typo in local image loading code
+
 # 4.40.3
 ## Fixes
  * Corrected bug in preferences setting for marker editor that incorrectly tracked checkbox value
