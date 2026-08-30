@@ -21,6 +21,7 @@ versions.
 ## Fixes
  * Corrected typo in `BBWidth` field
  * Corrected typo in local image loading code
+ * Corrected data type error in map save file format handler.
 
 # 4.40.3
 ## Fixes
