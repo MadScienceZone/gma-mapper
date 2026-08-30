@@ -16141,6 +16141,13 @@ proc UpdatePeerList {for_user tkey} {
 proc SendDieRoll {recipients dice blind_p for_user tkey} {
 	global dice_preset_data
 	global ActiveTargetList
+	global local_user
+	if {$for_user ne $local_user} {
+		set for_roll $for_user
+	} else {
+		set for_roll {}
+	}
+
 	set d [ParseRecipientList $recipients TO ToGM $blind_p]
 	# Special case: table lookups are introduced by die-rolls that look like
 	# [title=] #tablename [...]
@@ -16165,9 +16172,9 @@ proc SendDieRoll {recipients dice blind_p for_user tkey} {
 			set flags {}
 		}
 
-		::gmaproto::roll_dice "$title [dict get $tbl dieroll] $rest" [dict get $d Recipients] [dict get $d ToAll] [dict get $d ToGM] "#$globmark$tablename;$tkey;$flags;[new_id]" $ActiveTargetList
+		::gmaproto::roll_dice "$title [dict get $tbl dieroll] $rest" [dict get $d Recipients] [dict get $d ToAll] [dict get $d ToGM] "#$globmark$tablename;$tkey;$flags;[new_id]" $ActiveTargetList {} $for_roll
 	} else {
-		::gmaproto::roll_dice $dice [dict get $d Recipients] [dict get $d ToAll] [dict get $d ToGM] [new_id] $ActiveTargetList
+		::gmaproto::roll_dice $dice [dict get $d Recipients] [dict get $d ToAll] [dict get $d ToGM] [new_id] $ActiveTargetList {} $for_roll
 	}
 }
 proc UpdateDicePresets {deflist for_user {system false}} {::gmaproto::define_dice_presets $deflist false $for_user $system}
