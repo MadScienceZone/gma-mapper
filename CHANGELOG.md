@@ -3,19 +3,27 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.40.3          <!-- @@##@@ -->
- * Effective Date: 05-Aug-2026               <!-- @@##@@ -->
+ * This Package Version: 4.41          <!-- @@##@@ -->
+ * Effective Date: 31-Aug-2026               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.47 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.48 <!-- @@##@@ -->
  * GMA Mapper File Format: 24	     <!-- @@##@@ -->
- * GMA Mapper Protocol: 426        <!-- @@##@@ -->
+ * GMA Mapper Protocol: 427        <!-- @@##@@ -->
  * GMA Mapper Preferences File Format: 15 <!-- @@##@@ -->
 
 ## DEPRECATION NOTICE
 The support for old server protocols (<400) has ended.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.41
+## Fixes
+ * Corrected typo in `BBWidth` field
+ * Corrected typo in local image loading code
+ * Corrected data type error in map save file format handler.
+## Adds
+ * Supports server protocol 427 which now supports correct attribution for delegated die rolls.
 
 # 4.40.3
 ## Fixes

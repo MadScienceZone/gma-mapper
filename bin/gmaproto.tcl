@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___          ___    _______     ______     #
-# (  ____ \(       )(  ___  ) Game         /   )        /   )  (  __   )   / ___  \    #
-# | (    \/| () () || (   ) | Master's    / /) |       / /) |  | (  )  |   \/   \  \   #
-# | |      | || || || (___) | Assistant  / (_) (_     / (_) (_ | | /   |      ___) /   #
-# | | ____ | |(_)| ||  ___  |           (____   _)   (____   _)| (/ /) |     (___ (    #
-# | | \_  )| |   | || (   ) | VTT            ) (          ) (  |   / | |         ) \   #
-# | (___) || )   ( || )   ( | Mapper         | |   _      | |  |  (__) | _ /\___/  /   #
-# (_______)|/     \||/     \| Client         (_)  (_)     (_)  (_______)(_)\______/    #
+#  _______  _______  _______                ___          ___     __                    #
+# (  ____ \(       )(  ___  ) Game         /   )        /   )   /  \                   #
+# | (    \/| () () || (   ) | Master's    / /) |       / /) |   \/) )                  #
+# | |      | || || || (___) | Assistant  / (_) (_     / (_) (_    | |                  #
+# | | ____ | |(_)| ||  ___  |           (____   _)   (____   _)   | |                  #
+# | | \_  )| |   | || (   ) | VTT            ) (          ) (     | |                  #
+# | (___) || )   ( || )   ( | Mapper         | |   _      | |   __) (_                 #
+# (_______)|/     \||/     \| Client         (_)  (_)     (_)   \____/                 #
 #                                                                                      #
 ########################################################################################
 #
@@ -56,9 +56,9 @@ package require base64 2.4.2
 package require uuid 1.0.1
 
 namespace eval ::gmaproto {
-	variable protocol 426
+	variable protocol 427
 	variable min_protocol 400
-	variable max_protocol 426
+	variable max_protocol 427
 	variable max_max_protocol 499
 	variable maximum_message_length 61440 
 	variable frag_size 32768
@@ -152,7 +152,7 @@ namespace eval ::gmaproto {
 		COREIDX= {RequestID s Type s IsDone ? N i Of i Name s Code s}
 		CONN    {PeerList {a {Addr s User s Client s LastPolo f IsAuthenticated ? IsMe ? AKA l NotPlaying ?}}}
 		CS      {Absolute f Relative f Running ?}
-		D       {Recipients l ToAll ? ToGM ? RollSpec s RequestID s Targets l Type s}
+		D       {Recipients l ToAll ? ToGM ? RollSpec s RequestID s Targets l Type s For s}
 		DD      {Global ? For s Presets {a {Name s Description s DieRollSpec s}}}
 		DD+     {Global ? For s Presets {a {Name s Description s DieRollSpec s}}}
 		DD/     {Global ? For s Filter s}
@@ -189,7 +189,7 @@ namespace eval ::gmaproto {
 		PS      {ID s Name s Health {o {MaxHP i TmpHP i TmpDamage i LethalDamage i NonLethalDamage i Con i IsFlatFooted ? IsStable ? Condition s HPBlur i AC i FlatFootedAC i TouchAC i CMD i}} Gx f Gy f Skin i SkinSize l PolyGM ? Elev i Color s Note s Size s DispSize s StatusList l AoE {o {Radius f Color s}} MoveMode i Reach i Killed ? Dim ? CreatureType i Hidden ? CustomReach {o {Enabled ? Natural i Extended i}} Targets l TargetedModifiers TM}
 		READY   {}
 		REDIRECT {Host s Port i Reason s}
-		ROLL    {Replay ? Sender s Recipients l MessageID i ToAll ? ToGM ? Title s Result {o {InvalidRequest ? ResultSuppressed ? Result i Details {a {Type s Value s}}}} RequestID s MoreResults ? Sent s Origin ? Targets l Type s}
+		ROLL    {Replay ? Sender s Recipients l MessageID i ToAll ? ToGM ? Title s Result {o {InvalidRequest ? ResultSuppressed ? Result i Details {a {Type s Value s}}}} RequestID s MoreResults ? Sent s Origin ? Targets l Type s For s}
 		SOUND   {Name s Loop ? Stop ? Addrs l}
 		SYNC    {}
 		SYNC-CHAT {Target i}
@@ -580,7 +580,7 @@ proc ::gmaproto::_attribute_encode {k v} {
 		Locked   { return [::gmaproto::json_bool $v] }
 
 		BBHeight -
-		BBwidth  -
+		BBWidth  -
 		Elev     -
 		Extent   -
 		Gx       -
@@ -1608,8 +1608,8 @@ proc ::gmaproto::polo {} {
 	::gmaproto::_protocol_send POLO
 }
 
-proc ::gmaproto::roll_dice {spec recipients to_all blind_to_gm {rid {}} {targets {}} {type {}}} {
-	::gmaproto::_protocol_send D Recipients $recipients ToAll $to_all ToGM $blind_to_gm RollSpec $spec RequestID $rid Targets $targets Type $type
+proc ::gmaproto::roll_dice {spec recipients to_all blind_to_gm {rid {}} {targets {}} {type {}} {for_user {}}} {
+	::gmaproto::_protocol_send D Recipients $recipients ToAll $to_all ToGM $blind_to_gm RollSpec $spec RequestID $rid Targets $targets Type $type For $for_user
 }
 
 proc ::gmaproto::sync_chat {target} {
@@ -2525,7 +2525,7 @@ proc ::gmaproto::json_decode_special {special_type d} {
 	}
 }
 
-# @[00]@| GMA-Mapper 4.40.3
+# @[00]@| GMA-Mapper 4.41
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2026 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

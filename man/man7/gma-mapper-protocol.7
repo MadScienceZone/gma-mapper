@@ -1,7 +1,7 @@
 '\" t
-'\" *** 426 ***
+'\" *** 427 ***
 '\" <<ital-is-var>>
-.TH GMA-MAPPER-PROTOCOL 7 "GMA-Mapper 4.40.3" 05-Aug-2026 "Protocols" \" @@mp@@
+.TH GMA-MAPPER-PROTOCOL 7 "GMA-Mapper 4.41" 31-Aug-2026 "Protocols" \" @@mp@@
 .SH NAME
 gma-mapper-protocol \- GMA client/server protocol specification
 .SH EXPERIMENTAL
@@ -79,7 +79,7 @@ be implemented to wait synchronously for a server
 response during the authentication negotiation stage.
 .LP
 '\" <</bold-is-fixed>>
-.B "This describes protocol version 426."
+.B "This describes protocol version 427."
 '\" <<bold-is-fixed>>
 These notes are intended to be 
 detailed enough to implement a client from and should be considered
@@ -2431,6 +2431,14 @@ Roll dice using the server's built-in die rolling facility.
 The JSON payload contains the following fields:
 '\" <<list>>
 .RS
+'\" <<New>>
+.TP
+.B For
+If this field is present and non-empty, it gives the name of the user for whom
+this die-roll is being made. This indicates that the user making the roll is doing so
+as the delegate for another player. The GMA toolset receiving the result of the die roll
+should consider the roll as if being made by this other player's character instead.
+'\" <</New>>
 .TP
 '\" <</ital-is-var>>
 .BI Recipients " (list of strings)"
@@ -4605,6 +4613,14 @@ Reports the results of a die roll initiated by the
 command. Clients MUST NOT send this command. The JSON payload includes the following fields:
 '\" <<list>>
 .RS
+'\" <<New>>
+.TP
+.B For
+If this field is present and non-empty, it gives the name of the user for whom
+this die-roll is being made. This indicates that the user making the roll was doing so
+as the delegate for another player. The GMA toolset receiving this result
+should therefore consider the roll as if being made by this other player's character instead.
+'\" <</New>>
 .TP
 .BI Sender
 The name of the user who rolled the dice. 
@@ -5222,8 +5238,17 @@ Steve Willoughby / steve@madscience.zone;
 John Mechalas (elevation and movement modes).
 .SH HISTORY
 .LP
-This document defines map protocol version 426,
-which corrects the format of the
+This document defines map protocol version 427,
+which introduces the
+.B For
+fields in the
+.B D
+and
+.B ROLL
+server messages.
+.LP
+Previously, protocol version 426
+corrected the format of the
 .B TargetedModifiers
 field for creatures.
 .LP

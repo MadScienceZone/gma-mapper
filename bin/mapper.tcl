@@ -27,10 +27,10 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.40.3}     ;# @@##@@
+set GMAMapperVersion {4.41}     ;# @@##@@
 set GMAMapperFileFormat {24}        ;# @@##@@
-set GMAMapperProtocol {426}         ;# @@##@@
-set CoreVersionNumber {6.47}            ;# @@##@@
+set GMAMapperProtocol {427}         ;# @@##@@
+set CoreVersionNumber {6.48}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -3697,9 +3697,9 @@ proc loadfile {file args} {
 					set image_id [dict get $d Name]
 					foreach instance [dict get $d Sizes] {
 						DEBUG 2 "... $instance"
+						::gmautil::dassign $instance Zoom image_zoom File image_filename
 						if {![dict get $instance IsLocalFile]} {
 							DEBUG 3 "Image is supposed to be on the server. Retrieving..."
-							::gmautil::dassign $instance Zoom image_zoom File image_filename
 							if {[dict get $d Animation] ne {} && [dict get $d Animation Frames] > 0} {
 								DEBUG 3 "Image is animated"
 								::gmautil::dassign $d {Animation Frames} aframes \
@@ -4758,7 +4758,7 @@ proc RefreshGrid {show} {
 						global TILE_ATTR
 						::gmautil::dassign $OBJdata($id) BBHeight BBHeight BBWidth BBWidth Image bbti
 						if {$BBHeight > 0 && $BBWidth > 0} {
-							set bbxx [expr $X + $BBwidth]
+							set bbxx [expr $X + $BBWidth]
 							set bbyy [expr $Y + $BBHeight]
 							$canvas create polygon "$X $Y $bbxx $Y $bbxx $bbyy $X $bbyy $X $Y $bbxx $bbyy $X $bbyy $bbxx $Y" \
 								-fill {} -outline red -width 5 -tags [list obj$id allOBJ bbox$id]
@@ -16141,6 +16141,13 @@ proc UpdatePeerList {for_user tkey} {
 proc SendDieRoll {recipients dice blind_p for_user tkey} {
 	global dice_preset_data
 	global ActiveTargetList
+	global local_user
+	if {$for_user ne $local_user} {
+		set for_roll $for_user
+	} else {
+		set for_roll {}
+	}
+
 	set d [ParseRecipientList $recipients TO ToGM $blind_p]
 	# Special case: table lookups are introduced by die-rolls that look like
 	# [title=] #tablename [...]
@@ -16165,9 +16172,9 @@ proc SendDieRoll {recipients dice blind_p for_user tkey} {
 			set flags {}
 		}
 
-		::gmaproto::roll_dice "$title [dict get $tbl dieroll] $rest" [dict get $d Recipients] [dict get $d ToAll] [dict get $d ToGM] "#$globmark$tablename;$tkey;$flags;[new_id]" $ActiveTargetList
+		::gmaproto::roll_dice "$title [dict get $tbl dieroll] $rest" [dict get $d Recipients] [dict get $d ToAll] [dict get $d ToGM] "#$globmark$tablename;$tkey;$flags;[new_id]" $ActiveTargetList {} $for_roll
 	} else {
-		::gmaproto::roll_dice $dice [dict get $d Recipients] [dict get $d ToAll] [dict get $d ToGM] [new_id] $ActiveTargetList
+		::gmaproto::roll_dice $dice [dict get $d Recipients] [dict get $d ToAll] [dict get $d ToGM] [new_id] $ActiveTargetList {} $for_roll
 	}
 }
 proc UpdateDicePresets {deflist for_user {system false}} {::gmaproto::define_dice_presets $deflist false $for_user $system}
@@ -18875,7 +18882,7 @@ proc CustomCondPerson {mob_id condition targeter marker_data} {
 #
 #  called when rendering somone or advancing the initiative turn or updating target attribute
 #
-# @[00]@| GMA-Mapper 4.40.3
+# @[00]@| GMA-Mapper 4.41
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2026 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
