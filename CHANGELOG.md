@@ -17,11 +17,13 @@ The support for old server protocols (<400) has ended.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
-# (unreleased)
+# 4.41
 ## Fixes
  * Corrected typo in `BBWidth` field
  * Corrected typo in local image loading code
  * Corrected data type error in map save file format handler.
+## Adds
+ * Supports server protocol 427 which now supports correct attribution for delegated die rolls.
 
 # 4.40.3
 ## Fixes
