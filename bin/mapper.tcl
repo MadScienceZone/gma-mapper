@@ -27,7 +27,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.41}     ;# @@##@@
+set GMAMapperVersion {4.41.1_alpha}     ;# @@##@@
 set GMAMapperFileFormat {24}        ;# @@##@@
 set GMAMapperProtocol {427}         ;# @@##@@
 set CoreVersionNumber {6.48}            ;# @@##@@
@@ -4965,6 +4965,8 @@ proc ShowDiceSyntax {} {
 		{b {| dc } i N p "\tThis is a check against a difficulty class (DC) of " i N 
 		 p {. This does not affect the roll, but will report back whether the roll satisfied the DC and by what margin.}}
 		{b {| sf } p \[ i success p \[ b / i fail p "\]\]\tThis roll (which must involve but a single die) indicates automatic success or failure on a natural 20 or 1 respectively (or whatever the maximum value of the die is, if not a d20). The optional " i success p " or " i fail p " labels are used in the report (or suitable defaults are used if these are not given)."}
+		{b {| fortune} p "\tChange the roll so that all d20s are rolled an extra time, taking the better outcome in each case."}
+		{b {| misfortune} p "\tAs " b {| fortune} p {, but takes the worse of the two dice rolled.}}
 		{p {}}
 		{p {Examples:}}
 		{b d20         p "\tRoll a 20-sided die."}
@@ -18882,7 +18884,7 @@ proc CustomCondPerson {mob_id condition targeter marker_data} {
 #
 #  called when rendering somone or advancing the initiative turn or updating target attribute
 #
-# @[00]@| GMA-Mapper 4.41
+# @[00]@| GMA-Mapper 4.41.1_alpha
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2026 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

@@ -3,8 +3,8 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.41          <!-- @@##@@ -->
- * Effective Date: 31-Aug-2026               <!-- @@##@@ -->
+ * This Package Version: 4.41.1_alpha          <!-- @@##@@ -->
+ * Effective Date: 16-Sep-2026               <!-- @@##@@ -->
 
 ## Compatibility
  * GMA Core API Library Version: 6.48 <!-- @@##@@ -->
@@ -16,6 +16,10 @@
 The support for old server protocols (<400) has ended.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# 4.41.1
+## Fixes
+ * Added note to the die roll syntax help message to acknowledge the new fortune options.
 
 # 4.41
 ## Fixes
