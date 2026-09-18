@@ -6497,6 +6497,43 @@ set HealthBarFrameWidth 2
 #      by GMA's release CI/CD pipeline toolchain.
 
 #@@:tcl:conditions.json:begin:MarkerColor@@
+array set MarkerColor {
+	bleed red
+	{ability damage} yellow
+	{ability drained} orange
+	{energy drained} black
+	poisoned green
+	deafened black
+	stable sienna
+	blinded black
+	dazzled cyan
+	confused orange
+	cowering sienna
+	dazed purple
+	fascinated cyan
+	paralyzed black
+	helpless gray
+	staggered blue
+	stunned red
+	dying *
+	disabled red
+	unconscious purple
+	petrified gray
+	entangled green
+	grappled orange
+	pinned red
+	prone blue
+	exhausted red
+	fatigued orange
+	nauseated green
+	sickened sienna
+	flat-footed blue
+	incorporeal gray
+	invisible ..black
+	shaken sienna
+	frightened yellow
+	panicked red
+}
 #@@:tcl:conditions.json:end:@@
 
 # marker shapes are
@@ -6512,12 +6549,90 @@ set HealthBarFrameWidth 2
 #   <>  O   diamond or circle around entire token
 
 #@@:tcl:conditions.json:begin:MarkerShape@@
+array set MarkerShape {
+	bleed |v
+	{ability damage} |v
+	{ability drained} |v
+	{energy drained} v|
+	poisoned o|
+	deafened |<>
+	stable <>|
+	blinded //
+	dazzled //
+	confused =
+	cowering =
+	dazed =
+	fascinated =
+	paralyzed =
+	helpless =
+	staggered =
+	stunned =
+	dying /
+	disabled |
+	unconscious ||
+	petrified X
+	entangled #
+	grappled +
+	pinned +
+	prone -
+	exhausted V
+	fatigued V
+	nauseated ^
+	sickened ^
+	flat-footed O
+	incorporeal O
+	invisible O
+	shaken <>
+	frightened <>
+	panicked <>
+}
 #@@:tcl:conditions.json:end:@@
 
 #@@:tcl:conditions.json:begin:MarkerTransparent@@
+array set MarkerTransparent {
+	incorporeal true
+	invisible true
+}
 #@@:tcl:conditions.json:end:@@
 
 #@@:tcl:conditions.json:begin:MarkerDescription@@
+array set MarkerDescription {
+	bleed {Bleeding: take damage each turn unless stopped by a DC 15 Heal check or any spell that cures hit point damage (even if bleed is ability damage).}
+	{ability damage} {Ability Damage: penalties to ability-related checks but does not affect the ability score itself.}
+	{ability drained} {Ability Drained: Ability score reduced with all applicable effects that implies. May be healed via spells such as restoration.}
+	{energy drained} {Energy Drained: has negative levels. Take cumulative -1 penalty per level drained on all ability checks, attack rolls, combat maneuver checks, combat maneuver defense, saving throws, and skill checks. Current and total hit points reduce by 5 per negative level. Treated as level reduction for level-dependent variables. No loss of prepared spells or slots. Daily saving throw to remove each negative level unless permanent.  If negative levels >= hit dice, dies.}
+	poisoned {Poisoned: may have onset delay and additional saving throws and additional damage over time as the poison runs its course.}
+	deafened {Deafened: cannot hear. -4 initiative, automatically fails Perception checks based on sound, -4 on opposed Perception checks, 20% of spell failure when casting spells with verbal components.}
+	stable {Stable: no longer dying but unconscious. If made stable by other's action, may make DC 10 Constitution check hourly to become conscious and disabled even with negative hit points, with check penalty equal to negative hit points. If became stable without help, can make hourly Con check to become stable as above but failure causes 1 hit point damage.}
+	blinded {Blinded: cannot see, -2 AC, no Dexterity bonus to AC, -4 on most Strength- and Dexterity-based skill checks and opposed Perception skill checks. All checks and activities that rely on vision automatically fail. Opponents have total concealment (50% miss chance). Must make DC 10 Acrobatics check to move faster than 1/2 speed (fail: fall prone).}
+	dazzled {Dazzled: unable to see well because of overstimulation of the eyes. -1 on attack rolls and sight-based Perception checks.}
+	confused {Confused: cannot act normally or tell ally from foe, treating all as enemies. Action is random: 01-25%=normal, 26-50%=babble incoherently, 51-75%=deal 1d8+Str modifier damage to self, 76-100%=attack nearest creature. Beneficial touch spells require attack roll. Attacks last creature who attacked it. Will not make attacks of opportunity unless against creature already fighting.}
+	cowering {Cowering: frozen in fear and can take no actions. -2 AC, no Dexterity bonus.}
+	dazed {Dazed: unable to act normally (no actions, no AC penalty).}
+	fascinated {Fascinated: entranced by Su or Sp effect. Stand or sit quietly, taking no other actions. -4 on skill checks made as reactions. Potential threats grant new saving throw against fascinating effect. Obvious threat automatically breaks fascination. Ally may make shake creature free of the effect as standard action.}
+	paralyzed {Paralyzed: frozen in place, unable to move or act. Effective Dexterity and Strength of 0. Helpless but can take purely mental actions. Winged flying creatures fall. Swimmers may drown. Others may move through space of paralyzed creatures, but counts as 2 spaces.}
+	helpless {Helpless: paralyzed, held, bound, sleeping, unconscious, etc. Effective Dexterity of 0. Melee attackers get +4 bonus (no bonus for ranged). Can be sneak attacked. Subject to coup de grâce (full-round action with automatic critical hit, Fort save DC 10 + damage dealt or die; if immune to critical hits, then critical damage not taken nor Fort save required).}
+	staggered {Staggered: only single move or standard action. No full-round actions but ok to make free, swift, and immediate actions.}
+	stunned {Stunned: drop everything held, take no actions, -2 AC, lose Dexterity bonus to AC.}
+	dying {Dying: unconscious, no actions. Each turn make DC 10 Constitution check to stabilize, at penalty equal to current (negative) hit points. Natural 20=auto success. If check failed, take 1 hp damage.}
+	disabled {Disabled: conscious, make take a single move or standard action but not both nor full-round actions; swift, immediate, and free actions are ok. Move at 1/2 speed. Std actions that are strenuous deal 1 point of damage at completion.}
+	unconscious {Unconscious: knocked out and helpless.}
+	petrified {Petrified: turned to stone, unconscious. Broken pieces must be reattached when turning to flesh to avoid permanent damage.}
+	entangled {Entangled: ensnared, move at 1/2 speed, cannot run or charge, -2 attack, -4 Dexterity. Spellcasting requires concentration DC 15+spell level or lose spell.}
+	grappled {Grappled: restrained, cannot move, -4 Dexterity, -2 attacks and combat maneuver checks except those made to grapple or escape grapple. No action requiring two hands. Spellcasting or (Sp) requires concentration DC 10 + grappler's CMB + spell level) or lose spell. Cannot make attack of opportunity. Cannot use Stealth against grappler but if becomes invisible, gain +2 on CMD to avoid being grappled.}
+	pinned {Pinned: tightly bound. Cannot move. No Dexterity bonus, plus -4 AC. May attempt to free with CMB or Escape Artist check, take verbal and mental actions, but not cast spells with somatic or material components. Spell casting requires concentration DC 10 + grappler's CMB + spell level or lose spell. More severe than (and does not stack with) grapple condition.}
+	prone {Prone: lying on ground. -4 on melee attacks, cannot use ranged weapon except crossbows. +4 AC vs. ranged attacks but -4 AC vs. melee attacks. Standing up is a move-equivalent action that provokes attacks of opportunity.}
+	exhausted {Exhausted: move 1/2 speed, cannot run or charge, -6 Strength and Dexterity. Change to fatigued after 1 hour of complete rest.}
+	fatigued {Fatigued: can't run or charge,-2 penalty to Strength and Dexterity. Advance to exhausted if doing anything that would normally cause fatigue; Remove after 8 hours of complete rest.}
+	nauseated {Nauseated: Cannot attack, cast spells, concentrate on spells, or do anything else requiring attention. Can only take a single move action.}
+	sickened {Sickened: -2 on attacks, weapon damage, saving throws, skill checks, ability checks.}
+	flat-footed {Flat-Footed: not yet acted during combat, unable to react normally to the situation. Loses Dexterity bonus to AC, cannot make attacks of opportunity.}
+	incorporeal {Incorporeal: no physical body. Immune to nonmagic attacks,50% damage from magic weapons, spells, Sp effects, Su effects. Full damage from other incorporeal creatures and effects as well as force effects.}
+	invisible {Invisible: +2 attack vs. sighted opponent, ignore opponent Dexterity bonus to AC. Immune to favored enemy/sneak attack damage. Can be noticed by those within 30 ft (DC 20 Perception) but cannot be targeted w/o +20 DC to pinpoint location, even so still 50% miss chance; see p. 563.}
+	shaken {Shaken: -2 on attacks, saving throws, skill checks, ability checks.}
+	frightened {Frightened: flees from source of fear if possible, else fight. -2 attacks, saving throws, skill checks, and ability checks. Can use special abilities and spells to flee (MUST do so if they are only way to escape).}
+	panicked {Panicked: drop anything held and flee at top speed along random path. -2 on saving throws, skill checks, ability checks. If cornered, cowers. Can use special abilities and spells to flee (MUST if that's the only way to escape).}
+}
 #@@:tcl:conditions.json:end:@@
 
 proc CreatureStatusTransparent {id conditions} {

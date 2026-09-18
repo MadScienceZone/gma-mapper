@@ -4,7 +4,7 @@
 
 ## Current Version Information
  * This Package Version: 4.41.1-alpha_alpha_alpha          <!-- @@##@@ -->
- * Effective Date: 16-Sep-2026               <!-- @@##@@ -->
+ * Effective Date: 18-Sep-2026               <!-- @@##@@ -->
 
 ## Compatibility
  * GMA Core API Library Version: 6.48 <!-- @@##@@ -->

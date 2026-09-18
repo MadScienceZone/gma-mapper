@@ -21,29 +21,31 @@ package require getstring
 namespace eval ::gmaprofile {
 	namespace export editor
 	variable __marker_shapes
-	array set __marker_shapes {
-		{O} "circle" 
-		{X} "X" 
-		{V} "downward triangle" 
-		{^} "upward triangle"
-		{<>} "diamond"
-		{#} "double cross"
-		{+} "single cross"
-		{\\\\} "double backslash"
-		{//} "double slash"
-		{\\} "backslash"
-		{/} "slash"
-		{=} "double horizontal"
-		{-} "single horizontal"
-		{||} "double vertical"
-		{|} "single vertical"
-		{|v} "small triangle to left"
-		{v|} "small triangle to right"
-		{|o} "small circle to left"
-		{o|} "small circle to right"
-		{|<>} "small diamond to left"
-		{<>|} "small diamond to right"
-	}
+	#@@:tcl:condition-shapes.json:begin:__marker_shapes@@ AUTOMATICALLY GENERATED
+array set __marker_shapes {
+	O circle
+	X X
+	V {downward triangle}
+	^ {upward triangle}
+	<> diamond
+	{#} {double cross}
+	+ {single cross}
+	{\\\\} {double backslash}
+	// {double slash}
+	{\\} backslash
+	/ slash
+	= {double horizontal}
+	- {single horizontal}
+	|| {double vertical}
+	| {single vertical}
+	|v {small triangle to left}
+	v| {small triangle to right}
+	|o {small circle to left}
+	o| {small circle to right}
+	|<> {small diamond to left}
+	<>| {small diamond to right}
+}
+	#@@:tcl:condition-shapes.json:end:@@
 	variable _fontid 0
 	variable lockout_select_fbn false
 	variable _profile {}
