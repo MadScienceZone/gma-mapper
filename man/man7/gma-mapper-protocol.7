@@ -1,5 +1,5 @@
 '\" t
-'\" *** 427 ***
+'\" *** 428 ***
 '\" <<ital-is-var>>
 .TH GMA-MAPPER-PROTOCOL 7 "GMA-Mapper 4.41.1-alpha" 16-Sep-2026 "Protocols" \" @@mp@@
 .SH NAME
@@ -79,7 +79,7 @@ be implemented to wait synchronously for a server
 response during the authentication negotiation stage.
 .LP
 '\" <</bold-is-fixed>>
-.B "This describes protocol version 427."
+.B "This describes protocol version 428."
 '\" <<bold-is-fixed>>
 These notes are intended to be 
 detailed enough to implement a client from and should be considered
@@ -4558,6 +4558,18 @@ for the
 .B DSM
 command. 
 Clients MAY but do not need to send this value.
+.TP
+.BI "Limit " (int)
+If present and positive, at most this many targets at a time may have this condition.
+Clients SHOULD ask the player to choose how to resolve this if another target is requested,
+as it may be appropriate for them to drop one or more old targets in favor of the new one.
+(Added in protocol 428.)
+.TP
+.BI "EndAtDeath " (bool)
+If present and true, this condition MAY be removed automatically by clients when they notice
+the target has died. A client MAY wait until a convenient time, such as when a new target is
+about to be assigned, to check for this opportunity and act on it.
+(Added in protocol 428.)
 .RE
 '\" <</>>
 '\" <</New>>
@@ -5238,8 +5250,16 @@ Steve Willoughby / steve@madscience.zone;
 John Mechalas (elevation and movement modes).
 .SH HISTORY
 .LP
-This document defines map protocol version 427,
-which introduces the
+This document defines map protocol version 428,
+which enhances the definition of the
+.B TargetedModifiers
+attribute to have additional fields
+.B Limit
+and
+.BR EndAtDeath .
+.LP
+Previously, protocol version 427
+introduced the
 .B For
 fields in the
 .B D
@@ -5247,7 +5267,7 @@ and
 .B ROLL
 server messages.
 .LP
-Previously, protocol version 426
+Protocol version 426
 corrected the format of the
 .B TargetedModifiers
 field for creatures.
