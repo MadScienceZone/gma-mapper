@@ -7064,6 +7064,8 @@ proc RefreshTargets {} {
 		} err]} {
 			DEBUG 0 "Unable to draw target source: $err"
 		}
+		puts "=> ActiveTargetSource   $ActiveTargetSource"
+		puts "=> ExplicitTargetSource $ExplicitTargetSource"
 	} else {
 		$canvas delete MYTARG
 		foreach my_source $me {
