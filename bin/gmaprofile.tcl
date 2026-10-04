@@ -1556,14 +1556,24 @@ Modifier names have a leading slash (like "/super") if global.}
 	}
 
 	proc _set_marker_limit {s args} {
-		variable _profile
-		global marker_limit
-		puts "*** _set_marker_limit s=$s args=$args limit=$marker_limit ***"
-		if {[set markername [_selected_marker_name $s.m.markers]] ne {}} {
-			puts "*** selected marker=$markername ***"
-			dict set _profile styles markers $markername limit $marker_limit
+		# Since this is on a variable trace it can be called earlier than
+		# the GUI is ready for, so we'll be permissive here and not worry
+		# if sometimes we can't succeed with the call. Normally this would
+		# be something I'd sternly lecture my junior devs about not doing,
+		# but I'll indulge myself on this one even though I know I should
+		# clean this up better. The justification is that this is just here
+		# to capture the variable setting in the GUI and it'll eventually do
+		# that anyway. Now why I bothered to write this in the time it would
+		# have taken to make the code do it anyway more gracefully is an
+		# exercise left to the student.
+		catch {
+			variable _profile
+			global marker_limit
+			if {[set markername [_selected_marker_name $s.m.markers]] ne {}} {
+				dict set _profile styles markers $markername limit $marker_limit
+			}
+			return 1
 		}
-		return 1
 	}
 
 	proc _set_marker_mods {st e v} {
