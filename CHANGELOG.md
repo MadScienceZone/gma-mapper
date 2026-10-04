@@ -17,6 +17,14 @@ The support for old server protocols (<400) has ended.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
 
+# v4.42
+## Adds
+ * Now supports server protocol 428.
+ * Enhances custom conditions to allow setting limits on the number of targets that can be given a given one at a time. For example, a class ability like studied target might only allow 2 or 3 studied targets at a time, and this can now be tracked and enforced by the mapper. 
+   * To go along with this, you can now specify that the condition only remains in effect until the target is killed. In this case, if you would exceed the limit of the number of allowed targets for that condition, the mapper will remove any on targets that are already killed.
+   * The list of what condition codes you have in effect on targets is now displayed in your character token pop-up tooltip when you mouse over it.
+ * Standard (built-in) condition markers are no longer hard-coded directly in the source code but are now embedded there by our CI/CD infrastructure so they are centralized and in sync with the rest of the GMA tool suite.
+
 # 4.41.1
 ## Fixes
  * Added note to the die roll syntax help message to acknowledge the new fortune options.
