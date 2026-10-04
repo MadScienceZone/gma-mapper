@@ -56,9 +56,9 @@ package require base64 2.4.2
 package require uuid 1.0.1
 
 namespace eval ::gmaproto {
-	variable protocol 427
+	variable protocol 428
 	variable min_protocol 400
-	variable max_protocol 427
+	variable max_protocol 428
 	variable max_max_protocol 499
 	variable maximum_message_length 61440 
 	variable frag_size 32768
@@ -616,7 +616,7 @@ proc ::gmaproto::_attribute_encode {k v} {
 		TargetedModifiers {
 			return [json::write object {*}[dict map {dk dv} $v {
 				set dv [json::write object {*}[dict map {dkk dvv} $dv {
-					set dvv [::gmaproto::_encode_payload $dvv {Tracer ? Modifiers l Shape s Color s Description s}]
+					set dvv [::gmaproto::_encode_payload $dvv {Tracer ? Modifiers l Shape s Color s Description s Limit i EndAtDeath ?}]
 				}]]
 			}]]
 		}
@@ -2515,6 +2515,8 @@ proc ::gmaproto::json_decode_special {special_type d} {
 						Shape [expr {[dict exists $details Shape] ? [dict get $details Shape] : {O}}]\
 						Color [expr {[dict exists $details Color] ? [dict get $details Color] : {black}}]\
 						Tracer [expr {[dict exists $details Tracer] ? [dict get $details Tracer] : false}]\
+						Limit [expr {[dict exists $details Limit] ? [dict get $details Limit] : 0}]\
+						EndAtDeath [expr {[dict exists $details EndAtDeath] ? [dict get $details EndAtDeath] : false}] \
 						Description [expr {[dict exists $details Description] ? [dict get $details Description] : {}}]
 				}
 			}]

@@ -27,9 +27,9 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.41.1-alpha}     ;# @@##@@
+set GMAMapperVersion {4.41.1-alpha.1}     ;# @@##@@
 set GMAMapperFileFormat {24}        ;# @@##@@
-set GMAMapperProtocol {427}         ;# @@##@@
+set GMAMapperProtocol {428}         ;# @@##@@
 set CoreVersionNumber {6.48}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
@@ -185,6 +185,16 @@ proc begin_progress { id title max args } {
         DEBUG 0 "begin_progress $id: $err"
     }
     return $id
+}
+
+# is a given creature ID one that the player is controlling?
+proc is_mob_me {id} {
+	foreach one_of_mine [my_map_names] {
+		if {[isMobIdentity $one_of_mine $id]} {
+			return true
+		}
+	}
+	return false
 }
 
 # return the list of names this player is controlling, or {} if we don't know.
@@ -3242,7 +3252,7 @@ proc blur_hp {maxhp lethal} {
 }
 
 proc CreateHealthStatsToolTip {mob_id {extra_condition {}}} {
-	global MOBdata
+	global MOBdata is_GM
 	if {$mob_id eq {} || ![info exists MOBdata($mob_id)]} {
 		return {}
 	}
@@ -3251,8 +3261,29 @@ proc CreateHealthStatsToolTip {mob_id {extra_condition {}}} {
 	set conditions {}
 	set has_health_info false
 	set targets {}
+	set t_conditions {}
 	if {[dict exists $MOBdata($mob_id) Targets] && [set targ [dict get $MOBdata($mob_id) Targets]] ne {}} {
 		set targets [format "\nCurrently targeting %s." [join $targ ", "]]
+	}
+	if {($is_GM || [is_mob_me $mob_id]) && [dict exists $MOBdata($mob_id) TargetedModifiers]} {
+		array unset tm_cond_limits
+		dict for {tm_target_name tm_cond} [dict get $MOBdata($mob_id) TargetedModifiers] {
+			append t_conditions "\n>> $tm_target_name: "
+			set first true
+			dict for {tm_cond_name tm_details} $tm_cond {
+				if {$first} {
+					set first false
+				} else {
+					append t_conditions ", "
+				}
+				append t_conditions $tm_cond_name
+				puts "[dict get $tm_details]"
+				if {[dict exists $tm_details Limit] && [set limit [dict get $tm_details Limit]] > 0} {
+					incr tm_cond_limits($tm_cond_name)
+					append t_conditions " ($tm_cond_limits($tm_cond_name) of $limit)"
+				}
+			}
+		}
 	}
 	set dead [dict get $MOBdata($mob_id) Killed]
 
@@ -3390,6 +3421,9 @@ proc CreateHealthStatsToolTip {mob_id {extra_condition {}}} {
 
 	if {$targets ne {}} {
 		append tiptext $targets
+	}
+	if {$t_conditions ne {}} {
+		append tiptext $t_conditions
 	}
 
 	# add conditions
@@ -7721,6 +7755,8 @@ proc RenderSomeone {w id {norecurse false} args} {
 						dashpattern [lindex $dc 0]\
 						description [dict get $d Description]\
 						tracer      [dict get $d Tracer]\
+						endatdeath  [dict get $d EndAtDeath]\
+						limit       [dict get $d Limit]\
 					]
 				} err]} {
 					DEBUG 0 "unable to find custom marker to mark $mob_name with $ccond in profile and I ran into an error trying to get it from the object itself: $err"
@@ -18802,6 +18838,8 @@ proc CustomCondPerson {mob_id condition targeter marker_data} {
 			Color "[dict get $mdata dashpattern][dict get $mdata color]" \
 			Tracer [dict get $mdata tracer] \
 			Description [dict get $mdata description] \
+			EndAtDeath [dict get $mdata endatdeath] \
+			Limit [dict get $mdata limit] \
 		]
 #		DEBUG 0 "d=[dict get $MOBdata($id) TargetedModifiers]"
 	}
