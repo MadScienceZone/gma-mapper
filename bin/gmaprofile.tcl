@@ -250,6 +250,8 @@ array set __marker_shapes {
 				dashpattern s
 				description s
 				tracer ?
+				endatdeath ?
+				limit i
 			}}
 		}}
 	}
@@ -1016,12 +1018,15 @@ array set __marker_shapes {
 
 
 		global marker mods marker_desc marker_shape marker_dash marker_color marker_tracer_en
+		global marker_endatdeath marker_limit
 		set marker_mods {}
 		set marker_desc {}
 		set marker_shape circle
 		set marker_dash {}
 		set marker_color black
 		set marker_tracer_en false
+		set marker_endatdeath false
+		set marker_limit 0
 
 		grid [label $st.m.title -text "Define custom markers you can place on creatures to denote things like studied or smite evil targets, etc."] - -
 		grid [listbox $st.m.markers -yscrollcommand "$st.m.scroll set" -selectmode browse \
@@ -1054,6 +1059,12 @@ Modifier names have a leading slash (like "/super") if global.}
 			-highlightcolor $marker_color -highlightbackground $marker_color -highlightthickness 2 \
 			-command "::gmaprofile::_set_marker_color $st.m $st.m.color"] -row 8 -column 2 -sticky we -padx 1 -pady 1
 		grid [ttk::checkbutton $st.m.tracer -text "Draw tracer line" -onvalue true -offvalue false -variable marker_tracer_en -command "::gmaprofile::_set_marker_tracer $st.m" -state disabled] - -sticky w
+		grid [ttk::checkbutton $st.m.endatdeath -text "Condition ends at target's death" -onvalue true -offvalue false -variable marker_endatdeath -state disabled -command [list ::gmaprofile::_set_marker_endatdeath $st]] - -sticky w
+		grid [ttk::label $st.m.limitlbl -text "Maximum number at once:"] \
+		     [ttk::spinbox $st.m.limit -state disabled -from 0 -to 25 -increment 1 -textvariable marker_limit -width 3] -sticky w
+	     	::tooltip::tooltip $st.m.limit {The condition can only be applied to this many targets at the same time (set to 0 for unlimited number of targets at once).}
+		::tooltip::tooltip $st.m.endatdeath {If checked, the condition is automatically ended if the target dies. (Note that this may not immediately happen in the mapper client.)}
+	     	trace add variable marker_limit write [list ::gmaprofile::_set_marker_limit $st]
 
 		#XXX
 		#XXX modifiers color shape description dashpattern
@@ -1461,6 +1472,8 @@ Modifier names have a leading slash (like "/super") if global.}
 				dashpattern {}\
 				description {}\
 				tracer false\
+				endatdeath false\
+				limit 0\
 			]
 			$w.n.s.n.m.markers selection clear 0 end
 			$w.n.s.n.m.markers selection set end
@@ -1535,6 +1548,36 @@ Modifier names have a leading slash (like "/super") if global.}
 		_select_marker_by_name $st {}
 		dict unset _profile styles markers $srcmarker
 	}
+	proc _set_marker_endatdeath {s} {
+		variable _profile
+		global marker_endatdeath
+		if {[set markername [_selected_marker_name $s.m.markers]] ne {}} {
+			dict set _profile styles markers $markername endatdeath $marker_endatdeath 
+		}
+		return 1
+	}
+
+	proc _set_marker_limit {s args} {
+		# Since this is on a variable trace it can be called earlier than
+		# the GUI is ready for, so we'll be permissive here and not worry
+		# if sometimes we can't succeed with the call. Normally this would
+		# be something I'd sternly lecture my junior devs about not doing,
+		# but I'll indulge myself on this one even though I know I should
+		# clean this up better. The justification is that this is just here
+		# to capture the variable setting in the GUI and it'll eventually do
+		# that anyway. Now why I bothered to write this in the time it would
+		# have taken to make the code do it anyway more gracefully is an
+		# exercise left to the student.
+		catch {
+			variable _profile
+			global marker_limit
+			if {[set markername [_selected_marker_name $s.m.markers]] ne {}} {
+				dict set _profile styles markers $markername limit $marker_limit
+			}
+			return 1
+		}
+	}
+
 	proc _set_marker_mods {st e v} {
 		variable _profile
 		if {[set markername [_selected_marker_name $st.m.markers]] ne {}} {
@@ -1562,7 +1605,7 @@ Modifier names have a leading slash (like "/super") if global.}
 	}
 	proc _push_marker {w name} {
 		variable _profile
-		global marker_mods marker_desc marker_shape marker_dash marker_color marker_tracer_en
+		global marker_mods marker_desc marker_shape marker_dash marker_color marker_tracer_en marker_limit marker_endatdeath
 		if {$name eq {} || ![dict exists $_profile styles markers $name]} {
 			$w.mods configure -state disabled
 			$w.desc configure -state disabled
@@ -1570,12 +1613,16 @@ Modifier names have a leading slash (like "/super") if global.}
 			$w.dash configure -state disabled
 			$w.color configure -state disabled
 			$w.tracer configure -state disabled
+			$w.endatdeath configure -state disabled
+			$w.limit configure -state disabled
 			set marker_mods {}
 			set marker_desc {}
 			set marker_shape O
 			set marker_dash {}
 			set marker_color black
 			set marker_tracer_en false
+			set marker_endatdeath false
+			set marker_limit 0
 			#_draw_marker
 			::gmaprofile::_marker_dashpattern $w {}
 			::gmaprofile::_marker_shape $w O
@@ -1587,7 +1634,9 @@ Modifier names have a leading slash (like "/super") if global.}
 			$w.dash configure -state normal
 			$w.color configure -state normal
 			$w.tracer configure -state normal
-			::gmautil::dassign [dict get $_profile styles markers $name] modifiers mm description marker_desc shape m_shape dashpattern m_dash color marker_color tracer marker_tracer_en
+			$w.endatdeath configure -state normal
+			$w.limit configure -state normal
+			::gmautil::dassign [dict get $_profile styles markers $name] modifiers mm description marker_desc shape m_shape dashpattern m_dash color marker_color tracer marker_tracer_en limit marker_limit endatdeath marker_endatdeath
 			set marker_mods [join $mm ,]
 			::gmaprofile::_marker_dashpattern $w $m_dash $name
 			::gmaprofile::_marker_shape $w $m_shape $name

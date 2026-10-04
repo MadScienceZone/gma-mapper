@@ -1,14 +1,5 @@
 #!/usr/bin/env wish
-# TODO not showing description of custom targets (gm and user)
-# TODO not showing custom target info/desc in target's popup info (gm and user)
-# TODO not updating markers when receiving attributes via OA about ourselves from the outside
-#	(such as upon reconnect)
-# TODO implement tracking in socket lib
-# TODO not OA @<char> NewAttrs TargetedModifiers {<target> {<name> {Modifiers [<list>]}}}
-# TODO we need to track who is targeting who w/conditions
-# TODO if that's us, show those markers
 # DONE make sure that clearing all the targets can transmit a "clear the list to nil" signal that doesn't get cleared to something empty that looks like "there's nothing here to read at all".
-# TODO die roller tracks these in its own handler
 ########################################################################################
 #  _______  _______  _______                ___       ______    _____      _______     #
 # (  ____ \(       )(  ___  ) Game         /   )     / ___  \  / ___ \    / ___   )    #
@@ -27,9 +18,9 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.41.1-alpha}     ;# @@##@@
+set GMAMapperVersion {4.41.1-alpha.1}     ;# @@##@@
 set GMAMapperFileFormat {24}        ;# @@##@@
-set GMAMapperProtocol {427}         ;# @@##@@
+set GMAMapperProtocol {428}         ;# @@##@@
 set CoreVersionNumber {6.48}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
@@ -185,6 +176,16 @@ proc begin_progress { id title max args } {
         DEBUG 0 "begin_progress $id: $err"
     }
     return $id
+}
+
+# is a given creature ID one that the player is controlling?
+proc is_mob_me {id} {
+	foreach one_of_mine [my_map_names] {
+		if {[isMobIdentity $one_of_mine $id]} {
+			return true
+		}
+	}
+	return false
 }
 
 # return the list of names this player is controlling, or {} if we don't know.
@@ -3242,7 +3243,7 @@ proc blur_hp {maxhp lethal} {
 }
 
 proc CreateHealthStatsToolTip {mob_id {extra_condition {}}} {
-	global MOBdata
+	global MOBdata is_GM
 	if {$mob_id eq {} || ![info exists MOBdata($mob_id)]} {
 		return {}
 	}
@@ -3251,8 +3252,29 @@ proc CreateHealthStatsToolTip {mob_id {extra_condition {}}} {
 	set conditions {}
 	set has_health_info false
 	set targets {}
+	set t_conditions {}
 	if {[dict exists $MOBdata($mob_id) Targets] && [set targ [dict get $MOBdata($mob_id) Targets]] ne {}} {
 		set targets [format "\nCurrently targeting %s." [join $targ ", "]]
+	}
+	if {($is_GM || [is_mob_me $mob_id]) && [dict exists $MOBdata($mob_id) TargetedModifiers]} {
+		array unset tm_cond_limits
+		dict for {tm_target_name tm_cond} [dict get $MOBdata($mob_id) TargetedModifiers] {
+			append t_conditions "\n>> $tm_target_name: "
+			set first true
+			dict for {tm_cond_name tm_details} $tm_cond {
+				if {$first} {
+					set first false
+				} else {
+					append t_conditions ", "
+				}
+				append t_conditions $tm_cond_name
+				puts "[dict get $tm_details]"
+				if {[dict exists $tm_details Limit] && [set limit [dict get $tm_details Limit]] > 0} {
+					incr tm_cond_limits($tm_cond_name)
+					append t_conditions " ($tm_cond_limits($tm_cond_name) of $limit)"
+				}
+			}
+		}
 	}
 	set dead [dict get $MOBdata($mob_id) Killed]
 
@@ -3391,6 +3413,9 @@ proc CreateHealthStatsToolTip {mob_id {extra_condition {}}} {
 	if {$targets ne {}} {
 		append tiptext $targets
 	}
+	if {$t_conditions ne {}} {
+		append tiptext $t_conditions
+	}
 
 	# add conditions
 	global MarkerDescription
@@ -3403,6 +3428,7 @@ proc CreateHealthStatsToolTip {mob_id {extra_condition {}}} {
 		}
 	}
 
+	# describe the effects ON the target's token for custom conditions I put on them.
 	foreach for_player [my_map_names] {
 		if {[info exists MOBdata([set myID [GetBaseMobID $for_player]])]} {
 			set my_mob $MOBdata($myID)
@@ -7716,6 +7742,8 @@ proc RenderSomeone {w id {norecurse false} args} {
 						dashpattern [lindex $dc 0]\
 						description [dict get $d Description]\
 						tracer      [dict get $d Tracer]\
+						endatdeath  [dict get $d EndAtDeath]\
+						limit       [dict get $d Limit]\
 					]
 				} err]} {
 					DEBUG 0 "unable to find custom marker to mark $mob_name with $ccond in profile and I ran into an error trying to get it from the object itself: $err"
@@ -18791,12 +18819,47 @@ proc CustomCondPerson {mob_id condition targeter marker_data} {
 		# we don't, so set it now
 #		DEBUG 0 "adding $condition to $mob_name d=[dict get $MOBdata($id) TargetedModifiers]"
 		set mdata [dict get $marker_data $condition]
+		if {[dict exists $mdata limit] && [set limit [dict get $mdata limit]] > 0} {
+			# this has a limited number of applications
+			# have we exceeded it yet?
+			set picklist {}
+			set rmlist {}
+			if {[dict exists $MOBdata($id) TargetedModifiers]} {
+				dict for {tm_target_name tm_cond} [dict get $MOBdata($id) TargetedModifiers] {
+					dict for {tm_cond_name tm_details} $tm_cond {
+						if {[dict exists $tm_details EndAtDeath] && [dict get $tm_details EndAtDeath]} {
+							# if the target is dead, remove this condition
+							if {[info exists MOBdata([set tm_target_mob_id [GetBaseMobID $tm_target_name]])] && [dict get $MOBdata($tm_target_mob_id) Killed]} {
+								lappend rmlist [list $tm_target_name $tm_cond_name]
+								continue
+							}
+						} 
+						if {$tm_cond_name eq $condition} {
+							lappend picklist $tm_target_name
+						}
+					}
+				}
+			}
+			foreach expired_tm $rmlist {
+				dict unset MOBdata($id) TargetedModifiers [lindex $expired_tm 0] [lindex $expired_tm 1]
+				if {[dict size [dict get $MOBdata($id) TargetedModifiers [lindex $expired_tm 0]]] == 0} {
+					dict unset MOBdata($id) TargetedModifiers [lindex $expired_tm 0]
+				}
+			}
+			if {[llength $picklist] >= $limit} {
+				AskWhichConditionsToKeep $id $condition $picklist $limit $mdata $mob_name
+				return
+			}
+		}
+
 		dict set MOBdata($id) TargetedModifiers $mob_name $condition [dict create \
 			Modifiers [dict get $mdata modifiers] \
 			Shape [dict get $mdata shape] \
 			Color "[dict get $mdata dashpattern][dict get $mdata color]" \
 			Tracer [dict get $mdata tracer] \
 			Description [dict get $mdata description] \
+			EndAtDeath [dict get $mdata endatdeath] \
+			Limit [dict get $mdata limit] \
 		]
 #		DEBUG 0 "d=[dict get $MOBdata($id) TargetedModifiers]"
 	}
@@ -18804,6 +18867,76 @@ proc CustomCondPerson {mob_id condition targeter marker_data} {
 	RefreshMOBs
 }
 
+proc AskWhichConditionsToKeep {id condition picklist limit mdata new_name} {
+	set w .awctk
+	if {[winfo exists $w]} {
+		destroy $w
+	}
+	global awctk_en
+	toplevel $w
+	wm title $w "Choose Custom Condition Target(s) to Keep"
+	if {$limit == 1} {
+		set plural {}
+	} else {
+		set plural {s}
+	}
+	grid [label $w.l1 -text "You can only apply the custom condition \"$condition\" to"] -sticky w -columnspan 2
+	grid [label $w.l2 -text "at most $limit target$plural. Which target$plural do you want"] -sticky w -columnspan 2
+	grid [label $w.l3 -text "to have the condition applied to now?"] -sticky w -columnspan 2
+	set btn 0
+	array unset awctk_en
+	foreach name $picklist {
+		grid [ttk::checkbutton $w.n$btn -onvalue true -offvalue false -variable awctk_en($name) -text $name] -sticky w -columnspan 2
+		incr btn
+		set awctk_en($name) true
+	}
+	grid [ttk::checkbutton $w.newbtn -onvalue true -offvalue false -variable awctk_en($new_name) -text $new_name] -sticky w -columnspan 2
+	set awctk_en($new_name) false
+	grid [ttk::button $w.cancel -text Cancel -command [list destroy $w]] \
+	     [ttk::button $w.ok -text OK -command [list _commit_AWCtK $w $id $condition $limit $mdata]]
+}
+	
+proc _commit_AWCtK {w id condition limit mdata} {
+	global MOBdata
+	global awctk_en
+
+	set count 0
+	foreach {name en} [array get awctk_en] {
+		if {$en} {
+			incr count
+		}
+	}
+	if {$count > $limit} {
+		tk_messageBox -type ok -icon error -title "Too many targets selected" \
+			-message "You can't choose more than $limit." -parent $w
+		return
+	}
+
+	foreach {name en} [array get awctk_en] {
+		if {$en} {
+			dict set MOBdata($id) TargetedModifiers $name $condition [dict create \
+				Modifiers [dict get $mdata modifiers] \
+				Shape [dict get $mdata shape] \
+				Color "[dict get $mdata dashpattern][dict get $mdata color]" \
+				Tracer [dict get $mdata tracer] \
+				Description [dict get $mdata description] \
+				EndAtDeath [dict get $mdata endatdeath] \
+				Limit [dict get $mdata limit] \
+			]
+		} else {
+			if {[dict exists $MOBdata($id) TargetedModifiers $name $condition]} {
+				dict unset MOBdata($id) TargetedModifiers $name $condition 
+				if {[dict size [dict get $MOBdata($id) TargetedModifiers $name]] == 0} {
+					dict unset MOBdata($id) TargetedModifiers $name
+				}
+			}
+		}
+	}
+
+	::gmaproto::update_obj_attributes "@[GetMobName $id]" [dict create TargetedModifiers [dict get $MOBdata($id) TargetedModifiers]]
+	RefreshMOBs
+	destroy $w
+}
 
 # dice_preset_data
 #	collapse,<tkey>,<piname> bool
