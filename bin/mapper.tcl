@@ -18,7 +18,7 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.42}     ;# @@##@@
+set GMAMapperVersion {4.42.1-alpha}     ;# @@##@@
 set GMAMapperFileFormat {24}        ;# @@##@@
 set GMAMapperProtocol {428}         ;# @@##@@
 set CoreVersionNumber {6.48}            ;# @@##@@
@@ -14650,7 +14650,13 @@ proc PresetLists {arrayname tkey args} {
 				dict set d DisplaySeq [incr seq]
 			}
 
-			lappend tables $d
+			# reject die roller presets
+			if {[dict get $d DieRoller]} {
+				dict set d DisplayName $pname
+				lappend custom $d
+			} else {
+				lappend tables $d
+			}
 		} elseif {[regexp {^§(.*?);(.*?);(.*?)(?:;([^|]*))?(?:\|(.*))?$} $pname _ sequence varname flags client dname]} {
 			#  _                    _  __     __          ____  __           _ 
 			# | |    ___   ___ __ _| | \ \   / /_ _ _ __ / /  \/  | ___   __| |
@@ -14695,6 +14701,12 @@ proc PresetLists {arrayname tkey args} {
 				dict set d DisplaySeq [incr seq]
 			}
 
+			# reject die roller presets
+			if {[dict get $d DieRoller]} {
+				dict set d DisplayName $pname
+				lappend custom $d
+				continue
+			} 
 			lappend mods $d
 			set u_piname [to_window_id u[dict get $d Name]]
 
@@ -14754,16 +14766,42 @@ proc PresetLists {arrayname tkey args} {
 				dict set d DisplaySeq [incr seq]
 				lappend rolls $d
 			} else {
-				# content before the | can be $[<area>]<sequence><groups>
-				# TODO: actually, it can be more
-				# TODO: can also include [;flags[;client_data]]
 				set nstr [lindex $pieces 0]
+				set flags {}
 				if {[regexp {^(\$\[.*?\])(.*)$} $nstr _ areatag rest]} {
 					set nstr $rest
 					dict set d AreaTag $areatag
 				} else {
 					dict set d AreaTag {}
 				}
+				set nflds [split $nstr ";"]
+				# <sequence><groups>[;<flags>[;<client data>]]
+				if {[llength $nflds] > 1} {
+					set flags [lindex $nflds 1]
+				}
+				if {[llength $nflds] > 2} {
+					dict set d ClientData [lindex $nflds 2]
+				}
+				set nstr [lindex $nflds 0]
+				foreach {flagcode flagname} {
+					e Enabled
+					D DieRoller
+					g Global
+				} {
+					if {[string first $flagcode $flags] >= 0} {
+						dict set d $flagname true
+					} else {
+						dict set d $flagname false
+					}
+				}
+
+				# reject die roller presets
+				if {[dict get $d DieRoller]} {
+					dict set d DisplayName [join [lrange $pieces 1 end] |]
+					lappend custom $d
+					continue
+				}
+
 				if {[llength [set seqparts [split $nstr "\u25B6"]]] > 1} {
 					dict set d Group [join [lrange $seqparts 1 end] "\u25B6"]
 					set nstr [lindex $seqparts 0]
