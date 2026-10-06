@@ -13561,6 +13561,7 @@ proc EditDieRollPresets {for_user tkey {edit_system false}} {
 	     	::tooltip::tooltip $wnm.varp$i "If checked, the modifier is used in place of <var>, otherwise added to all die rolls"
 #		trace add variable dice_preset_data(EDRP_mod_en,$tkey,$i) {array read write unset} TRACEvar
 		set dice_preset_data(EDRP_mod_en,$tkey,$i) [::gmaproto::int_bool [dict get $preset Enabled]]
+		set dice_preset_data(EDRP_mod_dr,$tkey,$i) [::gmaproto::int_bool [dict get $preset DieRoller]]
 #		set dice_preset_data(EDRP_mod_en,$tkey,$i) false
 		set dice_preset_data(EDRP_mod_g,$tkey,$i) [::gmaproto::int_bool [dict get $preset Global]]
 		if {[dict get $preset Variable] eq {}} {
@@ -13901,6 +13902,7 @@ proc EDRPsaveValues {w for_user tkey {system false}} {
 		#      |     |      |      |      ClientData DisplayName
 		#      |     |      |      Global
 		#      |     |      |      Enabled
+		#      |     |      |      DieRoller
 		#      |     Group  Variable
 		#      DisplaySeq
 		set flags {}
@@ -13909,6 +13911,9 @@ proc EDRPsaveValues {w for_user tkey {system false}} {
 		}
 		if {[dict get $p Global]} {
 			append flags g
+		}
+		if {[dict get $p DieRoller]} {
+			append flags D
 		}
 		if {[string is digit -strict [set n [dict get $p DisplaySeq]]] && [scan $n %d nn] == 1} {
 			set n [format "%03d" $nn]
@@ -14116,6 +14121,7 @@ proc EDRPgetValues {w for_user tkey} {
 		dict set d Description [$wnm.desc$i get]
 		dict set d DieRollSpec [$wnm.dspec$i get]
 		dict set d Enabled [::gmaproto::json_bool $dice_preset_data(EDRP_mod_en,$tkey,$i)]
+		dict set d DieRoller [::gmaproto::json_bool $dice_preset_data(EDRP_mod_dr,$tkey,$i)]
 		dict set d Group [$wnm.group$i cget -text]
 		dict lappend dice_preset_data(tmp_presets,$tkey) Modifiers $d
 	}
@@ -14181,6 +14187,8 @@ proc EDRPupdateGUI {w for_user tkey} {
 			$wnm.up$i configure -state normal
 		}
 		$wnm.dn$i configure -state normal
+		set dice_preset_data(EDRP_mod_dr,$tkey,$i) [::gmaproto::int_bool [dict get $p DieRoller]]
+		#TODO
 		incr i
 	}
 	if {$i > 0} {
@@ -14536,7 +14544,7 @@ proc EDRPaddModifier {w for_user tkey} {
 	global dice_preset_data icon_anchor_n icon_anchor_s icon_delete icon_bullet_arrow_right
 	set wnr [sframe content $w.n.r]
 	set wnm [sframe content $w.n.m]
-	set d [dict create Global false Enabled false Variable {} Name {} DisplayName {} DieRollSpec {} DisplaySeq {} Description {} Group {} ClientData {}]
+	set d [dict create Global false Enabled false DieRoller false Variable {} Name {} DisplayName {} DieRollSpec {} DisplaySeq {} Description {} Group {} ClientData {}]
 	dict lappend dice_preset_data(tmp_presets,$tkey) Modifiers $d
 	set i [expr [llength [dict get $dice_preset_data(tmp_presets,$tkey) Modifiers]] - 1]
 	set dice_preset_data(tmp_presets,$tkey,M,$i) $d
@@ -14544,6 +14552,7 @@ proc EDRPaddModifier {w for_user tkey} {
 	set dice_preset_data(EDRP_mod_en,$tkey,$i) 0
 	set dice_preset_data(EDRP_mod_ven,$tkey,$i) 0
 	set dice_preset_data(EDRP_mod_g,$tkey,$i) 0
+	set dice_preset_data(EDRP_mod_dr,$tkey,$i) 0
 	grid [button $wnm.gbtn$i -image $icon_bullet_arrow_right -command [list EditDRPGroup $wnm.group$i "Groups for Modifier #$i"]] \
 	     [label $wnm.group$i -text {}] \
 	     [ttk::checkbutton $wnm.en$i -text On -onvalue 1 -offvalue 0 -variable dice_preset_data(EDRP_mod_en,$tkey,$i)] \
@@ -14614,6 +14623,7 @@ proc PresetLists {arrayname tkey args} {
 			dict set d ClientData $client
 			foreach {flagcode flagname} {
 				m Markup
+				D DieRoller
 			} {
 				if {[string first $flagcode $flags] >= 0} {
 					dict set d $flagname true
@@ -14658,6 +14668,7 @@ proc PresetLists {arrayname tkey args} {
 			foreach {flagcode flagname} {
 				e Enabled
 				g Global
+				D DieRoller
 			} {
 				if {[string first $flagcode $flags] >= 0} {
 					dict set d $flagname true
@@ -14693,7 +14704,7 @@ proc PresetLists {arrayname tkey args} {
 					([string length $varname] == 1 ||
 					[string is alnum -strict [string range $varname 1 end]])} {
 						#
-						# Varible
+						# Variable
 						#
 						set DieRollPresetState($tkey,var,$varname) [dict get $d DieRollSpec]
 						if {[info exists dice_preset_data(en,$tkey,v:$varname)]} {
@@ -14702,6 +14713,7 @@ proc PresetLists {arrayname tkey args} {
 							set DieRollPresetState($tkey,on,v:$varname) [::gmaproto::json_bool [dict get $d Enabled]]
 						}
 						set DieRollPresetState($tkey,g,$varname) false
+						set DieRollPresetState($tkey,dr,$varname) [::gmaproto::json_bool [dict get $d DieRoller]]
 					} else {
 						DEBUG 0 "Invalid modifier variable name <$varname>. This variable will be ignored."
 						DEBUG 0 "Variables must begin with a letter and include only letters and numbers."
@@ -14723,6 +14735,7 @@ proc PresetLists {arrayname tkey args} {
 						lappend DieRollPresetState($tkey,apply_order) u$id
 					}
 					set DieRollPresetState($tkey,g,u$id) [dict get $d Global]
+					set DieRollPresetState($tkey,dr,u$id) [dict get $d DieRoller]
 				}
 			}
 		} else {
@@ -14742,6 +14755,8 @@ proc PresetLists {arrayname tkey args} {
 				lappend rolls $d
 			} else {
 				# content before the | can be $[<area>]<sequence><groups>
+				# TODO: actually, it can be more
+				# TODO: can also include [;flags[;client_data]]
 				set nstr [lindex $pieces 0]
 				if {[regexp {^(\$\[.*?\])(.*)$} $nstr _ areatag rest]} {
 					set nstr $rest
@@ -14792,6 +14807,7 @@ proc PresetLists {arrayname tkey args} {
 			dict set d ClientData $client
 			foreach {flagcode flagname} {
 				m Markup
+				D DieRoller
 			} {
 				if {[string first $flagcode $flags] >= 0} {
 					dict set d $flagname true
@@ -14836,6 +14852,7 @@ proc PresetLists {arrayname tkey args} {
 			foreach {flagcode flagname} {
 				e Enabled
 				g Global
+				D DieRoller
 			} {
 				if {[string first $flagcode $flags] >= 0} {
 					dict set d $flagname true
@@ -14875,6 +14892,7 @@ proc PresetLists {arrayname tkey args} {
 						} else {
 							set DieRollPresetState(sys,gvar_on,$varname) [dict get $d Enabled]
 						}
+						set DieRollPresetState(sys,gvar_dr,$varname) [dict get $d DieRoller]
 					} else {
 						DEBUG 0 "Invalid modifier variable name <$varname>. This variable will be ignored."
 						DEBUG 0 "Variables must begin with a letter and include only letters and numbers."
@@ -14892,6 +14910,7 @@ proc PresetLists {arrayname tkey args} {
 					}
 					set DieRollPresetState($tkey,g,g$id) [dict get $d Global]
 					lappend DieRollPresetState($tkey,apply_order) g$id
+					set DieRollPresetState($tkey,dr,g$id) [dict get $d DieRoller]
 				}
 			}
 		} else {
@@ -18248,6 +18267,7 @@ proc SyncPresetDetailFlags {d} {
 	if [dict get $d enabled] { dict lappend d flags e }
 	if [dict get $d global] { dict lappend d flags g }
 	if [dict get $d markup] { dict lappend d flags m }
+	if [dict get $d dieroller] { dict lappend d flags D }
 	return $d
 }
 
@@ -18256,7 +18276,10 @@ proc GetPresetDetails {p} {
 		client {} \
 		delim {} \
 		description [dict get $p Description] \
+		dictdata {} \
+		dictvalid false \
 		dieroll [dict get $p DieRollSpec] \
+		dieroller false \
 		enabled false \
 		flags {} \
 		global false \
@@ -18328,13 +18351,37 @@ proc GetPresetDetails {p} {
 				}
 				dict set d table $tbl
 			}
+		} elseif {[string range $name 0 0] eq "\u00a9"} {
+			# JSON data
+			dict set d type dict
+			set flds [split [string range $name 0 $baridx-1] ";"]
+			if {[llength $flds] > 1} {
+				set flags [lindex $flds 1]
+			}
+			if {[llength $flds] > 2} {
+				set client [lindex $flds 2]
+			}
+			if {[catch {
+				dict set d dictdata [json::json2dict [dict get $d DieRollSpec]]
+			}]} {
+				dict set d dictvalid false
+			} else {
+				dict set d dictvalid true
+			}
 		} else {
 			set flds [split [string range $name 0 $baridx-1] ";"]
+			if {[llength $flds] > 1} {
+				set flags [lindex $flds 1]
+			}
+			if {[llength $flds] > 2} {
+				set client [lindex $flds 2]
+			}
 		}
 
 		if {[lsearch $flags e] >= 0} {dict set d enabled true}
 		if {[lsearch $flags g] >= 0} {dict set d global true}
 		if {[lsearch $flags m] >= 0} {dict set d markup true}
+		if {[lsearch $flags D] >= 0} {dict set d dieroller true}
 
 		set groups [split [lindex $flds 0] "\u25B6"]
 		dict set d seq [lindex groups 0]
