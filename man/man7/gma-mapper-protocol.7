@@ -2699,15 +2699,20 @@ Clients MAY include optional
 .I flags
 and
 .I client_data
-fields delimited semicolons following the sequence value (e.g.,
+fields delimited by semicolons following the sequence value (e.g.,
 .RB \*(lq 042;b|example \*(rq). 
 This contains a number of single-character flags.
-The following flag is currently recognized:
+The following flags are currently recognized:
 .RS
 '\" <<list>>
 .TP
 .B b
 Send the die roll blindly to the GM only.
+'\" <<New>>
+.TP
+.B D
+This preset belongs to the stand-alone die roller.
+'\" <</New>>
 .LP
 This means the full definition of the simple preset name is:
 .LP
@@ -2743,8 +2748,12 @@ For example:
 The
 .I flags
 are up to the client to interpret, but we RECOMMEND the flag
+'\" <<New>>
+.RB \*(lq D \*(rq
+to mean the modifier or variable belongs to the stand-alone die roller,
+'\" <</New>>
 .RB \*(lq e \*(rq
-to mean the value should be enabled (or \*(lqon\*(rq) by default
+to mean the value should be enabled (or \*(lqon\*(rq) by default,
 and
 .RB \*(lq g \*(rq
 to mean the die-roll expression to the left of it should be grouped together in parentheses.
@@ -2816,7 +2825,12 @@ is up to the client to manage. Currently the defined flags are:
 '\" <<list>>
 .TP
 .B b
-The die rolls should be send blindly to the GM only.
+The die rolls should be sent blindly to the GM only.
+'\" <<New>>
+.TP
+.B D
+The table belongs to the stand-alone die roller.
+'\" <</New>>
 .TP
 .B m
 the table's text may include GMA markup formatting codes
@@ -5233,7 +5247,7 @@ This provides the maximum
 known to the server. From this point forward, new messages arriving
 to the client will have IDs larger than this, but if the client happened
 to be holding information relating to any such message at the 
-time this message is received, it SHOULD be
+time this message is received, it MUST be
 discarded by the client since it can't refer to any message currently
 in play from the server's point of view, and will conflict with new
 messages which will have that ID in the future.

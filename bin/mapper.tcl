@@ -14325,6 +14325,7 @@ proc EDRTtblSave {rw tkey i wfld} {
 		return
 	}
 
+	set sort_table false
 	for {set r 0} {$r < $limit} {incr r} {
 		set v $dice_preset_data(tmp_presets,$tkey,T,$i,v$r)
 		set t $dice_preset_data(tmp_presets,$tkey,T,$i,t$r)
@@ -14348,13 +14349,30 @@ proc EDRTtblSave {rw tkey i wfld} {
 		}
 		if {$r == 0} {
 			set last $v
-		} elseif {$r < $lastidx && $v <= $last} {
-			tk_messageBox -parent $rw -type ok -icon error -title "Invalid table data" \
+		} elseif {$r < $lastidx && $v <= $last && !$sort_table} {
+			if {[tk_messageBox -parent $rw -type yesno -icon error -title "Invalid table data" \
 				-message "This table contains errors. Correct the problem before saving the table." \
-				-detail "The values in the left column must be increasing in order as you go down the table. In this case, the value $v appears after the value $last."
-			return
+				-detail "The values in the left column must be increasing in order as you go down the table. In this case, the value $v appears after the value $last. Would you like to fix this automatically by sorting all the rows of the table? selecting YES will re-sort the rows in order. Selecting NO will abort the save operation and allow you to continue editing the table yourself."] ne "yes"} {
+				return
+			}
+			set sort_table true
 		}
 		lappend newtable $v $t
+	}
+	if {$sort_table} {
+		array unset newtable_tmp
+		foreach {idx text} $newtable {
+			if {$idx ne "*"} {
+				set newtable_tmp($idx) $text
+			} else {
+				set last_text $text
+			}
+		}
+		set newtable {}
+		foreach idx [lsort -integer [array names newtable_tmp]] {
+			lappend newtable $idx $newtable_tmp($idx)
+		}
+		lappend newtable * $last_text
 	}
 	dict set dice_preset_data(tmp_presets,$tkey,T,$i,d) table $newtable
 	dict set dice_preset_data(tmp_presets,$tkey,T,$i,d) markup $dice_preset_data(tmp_presets,$tkey,T,$i,m)
