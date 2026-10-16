@@ -1,5 +1,5 @@
 '\" t
-'\" *** 428 ***
+'\" *** 429 ***
 '\" <<ital-is-var>>
 .TH GMA-MAPPER-PROTOCOL 7 "GMA-Mapper 4.42" 04-Oct-2026 "Protocols" \" @@mp@@
 .SH NAME
@@ -79,7 +79,7 @@ be implemented to wait synchronously for a server
 response during the authentication negotiation stage.
 .LP
 '\" <</bold-is-fixed>>
-.B "This describes protocol version 428."
+.B "This describes protocol version 429."
 '\" <<bold-is-fixed>>
 These notes are intended to be 
 detailed enough to implement a client from and should be considered
@@ -371,6 +371,50 @@ To mitigate these cases, the server implements a data continuation protocol whic
 into multiple \*(lqbatches\*(rq and sent separately then reassembled on the other end. These fragments are each sent inside the payload of
 .B BATCH
 messages (see below).
+'\" <<New>>
+.SS "Subfield Encoding"
+.LP
+Certain protocol subfields may need protection from their contents being confused with
+surrounding delimiter text or other content, and as such may need to be encoded using
+an alternative character representation scheme. Clients MAY choose whether or not
+to encode the field on a case-by-case basis, rather than always doing so, to
+preserve readability of the data in transit to aid in debugging and to reduce data transfer
+volume.
+.LP
+Only fields which explicitly say they support this feature do so (this was added with protocol
+version 429, so most do not unless they were later changed to use it). To remain backward-compatible
+with older clients which may not have yet started adopting this scheme (albeit imperfectly\(emthe only
+recommended implementation which is compliant with this specification is to accurately follow this
+encoding scheme for all fields which say they support it), any such field with no encoding specifier
+at all is considered by default not to be encoded.
+.LP
+The first character is the encoding specifier and indicates how to interpret the remaining characters
+of the subfield:
+'\" <<list>>
+.TP
+.B \[u2298]
+(U+2298)
+No encoding. The remaining text should be interpreted as-is.
+.TP
+.B \[u229A] 
+(U+229A)
+URL encoding. The sequence
+.BI % xx
+represents the 8-bit value
+.I xx
+in hexadecimal, with a guarantee that spaces, semicolons, and vertical bars will not appear in the
+text (at a minimum). Spaces may appear either as
+.B %20
+or as
+.B +
+(as a special case).
+.TP
+.B \[u229B] 
+(U+229B)
+The text is encoded using base 64, with a guarantee that spaces, semicolons, and vertical bars will not
+appear in the text (at a minimum).
+'\" <</>>
+'\" <</New>>
 .SS "Command Details"
 .LP
 The client/server messages and their parameters are detailed below, ordered by the server
@@ -2800,7 +2844,9 @@ Stored tables MAY be stored as a die-roll preset with a
 field in the format
 .RS
 .LP
-.BI # sequence ; flags \fR[\fP; client \fR]\fP| tblname
+'\" <<New>>
+.BI # sequence ; flags \fR[\fP; client \fR[\fP; format \fR]]\fP| tblname
+'\" <</New>>
 .LP
 and the
 .B DieRollSpec
@@ -2860,6 +2906,38 @@ the values in the lookup table until a value is found that is greater than or eq
 .RB \*(lq * \*(rq
 value is reached, whereupon the corresponding text string is displayed by the client to the user in some
 appropriate fashion. Clients SHOULD transmit this result to other clients via a TO message.
+'\" <<New>>
+.LP
+If the
+.I client
+and/or
+.I format
+subfields are present, they are subfield-encoded (see note above).
+.LP
+The Format subfield provides a custom presentation for the table lookup result message to be sent as the chat message
+when the die result is received back. The pseudo-variable
+.B $#
+(which may also be written
+.BR ${#} )
+is replaced with the text from the table lookup, and
+.B $_
+.RB ( ${_} )
+with the numeric die-roll result itself.
+Other text in the format subfield is sent as-is, unless enclosed in square brackets. Text in square brackets is
+interpreted as a die-roll expression and is evaluated as such, the result of which is then sent in the chat
+message. If a single pair of brackets is used, the die roll is made using a local library call. If double
+square brackets are used (e.g.,
+.BR "[[1d6]]" )
+or the user is not the GM and is connected to the game server, then the die roll is sent to the game server
+to be rolled. If enclosed in 
+.BR [[? ... ]]
+brackets, then the roll is sent \*(lqblind\*(rq to the GM.
+.LP
+So for example, a format string for a table lookup related to pulling a random card from a deck might be
+.RB \*(lq "Pulled $# from the deck." \*(rq
+If you want to add another die roll to see if the card was drawn upside-down, you could add that:
+.RB \*(lq "Drew $#, [[50% inverted]]" \*(rq.
+'\" <</New>>
 .RE
 .TP
 5.
@@ -5270,8 +5348,11 @@ Steve Willoughby / steve@madscience.zone;
 John Mechalas (elevation and movement modes).
 .SH HISTORY
 .LP
-This document defines map protocol version 428,
-which enhances the definition of the
+This document defines map protocol version 429,
+which adds the subfield encoding option and adds the format fields to table die-roll presets.
+.LP
+Protocol 428
+enhanced the definition of the
 .B TargetedModifiers
 attribute to have additional fields
 .B Limit
