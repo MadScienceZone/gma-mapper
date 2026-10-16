@@ -2527,6 +2527,31 @@ proc ::gmaproto::json_decode_special {special_type d} {
 	}
 }
 
+proc ::gmaproto::subfield_encode {en data} {
+	switch -exact -- $en {
+		url {
+			return "\u229a[::http::quoteString $data]"
+		}
+		base64 {
+			return "\u229b[binary encode base64 $data]"
+		}
+	}
+	return "\u2298$data"
+}
+
+proc ::gmaproto::subfield_decode {data} {
+	if {[string length $data] == 0} {
+		return ""
+	}
+	switch -exact -- [string range $data 0 0] {
+		"\u2298" { return [string range $data 1 end] }
+		"\u229a" { return [::ncgi::decode [string range $data 1 end]] }
+		"\u229b" { return [binary decode base64 [string range $data 1 end]] }
+	}
+	error "unrecognized subfield format specifier code"
+}
+
+
 # @[00]@| GMA-Mapper 4.42
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2026 by Steven L. Willoughby (AKA MadScienceZone)
