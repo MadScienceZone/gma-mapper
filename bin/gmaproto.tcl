@@ -54,6 +54,7 @@ package require json 1.3.3
 package require json::write 1.0.3
 package require base64 2.4.2
 package require uuid 1.0.1
+package require ncgi 1.4.4
 
 namespace eval ::gmaproto {
 	variable protocol 428
@@ -2527,16 +2528,45 @@ proc ::gmaproto::json_decode_special {special_type d} {
 	}
 }
 
-proc ::gmaproto::subfield_encode {en data} {
+proc ::gmaproto::subfield_encode {data {en *}} {
+	if {$en eq "*"} {
+		# automatically select encoding mode
+		if {![string is ascii $data]} {
+			# string isn't fully 7-bit ASCII, so fall back to
+			# encoding in base64 so we could represent any binary
+			# data at all
+			set en base64
+		} elseif {![string is graph $data]} {
+			# string isn't entirely non-space printable characters
+			# either, so we should protect it with URL encoding to
+			# protect things like spaces, possibly other delimeters
+			# and control characters etc
+			set en url
+		} elseif {[string match {*[;|]*} $data]} {
+			# string has either ; or | character(s) in it so use simple encoding
+			set en simple
+		} else {
+			set en none
+		}
+	}
+
 	switch -exact -- $en {
+		none {
+			return "\u2298$data"
+		}
 		url {
-			return "\u229a[::http::quoteString $data]"
+			return "\u229a[::ncgi::encode $data]"
 		}
 		base64 {
 			return "\u229b[binary encode base64 $data]"
 		}
+		simple {
+			return "\u229c[string map {; @/ | @! { } @+ @ @@} $data]"
+		}
+		default {
+			error "unrecognized subfield format specifier \"$en\" requested for subfield_encode"
+		}
 	}
-	return "\u2298$data"
 }
 
 proc ::gmaproto::subfield_decode {data} {
@@ -2547,6 +2577,7 @@ proc ::gmaproto::subfield_decode {data} {
 		"\u2298" { return [string range $data 1 end] }
 		"\u229a" { return [::ncgi::decode [string range $data 1 end]] }
 		"\u229b" { return [binary decode base64 [string range $data 1 end]] }
+		"\u229c" { return [string map {@/ ; @! | @+ { } @@ @} [string range $data 1 end]] }
 	}
 	error "unrecognized subfield format specifier code"
 }

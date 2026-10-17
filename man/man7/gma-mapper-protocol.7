@@ -413,7 +413,33 @@ or as
 (U+229B)
 The text is encoded using base 64, with a guarantee that spaces, semicolons, and vertical bars will not
 appear in the text (at a minimum).
+.TP
+.B \[u229C]
+(U+229C)
+The text is encoded using a simple minimalist encoding which is designed to only protect the basic
+subfield syntax typically used and be very fast to encode and decode. It employs but four string
+replacements:
+'\" <<list>>
+.RS
+.TP 6
+.B ;
+.B @/
+.TP
+.B |
+.B @!
+.TP
+space
+.B @+
+.TP
+.B @
+.B @@
 '\" <</>>
+'\" <</>>
+.RE
+.LP
+To be as efficient and transparent (i.e., debuggable) as possible, clients SHOULD prefer an encoding scheme
+in this order: none, simple, URL, base64; taking the first one in the list which is sufficient to protect the
+field's current data.
 '\" <</New>>
 .SS "Command Details"
 .LP
