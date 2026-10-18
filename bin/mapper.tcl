@@ -12340,6 +12340,7 @@ proc DisplayDieRoll {d args} {
 			}
 			set attrib "$from "
 		}
+		# TODO handle format field
 		if {$tbl ne {}} {
 			foreach {v t} [dict get $tbl table] {
 				if {$v eq "*" || $result <= $v} {
@@ -13363,14 +13364,17 @@ proc EditDieRollPresets {for_user tkey {edit_system false}} {
 				if {$ti == 0} {
 					$w.n tab $tabid(GlobalTables) -state normal
 					grid [label $wngt.tg -text Group] [label $wngt.t0 -text Name] \
-						[label $wngt.t1 -text Description] [label $wngt.t2 -text {Die Roll}] \
-						[label $wngt.t3 -text Table] -sticky we
+						[label $wngt.t1 -text Description] \
+						[label $wngt.t2 -text Format] \
+						[label $wngt.t3 -text {Die Roll}] \
+						[label $wngt.t4 -text Table] -sticky we
 				}
 
 
 				grid [label $wngt.group$ti -text [join [dict get $pd group] "\u25B6"]] \
 					[label $wngt.name$ti -text [dict get $pd name] -anchor w -relief groove] \
 					[label $wngt.desc$ti -text [dict get $pd description] -anchor w -relief groove] \
+					[label $wngt.format$ti -text [dict get $pd format] -anchor w -relief groove] \
 					[label $wngt.dieroll$ti -text [dict get $pd dieroll] -anchor w -relief groove] \
 					[frame $wngt.table$ti] \
 					-sticky we
@@ -13446,6 +13450,7 @@ proc EditDieRollPresets {for_user tkey {edit_system false}} {
 			[label $wnt.group$i -text $pgroup] \
 			[entry $wnt.name$i] \
 			[entry $wnt.desc$i] \
+			[entry $wnt.format$i] \
 			[entry $wnt.dspec$i] \
 			[button $wnt.edit$i -image $icon_pencil -command [list EDRTtbl $wnt.tbl$i $tkey $i "Table #$i"]] \
 			[frame $wnt.tbl$i] \
@@ -13454,6 +13459,7 @@ proc EditDieRollPresets {for_user tkey {edit_system false}} {
 		set dice_preset_data(tmp_presets,$tkey,T,$i,d) [set details [GetPresetDetails $preset]]
 		$wnt.name$i insert 0 [dict get $details name]
 		$wnt.desc$i insert 0 [dict get $details description]
+		$wnt.format$i insert 0 [dict get $details format]
 		$wnt.dspec$i insert 0 [dict get $details dieroll]
 		set ti 0
 		set istart 1
@@ -19096,3 +19102,14 @@ proc _commit_AWCtK {w id condition limit mdata} {
 #	_apply_die_roll_mods
 #	_apply_die_roll_variables
 # [x] receiving OA signal to update TargetedModifiers doesn't affect visible display
+#
+# GetPresetDetails	- add format key to returned value for tables
+# SyncPresetDetailFlags
+# EncodePresetDetails
+# SearchForPreset
+# PresetLists
+# SendDieRoll
+# EDRTadd
+# EDRTtblSave
+# EDRTdel when nothing was entered: Description not known in dictionary
+# 	dict get $t Description
