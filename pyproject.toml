@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gma-mapper"
+version = "5.0.0a1"
+description = "GMA Virtual Tabletop Battle Map Client (Python + PySide6)"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Steven L. Willoughby", email = "steve@madscience.zone" }
+]
+dependencies = [
+    "PySide6>=6.6.0",
+    "httpx>=0.27.0",
+    "cryptography>=42.0.0",
+]
+
+[project.optional-dependencies]
+sftp = ["paramiko>=3.4.0"]
+dev = [
+    "pytest>=8.0.0",
+    "pyinstaller>=6.0.0",
+]
+
+[project.scripts]
+gma-mapper = "gma_mapper.__main__:main"
+
+[project.gui-scripts]
+gma-mapper-gui = "gma_mapper.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+

@@ -1,0 +1,57 @@
+name: Build GMA Mapper Executables
+
+on:
+  push:
+    branches: [ develop, python-port, main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ develop, main ]
+  workflow_dispatch:
+
+jobs:
+  test-and-build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact_name: gma-mapper-linux-x86_64
+            binary_path: dist/gma-mapper
+          - os: windows-latest
+            artifact_name: gma-mapper-windows-x86_64.exe
+            binary_path: dist/gma-mapper.exe
+          - os: macos-latest
+            artifact_name: gma-mapper-macos
+            binary_path: dist/gma-mapper
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]" pyinstaller
+
+      - name: Run unit tests
+        run: |
+          python -m unittest discover -s tests -v
+
+      - name: Build standalone executable with PyInstaller
+        run: |
+          pyinstaller --clean --noconfirm gma-mapper.spec
+
+      - name: Upload executable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.binary_path }}
+
