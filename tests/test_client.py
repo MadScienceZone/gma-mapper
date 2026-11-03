@@ -4,7 +4,7 @@ import base64
 import unittest
 from typing import Any
 
-from gma_mapper.net.client import ProtocolSession
+from gma_mapper.net.client import GMANetworkClient, ProtocolSession
 
 
 class TestProtocolSession(unittest.TestCase):
@@ -115,6 +115,36 @@ class TestProtocolSession(unittest.TestCase):
         session.receive_line('REDIRECT {"Host":"backup.example.com","Port":2325,"Reason":"failover"}')
         self.assertEqual(redirects[-1], ("backup.example.com", 2325, "failover"))
         self.assertTrue(session.pending_login)
+
+    def test_network_client_ready_read_qbytearray(self) -> None:
+        if GMANetworkClient is None:
+            self.skipTest("QtNetwork not available")
+
+        from PySide6.QtCore import QByteArray, QCoreApplication
+
+        _ = QCoreApplication.instance() or QCoreApplication([])
+
+        client = GMANetworkClient()
+        client.session.is_connected = True
+        received_commands: list[str] = []
+        client.session.dispatch_cb = lambda cmd, payload: received_commands.append(cmd)
+
+        class MockSocket:
+            def __init__(self, chunks: list[bytes]) -> None:
+                self._chunks = chunks
+
+            def readAll(self) -> QByteArray:
+                if self._chunks:
+                    return QByteArray(self._chunks.pop(0))
+                return QByteArray()
+
+        client._socket = MockSocket([b"PROTOCOL 428\nREADY\n", b"MARK {\"X\":10.0}\n"])  # type: ignore[assignment]
+        client._on_ready_read()
+        self.assertEqual(client.session.protocol, 428)
+        self.assertTrue(client.session.is_ready())
+
+        client._on_ready_read()
+        self.assertIn("MARK", received_commands)
 
 
 if __name__ == "__main__":

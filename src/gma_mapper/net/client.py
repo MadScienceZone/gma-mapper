@@ -704,7 +704,7 @@ try:
         def _on_ready_read(self) -> None:
             if not self._socket:
                 return
-            chunk = bytes(self._socket.readAll())
+            chunk = bytes(self._socket.readAll().data())
             if not chunk:
                 return
             self._read_buffer.extend(chunk)
