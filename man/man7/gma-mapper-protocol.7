@@ -813,7 +813,7 @@ Every time an
 .B ALLOW
 command is given, it resets the entire set of features, rather than 
 adding to them.
-Currently, the following one features are recognized:
+Currently, the following features are recognized:
 .RS
 '\" <<list>>
 .TP
@@ -1081,42 +1081,6 @@ message. The base-64 encoding is for each individual
 message; it is the underlying binary bytes that are then concatenated when
 the completed batch is received that will result in the reconstruction of
 the original JSON payload again.
-'\" <</>>
-'\" <<ital-is-var>>
-'\".LP
-'\".LP
-'\"For example, the single server message
-'\".na
-'\".nf
-'\".ft C
-'\"CONN {"PeerList": [{"Addr": "10.10.10.1 1234", "User": "Alice", "Client": 
-'\""mapper 1.23.45"}, {"Addr": "10.10.10.2 1235", "User": "Bob", "Client": 
-'\""mapper 1.23.45"}, {"Addr": "10.10.10.3 1236", "User": "Charlie", "Client": 
-'\""mapper 1.23.45"}]}
-'\".ft
-'\".ad
-'\".fi
-'\".LP
-'\"Is semantically equivalent to the set of server messages
-'\".na
-'\".nf
-'\".ft C
-'\"BATCH {"ID": "b1a6ebdc", "Batch": 0, "Total": 5, "Data":
-'\""eyJQZWVyTGlzdCI6IFt7IkFkZHIiOiAiMTAuMTAuMTAuMSAxMjM0IiwgIlVzZXIi"}
-'\"BATCH {"ID": "b1a6ebdc", "Batch": 1, "Total": 5, "Data":
-'\""OiAiQWxpY2UiLCAiQ2xpZW50IjoibWFwcGVyIDEuMjMuNDUifSwgeyJBZGRyIjogI"}
-'\"BATCH {"ID": "b1a6ebdc", "Batch": 2, "Total": 5, "Data":
-'\""jEwLjEwLjEwLjIgMTIzNSIsICJVc2VyIjogIkJvYiIsICJDbGllbnQiOiJtYXBwZX"}
-'\"BATCH {"ID": "b1a6ebdc", "Batch": 3, "Total": 5, "Data":
-'\""IgMS4yMy40NSJ9LCB7IkFkZHIiOiAiMTAuMTAuMTAuMyAxMjM2IiwgIlVzZXIiOiA"}
-'\"BATCH {"ID": "b1a6ebdc", "Batch": 4, "Total": 5, "Data":
-'\""iQ2hhcmxpZSIsICJDbGllbnQiOiJtYXBwZXIgMS4yMy40NSJ9XX0="}
-'\".ft
-'\".ad
-'\".fi
-'\".LP
-'\"(Obviously in practice you wouldn't break them into such tiny fragments; this
-'\"was done here for simplicity of illustration.)
 .LP
 Clients and servers SHOULD use this method to break up large messages. They MUST not send message payloads which
 would exceed 60K (i.e., 60\(mu1024) total bytes, including command name, spaces, and terminating newline.
@@ -1672,7 +1636,7 @@ If true, this creature may be a companion.
 .BI "IsUnique " (bool)
 If true, there is only one of this creature in existence.
 .TP
-.B AgeCagetory
+.B AgeCatetory
 The age category for the creature.
 .TP
 .B Gender
@@ -3354,7 +3318,7 @@ client in regard to this request will reference this same ID. A UUID string
 is suggested for this value.
 .TP
 '\" <</ital-is-var>>
-.BI Healh " (object)"
+.BI Health " (object)"
 The health object values you wish to set. If this is
 .BR null ,
 no changes are requested. Otherwise, the only values which will be considered
@@ -3404,7 +3368,7 @@ The time remaining until the temporary hit points expire, in the same format as
 for the
 .B Expires
 field in the
-.B TMREQ
+.B TMRQ
 message (q.v.).
 '\" <</>>
 .RE
@@ -3941,6 +3905,13 @@ Status check. If received, reply with a
 command.
 Clients MUST NOT send this command.
 .RS
+'\" <<New>>
+.LP
+The server MUST NOT send this until after normal operation mode has started
+(after it has sent the
+.B READY
+message to the client).
+'\" <</New>>
 .LP
 '\" <</bold-is-fixed>>
 .B N.B.
