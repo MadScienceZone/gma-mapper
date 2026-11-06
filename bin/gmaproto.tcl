@@ -481,12 +481,12 @@ proc ::gmaproto::_protocol_send {command args} {
 }
 proc ::gmaproto::_protocol_send_d {command dargs} {
 	set packet [::gmaproto::_protocol_encode $command $dargs]
-	if {[string length $packet] > $::gmaproto::maximum_message_length} {
+	if {[string bytelength $packet] > $::gmaproto::maximum_message_length} {
 		::gmaproto::DEBUG "$command packet length [string length $packet] exceeds maximum $::gmaproto::maximum_message_length"
 		if {[set delim [string first " " $packet]] < 0} {
 			error "malformed outgoing $command data packet (can't find delimiter)"
 		}
-		set blob [string range $packet $delim+1 end]
+		set blob [encoding convertto utf-8 [string range $packet $delim+1 end]]
 		set total_batches [expr [string length $blob] / $::gmaproto::frag_size]
 		if {([string length $blob] % $::gmaproto::frag_size) != 0} {
 			incr total_batches
@@ -1778,7 +1778,7 @@ proc ::gmaproto::_read_poll {} {
 				#::gmaproto::DEBUG "data now $data"
 			}
 			array unset ::gmaproto::_batch_storage $batch_group,*
-			set res [::gmaproto::_parse_data_packet "$cmd $data"]
+			set res [::gmaproto::_parse_data_packet "$cmd [encoding convertfrom utf-8 $data]"]
 			if {[lindex $res 0] eq {NIL}} {
 				::gmaproto::DEBUG "unable to restore command; got NIL"
 				return [list "" ""]
