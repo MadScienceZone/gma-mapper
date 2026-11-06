@@ -3,7 +3,7 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.42          <!-- @@##@@ -->
+ * This Package Version: 4.42.1-alpha          <!-- @@##@@ -->
  * Effective Date: 04-Oct-2026               <!-- @@##@@ -->
 
 ## Compatibility
@@ -16,6 +16,12 @@
 The support for old server protocols (<400) has ended.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# v4.42.1 (unreleased)
+## Fixes
+ * Corrects a bug in the handling of batched packets which contained multibyte Unicode characters.
+ * Now allows insertion of new die-roller table rows arbitrarily instead of only appending to the bottom.
+ * Corrects typos in the protocol spec document.
 
 # v4.42
 ## Adds
