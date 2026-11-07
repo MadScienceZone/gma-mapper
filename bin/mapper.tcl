@@ -12739,11 +12739,9 @@ $w.$i.extra configure -width [expr max(3,[string length [lindex [lindex $dice_pr
 				if {$scroll_to_y eq "*"} {
 					set scroll_to_y [$preset_scroller_base.vs get]
 				}
-				puts ":::: -view option from $args: preset=$preset_scroller_base, x=$scroll_to_x, y=$scroll_to_y"
 			} else {
 				set scroll_to_x {}
 				set scroll_to_y {}
-				puts ":::: no -view option"
 			}
 
 			global icon_bullet_arrow_down
