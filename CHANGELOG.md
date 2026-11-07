@@ -22,6 +22,7 @@ versions.
  * Corrects a bug in the handling of batched packets which contained multibyte Unicode characters.
  * Now allows insertion of new die-roller table rows arbitrarily instead of only appending to the bottom.
  * Corrects typos in the protocol spec document.
+ * Scrollbars on the die-roll preset pane stay put when die roll presets are updated instead of resetting the view to the top.
 
 # v4.42
 ## Adds
