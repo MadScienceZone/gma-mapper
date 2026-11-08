@@ -724,6 +724,31 @@ except ImportError:
             elif obj_id in self.elements:
                 self.elements[obj_id].update_data({"GX": gx, "GY": gy, "Gx": gx, "Gy": gy})
 
+        def update_object_attributes(self, obj_id: str, new_attrs: dict[str, Any]) -> None:
+            if obj_id in self.creatures:
+                self.creatures[obj_id].update_data(new_attrs)
+            elif obj_id in self.elements:
+                self.elements[obj_id].update_data(new_attrs)
+
+        def add_object_attribute_values(
+            self, obj_id: str, attr_name: str, values: list[str]
+        ) -> None:
+            item = self.creatures.get(obj_id) or self.elements.get(obj_id)
+            if item is not None:
+                cur_list = list(item.data.get(attr_name) or [])
+                for v in values:
+                    if v not in cur_list:
+                        cur_list.append(v)
+                item.update_data({attr_name: cur_list})
+
+        def remove_object_attribute_values(
+            self, obj_id: str, attr_name: str, values: list[str]
+        ) -> None:
+            item = self.creatures.get(obj_id) or self.elements.get(obj_id)
+            if item is not None:
+                cur_list = [x for x in (item.data.get(attr_name) or []) if x not in values]
+                item.update_data({attr_name: cur_list})
+
         def remove_object(self, obj_id: str) -> None:
             if obj_id == "*":
                 self.elements.clear()

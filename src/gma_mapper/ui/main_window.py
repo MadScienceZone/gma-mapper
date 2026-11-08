@@ -354,7 +354,11 @@ class MapperController:
             if attr_name and isinstance(values, list) and hasattr(self.scene, "add_object_attribute_values"):
                 self.scene.add_object_attribute_values(obj_id, str(attr_name), values)
             else:
-                attrs = payload.get("Attributes", payload)
+                attrs = (
+                    {str(attr_name): values}
+                    if attr_name and isinstance(values, list)
+                    else payload.get("Attributes", payload)
+                )
                 if obj_id in self.scene.tokens and isinstance(attrs, dict):
                     tok = self.scene.tokens[obj_id]
                     for k, v in attrs.items():
@@ -372,7 +376,11 @@ class MapperController:
             if attr_name and isinstance(values, list) and hasattr(self.scene, "remove_object_attribute_values"):
                 self.scene.remove_object_attribute_values(obj_id, str(attr_name), values)
             else:
-                attrs = payload.get("Attributes", payload)
+                attrs = (
+                    {str(attr_name): values}
+                    if attr_name and isinstance(values, list)
+                    else payload.get("Attributes", payload)
+                )
                 if obj_id in self.scene.tokens and isinstance(attrs, dict):
                     tok = self.scene.tokens[obj_id]
                     for k, v in attrs.items():
