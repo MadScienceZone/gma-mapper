@@ -146,6 +146,29 @@ class TestProtocolSession(unittest.TestCase):
         client._on_ready_read()
         self.assertIn("MARK", received_commands)
 
+        # Verify redial() blocks signals on old socket before abort() so _on_disconnected
+        # does not start _redial_timer and cause an infinite login loop.
+        class DisconnectingSocket:
+            def __init__(self, on_disc: Any) -> None:
+                self.signals_blocked = False
+                self._on_disc = on_disc
+
+            def blockSignals(self, b: bool) -> None:
+                self.signals_blocked = b
+
+            def abort(self) -> None:
+                if not self.signals_blocked:
+                    self._on_disc()
+
+            def deleteLater(self) -> None:
+                pass
+
+        client.session.host = ""
+        client._socket = DisconnectingSocket(client._on_disconnected)  # type: ignore[assignment]
+        client._redial_timer.start(1000)
+        client.redial()
+        self.assertFalse(client._redial_timer.isActive())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -658,16 +658,21 @@ try:
             self.session.is_connected = False
             self.session.stop_all_progress_meters()
             if self._socket is not None:
-                self._socket.disconnectFromHost()
-                self._socket.deleteLater()
+                old_sock = self._socket
                 self._socket = None
+                old_sock.blockSignals(True)
+                old_sock.disconnectFromHost()
+                old_sock.deleteLater()
 
         def redial(self) -> None:
+            self._redial_timer.stop()
             self._read_buffer.clear()
             if self._socket is not None:
-                self._socket.abort()
-                self._socket.deleteLater()
+                old_sock = self._socket
                 self._socket = None
+                old_sock.blockSignals(True)
+                old_sock.abort()
+                old_sock.deleteLater()
 
             if not self.session.host:
                 return

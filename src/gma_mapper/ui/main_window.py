@@ -18,6 +18,7 @@ from gma_mapper.core.file_io import (
 from gma_mapper.core.profile import (
     default_preferences,
     find_server_index,
+    preferred_color,
     save as save_preferences,
 )
 from gma_mapper.net.client import GMANetworkClient
@@ -102,6 +103,52 @@ class MapperController:
         self.polo_cb: Callable[[], None] | None = None
         self.combatant_moved_cb: Callable[[str], None] | None = None
         self.status_message_cb: Callable[[str], None] | None = None
+        self.debug_level: int = 0
+        self.debug_proto: bool = False
+        self.apply_preferences(self.prefs)
+
+    def log_debug(self, level: int, msg: str) -> None:
+        """Emit diagnostic message if ``level <= self.debug_level``."""
+        if level <= self.debug_level:
+            print(f"[gma-mapper:debug:{level}] {msg}", flush=True)
+
+    def apply_preferences(self, prefs: dict[str, Any] | None = None) -> None:
+        """Apply appearance, grid guide-line, player, and diagnostic preferences."""
+        if prefs is not None:
+            self.prefs = prefs
+        self.debug_level = max(0, min(6, int(self.prefs.get("debug_level", 0) or 0)))
+        self.debug_proto = bool(self.prefs.get("debug_proto", False))
+        dark = bool(self.prefs.get("dark", False))
+        theme = "dark" if dark else "light"
+        self.scene.dark_mode = dark
+        self.scene.grid_color = preferred_color(self.prefs, "grid", theme) or self.scene.grid_color
+        self.scene.grid_minor_color = preferred_color(self.prefs, "grid_minor", theme) or self.scene.grid_minor_color
+        self.scene.grid_major_color = preferred_color(self.prefs, "grid_major", theme) or self.scene.grid_major_color
+
+        guide_lines = self.prefs.get("guide_lines")
+        if isinstance(guide_lines, dict):
+            major = guide_lines.get("major") or {}
+            minor = guide_lines.get("minor") or {}
+            major_offsets = major.get("offsets") or {}
+            minor_offsets = minor.get("offsets") or {}
+            self.scene.major_interval = int(major.get("interval", 0) or 0)
+            self.scene.major_offset = (
+                int(major_offsets.get("x", 0) or 0),
+                int(major_offsets.get("y", 0) or 0),
+            )
+            self.scene.minor_interval = int(minor.get("interval", 0) or 0)
+            self.scene.minor_offset = (
+                int(minor_offsets.get("x", 0) or 0),
+                int(minor_offsets.get("y", 0) or 0),
+            )
+        if hasattr(self.scene, "update"):
+            self.scene.update()
+
+        self.cache.image_format = str(self.prefs.get("image_format", "png") or "png")
+        self.cache.curl_insecure = bool(self.prefs.get("curl_insecure", False))
+        self.audio.enabled = not bool(self.prefs.get("no_ondeck_audio", False))
+        if hasattr(self.chat_panel, "preset_table"):
+            self.chat_panel.preset_table.setEnabled(not bool(self.prefs.get("no_dice", False)))
 
     def current_url_base(self) -> str:
         url = ""
@@ -504,6 +551,7 @@ if HAS_PYSIDE6:
             )
             self.controller.polo_cb = lambda: self.net_client.session.polo()
             self.controller.status_message_cb = lambda msg: self.statusBar().showMessage(msg)
+            self._apply_debug_protocol()
 
             self.setWindowTitle(f"GMA Mapper {GMAMapperVersion}")
             self.resize(1280, 840)
@@ -602,11 +650,6 @@ if HAS_PYSIDE6:
             act_save_dice = QAction("Save Dice &Presets As...", self)
             act_save_dice.triggered.connect(self._on_save_dice)
             file_menu.addAction(act_save_dice)
-
-            file_menu.addSeparator()
-            act_prefs = QAction("P&references...", self)
-            act_prefs.triggered.connect(self._on_preferences)
-            file_menu.addAction(act_prefs)
 
             file_menu.addSeparator()
             act_quit = QAction("&Quit", self)
@@ -802,6 +845,11 @@ if HAS_PYSIDE6:
                 )
                 width_group.addAction(act_w)
                 width_menu.addAction(act_w)
+
+            edit_menu.addSeparator()
+            act_prefs = QAction("P&references...", self)
+            act_prefs.triggered.connect(self._on_preferences)
+            edit_menu.addAction(act_prefs)
 
             # 3. View Menu (ported from bin/mapper_legacy.tcl lines 1283-1326)
             view_menu = menubar.addMenu("&View")
@@ -1405,13 +1453,41 @@ if HAS_PYSIDE6:
             if path:
                 save_dice_presets_to_file(path, self.controller.chat_panel.presets)
 
+        def _configured_server_tuple(self, prefs: dict[str, Any]) -> tuple[str, int, str, str]:
+            prof_name = prefs.get("current_profile") or prefs.get("current_server", "offline")
+            idx = find_server_index(prefs, prof_name)
+            profiles = prefs.get("profiles", [])
+            if 0 <= idx < len(profiles):
+                srv = profiles[idx]
+                return (
+                    str(srv.get("host") or "").strip(),
+                    int(srv.get("port") or 0),
+                    str(srv.get("username") or srv.get("user") or ""),
+                    str(srv.get("password") or srv.get("pass") or ""),
+                )
+            return ("", 0, "", "")
+
+        def _apply_debug_protocol(self) -> None:
+            if self.controller.debug_proto:
+                self.net_client.session.debug_cb = lambda msg: print(f"[gma-mapper:proto] {msg}", flush=True)
+            else:
+                self.net_client.session.debug_cb = None
+
         def _on_preferences(self) -> None:
+            old_srv = self._configured_server_tuple(self.prefs)
             dlg = PreferencesDialog(self.prefs, self)
             if dlg.exec():
                 self.prefs = dlg.prefs
+                self.controller.apply_preferences(self.prefs)
+                self._apply_debug_protocol()
                 if self.prefs_path:
                     save_preferences(self.prefs_path, self.prefs)
-                self.connect_to_configured_server()
+                new_srv = self._configured_server_tuple(self.prefs)
+                if new_srv != old_srv:
+                    if new_srv[0] and new_srv[1]:
+                        self.connect_to_configured_server()
+                    else:
+                        self.net_client.hangup()
 
         def _on_check_updates(self) -> None:
             dlg = UpdateCheckDialog(GMAMapperVersion, self)
