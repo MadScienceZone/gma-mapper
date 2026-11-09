@@ -833,7 +833,7 @@ def _construct(input_dict: dict[str, Any] | None, types: dict[str, Any]) -> dict
             else:
                 result[field] = []
         elif t_code == "o":
-            if has_field and not _is_null(val) and val != {} and val != "":
+            if has_field and not _is_null(val) and val != "":
                 if not isinstance(val, dict):
                     raise ValueError(f"value for {field} is not a dict: {val}")
                 result[field] = _construct(val, t_sub)

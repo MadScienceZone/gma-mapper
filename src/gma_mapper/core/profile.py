@@ -590,49 +590,131 @@ def default_preferences() -> dict[str, Any]:
 
 
 def fix_missing(prefs: dict[str, Any]) -> dict[str, Any]:
-    """Populate missing style, font, scaling, or timer fields in `prefs` in-place."""
+    """Populate missing style, font, scaling, guide_lines, or server profile fields in `prefs` in-place.
+
+    Ensures all sub-objects expected by Tcl's `::gmaprofile::load`, `::gmaprofile::editor`, and
+    `ApplyPreferences` (`::gmautil::dassign`) are present with their nested keys so `_encode_payload_dict`
+    always emits the required JSON objects (even when empty `{}`).
+    """
+    d_prefs = default_preferences()
+    for top_key, top_val in d_prefs.items():
+        if top_key not in prefs:
+            prefs[top_key] = copy.deepcopy(top_val)
+
     d_styles = default_styles()
-    styles = prefs.setdefault("styles", {})
+    if not isinstance(prefs.get("styles"), dict):
+        prefs["styles"] = {}
+    styles = prefs["styles"]
 
     # dierolls
-    dierolls = styles.setdefault("dierolls", {})
-    comps = dierolls.setdefault("components", {})
+    if not isinstance(styles.get("dierolls"), dict):
+        styles["dierolls"] = {}
+    dierolls = styles["dierolls"]
+    if not isinstance(dierolls.get("components"), dict):
+        dierolls["components"] = {}
+    comps = dierolls["components"]
     for stylename, styledata in d_styles["dierolls"]["components"].items():
-        if stylename not in comps or not comps[stylename]:
+        if stylename not in comps or not isinstance(comps[stylename], dict) or not comps[stylename]:
             comps[stylename] = copy.deepcopy(styledata)
+        else:
+            c_entry = comps[stylename]
+            for color_field in ("fg", "bg"):
+                if not isinstance(c_entry.get(color_field), dict) or not c_entry[color_field]:
+                    c_entry[color_field] = copy.deepcopy(styledata[color_field])
+                else:
+                    c_entry[color_field].setdefault("dark", styledata[color_field]["dark"])
+                    c_entry[color_field].setdefault("light", styledata[color_field]["light"])
+            for field_name in ("overstrike", "underline", "font", "format"):
+                c_entry.setdefault(field_name, styledata[field_name])
     if "compact_recents" not in dierolls:
         dierolls["compact_recents"] = False
 
     # dialogs
-    dialogs = styles.setdefault("dialogs", {})
+    if not isinstance(styles.get("dialogs"), dict):
+        styles["dialogs"] = {}
+    dialogs = styles["dialogs"]
     for stylename, styledata in d_styles["dialogs"].items():
-        if stylename not in dialogs or not dialogs[stylename]:
+        if stylename not in dialogs or not isinstance(dialogs[stylename], dict) or not dialogs[stylename]:
             dialogs[stylename] = copy.deepcopy(styledata)
+        else:
+            dialogs[stylename].setdefault("dark", styledata["dark"])
+            dialogs[stylename].setdefault("light", styledata["light"])
 
     # clocks
-    clocks = styles.setdefault("clocks", {})
+    if not isinstance(styles.get("clocks"), dict):
+        styles["clocks"] = {}
+    clocks = styles["clocks"]
     for stylename, styledata in d_styles["clocks"].items():
         if stylename not in clocks or not clocks[stylename]:
             clocks[stylename] = copy.deepcopy(styledata)
+        elif isinstance(styledata, dict):
+            if not isinstance(clocks[stylename], dict):
+                clocks[stylename] = copy.deepcopy(styledata)
+            else:
+                clocks[stylename].setdefault("dark", styledata["dark"])
+                clocks[stylename].setdefault("light", styledata["light"])
 
     # characters
-    chars = styles.setdefault("characters", {})
+    if not isinstance(styles.get("characters"), dict):
+        styles["characters"] = {}
+    chars = styles["characters"]
     for symbol, desc in d_styles["characters"].items():
-        if symbol not in chars or not chars[symbol]:
+        if symbol not in chars or not isinstance(chars[symbol], dict) or not chars[symbol]:
             chars[symbol] = copy.deepcopy(desc)
+
+    # markers
+    if not isinstance(styles.get("markers"), dict):
+        styles["markers"] = {}
 
     # fonts
     d_fonts = default_fonts()
-    fonts = prefs.setdefault("fonts", {})
+    if not isinstance(prefs.get("fonts"), dict):
+        prefs["fonts"] = {}
+    fonts = prefs["fonts"]
     for font_name, font_dict in d_fonts.items():
-        if font_name not in fonts or not fonts[font_name]:
+        if font_name not in fonts or not isinstance(fonts[font_name], dict) or not fonts[font_name]:
             fonts[font_name] = copy.deepcopy(font_dict)
 
     # a11y
-    a11y = prefs.setdefault("a11y", {})
+    if not isinstance(prefs.get("a11y"), dict):
+        prefs["a11y"] = {}
+    a11y = prefs["a11y"]
     if "colorize_die_labels" not in a11y:
         a11y["colorize_die_labels"] = False
 
+    # guide_lines (required by Tcl's ApplyPreferences and ::gmaprofile::editor via ::gmautil::dassign)
+    if not isinstance(prefs.get("guide_lines"), dict):
+        prefs["guide_lines"] = copy.deepcopy(d_prefs["guide_lines"])
+    guides = prefs["guide_lines"]
+    for tier in ("major", "minor"):
+        if not isinstance(guides.get(tier), dict):
+            guides[tier] = {"interval": 0, "offsets": {"x": 0, "y": 0}}
+        else:
+            guides[tier]["interval"] = int(guides[tier].get("interval", 0) or 0)
+            if not isinstance(guides[tier].get("offsets"), dict):
+                guides[tier]["offsets"] = {"x": 0, "y": 0}
+            else:
+                guides[tier]["offsets"]["x"] = int(guides[tier]["offsets"].get("x", 0) or 0)
+                guides[tier]["offsets"]["y"] = int(guides[tier]["offsets"].get("y", 0) or 0)
+
+    # profiles
+    if not isinstance(prefs.get("profiles"), list) or not prefs["profiles"]:
+        prefs["profiles"] = [empty_server_profile("offline")]
+    else:
+        for i, prof in enumerate(prefs["profiles"]):
+            if not isinstance(prof, dict):
+                prefs["profiles"][i] = empty_server_profile("offline")
+            else:
+                defaults = empty_server_profile(str(prof.get("name", "offline") or "offline"))
+                for k, v in defaults.items():
+                    prof.setdefault(k, v)
+
+    if not prefs.get("current_profile"):
+        prefs["current_profile"] = str(prefs["profiles"][0].get("name", "offline"))
+    if not prefs.get("button_size"):
+        prefs["button_size"] = "small"
+    if not prefs.get("image_format"):
+        prefs["image_format"] = "png"
     if not prefs.get("scaling"):
         prefs["scaling"] = 1.0
     if not prefs.get("show_timers"):
@@ -643,7 +725,7 @@ def fix_missing(prefs: dict[str, Any]) -> dict[str, Any]:
 
 def save(filename: str | Path, data: dict[str, Any]) -> None:
     """Save `data` to `filename` in preferences v15 JSON format."""
-    out_data = copy.deepcopy(data)
+    out_data = fix_missing(copy.deepcopy(data))
     out_data["GMA_Mapper_preferences_version"] = CURRENT_FILE_VERSION
     encoded = _encode_payload_dict(out_data, FILE_FORMAT)
     path = Path(filename)

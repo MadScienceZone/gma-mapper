@@ -1,5 +1,6 @@
 """Unit tests for gma_mapper.core.profile (ported from bin/test_profiles.tcl)."""
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -31,25 +32,61 @@ class TestProfile(unittest.TestCase):
             pref_file = Path(tmpdir) / "testprefs.json"
             save(pref_file, prefs)
             loaded = load(pref_file)
-            self.assertEqual(loaded["GMA_Mapper_preferences_version"], CURRENT_FILE_VERSION)
-            self.assertEqual(loaded["current_profile"], "offline")
-            self.assertEqual(loaded["scaling"], 1.0)
-            self.assertIn("Normal", loaded["fonts"])
-            self.assertIn("fullresult", loaded["styles"]["dierolls"]["components"])
+            # Second save->load roundtrip must retain all nested objects for Tcl backwards compatibility
+            save(pref_file, loaded)
+            raw_json = json.loads(pref_file.read_text(encoding="utf-8"))
+            self.assertIn("guide_lines", raw_json)
+            self.assertIn("major", raw_json["guide_lines"])
+            self.assertIn("offsets", raw_json["guide_lines"]["major"])
+            self.assertIn("minor", raw_json["guide_lines"])
+            self.assertIn("offsets", raw_json["guide_lines"]["minor"])
+            self.assertIn("a11y", raw_json)
+            for comp_name, comp_val in raw_json["styles"]["dierolls"]["components"].items():
+                self.assertIn("fg", comp_val, f"missing fg in component {comp_name}")
+                self.assertIn("bg", comp_val, f"missing bg in component {comp_name}")
+
+            loaded2 = load(pref_file)
+            self.assertEqual(loaded2["GMA_Mapper_preferences_version"], CURRENT_FILE_VERSION)
+            self.assertEqual(loaded2["current_profile"], "offline")
+            self.assertEqual(loaded2["scaling"], 1.0)
             self.assertEqual(
-                preferred_color(loaded, "heading_fg", "dark"),
+                loaded2["guide_lines"],
+                {
+                    "major": {"interval": 0, "offsets": {"x": 0, "y": 0}},
+                    "minor": {"interval": 0, "offsets": {"x": 0, "y": 0}},
+                },
+            )
+            self.assertIn("Normal", loaded2["fonts"])
+            self.assertIn("fullresult", loaded2["styles"]["dierolls"]["components"])
+            self.assertEqual(
+                loaded2["styles"]["dierolls"]["components"]["begingroup"]["fg"],
+                {"dark": "", "light": ""},
+            )
+            self.assertEqual(
+                loaded2["styles"]["dierolls"]["components"]["begingroup"]["bg"],
+                {"dark": "", "light": ""},
+            )
+            self.assertEqual(
+                preferred_color(loaded2, "heading_fg", "dark"),
                 "cyan",
             )
             self.assertEqual(
-                preferred_color(loaded, "fg", "light"),
+                preferred_color(loaded2, "fg", "light"),
                 "#000000",
             )
 
     def test_fix_missing_and_symbols(self) -> None:
-        sparse: dict = {"GMA_Mapper_preferences_version": 5}
+        sparse: dict = {"GMA_Mapper_preferences_version": 5, "guide_lines": True}
         fix_missing(sparse)
         self.assertEqual(sparse["scaling"], 1.0)
         self.assertEqual(sparse["show_timers"], "mine")
+        self.assertEqual(
+            sparse["guide_lines"],
+            {
+                "major": {"interval": 0, "offsets": {"x": 0, "y": 0}},
+                "minor": {"interval": 0, "offsets": {"x": 0, "y": 0}},
+            },
+        )
         self.assertIn("ClockTime", sparse["fonts"])
         self.assertEqual(symbol_code_string("pin"), "📌")
         self.assertEqual(symbol_code_string("nonexistent"), "\u22a0")

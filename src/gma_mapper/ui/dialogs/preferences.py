@@ -5,7 +5,7 @@ from __future__ import annotations
 import copy
 from typing import Any
 
-from gma_mapper.core.profile import empty_server_profile, fix_missing
+from gma_mapper.core.profile import empty_server_profile, find_server_index, fix_missing
 
 try:
     from PySide6.QtWidgets import (
@@ -21,6 +21,7 @@ try:
         QComboBox,
         QPushButton,
         QDialogButtonBox,
+        QLabel,
     )
     HAS_PYSIDE6 = True
 except ImportError:
@@ -35,8 +36,9 @@ if HAS_PYSIDE6:
         def __init__(self, prefs: dict[str, Any], parent: QWidget | None = None) -> None:
             super().__init__(parent)
             self.setWindowTitle("GMA Mapper Preferences")
-            self.resize(560, 420)
+            self.resize(560, 440)
             self.prefs = fix_missing(copy.deepcopy(prefs))
+            self._editing_idx: int = -1
 
             layout = QVBoxLayout(self)
             self.tabs = QTabWidget(self)
@@ -61,7 +63,6 @@ if HAS_PYSIDE6:
             self.server_combo = QComboBox(tab)
             for srv in self.prefs.get("profiles", []):
                 self.server_combo.addItem(str(srv.get("name", "offline")))
-            self.server_combo.currentIndexChanged.connect(self._load_selected_server)
             top_row.addWidget(self.server_combo, 1)
 
             btn_new = QPushButton("New Profile", tab)
@@ -89,7 +90,13 @@ if HAS_PYSIDE6:
 
             self.tabs.addTab(tab, "Server Profiles")
             if self.prefs.get("profiles"):
-                self._load_selected_server(0)
+                cur_name = str(self.prefs.get("current_profile") or "offline")
+                initial_idx = find_server_index(self.prefs, cur_name)
+                if initial_idx < 0:
+                    initial_idx = 0
+                self.server_combo.setCurrentIndex(initial_idx)
+                self._load_selected_server(initial_idx)
+            self.server_combo.currentIndexChanged.connect(self._on_server_index_changed)
 
         def _build_general_tab(self) -> None:
             tab = QWidget(self.tabs)
@@ -100,34 +107,73 @@ if HAS_PYSIDE6:
             form.addRow("Theme:", self.dark_check)
 
             self.animate_check = QCheckBox("Enable animated map tiles", tab)
-            self.animate_check.setChecked(bool(self.prefs.get("animate", True)))
+            self.animate_check.setChecked(bool(self.prefs.get("animate", False)))
             form.addRow("Animations:", self.animate_check)
 
-            self.guide_check = QCheckBox("Show reach/space guide lines", tab)
-            self.guide_check.setChecked(bool(self.prefs.get("guide_lines", True)))
-            form.addRow("Guide Lines:", self.guide_check)
+            guides = self.prefs.get("guide_lines", {})
+            major = guides.get("major", {}) if isinstance(guides, dict) else {}
+            major_off = major.get("offsets", {}) if isinstance(major, dict) else {}
+            minor = guides.get("minor", {}) if isinstance(guides, dict) else {}
+            minor_off = minor.get("offsets", {}) if isinstance(minor, dict) else {}
 
-            self.blur_spin = QSpinBox(tab)
-            self.blur_spin.setRange(0, 365)
-            self.blur_spin.setValue(int(self.prefs.get("blur_limit", 30)))
-            form.addRow("Cache Expiration (days):", self.blur_spin)
+            major_row = QHBoxLayout()
+            self.major_interval_spin = QSpinBox(tab)
+            self.major_interval_spin.setRange(0, 1000)
+            self.major_interval_spin.setValue(int(major.get("interval", 0) or 0))
+            self.major_offset_x_spin = QSpinBox(tab)
+            self.major_offset_x_spin.setRange(-1000, 1000)
+            self.major_offset_x_spin.setValue(int(major_off.get("x", 0) or 0))
+            self.major_offset_y_spin = QSpinBox(tab)
+            self.major_offset_y_spin.setRange(-1000, 1000)
+            self.major_offset_y_spin.setValue(int(major_off.get("y", 0) or 0))
+            major_row.addWidget(QLabel("Interval:", tab))
+            major_row.addWidget(self.major_interval_spin)
+            major_row.addWidget(QLabel("Offset X:", tab))
+            major_row.addWidget(self.major_offset_x_spin)
+            major_row.addWidget(QLabel("Y:", tab))
+            major_row.addWidget(self.major_offset_y_spin)
+            form.addRow("Major Grid Lines:", major_row)
 
-            self.tabs.addTab(tab, "Display & Cache")
+            minor_row = QHBoxLayout()
+            self.minor_interval_spin = QSpinBox(tab)
+            self.minor_interval_spin.setRange(0, 1000)
+            self.minor_interval_spin.setValue(int(minor.get("interval", 0) or 0))
+            self.minor_offset_x_spin = QSpinBox(tab)
+            self.minor_offset_x_spin.setRange(-1000, 1000)
+            self.minor_offset_x_spin.setValue(int(minor_off.get("x", 0) or 0))
+            self.minor_offset_y_spin = QSpinBox(tab)
+            self.minor_offset_y_spin.setRange(-1000, 1000)
+            self.minor_offset_y_spin.setValue(int(minor_off.get("y", 0) or 0))
+            minor_row.addWidget(QLabel("Interval:", tab))
+            minor_row.addWidget(self.minor_interval_spin)
+            minor_row.addWidget(QLabel("Offset X:", tab))
+            minor_row.addWidget(self.minor_offset_x_spin)
+            minor_row.addWidget(QLabel("Y:", tab))
+            minor_row.addWidget(self.minor_offset_y_spin)
+            form.addRow("Minor Grid Lines:", minor_row)
+
+            self.tabs.addTab(tab, "Display & Grid")
+
+        def _on_server_index_changed(self, idx: int) -> None:
+            if self._editing_idx >= 0:
+                self._save_server_at(self._editing_idx)
+            self._load_selected_server(idx)
 
         def _load_selected_server(self, idx: int) -> None:
             servers = self.prefs.get("profiles", [])
             if 0 <= idx < len(servers):
+                self._editing_idx = idx
                 srv = servers[idx]
-                self.host_edit.setText(str(srv.get("host", "localhost")))
-                self.port_spin.setValue(int(srv.get("port", 2325) or 2325))
+                self.prefs["current_profile"] = str(srv.get("name", "offline"))
+                self.host_edit.setText(str(srv.get("host", "")))
+                self.port_spin.setValue(int(srv.get("port", 2323) or 2323))
                 self.user_edit.setText(str(srv.get("username", srv.get("user", ""))))
                 self.pass_edit.setText(str(srv.get("password", srv.get("pass", ""))))
                 self.curl_edit.setText(str(srv.get("curl_server", srv.get("curl_url_base", ""))))
                 self.scp_server_edit.setText(str(srv.get("scp_server", "")))
                 self.scp_dest_edit.setText(str(srv.get("scp_dest", "")))
 
-        def _save_current_server(self) -> None:
-            idx = self.server_combo.currentIndex()
+        def _save_server_at(self, idx: int) -> None:
             servers = self.prefs.get("profiles", [])
             if 0 <= idx < len(servers):
                 srv = servers[idx]
@@ -138,6 +184,13 @@ if HAS_PYSIDE6:
                 srv["curl_server"] = self.curl_edit.text().strip()
                 srv["scp_server"] = self.scp_server_edit.text().strip()
                 srv["scp_dest"] = self.scp_dest_edit.text().strip()
+
+        def _save_current_server(self) -> None:
+            idx = self.server_combo.currentIndex()
+            self._save_server_at(idx)
+            servers = self.prefs.get("profiles", [])
+            if 0 <= idx < len(servers):
+                self.prefs["current_profile"] = str(servers[idx].get("name", "offline"))
 
         def _on_new_server(self) -> None:
             self._save_current_server()
@@ -151,8 +204,22 @@ if HAS_PYSIDE6:
             self._save_current_server()
             self.prefs["dark"] = self.dark_check.isChecked()
             self.prefs["animate"] = self.animate_check.isChecked()
-            self.prefs["guide_lines"] = self.guide_check.isChecked()
-            self.prefs["blur_limit"] = self.blur_spin.value()
+            self.prefs["guide_lines"] = {
+                "major": {
+                    "interval": self.major_interval_spin.value(),
+                    "offsets": {
+                        "x": self.major_offset_x_spin.value(),
+                        "y": self.major_offset_y_spin.value(),
+                    },
+                },
+                "minor": {
+                    "interval": self.minor_interval_spin.value(),
+                    "offsets": {
+                        "x": self.minor_offset_x_spin.value(),
+                        "y": self.minor_offset_y_spin.value(),
+                    },
+                },
+            }
             self.accept()
 
 else:
