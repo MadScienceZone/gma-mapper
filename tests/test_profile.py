@@ -41,6 +41,12 @@ class TestProfile(unittest.TestCase):
             self.assertIn("minor", raw_json["guide_lines"])
             self.assertIn("offsets", raw_json["guide_lines"]["minor"])
             self.assertIn("a11y", raw_json)
+            for font_name, font_val in raw_json["fonts"].items():
+                self.assertIs(
+                    type(font_val["size"]),
+                    int,
+                    f"font {font_name} size must be int for Tk font create, got {type(font_val['size'])}",
+                )
             for comp_name, comp_val in raw_json["styles"]["dierolls"]["components"].items():
                 self.assertIn("fg", comp_val, f"missing fg in component {comp_name}")
                 self.assertIn("bg", comp_val, f"missing bg in component {comp_name}")

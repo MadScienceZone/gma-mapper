@@ -176,7 +176,7 @@ FILE_FORMAT: dict[str, Any] = {
         "D",
         {
             "family": "s",
-            "size": "f",
+            "size": "i",
             "weight": "i",
             "slant": "i",
             "overstrike": "?",
@@ -343,10 +343,10 @@ SymbolCodeString = symbol_code_string
 
 def default_fonts() -> dict[str, dict[str, Any]]:
     """Return the default dictionary of named fonts."""
-    def _f(family: str, size: float, weight: int = 0, slant: int = 0) -> dict[str, Any]:
+    def _f(family: str, size: int, weight: int = 0, slant: int = 0) -> dict[str, Any]:
         return {
             "family": family,
-            "size": float(size),
+            "size": int(size),
             "weight": weight,
             "slant": slant,
             "overstrike": False,
@@ -620,10 +620,10 @@ def fix_missing(prefs: dict[str, Any]) -> dict[str, Any]:
             c_entry = comps[stylename]
             for color_field in ("fg", "bg"):
                 if not isinstance(c_entry.get(color_field), dict) or not c_entry[color_field]:
-                    c_entry[color_field] = copy.deepcopy(styledata[color_field])
+                    c_entry[color_field] = {"dark": "", "light": ""}
                 else:
-                    c_entry[color_field].setdefault("dark", styledata[color_field]["dark"])
-                    c_entry[color_field].setdefault("light", styledata[color_field]["light"])
+                    c_entry[color_field].setdefault("dark", "")
+                    c_entry[color_field].setdefault("light", "")
             for field_name in ("overstrike", "underline", "font", "format"):
                 c_entry.setdefault(field_name, styledata[field_name])
     if "compact_recents" not in dierolls:
@@ -674,6 +674,12 @@ def fix_missing(prefs: dict[str, Any]) -> dict[str, Any]:
     for font_name, font_dict in d_fonts.items():
         if font_name not in fonts or not isinstance(fonts[font_name], dict) or not fonts[font_name]:
             fonts[font_name] = copy.deepcopy(font_dict)
+    for f_entry in fonts.values():
+        if isinstance(f_entry, dict) and "size" in f_entry:
+            try:
+                f_entry["size"] = int(round(float(f_entry["size"])))
+            except (ValueError, TypeError):
+                f_entry["size"] = 12
 
     # a11y
     if not isinstance(prefs.get("a11y"), dict):
