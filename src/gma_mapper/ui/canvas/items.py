@@ -706,6 +706,14 @@ try:
             margin = max(float(mob_area), float(mob_reach), aoe_r, 1.0) * BASE_GRID_SCALE + 28.0
             return QRectF(-margin, -margin, s + 2 * margin, s + 2 * margin)
 
+        def shape(self) -> QPainterPath:
+            """Restrict hit-testing and hover tooltips strictly to the creature's token footprint `[0, s) x [0, s)`."""
+            mob_size, _, _, _, _ = self._area_info()
+            s = max(0.5, mob_size) * BASE_GRID_SCALE
+            path = QPainterPath()
+            path.addRect(QRectF(0.0, 0.0, s, s))
+            return path
+
         def paint(
             self,
             painter: QPainter,

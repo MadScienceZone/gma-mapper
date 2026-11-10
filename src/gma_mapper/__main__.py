@@ -37,7 +37,7 @@ class MapperCLIOptions:
     dark: bool = False
     preload: bool = False
     no_animate: bool = False
-    button_size: int | None = None
+    button_size: str | None = None
     curl_url_base: str | None = None
     scp_dest: str | None = None
     scp_server: str | None = None
@@ -104,7 +104,11 @@ def parse_cli_args(argv: Sequence[str] | None = None) -> MapperCLIOptions:
     parser.add_argument("--dark", action="store_true", help="Enable dark UI mode")
     parser.add_argument("--preload", action="store_true", help="Preload map/image assets")
     parser.add_argument("--no-animate", action="store_true", help="Disable animated tiles")
-    parser.add_argument("--button-size", type=int, dest="button_size", help="Toolbar button size")
+    parser.add_argument(
+        "--button-size",
+        dest="button_size",
+        help='Toolbar button size ("small", "medium", "large", or "text")',
+    )
     parser.add_argument("--curl-url-base", dest="curl_url_base", help="Base URL for asset downloads")
     parser.add_argument("--scp-dest", dest="scp_dest", help="SCP destination path for GM uploads")
     parser.add_argument("--scp-server", dest="scp_server", help="SCP server host for GM uploads")
@@ -141,7 +145,13 @@ def apply_cli_overrides(prefs: dict, opts: MapperCLIOptions) -> dict:
     if opts.no_animate:
         prefs["animate"] = False
     if opts.button_size is not None:
-        prefs["button_size"] = opts.button_size
+        from gma_mapper.ui.icons import normalize_button_size
+
+        raw_bsize = str(opts.button_size).strip().lower()
+        if raw_bsize in ("text", "strings", "labels"):
+            prefs["toolbar_text"] = True
+        else:
+            prefs["button_size"] = normalize_button_size(opts.button_size)
 
     profiles = prefs.setdefault("profiles", [empty_server_profile("offline")])
     target_name = opts.profile

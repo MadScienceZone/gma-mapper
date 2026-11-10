@@ -297,6 +297,10 @@ if HAS_PYSIDE6:
                     self.button_size_combo.setCurrentIndex(idx)
             app_layout.addWidget(self.button_size_combo)
 
+            self.toolbar_icons_check = QCheckBox("Display toolbar buttons as icons", app_group)
+            self.toolbar_icons_check.setChecked(not bool(self.prefs.get("toolbar_text", False)))
+            app_layout.addWidget(self.toolbar_icons_check)
+
             tab_layout.addWidget(app_group)
 
             # 2. EXTRA GRID LINES
@@ -1598,6 +1602,7 @@ if HAS_PYSIDE6:
             self.prefs["preload"] = self.preload_check.isChecked()
             self.prefs["image_format"] = str(self.image_format_combo.currentData() or "png")
             self.prefs["button_size"] = str(self.button_size_combo.currentData() or "small")
+            self.prefs["toolbar_text"] = not self.toolbar_icons_check.isChecked()
             self.prefs["guide_lines"] = {
                 "major": {
                     "interval": self.major_interval_spin.value(),

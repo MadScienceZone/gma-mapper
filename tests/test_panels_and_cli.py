@@ -128,6 +128,142 @@ class TestPanelsAndCLI(unittest.TestCase):
         self.assertTrue(prefs["dark"])
         self.assertEqual(prefs["current_server"], "campaign1")
 
+        # Verify --button-size supports small/medium/large/text
+        opts_med = parse_cli_args(["--button-size", "medium"])
+        prefs_med = default_preferences()
+        apply_cli_overrides(prefs_med, opts_med)
+        self.assertEqual(prefs_med["button_size"], "medium")
+        self.assertFalse(prefs_med["toolbar_text"])
+
+        opts_txt = parse_cli_args(["--button-size", "text"])
+        prefs_txt = default_preferences()
+        apply_cli_overrides(prefs_txt, opts_txt)
+        self.assertTrue(prefs_txt["toolbar_text"])
+
+    def test_toolbar_icons_and_display_mode_toggle(self) -> None:
+        from gma_mapper.ui.icons import (
+            HAS_PYSIDE6,
+            TOOLBAR_BUTTON_ORDER,
+            IconCatalog,
+            button_pixel_size,
+            button_size_suffix,
+            dash_style_icon_name,
+            mode_slot_specs,
+            normalize_button_size,
+            resolve_icon_path,
+            stipple_icon_name,
+        )
+        from gma_mapper.ui.main_window import GMAMapperMainWindow
+
+        self.assertEqual(normalize_button_size("small"), "small")
+        self.assertEqual(normalize_button_size("medium"), "medium")
+        self.assertEqual(normalize_button_size("large"), "large")
+        self.assertEqual(normalize_button_size(30), "medium")
+        self.assertEqual(normalize_button_size(40), "large")
+        self.assertEqual(button_size_suffix("small"), "")
+        self.assertEqual(button_size_suffix("medium"), "_30")
+        self.assertEqual(button_size_suffix("large"), "_40")
+        self.assertEqual(button_pixel_size("small"), 16)
+        self.assertEqual(button_pixel_size("medium"), 30)
+        self.assertEqual(button_pixel_size("large"), 40)
+
+        # Light vs dark mode and size path resolution
+        p_light = resolve_icon_path("line", button_size="small", dark_mode=False)
+        p_dark = resolve_icon_path("line", button_size="small", dark_mode=True)
+        p_large = resolve_icon_path("line", button_size="large", dark_mode=True)
+        self.assertIsNotNone(p_light)
+        self.assertIsNotNone(p_dark)
+        self.assertIsNotNone(p_large)
+        self.assertEqual(p_light.name, "line.gif")
+        self.assertEqual(p_dark.name, "d_line.gif")
+        self.assertEqual(p_large.name, "d_line_40.gif")
+
+        self.assertEqual(dash_style_icon_name(""), "dash0")
+        self.assertEqual(dash_style_icon_name("-."), "dash6424")
+        self.assertEqual(stipple_icon_name(""), "stipple_100")
+        self.assertEqual(stipple_icon_name("gray12"), "stipple_88")
+        self.assertEqual(stipple_icon_name("gray75"), "stipple_25")
+
+        m1, m2, m3 = mode_slot_specs("poly", draw_join="miter", draw_spline=3, draw_dash="-")
+        self.assertEqual(m1[0], "join_miter")
+        self.assertTrue(m1[3])
+        self.assertEqual(m2[0], "spline_3")
+        self.assertTrue(m2[3])
+        self.assertEqual(m3[0], "dash64")
+        self.assertTrue(m3[3])
+
+        if not HAS_PYSIDE6:
+            return
+        from PySide6.QtCore import Qt
+
+        cat = IconCatalog(button_size="medium", dark_mode=True)
+        self.assertFalse(cat.icon("line").isNull())
+        self.assertFalse(cat.color_swatch_icon("fill_color", "#ff0000").isNull())
+        self.assertFalse(cat.app_window_icon().isNull())
+
+        win = GMAMapperMainWindow(prefs=default_preferences())
+        expected_keys = [k for k in TOOLBAR_BUTTON_ORDER if k != "|"]
+        self.assertEqual(list(win.toolbar_actions.keys()), expected_keys)
+        self.assertIn("#d9d9d9", win.tools_toolbar.styleSheet())
+        self.assertFalse(win.icon_catalog.dark_mode)
+        # Default mode is Icons (16x16 small)
+        self.assertEqual(
+            win.tools_toolbar.toolButtonStyle(),
+            Qt.ToolButtonStyle.ToolButtonIconOnly,
+        )
+        self.assertEqual(win.tools_toolbar.iconSize().width(), 16)
+        self.assertTrue(win.act_toolbar_icons.isChecked())
+
+        # Toggle to Text labels mode
+        win.set_toolbar_display_mode(use_icons=False)
+        self.assertTrue(win.prefs["toolbar_text"])
+        self.assertFalse(win.act_toolbar_icons.isChecked())
+        self.assertEqual(
+            win.tools_toolbar.toolButtonStyle(),
+            Qt.ToolButtonStyle.ToolButtonTextOnly,
+        )
+        self.assertEqual(win.toolbar_actions["line"].iconText(), "Line")
+        self.assertEqual(win.toolbar_actions["nil"].iconText(), "Play")
+
+        # Toggle back to Icons mode with large button_size
+        win.prefs["button_size"] = "large"
+        win.set_toolbar_display_mode(use_icons=True)
+        self.assertFalse(win.prefs["toolbar_text"])
+        self.assertTrue(win.act_toolbar_icons.isChecked())
+        self.assertEqual(
+            win.tools_toolbar.toolButtonStyle(),
+            Qt.ToolButtonStyle.ToolButtonIconOnly,
+        )
+        self.assertEqual(win.tools_toolbar.iconSize().width(), 40)
+
+        # Verify dynamic mode slots update when switching tools and cycling options
+        win.map_view.set_tool_mode("poly")
+        self.assertTrue(win.act_mode1.isEnabled())
+        self.assertTrue(win.act_mode2.isEnabled())
+        self.assertTrue(win.act_mode3.isEnabled())
+        self.assertEqual(win.act_mode1.iconText(), "Join:bevel")
+        win._on_toolbar_mode1()
+        self.assertEqual(win.act_mode1.iconText(), "Join:miter")
+        win._on_toolbar_mode2()
+        self.assertEqual(win.act_mode2.iconText(), "Spline:1")
+        win._on_toolbar_mode3()
+        self.assertEqual(win.act_mode3.iconText(), "Dash:-")
+
+        # Verify stipple, snap, width cycling and SaF mode
+        win._on_cycle_stipple()
+        self.assertEqual(win.map_view.draw_stipple, "gray12")
+        win._on_cycle_snap()
+        self.assertEqual(win.map_view.obj_snap, 2)
+        win._on_cycle_width()
+        self.assertEqual(win.map_view.draw_width, 3)
+
+        win._on_toggle_saf_mode(True)
+        self.assertFalse(win.toolbar_actions["line"].isEnabled())
+        self.assertTrue(win.act_saf_sync.isEnabled())
+        win._on_toggle_saf_mode(False)
+        self.assertTrue(win.toolbar_actions["line"].isEnabled())
+        self.assertFalse(win.act_saf_sync.isEnabled())
+
     def test_initiative_and_combat_dock_interactivity(self) -> None:
         self.assertEqual(strip_nameplate_prefix("grp1_Goblin #1"), "Goblin #1")
         self.assertEqual(

@@ -157,6 +157,19 @@ def grid_distance_feet(x0: float, y0: float, x1: float, y1: float) -> tuple[floa
     return (pf_feet, euclid_feet, angle_deg)
 
 
+def ping_marker_radius(seq: int) -> float | None:
+    """Return the contracting bullseye radius (in pixels) for `start_ping_marker` step `seq` (0..14).
+
+    Ported from `start_ping_marker` in `bin/mapper_legacy.tcl` lines 17188-17220:
+    3 cycles of 5 steps (`seq` 0..14), shrinking from `40.0` down to `0.0` in 10-pixel increments.
+    Returns `None` when `seq < 0` or `seq >= 15`.
+    """
+    if seq < 0 or seq >= 15:
+        return None
+    ring_idx = 4 - (seq % 5)
+    return float(ring_idx * 10)
+
+
 try:
     from PySide6.QtCore import QLineF, QPointF, QRectF, Qt, QTimer, Signal
     from PySide6.QtGui import QBrush, QColor, QFont, QPainter, QPen, QPixmap
@@ -198,6 +211,8 @@ try:
 
             self._target_lines: list[Any] = []
             self.highlighted_element_id: str = ""
+            self.marks: list[tuple[float, float]] = []
+            self._active_pings: dict[tuple[float, float], list[QGraphicsEllipseItem]] = {}
 
         def visible_objects_center(self) -> tuple[float, float] | None:
             """Return `(cx, cy)` scene center of all visible map elements and creatures."""
@@ -274,10 +289,10 @@ try:
                 if not tok.isVisible():
                     continue
                 mob_size, _, _, _, _ = tok._area_info()
-                s = mob_size * BASE_GRID_SCALE
+                s = max(0.5, mob_size) * BASE_GRID_SCALE
                 x0 = tok.gx * BASE_GRID_SCALE
                 y0 = tok.gy * BASE_GRID_SCALE
-                if x0 <= sx <= x0 + s and y0 <= sy <= y0 + s:
+                if x0 <= sx < x0 + s and y0 <= sy < y0 + s:
                     found.append(cid)
             if include_selected:
                 for sid in sorted(self.selected_mobs):
@@ -634,12 +649,36 @@ try:
                     self._target_lines.append(line)
 
         def flash_mark(self, x: float, y: float) -> None:
-            """Draw a temporary animated target ring at scene coordinates `(x, y)` for `MARK`."""
-            ring = QGraphicsEllipseItem(x - 25, y - 25, 50, 50)
-            ring.setPen(QPen(QColor("#ffff00"), 3))
-            ring.setZValue(2_100_000_000)
-            self.addItem(ring)
-            QTimer.singleShot(1500, lambda: self.removeItem(ring) if ring.scene() else None)
+            """Draw a contracting 15-step red-on-black bullseye ping at scene coordinates `(x, y)` (`start_ping_marker`)."""
+            key = (float(x), float(y))
+            self.marks.append(key)
+
+            def _clear_ping() -> None:
+                for item in self._active_pings.pop(key, []):
+                    if item.scene() is self:
+                        self.removeItem(item)
+
+            def _step_ping(seq: int = 0) -> None:
+                _clear_ping()
+                r = ping_marker_radius(seq)
+                if r is None:
+                    return
+                outer = QGraphicsEllipseItem(key[0] - r, key[1] - r, r * 2.0, r * 2.0)
+                outer.setPen(QPen(QColor("#000000"), 9))
+                outer.setBrush(Qt.BrushStyle.NoBrush)
+                outer.setZValue(2_100_000_000)
+                self.addItem(outer)
+
+                inner = QGraphicsEllipseItem(key[0] - r, key[1] - r, r * 2.0, r * 2.0)
+                inner.setPen(QPen(QColor("#ff0000"), 5))
+                inner.setBrush(Qt.BrushStyle.NoBrush)
+                inner.setZValue(2_100_000_001)
+                self.addItem(inner)
+
+                self._active_pings[key] = [outer, inner]
+                QTimer.singleShot(100, lambda: _step_ping(seq + 1))
+
+            _step_ping(0)
 
         @property
         def tokens(self) -> dict[str, CreatureTokenItem]:
@@ -685,6 +724,10 @@ except ImportError:
             self.creature_by_name: dict[str, str] = {}
             self.combat_mode: bool = False
             self.active_actor_id: str = ""
+            self.marks: list[tuple[float, float]] = []
+
+        def flash_mark(self, x: float, y: float) -> None:
+            self.marks.append((float(x), float(y)))
 
         @property
         def tokens(self) -> dict[str, _HeadlessItem]:

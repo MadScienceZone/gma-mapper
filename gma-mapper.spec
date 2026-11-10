@@ -14,6 +14,10 @@ sounds_dir = repo_root / "lib" / "MadScienceZone" / "GMA" / "Mapper" / "sounds"
 if sounds_dir.is_dir():
     datas.append((str(sounds_dir), "lib/MadScienceZone/GMA/Mapper/sounds"))
 
+icons_dir = repo_root / "lib" / "MadScienceZone" / "GMA" / "Mapper" / "icons"
+if icons_dir.is_dir():
+    datas.append((str(icons_dir), "lib/MadScienceZone/GMA/Mapper/icons"))
+
 images_dir = repo_root / "images"
 if images_dir.is_dir():
     datas.append((str(images_dir), "images"))

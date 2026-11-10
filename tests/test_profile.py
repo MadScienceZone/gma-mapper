@@ -126,6 +126,7 @@ class TestProfile(unittest.TestCase):
         self.assertFalse(dlg.preload_check.isChecked())
         self.assertEqual(dlg.image_format_combo.currentData(), "png")
         self.assertEqual(dlg.button_size_combo.currentData(), "small")
+        self.assertTrue(dlg.toolbar_icons_check.isChecked())
         self.assertEqual(dlg.major_interval_spin.value(), 0)
         self.assertEqual(dlg.minor_interval_spin.value(), 0)
         self.assertFalse(dlg.no_dice_check.isChecked())
@@ -153,6 +154,7 @@ class TestProfile(unittest.TestCase):
         dlg.preload_check.setChecked(True)
         dlg.image_format_combo.setCurrentIndex(dlg.image_format_combo.findData("gif"))
         dlg.button_size_combo.setCurrentIndex(dlg.button_size_combo.findData("medium"))
+        dlg.toolbar_icons_check.setChecked(False)
         dlg.major_interval_spin.setValue(10)
         dlg.major_offset_x_spin.setValue(2)
         dlg.major_offset_y_spin.setValue(3)
@@ -185,6 +187,7 @@ class TestProfile(unittest.TestCase):
         self.assertTrue(updated["preload"])
         self.assertEqual(updated["image_format"], "gif")
         self.assertEqual(updated["button_size"], "medium")
+        self.assertTrue(updated["toolbar_text"])
         self.assertEqual(
             updated["guide_lines"],
             {

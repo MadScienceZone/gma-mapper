@@ -41,9 +41,11 @@ from gma_mapper.ui.canvas.items import (
     resolve_condition_markers,
 )
 from gma_mapper.ui.canvas.scene import (
+    BattleMapScene,
     grid_coord_label,
     grid_distance_feet,
     grid_to_scene_xy,
+    ping_marker_radius,
     scene_to_grid_xy,
     snap_creature_grid_xy,
     visible_objects_bounds,
@@ -327,6 +329,109 @@ class TestCanvasHelpers(unittest.TestCase):
         # Hatch lines per square: 7 diagonal segments
         self.assertEqual(len(aoe_grid_hatch_lines(2, 3, local_aura=False)), 7)
         self.assertEqual(len(aoe_grid_hatch_lines(2, 3, local_aura=True)), 7)
+
+    def test_ping_marker_and_shift_left_click(self) -> None:
+        # 15 steps (0..14): 3 cycles of [40, 30, 20, 10, 0]
+        expected_radii = [40.0, 30.0, 20.0, 10.0, 0.0] * 3
+        self.assertEqual([ping_marker_radius(s) for s in range(15)], expected_radii)
+        self.assertIsNone(ping_marker_radius(-1))
+        self.assertIsNone(ping_marker_radius(15))
+
+        try:
+            from PySide6.QtCore import QEvent, QPointF, Qt
+            from PySide6.QtGui import QMouseEvent
+            from PySide6.QtWidgets import QApplication
+            from gma_mapper.ui.canvas.view import BattleMapView
+
+            app = QApplication.instance() or QApplication([])
+            _ = app
+            scene = BattleMapScene()
+            view = BattleMapView(scene)
+            emitted_marks: list[tuple[float, float]] = []
+            view.mark_requested.connect(lambda sx, sy: emitted_marks.append((sx, sy)))
+
+            # Simulate Shift+LeftMouse press at viewport point (120, 160)
+            ev = QMouseEvent(
+                QEvent.Type.MouseButtonPress,
+                QPointF(120.0, 160.0),
+                QPointF(120.0, 160.0),
+                Qt.MouseButton.LeftButton,
+                Qt.MouseButton.LeftButton,
+                Qt.KeyboardModifier.ShiftModifier,
+            )
+            view.mousePressEvent(ev)
+            self.assertEqual(len(emitted_marks), 1)
+            self.assertEqual(len(scene.marks), 1)
+            self.assertEqual(emitted_marks[0], scene.marks[0])
+            self.assertEqual(len(scene._active_pings[scene.marks[0]]), 2)
+
+            # Place a creature at (2, 2) -> scene [100, 150) x [100, 150) with reach/AoE margin
+            scene.add_or_update_token(
+                "p1",
+                {
+                    "ID": "p1",
+                    "Name": "Valeros",
+                    "Gx": 2.0,
+                    "Gy": 2.0,
+                    "Size": "M",
+                    "CreatureType": 2,
+                    "AoE": {"Radius": 4.0, "Color": "cyan"},
+                },
+            )
+            dragged: list[tuple[str, float, float]] = []
+            selected: list[str] = []
+            view.token_dragged.connect(lambda cid, gx, gy: dragged.append((cid, gx, gy)))
+            view.token_selected.connect(lambda cid: selected.append(cid))
+
+            # Left-clicking empty background at (220, 220) (inside AoE boundingRect, outside token footprint) does nothing
+            press_bg = QMouseEvent(
+                QEvent.Type.MouseButtonPress,
+                QPointF(220.0, 220.0),
+                QPointF(220.0, 220.0),
+                Qt.MouseButton.LeftButton,
+                Qt.MouseButton.LeftButton,
+                Qt.KeyboardModifier.NoModifier,
+            )
+            rel_bg = QMouseEvent(
+                QEvent.Type.MouseButtonRelease,
+                QPointF(220.0, 220.0),
+                QPointF(220.0, 220.0),
+                Qt.MouseButton.LeftButton,
+                Qt.MouseButton.NoButton,
+                Qt.KeyboardModifier.NoModifier,
+            )
+            view.mousePressEvent(press_bg)
+            view.mouseReleaseEvent(rel_bg)
+            self.assertEqual(selected, [])
+            self.assertEqual(dragged, [])
+            self.assertEqual((scene.creatures["p1"].gx, scene.creatures["p1"].gy), (2.0, 2.0))
+
+            # Left-clicking directly on the token at (125, 125) without dragging selects it without moving it
+            press_tok = QMouseEvent(
+                QEvent.Type.MouseButtonPress,
+                QPointF(125.0, 125.0),
+                QPointF(125.0, 125.0),
+                Qt.MouseButton.LeftButton,
+                Qt.MouseButton.LeftButton,
+                Qt.KeyboardModifier.NoModifier,
+            )
+            rel_tok = QMouseEvent(
+                QEvent.Type.MouseButtonRelease,
+                QPointF(125.0, 125.0),
+                QPointF(125.0, 125.0),
+                Qt.MouseButton.LeftButton,
+                Qt.MouseButton.NoButton,
+                Qt.KeyboardModifier.NoModifier,
+            )
+            view.mousePressEvent(press_tok)
+            view.mouseReleaseEvent(rel_tok)
+            self.assertEqual(selected, ["p1"])
+            self.assertEqual(dragged, [])
+            self.assertEqual((scene.creatures["p1"].gx, scene.creatures["p1"].gy), (2.0, 2.0))
+        except ImportError:
+            scene = BattleMapScene()
+            scene.flash_mark(120.0, 160.0)
+            self.assertEqual(scene.marks, [(120.0, 160.0)])
 
 
 if __name__ == "__main__":

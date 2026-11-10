@@ -16,6 +16,13 @@ from gma_mapper.core.file_io import (
 WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
 
 
+def _can_read_external(p: Path) -> bool:
+    try:
+        return p.exists() and bool(p.read_bytes()[:1])
+    except PermissionError:
+        return False
+
+
 class TestFileIO(unittest.TestCase):
     def test_parse_tcl_list(self) -> None:
         self.assertEqual(
@@ -30,7 +37,7 @@ class TestFileIO(unittest.TestCase):
     def test_load_real_legacy_and_modern_map_files(self) -> None:
         # Modern v23 map file
         temple_path = WORKSPACE_ROOT / "FireGeodeTemple.map"
-        if temple_path.exists():
+        if _can_read_external(temple_path):
             meta, objs = load_from_file(temple_path)
             self.assertEqual(meta["Timestamp"], 1702857654)
             self.assertGreater(len(objs), 20)
@@ -39,7 +46,7 @@ class TestFileIO(unittest.TestCase):
 
         # Legacy v17 map file with creatures
         session_one_path = WORKSPACE_ROOT / "end of session one.map"
-        if session_one_path.exists():
+        if _can_read_external(session_one_path):
             meta, objs = load_from_file(session_one_path)
             self.assertEqual(meta["FileVersion"], 17)
             creatures = [d for t, d in objs if t == "CREATURE"]
@@ -50,7 +57,7 @@ class TestFileIO(unittest.TestCase):
 
         # Legacy v17 map file with geometry
         sheriff_path = WORKSPACE_ROOT / "Sheriffsoffice.map"
-        if sheriff_path.exists():
+        if _can_read_external(sheriff_path):
             meta, objs = load_from_file(sheriff_path)
             self.assertEqual(meta["FileVersion"], 17)
             types = {t for t, _ in objs}
@@ -105,14 +112,14 @@ class TestFileIO(unittest.TestCase):
 
     def test_load_and_roundtrip_dice_presets(self) -> None:
         viktor_path = WORKSPACE_ROOT / "Viktor.dice"
-        if viktor_path.exists():
+        if _can_read_external(viktor_path):
             meta, presets = load_dice_presets_from_file(viktor_path)
             self.assertEqual(meta["FileVersion"], 2)
             self.assertEqual(len(presets), 10)
             self.assertEqual(presets[0]["Name"], "1-StaffDam")
 
         magnius_path = WORKSPACE_ROOT / "magnius.dice"
-        if magnius_path.exists():
+        if _can_read_external(magnius_path):
             meta, presets = load_dice_presets_from_file(magnius_path)
             self.assertEqual(meta["FileVersion"], 1)
             self.assertEqual(len(presets), 4)

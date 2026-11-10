@@ -85,6 +85,7 @@ try:
         mob_spawned = Signal(dict)  # PS creature dict
         hp_request_sent = Signal(dict)  # HPREQ dict
         tool_changed = Signal(str)  # active_tool name
+        tool_options_changed = Signal()  # active tool sub-options (join, spline, arrow, dash, etc.)
         status_message = Signal(str)  # status bar notification
         sync_view_requested = Signal(float, float, str)  # (xview, yview, grid_label)
 
@@ -148,6 +149,7 @@ try:
             self._last_scene_pos = QPointF(0.0, 0.0)
             self._tool_start: QPointF | None = None
             self._dragging_token: CreatureTokenItem | None = None
+            self._dragging_token_moved: bool = False
             self._ruler_line: QGraphicsLineItem | None = None
             self._ruler_text: QGraphicsSimpleTextItem | None = None
             self._preview_rect: QGraphicsRectItem | None = None
@@ -332,6 +334,8 @@ try:
                 self.map_scene.removeItem(self._preview_rect)
                 self._preview_rect = None
             self._tool_start = None
+            self._dragging_token = None
+            self._dragging_token_moved = False
             self._moving_obj_id = ""
             self._moving_obj_orig_data = None
             self._mob_aoe_id = ""
@@ -592,7 +596,7 @@ try:
                         {"Arrow": to_enum("Arrow", self.draw_arrow)}
                     )
                 self.status_message.emit(f"Line arrow style: {self.draw_arrow}")
-            elif self.active_tool == "poly":
+            elif self.active_tool in ("poly", "aoebound"):
                 self.draw_join = cycle_join_style(self.draw_join)
                 if self._active_draw_id in self.map_scene.elements:
                     self.map_scene.elements[self._active_draw_id].update_data(
@@ -617,10 +621,11 @@ try:
                 self.status_message.emit(
                     f"Area of effect shape: {self.draw_aoe_shape}"
                 )
+            self.tool_options_changed.emit()
 
         def trigger_alt_2(self) -> None:
             """Handle `Alt+2` tool sub-option cycling matching `bin/mapper_legacy.tcl`."""
-            if self.active_tool == "poly":
+            if self.active_tool in ("poly", "aoebound"):
                 self.draw_spline = cycle_spline_level(self.draw_spline)
                 if self._active_draw_id in self.map_scene.elements:
                     self.map_scene.elements[self._active_draw_id].update_data(
@@ -639,6 +644,7 @@ try:
                 self.status_message.emit(
                     f"Area of effect spread: {'ON' if self.draw_aoe_spread else 'OFF'}"
                 )
+            self.tool_options_changed.emit()
 
         def trigger_alt_3(self) -> None:
             """Handle `Alt+3` dash style cycling matching `bin/mapper_legacy.tcl`."""
@@ -651,6 +657,7 @@ try:
                 self.status_message.emit(
                     f"Dash style: {self.draw_dash or 'solid'}"
                 )
+            self.tool_options_changed.emit()
 
         def adjust_view(self, grid_label: str = "", xview: float = 0.0, yview: float = 0.0) -> None:
             """Scroll viewport to `grid_label` or `(xview, yview)` from `AV` server command."""
@@ -878,9 +885,27 @@ try:
                 return
             super().mouseDoubleClickEvent(event)
 
+        def ping_marker(self, sx: float, sy: float) -> None:
+            """Place an animated ping marker at scene coordinates `(sx, sy)` and broadcast `MARK` (`PingMarker`)."""
+            self.map_scene.flash_mark(sx, sy)
+            self.mark_requested.emit(sx, sy)
+
         def mousePressEvent(self, event: QMouseEvent) -> None:
             scene_pt = self.mapToScene(event.position().toPoint())
             self._last_scene_pos = scene_pt
+
+            # Shift+LeftClick places a ping mark anywhere on the map (matching `bind $canvas <Shift-1> "PingMarker $canvas %x %y"`)
+            if (
+                event.button() == Qt.MouseButton.LeftButton
+                and (event.modifiers() & Qt.KeyboardModifier.ShiftModifier)
+                and not (
+                    event.modifiers()
+                    & (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.AltModifier)
+                )
+            ):
+                self.ping_marker(scene_pt.x(), scene_pt.y())
+                event.accept()
+                return
 
             # Middle button finishes an active multi-point shape (matching EndObj in Tcl) or pans
             if event.button() == Qt.MouseButton.MiddleButton:
@@ -933,8 +958,7 @@ try:
                     return
 
                 if self.active_tool == "mark":
-                    self.map_scene.flash_mark(scene_pt.x(), scene_pt.y())
-                    self.mark_requested.emit(scene_pt.x(), scene_pt.y())
+                    self.ping_marker(scene_pt.x(), scene_pt.y())
                     event.accept()
                     return
 
@@ -1058,17 +1082,25 @@ try:
                     event.accept()
                     return
 
-                # Pointer tool: check if clicking a creature token
-                item = self.map_scene.itemAt(scene_pt, self.transform())
-                if isinstance(item, CreatureTokenItem):
-                    self.token_selected.emit(item.mob_id)
+                # Pointer tool: check if clicking directly inside a creature token's footprint (`ScreenXYToMOBID`)
+                mobs_under_cursor = self.map_scene.mobs_at_scene_pos(
+                    scene_pt, include_selected=False
+                )
+                if mobs_under_cursor:
+                    tok = self.map_scene.creatures[mobs_under_cursor[-1]]
+                    self.token_selected.emit(tok.mob_id)
                     if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
-                        self.map_scene.toggle_mob_selection(item.mob_id)
+                        self.map_scene.toggle_mob_selection(tok.mob_id)
                         event.accept()
                         return
-                    self._dragging_token = item
+                    self._dragging_token = tok
+                    self._dragging_token_moved = False
                     event.accept()
                     return
+
+                # Left-clicking on the map background in pointer mode does nothing
+                event.accept()
+                return
 
             super().mousePressEvent(event)
 
@@ -1168,16 +1200,23 @@ try:
                 event.accept()
                 return
 
-            if self._dragging_token is not None:
+            if self._dragging_token is not None and (
+                event.buttons() & Qt.MouseButton.LeftButton
+            ):
                 snap_gx, snap_gy = snap_creature_grid_xy(
                     scene_pt.x(),
                     scene_pt.y(),
                     self._dragging_token.data,
                     self.map_scene.creature_grid_snap,
                 )
-                self._dragging_token.setPos(
-                    snap_gx * BASE_GRID_SCALE, snap_gy * BASE_GRID_SCALE
-                )
+                if (snap_gx, snap_gy) != (
+                    self._dragging_token.gx,
+                    self._dragging_token.gy,
+                ) or self._dragging_token_moved:
+                    self._dragging_token_moved = True
+                    self._dragging_token.setPos(
+                        snap_gx * BASE_GRID_SCALE, snap_gy * BASE_GRID_SCALE
+                    )
                 event.accept()
                 return
 
@@ -1261,16 +1300,22 @@ try:
 
             if self._dragging_token is not None:
                 tok = self._dragging_token
+                moved = self._dragging_token_moved
                 self._dragging_token = None
-                snap_gx, snap_gy = snap_creature_grid_xy(
-                    scene_pt.x(),
-                    scene_pt.y(),
-                    tok.data,
-                    self.map_scene.creature_grid_snap,
-                )
-                tok.update_data({"Gx": snap_gx, "Gy": snap_gy})
-                self.map_scene.refresh_targets()
-                self.token_dragged.emit(tok.mob_id, snap_gx, snap_gy)
+                self._dragging_token_moved = False
+                if moved:
+                    snap_gx, snap_gy = snap_creature_grid_xy(
+                        scene_pt.x(),
+                        scene_pt.y(),
+                        tok.data,
+                        self.map_scene.creature_grid_snap,
+                    )
+                    if (snap_gx, snap_gy) != (tok.gx, tok.gy):
+                        tok.update_data({"Gx": snap_gx, "Gy": snap_gy})
+                        self.map_scene.refresh_targets()
+                        self.token_dragged.emit(tok.mob_id, snap_gx, snap_gy)
+                    else:
+                        tok._sync_position()
                 event.accept()
                 return
 

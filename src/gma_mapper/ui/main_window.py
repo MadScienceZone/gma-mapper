@@ -23,10 +23,18 @@ from gma_mapper.core.profile import (
 )
 from gma_mapper.net.client import GMANetworkClient
 from gma_mapper.ui.audio import AudioManager
+from gma_mapper.ui.icons import (
+    TOOLBAR_BUTTON_ORDER,
+    TOOLBAR_TOOLTIPS,
+    IconCatalog,
+    mode_slot_specs,
+    stipple_icon_name,
+)
 from gma_mapper.ui.canvas.drawing import (
     GRID_SNAP_CHOICES,
     LINE_WIDTH_CHOICES,
     STIPPLE_CHOICES,
+    cycle_in_list,
 )
 from gma_mapper.ui.canvas.items import creature_image_candidates
 from gma_mapper.ui.canvas.scene import CREATURE_GRID_SNAP_CHOICES, BattleMapScene
@@ -47,7 +55,7 @@ from gma_mapper.ui.panels.combat import (
 )
 
 try:
-    from PySide6.QtCore import Qt, QTimer, Signal
+    from PySide6.QtCore import QSize, Qt, QTimer, Signal
     from PySide6.QtGui import QAction, QActionGroup, QColor, QKeySequence, QPixmap
     from PySide6.QtWidgets import (
         QApplication,
@@ -57,7 +65,9 @@ try:
         QFileDialog,
         QInputDialog,
         QLineEdit,
+        QMenu,
         QToolBar,
+        QToolButton,
         QStatusBar,
     )
     from gma_mapper.ui.panels.clock import TimerRequestDialog
@@ -521,6 +531,15 @@ class MapperController:
 
 if HAS_PYSIDE6:
 
+    TOOLBAR_LIGHT_STYLESHEET = (
+        "QToolBar { background-color: #d9d9d9; border-bottom: 1px solid #a0a0a0; spacing: 2px; padding: 2px; }"
+        "QToolBar::separator { background-color: #a0a0a0; width: 1px; margin: 2px 3px; }"
+        "QToolButton { background-color: #e6e6e6; color: #000000; border: 1px solid #b8b8b8; border-radius: 2px; padding: 2px; }"
+        "QToolButton:hover { background-color: #f4f4f4; border-color: #888888; }"
+        "QToolButton:checked, QToolButton:pressed { background-color: #b8cfe5; border: 1px solid #5b82ad; }"
+        "QToolButton:disabled { background-color: #d9d9d9; color: #777777; border-color: #c4c4c4; }"
+    )
+
     class GMAMapperMainWindow(QMainWindow):
         """Primary Qt6 Main Window for GMA Mapper (`QMainWindow` + `QDockWidget` panels)."""
 
@@ -537,6 +556,12 @@ if HAS_PYSIDE6:
             self.prefs_path = Path(prefs_path) if prefs_path else None
             self.cache = AssetCache()
             self.audio = AudioManager()
+            self._saf_mode = False
+            self.icon_catalog = IconCatalog(
+                button_size=self.prefs.get("button_size", "small"),
+                dark_mode=False,
+                image_format=str(self.prefs.get("image_format", "png") or "png"),
+            )
             self._download_pool = ThreadPoolExecutor(max_workers=4)
             self._auth_prompt_pending = False
             self.net_client = GMANetworkClient(self)
@@ -554,6 +579,9 @@ if HAS_PYSIDE6:
             self._apply_debug_protocol()
 
             self.setWindowTitle(f"GMA Mapper {GMAMapperVersion}")
+            app_icon = self.icon_catalog.app_window_icon()
+            if app_icon is not None and not app_icon.isNull():
+                self.setWindowIcon(app_icon)
             self.resize(1280, 840)
 
             # Central Battle Map View
@@ -619,25 +647,33 @@ if HAS_PYSIDE6:
         def _create_menus_and_toolbar(self) -> None:
             menubar = self.menuBar()
             self._tool_actions: dict[str, QAction] = {}
+            self.toolbar_actions: dict[str, QAction] = {}
+            self._stipple_actions: dict[str, QAction] = {}
+            self._snap_actions: dict[int, QAction] = {}
+            self._width_actions: dict[int, QAction] = {}
 
             # 1. File Menu
             file_menu = menubar.addMenu("&File")
             act_open_map = QAction("&Load Map File...", self)
+            act_open_map.setIconText("Load")
             act_open_map.setShortcut(QKeySequence("Ctrl+O"))
             act_open_map.triggered.connect(lambda _c=False: self._on_open_map(merge=False))
             file_menu.addAction(act_open_map)
 
             act_merge_map = QAction("&Merge Map File...", self)
+            act_merge_map.setIconText("Merge")
             act_merge_map.setShortcut(QKeySequence("Alt+O"))
             act_merge_map.triggered.connect(lambda _c=False: self._on_open_map(merge=True))
             file_menu.addAction(act_merge_map)
 
             act_save_map = QAction("&Save Map File...", self)
+            act_save_map.setIconText("Save")
             act_save_map.setShortcut(QKeySequence("Ctrl+S"))
             act_save_map.triggered.connect(self._on_save_map)
             file_menu.addAction(act_save_map)
 
             act_unload_map = QAction("&Remove Elements from File...", self)
+            act_unload_map.setIconText("Unload")
             act_unload_map.setShortcut(QKeySequence("Ctrl+Alt+O"))
             act_unload_map.triggered.connect(self._on_unload_map)
             file_menu.addAction(act_unload_map)
@@ -653,6 +689,7 @@ if HAS_PYSIDE6:
 
             file_menu.addSeparator()
             act_quit = QAction("&Quit", self)
+            act_quit.setIconText("Quit")
             act_quit.triggered.connect(self.close)
             file_menu.addAction(act_quit)
 
@@ -667,8 +704,11 @@ if HAS_PYSIDE6:
                 mode: str,
                 shortcut: str = "",
                 status_tip: str = "",
+                short_text: str = "",
             ) -> QAction:
                 act = QAction(label, self)
+                if short_text:
+                    act.setIconText(short_text)
                 act.setCheckable(True)
                 if mode == "pointer":
                     act.setChecked(True)
@@ -683,15 +723,17 @@ if HAS_PYSIDE6:
                     )
                 )
                 tool_group.addAction(act)
-                parent_menu.addAction(act)
+                if parent_menu is not None:
+                    parent_menu.addAction(act)
                 self._tool_actions[mode] = act
                 return act
 
             _add_tool_action(
-                edit_menu, "Normal Play Mode", "pointer", "Alt+N", "Selected normal play mode"
+                edit_menu, "Normal Play Mode", "pointer", "Alt+N", "Selected normal play mode", "Play"
             )
             edit_menu.addSeparator()
 
+            clear_actions_by_label: dict[str, QAction] = {}
             for clr_label, clr_targets in [
                 ("Clear All Map Elements", ["E*"]),
                 ("Clear All Monsters", ["M*"]),
@@ -704,6 +746,12 @@ if HAS_PYSIDE6:
                     lambda _c=False, tlist=clr_targets: self._clear_targets(tlist)
                 )
                 edit_menu.addAction(act_clr)
+                clear_actions_by_label[clr_label] = act_clr
+
+            self.act_clear_elements = clear_actions_by_label["Clear All Map Elements"]
+            self.act_clear_elements.setIconText("Clear Map")
+            self.act_clear_creatures = clear_actions_by_label["Clear All Creatures"]
+            self.act_clear_creatures.setIconText("Clear Creatures")
 
             edit_menu.addSeparator()
             _add_tool_action(
@@ -712,6 +760,7 @@ if HAS_PYSIDE6:
                 "line",
                 "Alt+L",
                 "Selected line tool [Alt+1 arrows, Alt+3 dashes, Double/Right-click to finish]",
+                "Line",
             )
             _add_tool_action(
                 edit_menu,
@@ -719,6 +768,7 @@ if HAS_PYSIDE6:
                 "rect",
                 "Alt+R",
                 "Selected rectangle tool [Alt+3 dashes]",
+                "Rect",
             )
             _add_tool_action(
                 edit_menu,
@@ -726,6 +776,7 @@ if HAS_PYSIDE6:
                 "poly",
                 "Alt+P",
                 "Selected polygon tool [Alt+1 join, Alt+2 spline, Alt+3 dashes, Double/Right-click to finish]",
+                "Poly",
             )
             _add_tool_action(
                 edit_menu,
@@ -733,6 +784,7 @@ if HAS_PYSIDE6:
                 "circ",
                 "Alt+E",
                 "Selected ellipse tool [Alt+3 dashes]",
+                "Circ",
             )
             _add_tool_action(
                 edit_menu,
@@ -740,6 +792,7 @@ if HAS_PYSIDE6:
                 "arc",
                 "Alt+A",
                 "Selected arc tool [Alt+1 mode, Alt+3 dashes]",
+                "Arc",
             )
             _add_tool_action(
                 edit_menu,
@@ -747,6 +800,7 @@ if HAS_PYSIDE6:
                 "text",
                 "Alt+T",
                 "Selected text tool [Right-click to change text, Alt+1 font, Alt+2 anchor]",
+                "Text",
             )
             _add_tool_action(
                 edit_menu,
@@ -754,6 +808,7 @@ if HAS_PYSIDE6:
                 "kill",
                 "Alt+X",
                 "Selected remove-object tool [Click element, or P/N to cycle and X to delete]",
+                "Delete",
             )
             _add_tool_action(
                 edit_menu,
@@ -761,6 +816,7 @@ if HAS_PYSIDE6:
                 "move",
                 "Alt+M",
                 "Selected move-object tool [Drag element, Arrows/HJKL to nudge, U/D/F/B for Z-order]",
+                "Move",
             )
             _add_tool_action(
                 edit_menu,
@@ -768,6 +824,7 @@ if HAS_PYSIDE6:
                 "tile",
                 "Alt+S",
                 "Selected stamp tool [Right-click to choose tile image, Left-click to place]",
+                "Stamp",
             )
             _add_tool_action(
                 edit_menu,
@@ -775,7 +832,9 @@ if HAS_PYSIDE6:
                 "aoebound",
                 "Alt+B",
                 "Selected area-of-effect boundary tool [Click vertices, Double/Right-click to finish]",
+                "AoE Bound",
             )
+            _add_tool_action(None, "Mark", "mark", "", "Selected mark/ping tool", "Mark")
 
             edit_menu.addSeparator()
             self.act_force_top = QAction("Force Drawn Elements to Top", self)
@@ -788,20 +847,21 @@ if HAS_PYSIDE6:
 
             edit_menu.addSeparator()
             self.act_fill_shapes = QAction("Fill Shapes", self)
+            self.act_fill_shapes.setIconText("Fill")
             self.act_fill_shapes.setCheckable(True)
             self.act_fill_shapes.setChecked(self.map_view.fill_enabled)
-            self.act_fill_shapes.triggered.connect(
-                lambda checked: setattr(self.map_view, "fill_enabled", bool(checked))
-            )
+            self.act_fill_shapes.triggered.connect(self._on_toggle_fill_shapes)
             edit_menu.addAction(self.act_fill_shapes)
 
-            act_fill_col = QAction("Choose Fill Color...", self)
-            act_fill_col.triggered.connect(self._on_choose_fill_color)
-            edit_menu.addAction(act_fill_col)
+            self.act_fill_col = QAction("Choose Fill Color...", self)
+            self.act_fill_col.setIconText("Fill Color")
+            self.act_fill_col.triggered.connect(self._on_choose_fill_color)
+            edit_menu.addAction(self.act_fill_col)
 
-            act_line_col = QAction("Choose Outline Color...", self)
-            act_line_col.triggered.connect(self._on_choose_line_color)
-            edit_menu.addAction(act_line_col)
+            self.act_line_col = QAction("Choose Outline Color...", self)
+            self.act_line_col.setIconText("Line Color")
+            self.act_line_col.triggered.connect(self._on_choose_line_color)
+            edit_menu.addAction(self.act_line_col)
 
             stipple_menu = edit_menu.addMenu("Select Fill Pattern")
             stipple_group = QActionGroup(self)
@@ -812,10 +872,11 @@ if HAS_PYSIDE6:
                 if st_val == self.map_view.draw_stipple:
                     act_st.setChecked(True)
                 act_st.triggered.connect(
-                    lambda _c=False, v=st_val: setattr(self.map_view, "draw_stipple", v)
+                    lambda _c=False, v=st_val: self._set_stipple(v)
                 )
                 stipple_group.addAction(act_st)
                 stipple_menu.addAction(act_st)
+                self._stipple_actions[st_val] = act_st
 
             edit_menu.addSeparator()
             snap_menu = edit_menu.addMenu("Set Grid Snap")
@@ -827,10 +888,11 @@ if HAS_PYSIDE6:
                 if sn_val == self.map_view.obj_snap:
                     act_sn.setChecked(True)
                 act_sn.triggered.connect(
-                    lambda _c=False, v=sn_val: setattr(self.map_view, "obj_snap", v)
+                    lambda _c=False, v=sn_val: self._set_obj_snap(v)
                 )
                 snap_group.addAction(act_sn)
                 snap_menu.addAction(act_sn)
+                self._snap_actions[sn_val] = act_sn
 
             width_menu = edit_menu.addMenu("Set Line Thickness")
             width_group = QActionGroup(self)
@@ -841,10 +903,11 @@ if HAS_PYSIDE6:
                 if w_val == self.map_view.draw_width:
                     act_w.setChecked(True)
                 act_w.triggered.connect(
-                    lambda _c=False, v=w_val: setattr(self.map_view, "draw_width", v)
+                    lambda _c=False, v=w_val: self._set_draw_width(v)
                 )
                 width_group.addAction(act_w)
                 width_menu.addAction(act_w)
+                self._width_actions[w_val] = act_w
 
             edit_menu.addSeparator()
             act_prefs = QAction("P&references...", self)
@@ -859,13 +922,21 @@ if HAS_PYSIDE6:
             self.act_show_toolbar.setChecked(True)
             view_menu.addAction(self.act_show_toolbar)
 
+            self.act_toolbar_icons = QAction("Show Toolbar &Icons", self)
+            self.act_toolbar_icons.setCheckable(True)
+            self.act_toolbar_icons.setChecked(not bool(self.prefs.get("toolbar_text", False)))
+            self.act_toolbar_icons.triggered.connect(self._on_toggle_toolbar_icons)
+            view_menu.addAction(self.act_toolbar_icons)
+
             self.act_show_grid = QAction("Show Map &Grid", self)
+            self.act_show_grid.setIconText("Grid")
             self.act_show_grid.setCheckable(True)
             self.act_show_grid.setChecked(self.controller.scene.show_grid)
             self.act_show_grid.triggered.connect(self._on_toggle_grid)
             view_menu.addAction(self.act_show_grid)
 
             self.act_show_health = QAction("Show &Health Stats", self)
+            self.act_show_health.setIconText("HP")
             self.act_show_health.setCheckable(True)
             self.act_show_health.setChecked(self.controller.scene.show_health_stats)
             self.act_show_health.triggered.connect(self._on_toggle_health_stats)
@@ -893,16 +964,19 @@ if HAS_PYSIDE6:
 
             view_menu.addSeparator()
             act_zin = QAction("Zoom &In", self)
+            act_zin.setIconText("Zoom In")
             act_zin.setShortcut(QKeySequence("Ctrl++"))
             act_zin.triggered.connect(self.map_view.zoom_in)
             view_menu.addAction(act_zin)
 
             act_zout = QAction("Zoom &Out", self)
+            act_zout.setIconText("Zoom Out")
             act_zout.setShortcut(QKeySequence("Ctrl+-"))
             act_zout.triggered.connect(self.map_view.zoom_out)
             view_menu.addAction(act_zout)
 
             act_zreset = QAction("&Restore Zoom (100%)", self)
+            act_zreset.setIconText("100%")
             act_zreset.setShortcut(QKeySequence("Ctrl+0"))
             act_zreset.triggered.connect(self.map_view.reset_zoom)
             view_menu.addAction(act_zreset)
@@ -939,6 +1013,7 @@ if HAS_PYSIDE6:
             # 4. Play Menu (ported from bin/mapper_legacy.tcl lines 1352-1460)
             play_menu = menubar.addMenu("&Play")
             self.act_combat_mode = QAction("&Combat Mode", self)
+            self.act_combat_mode.setIconText("Combat")
             self.act_combat_mode.setCheckable(True)
             self.act_combat_mode.setChecked(self.controller.scene.combat_mode)
             self.act_combat_mode.triggered.connect(self._on_toggle_combat_mode)
@@ -950,6 +1025,7 @@ if HAS_PYSIDE6:
                 "saoe",
                 "Ctrl+A",
                 "Selected area-of-effect tool [Alt+1 shape (radius/cone/ray), Alt+2 spread]",
+                "AoE",
             )
             _add_tool_action(
                 play_menu,
@@ -957,6 +1033,7 @@ if HAS_PYSIDE6:
                 "ruler",
                 "Ctrl+D",
                 "Selected ruler tool",
+                "Ruler",
             )
 
             csnap_menu = play_menu.addMenu("Creature Token &Grid Snap")
@@ -975,6 +1052,7 @@ if HAS_PYSIDE6:
 
             play_menu.addSeparator()
             act_req_timer = QAction("Request a New &Timer...", self)
+            act_req_timer.setIconText("Timer")
             act_req_timer.triggered.connect(self._on_open_timer_request_dialog)
             play_menu.addAction(act_req_timer)
 
@@ -992,47 +1070,117 @@ if HAS_PYSIDE6:
             act_deselect_all.triggered.connect(self.controller.scene.clear_mob_selection)
             play_menu.addAction(act_deselect_all)
 
-            # 5. Tools Toolbar
-            toolbar = QToolBar("Tools", self)
-            self.tools_toolbar = toolbar
-            self.act_show_toolbar.triggered.connect(toolbar.setVisible)
-            self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
-
-            _add_tool_action(toolbar, "Mark", "mark", "", "Selected mark/ping tool")
-            for mode in ("pointer", "ruler", "saoe", "line", "rect", "poly", "circ", "arc", "text", "tile", "move", "kill"):
-                if mode in self._tool_actions:
-                    toolbar.addAction(self._tool_actions[mode])
-
-            toolbar.addSeparator()
-            toolbar.addAction(act_line_col)
-            toolbar.addAction(act_fill_col)
-            toolbar.addAction(self.act_fill_shapes)
-
-            act_opt1 = QAction("Opt1 (Alt+1)", self)
-            act_opt1.setToolTip("Cycle Arrow / Join / Arc Mode / Font (Alt+1)")
-            act_opt1.triggered.connect(self.map_view.trigger_alt_1)
-            toolbar.addAction(act_opt1)
-
-            act_opt2 = QAction("Opt2 (Alt+2)", self)
-            act_opt2.setToolTip("Cycle Polygon Spline / Text Anchor (Alt+2)")
-            act_opt2.triggered.connect(self.map_view.trigger_alt_2)
-            toolbar.addAction(act_opt2)
-
-            act_opt3 = QAction("Dash (Alt+3)", self)
-            act_opt3.setToolTip("Cycle Line Dash Pattern (Alt+3)")
-            act_opt3.triggered.connect(self.map_view.trigger_alt_3)
-            toolbar.addAction(act_opt3)
-
-            toolbar.addSeparator()
-            toolbar.addAction(act_zin)
-            toolbar.addAction(act_zout)
-            toolbar.addAction(act_zreset)
-
             # 5. Help Menu
             help_menu = menubar.addMenu("&Help")
             act_update = QAction("Check for &Updates...", self)
             act_update.triggered.connect(self._on_check_updates)
             help_menu.addAction(act_update)
+
+            # 6. Tools Toolbar (ported from bin/mapper_legacy.tcl lines 2835-2880)
+            toolbar = QToolBar("Tools", self)
+            self.tools_toolbar = toolbar
+            self.act_show_toolbar.triggered.connect(toolbar.setVisible)
+            self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
+
+            # Optional compact menu button (when preferences `menu_button` is True)
+            self.menu_tool_button = QToolButton(toolbar)
+            self.menu_tool_button.setText("Menu")
+            self.menu_tool_button.setToolTip("Main Application Menu")
+            self.menu_tool_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+            compact_menu = QMenu(self.menu_tool_button)
+            for sub_m in (file_menu, edit_menu, view_menu, play_menu, help_menu):
+                compact_menu.addMenu(sub_m)
+            self.menu_tool_button.setMenu(compact_menu)
+            self.act_menu_button_widget = toolbar.addWidget(self.menu_tool_button)
+
+            self.act_mode1 = QAction("Opt1", self)
+            self.act_mode1.triggered.connect(self._on_toolbar_mode1)
+            self.act_mode2 = QAction("Opt2", self)
+            self.act_mode2.triggered.connect(self._on_toolbar_mode2)
+            self.act_mode3 = QAction("Dash", self)
+            self.act_mode3.triggered.connect(self._on_toolbar_mode3)
+
+            self.act_cycle_stipple = QAction("Pattern", self)
+            self.act_cycle_stipple.triggered.connect(self._on_cycle_stipple)
+
+            self.act_cycle_snap = QAction("Snap", self)
+            self.act_cycle_snap.triggered.connect(self._on_cycle_snap)
+
+            self.act_cycle_width = QAction("Width", self)
+            self.act_cycle_width.triggered.connect(self._on_cycle_width)
+
+            self.act_open_chat_dock = QAction("Chat/Dice", self)
+            self.act_open_chat_dock.triggered.connect(self._on_toggle_chat_dock)
+
+            self.act_open_clock_dock = QAction("Clock", self)
+            self.act_open_clock_dock.triggered.connect(self._on_toggle_clock_dock)
+
+            self.act_saf_sync = QAction("Push", self)
+            self.act_saf_sync.setEnabled(False)
+            self.act_saf_sync.triggered.connect(self._on_saf_push_sync)
+
+            self.act_saf_mode = QAction("SaF", self)
+            self.act_saf_mode.setCheckable(True)
+            self.act_saf_mode.triggered.connect(self._on_toggle_saf_mode)
+
+            self.act_sync_server = QAction("Sync", self)
+            self.act_sync_server.triggered.connect(self._on_sync_from_server)
+
+            self.toolbar_actions = {
+                "line": self._tool_actions["line"],
+                "rect": self._tool_actions["rect"],
+                "poly": self._tool_actions["poly"],
+                "circ": self._tool_actions["circ"],
+                "arc": self._tool_actions["arc"],
+                "text": self._tool_actions["text"],
+                "mode": self.act_mode1,
+                "mode2": self.act_mode2,
+                "mode3": self.act_mode3,
+                "nil": self._tool_actions["pointer"],
+                "kill": self._tool_actions["kill"],
+                "move": self._tool_actions["move"],
+                "stamp": self._tool_actions["tile"],
+                "nfill": self.act_fill_shapes,
+                "cfill": self.act_fill_col,
+                "cline": self.act_line_col,
+                "cstip": self.act_cycle_stipple,
+                "snap": self.act_cycle_snap,
+                "width": self.act_cycle_width,
+                "clear": self.act_clear_elements,
+                "clearp": self.act_clear_creatures,
+                "combat": self.act_combat_mode,
+                "showhp": self.act_show_health,
+                "aoe": self._tool_actions["saoe"],
+                "aoebound": self._tool_actions["aoebound"],
+                "ruler": self._tool_actions["ruler"],
+                "griden": self.act_show_grid,
+                "chat": self.act_open_chat_dock,
+                "iniclock": self.act_open_clock_dock,
+                "tmrq": act_req_timer,
+                "zi": act_zin,
+                "zo": act_zout,
+                "refresh": act_zreset,
+                "load": act_open_map,
+                "merge": act_merge_map,
+                "unload": act_unload_map,
+                "sync": self.act_saf_sync,
+                "saf": self.act_saf_mode,
+                "polo": self.act_sync_server,
+                "save": act_save_map,
+                "exit": act_quit,
+            }
+
+            for btn_key, tip in TOOLBAR_TOOLTIPS.items():
+                if btn_key in self.toolbar_actions and tip:
+                    self.toolbar_actions[btn_key].setToolTip(tip)
+
+            for entry in TOOLBAR_BUTTON_ORDER:
+                if entry == "|":
+                    toolbar.addSeparator()
+                elif entry in self.toolbar_actions:
+                    toolbar.addAction(self.toolbar_actions[entry])
+
+            self._refresh_toolbar_appearance()
 
         def _wire_signals(self) -> None:
             self._image_downloaded.connect(self._on_image_downloaded)
@@ -1078,6 +1226,7 @@ if HAS_PYSIDE6:
                 lambda img_name, z: self.controller._ensure_pixmap_loaded(img_name, z)
             )
             self.map_view.tool_changed.connect(self._on_tool_changed)
+            self.map_view.tool_options_changed.connect(self._update_toolbar_dynamic_states)
             self.map_view.status_message.connect(
                 lambda msg: self.statusBar().showMessage(msg)
             )
@@ -1364,6 +1513,250 @@ if HAS_PYSIDE6:
         def _on_tool_changed(self, mode: str) -> None:
             if hasattr(self, "_tool_actions") and mode in self._tool_actions:
                 self._tool_actions[mode].setChecked(True)
+            self._update_toolbar_dynamic_states()
+
+        def _on_toggle_toolbar_icons(self, checked: bool) -> None:
+            self.prefs["toolbar_text"] = not bool(checked)
+            self._refresh_toolbar_appearance()
+            if self.prefs_path:
+                save_preferences(self.prefs_path, self.prefs)
+            self.statusBar().showMessage(
+                "Toolbar display mode: Icons" if checked else "Toolbar display mode: Text labels"
+            )
+
+        def set_toolbar_display_mode(self, use_icons: bool) -> None:
+            """Switch the command bar between icon buttons (`use_icons=True`) and text strings (`use_icons=False`)."""
+            self.prefs["toolbar_text"] = not bool(use_icons)
+            self._refresh_toolbar_appearance()
+
+        def _refresh_toolbar_appearance(self) -> None:
+            """Refresh toolbar icon size, theme, button display style (icons vs. text), and menu button visibility."""
+            self.tools_toolbar.setStyleSheet(TOOLBAR_LIGHT_STYLESHEET)
+            self.icon_catalog.configure(
+                button_size=self.prefs.get("button_size", "small"),
+                dark_mode=False,
+                image_format=str(self.prefs.get("image_format", "png") or "png"),
+            )
+            px = self.icon_catalog.pixel_size()
+            self.tools_toolbar.setIconSize(QSize(px, px))
+
+            use_text = bool(self.prefs.get("toolbar_text", False))
+            self.tools_toolbar.setToolButtonStyle(
+                Qt.ToolButtonStyle.ToolButtonTextOnly
+                if use_text
+                else Qt.ToolButtonStyle.ToolButtonIconOnly
+            )
+            if hasattr(self, "act_toolbar_icons"):
+                self.act_toolbar_icons.blockSignals(True)
+                self.act_toolbar_icons.setChecked(not use_text)
+                self.act_toolbar_icons.blockSignals(False)
+
+            use_menu_btn = bool(self.prefs.get("menu_button", False))
+            self.menuBar().setVisible(not use_menu_btn)
+            if hasattr(self, "act_menu_button_widget"):
+                self.act_menu_button_widget.setVisible(use_menu_btn)
+            if hasattr(self, "menu_tool_button"):
+                self.menu_tool_button.setIcon(self.icon_catalog.icon("menu"))
+                self.menu_tool_button.setToolButtonStyle(
+                    Qt.ToolButtonStyle.ToolButtonTextOnly
+                    if use_text
+                    else Qt.ToolButtonStyle.ToolButtonIconOnly
+                )
+
+            static_icon_map = {
+                "nil": "play",
+                "kill": "cut",
+                "move": "shape_square_go",
+                "clear": "clear",
+                "clearp": "clear_players",
+                "combat": "combat",
+                "showhp": "heart",
+                "ruler": "ruler",
+                "griden": "snap_1",
+                "chat": "die20",
+                "iniclock": "clock",
+                "tmrq": "tmrq",
+                "zi": "zoom_in",
+                "zo": "zoom_out",
+                "refresh": "zoom",
+                "saf": "saf",
+                "polo": "arrow_refresh",
+                "save": "save",
+                "exit": "exit",
+            }
+            for btn_key, icon_name in static_icon_map.items():
+                if btn_key in self.toolbar_actions:
+                    self.toolbar_actions[btn_key].setIcon(self.icon_catalog.icon(icon_name))
+
+            self._update_toolbar_dynamic_states()
+
+        def _update_toolbar_dynamic_states(self) -> None:
+            """Sync dynamic toolbar icons, labels, and tooltips (`mode`/`mode2`/`mode3`, fill, colors, stipple, snap, width, SaF)."""
+            if not hasattr(self, "toolbar_actions") or not self.toolbar_actions:
+                return
+
+            # 1. Fill, Color Swatches, Stipple, Grid Snap, and Line Width
+            fill_icon = "fill" if self.map_view.fill_enabled else "no_fill"
+            self.act_fill_shapes.blockSignals(True)
+            self.act_fill_shapes.setChecked(self.map_view.fill_enabled)
+            self.act_fill_shapes.blockSignals(False)
+            self.act_fill_shapes.setIcon(self.icon_catalog.icon(fill_icon))
+
+            self.act_fill_col.setIcon(
+                self.icon_catalog.color_swatch_icon("fill_color", self.map_view.draw_fill_color)
+            )
+            self.act_line_col.setIcon(
+                self.icon_catalog.color_swatch_icon("outline_color", self.map_view.draw_line_color)
+            )
+
+            st_icon = stipple_icon_name(self.map_view.draw_stipple)
+            self.act_cycle_stipple.setIcon(self.icon_catalog.icon(st_icon))
+            self.act_cycle_stipple.setIconText(f"Pat:{self.map_view.draw_stipple or '100%'}")
+
+            snap_idx = int(self.map_view.obj_snap) % 5
+            self.act_cycle_snap.setIcon(self.icon_catalog.icon(f"snap_{snap_idx}"))
+            self.act_cycle_snap.setIconText(f"Snap:{snap_idx}")
+
+            width_idx = int(self.map_view.draw_width) % 10
+            self.act_cycle_width.setIcon(self.icon_catalog.icon(f"width_{width_idx}"))
+            self.act_cycle_width.setIconText(f"W:{width_idx}")
+
+            # 2. Store-and-Forward (SaF) mode vs normal drawing mode
+            draw_btn_icons = {
+                "line": "line",
+                "rect": "rect",
+                "poly": "poly",
+                "circ": "circ",
+                "arc": "arc",
+                "text": "textfield_add",
+                "stamp": "stamp",
+                "aoe": "wand",
+                "aoebound": "wandbound",
+            }
+            if self._saf_mode:
+                blank_ic = self.icon_catalog.icon("blank")
+                for bkey in draw_btn_icons:
+                    if bkey in self.toolbar_actions:
+                        self.toolbar_actions[bkey].setIcon(blank_ic)
+                        self.toolbar_actions[bkey].setEnabled(False)
+                for m_act, m_lbl in ((self.act_mode1, "Opt1"), (self.act_mode2, "Opt2"), (self.act_mode3, "Dash")):
+                    m_act.setIcon(blank_ic)
+                    m_act.setIconText(m_lbl)
+                    m_act.setToolTip("")
+                    m_act.setEnabled(False)
+                self.toolbar_actions["load"].setIcon(self.icon_catalog.icon("saf_open"))
+                self.toolbar_actions["merge"].setIcon(self.icon_catalog.icon("saf_merge"))
+                self.toolbar_actions["unload"].setIcon(self.icon_catalog.icon("saf_unload"))
+                self.act_saf_sync.setIcon(self.icon_catalog.icon("saf_group_go"))
+                self.act_saf_sync.setToolTip("Push this map to all other clients (USE THIS WITH CARE)")
+                self.act_saf_sync.setEnabled(True)
+            else:
+                for bkey, ic_name in draw_btn_icons.items():
+                    if bkey in self.toolbar_actions:
+                        self.toolbar_actions[bkey].setIcon(self.icon_catalog.icon(ic_name))
+                        self.toolbar_actions[bkey].setEnabled(True)
+                m1, m2, m3 = mode_slot_specs(
+                    active_tool=self.map_view.active_tool,
+                    draw_join=self.map_view.draw_join,
+                    draw_aoe_shape=self.map_view.draw_aoe_shape,
+                    draw_arc_mode=self.map_view.draw_arc_mode,
+                    draw_arrow=self.map_view.draw_arrow,
+                    draw_spline=self.map_view.draw_spline,
+                    draw_aoe_spread=self.map_view.draw_aoe_spread,
+                    draw_text_anchor=self.map_view.draw_text_anchor,
+                    draw_dash=self.map_view.draw_dash,
+                )
+                for act_slot, (ic_name, short_lbl, tip, enabled) in (
+                    (self.act_mode1, m1),
+                    (self.act_mode2, m2),
+                    (self.act_mode3, m3),
+                ):
+                    act_slot.setIcon(self.icon_catalog.icon(ic_name))
+                    act_slot.setIconText(short_lbl)
+                    act_slot.setToolTip(tip)
+                    act_slot.setEnabled(enabled)
+                self.toolbar_actions["load"].setIcon(self.icon_catalog.icon("open"))
+                self.toolbar_actions["merge"].setIcon(self.icon_catalog.icon("merge"))
+                self.toolbar_actions["unload"].setIcon(self.icon_catalog.icon("unload"))
+                self.act_saf_sync.setIcon(self.icon_catalog.icon("blank"))
+                self.act_saf_sync.setToolTip("")
+                self.act_saf_sync.setEnabled(False)
+
+        def _on_toolbar_mode1(self) -> None:
+            self.map_view.trigger_alt_1()
+
+        def _on_toolbar_mode2(self) -> None:
+            if self.map_view.active_tool == "line":
+                self.map_view.trigger_alt_1()
+            else:
+                self.map_view.trigger_alt_2()
+
+        def _on_toolbar_mode3(self) -> None:
+            self.map_view.trigger_alt_3()
+
+        def _on_toggle_fill_shapes(self, checked: bool) -> None:
+            self.map_view.fill_enabled = bool(checked)
+            self._update_toolbar_dynamic_states()
+            self.statusBar().showMessage(f"Fill shapes: {'ON' if checked else 'OFF'}")
+
+        def _set_stipple(self, stipple: str) -> None:
+            self.map_view.draw_stipple = stipple
+            if stipple in self._stipple_actions:
+                self._stipple_actions[stipple].setChecked(True)
+            self._update_toolbar_dynamic_states()
+            self.statusBar().showMessage(f"Fill pattern: {stipple or 'solid (100%)'}")
+
+        def _on_cycle_stipple(self) -> None:
+            choices = [st_val for st_val, _ in STIPPLE_CHOICES]
+            next_st = cycle_in_list(self.map_view.draw_stipple, choices)
+            self._set_stipple(next_st)
+
+        def _set_obj_snap(self, snap: int) -> None:
+            self.map_view.obj_snap = int(snap) % 5
+            if self.map_view.obj_snap in self._snap_actions:
+                self._snap_actions[self.map_view.obj_snap].setChecked(True)
+            self._update_toolbar_dynamic_states()
+            self.statusBar().showMessage(f"Grid snap set to {self.map_view.obj_snap}")
+
+        def _on_cycle_snap(self) -> None:
+            self._set_obj_snap((int(self.map_view.obj_snap) + 1) % 5)
+
+        def _set_draw_width(self, width: int) -> None:
+            self.map_view.draw_width = int(width) % 10
+            if self.map_view.draw_width in self._width_actions:
+                self._width_actions[self.map_view.draw_width].setChecked(True)
+            self._update_toolbar_dynamic_states()
+            self.statusBar().showMessage(f"Line width set to {self.map_view.draw_width}")
+
+        def _on_cycle_width(self) -> None:
+            self._set_draw_width((int(self.map_view.draw_width) + 1) % 10)
+
+        def _on_toggle_chat_dock(self) -> None:
+            if self.chat_dock.isHidden():
+                self.chat_dock.show()
+            self.chat_dock.raise_()
+
+        def _on_toggle_clock_dock(self) -> None:
+            if self.clock_dock.isHidden():
+                self.clock_dock.show()
+            self.clock_dock.raise_()
+
+        def _on_toggle_saf_mode(self, checked: bool) -> None:
+            self._saf_mode = bool(checked)
+            if self._saf_mode:
+                self.map_view.set_tool_mode("pointer")
+            self._update_toolbar_dynamic_states()
+            self.statusBar().showMessage(
+                f"Store-and-forward mode {'enabled' if self._saf_mode else 'disabled'}"
+            )
+
+        def _on_saf_push_sync(self) -> None:
+            self.net_client.session.sync()
+            self.statusBar().showMessage("Synchronized map state with server")
+
+        def _on_sync_from_server(self) -> None:
+            self.net_client.session.sync()
+            self.statusBar().showMessage("Requested game state sync from server")
 
         def _clear_targets(self, targets: list[str]) -> None:
             for t in targets:
@@ -1382,6 +1775,7 @@ if HAS_PYSIDE6:
                 self.map_view.fill_enabled = True
                 if hasattr(self, "act_fill_shapes"):
                     self.act_fill_shapes.setChecked(True)
+                self._update_toolbar_dynamic_states()
                 self.statusBar().showMessage(f"Fill color set to {col.name()}")
 
         def _on_choose_line_color(self) -> None:
@@ -1392,6 +1786,7 @@ if HAS_PYSIDE6:
             )
             if col.isValid():
                 self.map_view.draw_line_color = col.name()
+                self._update_toolbar_dynamic_states()
                 self.statusBar().showMessage(f"Outline color set to {col.name()}")
 
         def _on_toggle_grid(self, checked: bool) -> None:
@@ -1479,6 +1874,7 @@ if HAS_PYSIDE6:
             if dlg.exec():
                 self.prefs = dlg.prefs
                 self.controller.apply_preferences(self.prefs)
+                self._refresh_toolbar_appearance()
                 self._apply_debug_protocol()
                 if self.prefs_path:
                     save_preferences(self.prefs_path, self.prefs)
