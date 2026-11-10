@@ -231,13 +231,24 @@ if HAS_PYSIDE6:
                     self.rollRequested.emit(name, spec, self.current_targets())
 
         def set_presets(self, presets: list[dict[str, Any]]) -> None:
-            """Populate the die-roll presets table from ``DD`` / ``DD=`` or local ``.dice`` file."""
+            """Populate the die-roll presets table from ``DD`` / ``DD=`` or local ``.dice`` file.
+
+            Preserves horizontal and vertical scrollbar positions across updates.
+            """
+            v_bar = self.preset_table.verticalScrollBar()
+            h_bar = self.preset_table.horizontalScrollBar()
+            v_pos = v_bar.value() if v_bar is not None else 0
+            h_pos = h_bar.value() if h_bar is not None else 0
             self.presets = list(presets)
             self.preset_table.setRowCount(len(self.presets))
             for idx, p in enumerate(self.presets):
                 self.preset_table.setItem(idx, 0, QTableWidgetItem(str(p.get("Name", ""))))
                 self.preset_table.setItem(idx, 1, QTableWidgetItem(str(p.get("Description", ""))))
                 self.preset_table.setItem(idx, 2, QTableWidgetItem(str(p.get("DieRollSpec", ""))))
+            if v_bar is not None:
+                v_bar.setValue(v_pos)
+            if h_bar is not None:
+                h_bar.setValue(h_pos)
 
         def append_roll(self, payload: dict[str, Any], styles: dict[str, Any] | None = None) -> None:
             self.transcript.append(format_roll_result(payload, styles))

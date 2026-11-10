@@ -1088,9 +1088,9 @@ def encode_with_batching(
     max_len: int = MAXIMUM_MESSAGE_LENGTH,
     frag_size: int = FRAG_SIZE,
 ) -> list[str]:
-    """Encode a command and split into `BATCH` packets if it exceeds `max_len`."""
+    """Encode a command and split into `BATCH` packets if its UTF-8 byte length exceeds `max_len`."""
     packet = _protocol_encode(command, dargs)
-    if len(packet) <= max_len:
+    if len(packet.encode("utf-8")) <= max_len:
         return [packet]
 
     delim = packet.find(" ")
