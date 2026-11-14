@@ -591,6 +591,29 @@ def default_preferences() -> dict[str, Any]:
     }
 
 
+def _deep_fill_defaults(
+    target: dict[str, Any],
+    defaults: dict[str, Any],
+    *,
+    replace_empty_dicts: bool = False,
+) -> dict[str, Any]:
+    """Recursively populate missing or non-dict nested keys in `target` from `defaults`.
+
+    When `replace_empty_dicts` is True, an existing empty dict `{}` for a key whose
+    default is a non-empty dict is replaced with a deep copy of the default.
+    """
+    for key, def_val in defaults.items():
+        if key not in target:
+            target[key] = copy.deepcopy(def_val)
+        elif isinstance(def_val, dict):
+            cur = target[key]
+            if not isinstance(cur, dict) or (replace_empty_dicts and def_val and not cur):
+                target[key] = copy.deepcopy(def_val)
+            else:
+                _deep_fill_defaults(cur, def_val, replace_empty_dicts=replace_empty_dicts)
+    return target
+
+
 def fix_missing(prefs: dict[str, Any]) -> dict[str, Any]:
     """Populate missing style, font, scaling, guide_lines, or server profile fields in `prefs` in-place.
 
@@ -599,113 +622,42 @@ def fix_missing(prefs: dict[str, Any]) -> dict[str, Any]:
     always emits the required JSON objects (even when empty `{}`).
     """
     d_prefs = default_preferences()
-    for top_key, top_val in d_prefs.items():
-        if top_key not in prefs:
-            prefs[top_key] = copy.deepcopy(top_val)
 
-    d_styles = default_styles()
-    if not isinstance(prefs.get("styles"), dict):
-        prefs["styles"] = {}
+    # Preserve legacy behavior: if `a11y` already existed without `colorize_die_labels`,
+    # it defaults to False rather than True.
+    if isinstance(prefs.get("a11y"), dict):
+        prefs["a11y"].setdefault("colorize_die_labels", False)
+
+    # Recursively populate missing top-level keys, styles, fonts, and guide_lines.
+    _deep_fill_defaults(prefs, d_prefs)
+
+    # Ensure existing empty dicts inside component/dialog/clock/character/font entries
+    # are replaced with their full default sub-dictionaries.
+    d_styles = d_prefs["styles"]
     styles = prefs["styles"]
+    _deep_fill_defaults(styles["dierolls"]["components"], d_styles["dierolls"]["components"], replace_empty_dicts=True)
+    _deep_fill_defaults(styles["dialogs"], d_styles["dialogs"], replace_empty_dicts=True)
+    _deep_fill_defaults(styles["clocks"], d_styles["clocks"], replace_empty_dicts=True)
+    _deep_fill_defaults(styles["characters"], d_styles["characters"], replace_empty_dicts=True)
+    _deep_fill_defaults(prefs["fonts"], d_prefs["fonts"], replace_empty_dicts=True)
 
-    # dierolls
-    if not isinstance(styles.get("dierolls"), dict):
-        styles["dierolls"] = {}
-    dierolls = styles["dierolls"]
-    if not isinstance(dierolls.get("components"), dict):
-        dierolls["components"] = {}
-    comps = dierolls["components"]
-    for stylename, styledata in d_styles["dierolls"]["components"].items():
-        if stylename not in comps or not isinstance(comps[stylename], dict) or not comps[stylename]:
-            comps[stylename] = copy.deepcopy(styledata)
-        else:
-            c_entry = comps[stylename]
-            for color_field in ("fg", "bg"):
-                if not isinstance(c_entry.get(color_field), dict) or not c_entry[color_field]:
-                    c_entry[color_field] = {"dark": "", "light": ""}
-                else:
-                    c_entry[color_field].setdefault("dark", "")
-                    c_entry[color_field].setdefault("light", "")
-            for field_name in ("overstrike", "underline", "font", "format"):
-                c_entry.setdefault(field_name, styledata[field_name])
-    if "compact_recents" not in dierolls:
-        dierolls["compact_recents"] = False
-
-    # dialogs
-    if not isinstance(styles.get("dialogs"), dict):
-        styles["dialogs"] = {}
-    dialogs = styles["dialogs"]
-    for stylename, styledata in d_styles["dialogs"].items():
-        if stylename not in dialogs or not isinstance(dialogs[stylename], dict) or not dialogs[stylename]:
-            dialogs[stylename] = copy.deepcopy(styledata)
-        else:
-            dialogs[stylename].setdefault("dark", styledata["dark"])
-            dialogs[stylename].setdefault("light", styledata["light"])
-
-    # clocks
-    if not isinstance(styles.get("clocks"), dict):
-        styles["clocks"] = {}
-    clocks = styles["clocks"]
-    for stylename, styledata in d_styles["clocks"].items():
-        if stylename not in clocks or not clocks[stylename]:
-            clocks[stylename] = copy.deepcopy(styledata)
-        elif isinstance(styledata, dict):
-            if not isinstance(clocks[stylename], dict):
-                clocks[stylename] = copy.deepcopy(styledata)
-            else:
-                clocks[stylename].setdefault("dark", styledata["dark"])
-                clocks[stylename].setdefault("light", styledata["light"])
-
-    # characters
-    if not isinstance(styles.get("characters"), dict):
-        styles["characters"] = {}
-    chars = styles["characters"]
-    for symbol, desc in d_styles["characters"].items():
-        if symbol not in chars or not isinstance(chars[symbol], dict) or not chars[symbol]:
-            chars[symbol] = copy.deepcopy(desc)
-
-    # markers
-    if not isinstance(styles.get("markers"), dict):
-        styles["markers"] = {}
-
-    # fonts
-    d_fonts = default_fonts()
-    if not isinstance(prefs.get("fonts"), dict):
-        prefs["fonts"] = {}
-    fonts = prefs["fonts"]
-    for font_name, font_dict in d_fonts.items():
-        if font_name not in fonts or not isinstance(fonts[font_name], dict) or not fonts[font_name]:
-            fonts[font_name] = copy.deepcopy(font_dict)
-    for f_entry in fonts.values():
+    # Coerce font sizes to integers (required by Tk/Qt font creation).
+    for f_entry in prefs["fonts"].values():
         if isinstance(f_entry, dict) and "size" in f_entry:
             try:
                 f_entry["size"] = int(round(float(f_entry["size"])))
             except (ValueError, TypeError):
                 f_entry["size"] = 12
 
-    # a11y
-    if not isinstance(prefs.get("a11y"), dict):
-        prefs["a11y"] = {}
-    a11y = prefs["a11y"]
-    if "colorize_die_labels" not in a11y:
-        a11y["colorize_die_labels"] = False
-
-    # guide_lines (required by Tcl's ApplyPreferences and ::gmaprofile::editor via ::gmautil::dassign)
-    if not isinstance(prefs.get("guide_lines"), dict):
-        prefs["guide_lines"] = copy.deepcopy(d_prefs["guide_lines"])
+    # Coerce guide_lines integer fields.
     guides = prefs["guide_lines"]
     for tier in ("major", "minor"):
-        if not isinstance(guides.get(tier), dict):
-            guides[tier] = {"interval": 0, "offsets": {"x": 0, "y": 0}}
-        else:
-            guides[tier]["interval"] = int(guides[tier].get("interval", 0) or 0)
-            if not isinstance(guides[tier].get("offsets"), dict):
-                guides[tier]["offsets"] = {"x": 0, "y": 0}
-            else:
-                guides[tier]["offsets"]["x"] = int(guides[tier]["offsets"].get("x", 0) or 0)
-                guides[tier]["offsets"]["y"] = int(guides[tier]["offsets"].get("y", 0) or 0)
+        tier_dict = guides[tier]
+        tier_dict["interval"] = int(tier_dict.get("interval", 0) or 0)
+        tier_dict["offsets"]["x"] = int(tier_dict["offsets"].get("x", 0) or 0)
+        tier_dict["offsets"]["y"] = int(tier_dict["offsets"].get("y", 0) or 0)
 
-    # profiles
+    # Normalize server profiles list.
     if not isinstance(prefs.get("profiles"), list) or not prefs["profiles"]:
         prefs["profiles"] = [empty_server_profile("offline")]
     else:
@@ -714,9 +666,9 @@ def fix_missing(prefs: dict[str, Any]) -> dict[str, Any]:
                 prefs["profiles"][i] = empty_server_profile("offline")
             else:
                 defaults = empty_server_profile(str(prof.get("name", "offline") or "offline"))
-                for k, v in defaults.items():
-                    prof.setdefault(k, v)
+                _deep_fill_defaults(prof, defaults)
 
+    # Normalize empty/falsy scalar defaults.
     if not prefs.get("current_profile"):
         prefs["current_profile"] = str(prefs["profiles"][0].get("name", "offline"))
     if not prefs.get("button_size"):

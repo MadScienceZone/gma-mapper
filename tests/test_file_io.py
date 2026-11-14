@@ -139,6 +139,10 @@ class TestFileIO(unittest.TestCase):
         self.assertEqual(len(presets2), 1)
         self.assertEqual(presets2[0]["Name"], "Attack")
 
+        bad_buf = io.StringIO("__DICE__:2\n«BAD_HEADER_WITHOUT_SPACE»\n")
+        with self.assertRaisesRegex(ValueError, "invalid die roll preset file format: unexpected data"):
+            load_dice_presets_from_file(bad_buf)
+
 
 if __name__ == "__main__":
     unittest.main()

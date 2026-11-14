@@ -351,6 +351,11 @@ def dassigndef(
 
 _NULL_BLOCK = b"\x00" * 512
 
+# Maximum uncompressed size allowed for a single USTAR archive entry during extraction
+# (256 MiB by default). Prevents out-of-memory (OOM) crashes if an archive has a
+# corrupted header or a maliciously crafted multi-gigabyte entry size.
+MAX_USTAR_ENTRY_SIZE: int = 256 * 1024 * 1024
+
 
 @dataclass
 class UstarEntry:
@@ -564,34 +569,54 @@ def ustar_gzip_contents(path: str | os.PathLike[str]) -> list[UstarEntry]:
 def ustar_extract(
     stream: BinaryIO,
     callback: Callable[[UstarEntry, bytes], None],
+    max_entry_size: int = MAX_USTAR_ENTRY_SIZE,
 ) -> None:
     """Read a USTAR archive from `stream`, invoking `callback(header, data)` for each entry."""
     while True:
         hdr = _ustar_parse_header(stream)
         if hdr is None:
             break
+        # Guard against negative or excessively large entry sizes before allocating memory
+        # so malformed headers or tar-bombs cannot exhaust process RAM.
+        if hdr.size < 0 or hdr.size > max_entry_size:
+            raise ValueError(
+                f"ustar_extract: entry {hdr.name!r} size {hdr.size} exceeds maximum allowed "
+                f"size ({max_entry_size} bytes)"
+            )
+        # Accumulate 512-byte blocks directly into a pre-sized bytearray instead of building
+        # a potentially huge list of 512-byte `bytes` objects before joining.
         data_blocks = (hdr.size + 511) // 512
-        chunks = [_ustar_getblock(stream) for _ in range(data_blocks)]
-        data = b"".join(chunks)[: hdr.size]
-        callback(hdr, data)
+        buf = bytearray()
+        remaining = hdr.size
+        for _ in range(data_blocks):
+            block = _ustar_getblock(stream)
+            if remaining >= 512:
+                buf.extend(block)
+                remaining -= 512
+            elif remaining > 0:
+                buf.extend(block[:remaining])
+                remaining = 0
+        callback(hdr, bytes(buf))
 
 
 def ustar_file_extract(
     path: str | os.PathLike[str],
     callback: Callable[[UstarEntry, bytes], None],
+    max_entry_size: int = MAX_USTAR_ENTRY_SIZE,
 ) -> None:
     """Extract a `.tar` file via `callback(header, data)`."""
     with open(path, "rb") as f:
-        ustar_extract(f, callback)
+        ustar_extract(f, callback, max_entry_size=max_entry_size)
 
 
 def ustar_gzip_extract(
     path: str | os.PathLike[str],
     callback: Callable[[UstarEntry, bytes], None],
+    max_entry_size: int = MAX_USTAR_ENTRY_SIZE,
 ) -> None:
     """Extract a `.tar.gz` file via `callback(header, data)`."""
     with gzip.open(path, "rb") as f:
-        ustar_extract(f, callback)  # type: ignore[arg-type]
+        ustar_extract(f, callback, max_entry_size=max_entry_size)  # type: ignore[arg-type]
 
 
 def ustar_format_contents(contents: list[UstarEntry]) -> str:

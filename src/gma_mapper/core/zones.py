@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import functools
 import math
 import re
 from dataclasses import dataclass
@@ -314,13 +315,18 @@ _STANDARD_MATRICES: dict[str, tuple[int, int, list[list[int]]]] = {
         ],
     ),
 }
-# Aliases for 1/S/s/M/m, 2/L, 3/H
+# Aliases for 1/S/s/M/m, 2/L, 3/H, 4/G, 6/C
 for _alias in ("S", "s", "M", "m"):
     _STANDARD_MATRICES[_alias] = _STANDARD_MATRICES["1"]
 _STANDARD_MATRICES["2"] = _STANDARD_MATRICES["L"]
 _STANDARD_MATRICES["3"] = _STANDARD_MATRICES["H"]
+_STANDARD_MATRICES["4"] = _STANDARD_MATRICES["G"]
+_STANDARD_MATRICES["6"] = _STANDARD_MATRICES["C"]
 
 
+# Cache parsed size parameters and size codes since creature tokens repeatedly
+# query the same size strings during layout, hit-testing, and zoom updates.
+@functools.lru_cache(maxsize=512)
 def creature_size_params(size_code: str) -> SizeParams | None:
     """Parse a creature size code `[FDTSMLHGC][nat][->ext][=space][:comment]` into grid units."""
     m = _SIZE_PARAMS_RE.match(str(size_code))
@@ -341,6 +347,7 @@ def CreatureSizeParams(size_code: str) -> list[str | int]:
     return params.to_tcl_list() if params is not None else []
 
 
+@functools.lru_cache(maxsize=512)
 def parse_size_code(size_code: str) -> ParsedSizeCode:
     """Parse full size code `[fdtsmlhgc][reach][->extended][=token][:*?comment]` or raise ValueError."""
     m = _FULL_SIZE_CODE_RE.match(str(size_code))
@@ -422,6 +429,9 @@ def monster_size_value(size: str | int) -> int | float:
 MonsterSizeValue = monster_size_value
 
 
+# Cache standard and computed reach templates to avoid re-copying or recomputing
+# threat matrices on every token draw/hover pass.
+@functools.lru_cache(maxsize=128)
 def reach_matrix(size: str | int) -> ReachTemplate | None:
     """Return the standard `ReachTemplate` for the first character of `size` (`ReachMatrix`)."""
     s = str(size)
@@ -464,6 +474,7 @@ def MatchesStandardTemplate(size: str, natural: int, extended: int) -> list[Any]
     return tpl.to_tcl_list() if tpl is not None else []
 
 
+@functools.lru_cache(maxsize=256)
 def computed_reach_matrix(size: str, natural: int, reach: int) -> ReachTemplate:
     """Compute or look up the threat and reach zone matrix for `(size, natural, reach)`.
 

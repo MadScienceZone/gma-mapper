@@ -53,6 +53,8 @@ class TestZones(unittest.TestCase):
 
         self.assertEqual(MatchesStandardTemplate("M", 1, 2), m_tpl)
         self.assertEqual(MatchesStandardTemplate("M", 1, 3), [])
+        self.assertEqual(ReachMatrix("4"), ReachMatrix("G"))
+        self.assertEqual(ReachMatrix("6"), ReachMatrix("C"))
 
     def test_computed_reach_matrix_custom(self) -> None:
         # M with natural=1, reach=3 -> dimension = 1 + 2*3 = 7x7

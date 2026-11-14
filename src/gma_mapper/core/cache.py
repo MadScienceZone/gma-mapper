@@ -8,11 +8,14 @@ from __future__ import annotations
 import base64
 import email.utils
 import hashlib
+import logging
 import os
 import re
+import shlex
 import shutil
 import ssl
 import subprocess
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -20,6 +23,13 @@ from pathlib import Path
 from typing import Any
 
 from gma_mapper.net.protocol import json_from_dict, new_dict_from_json
+
+logger = logging.getLogger(__name__)
+
+# Security guard: server file IDs (MD5-base64 map IDs or hex/alphanumeric asset IDs)
+# must contain only safe identifier characters and be at least 2 characters long
+# (since the remote path shards on file_id[0:1] and file_id[0:2]).
+_VALID_FILE_ID_RE = re.compile(r"^[A-Za-z0-9_-]{2,}$")
 
 DEFAULT_CACHE_DIR: Path = Path.home() / ".gma" / "mapper" / "cache"
 DEFAULT_CURL_SERVER: str = "https://www.rag.com/gma/map"
@@ -127,7 +137,7 @@ class AssetCache:
         p = Path(cache_path)
         posix_str = p.as_posix()
 
-        img_pat = rf"/([:;][0-9]+[:;])?([^/]+)@([0-9.]+)\.{re.escape(self.image_format)}$"
+        img_pat = rf"(?:^|/)([:;][0-9]+[:;])?([^/]+)@([0-9.]+)\.{re.escape(self.image_format)}$"
         m = re.search(img_pat, posix_str)
         if m:
             image_frame = (m.group(1) or "").replace(";", ":")
@@ -138,11 +148,11 @@ class AssetCache:
                 return (True, age, image_name, image_zoom, image_frame)
             return (False, 0, image_name, image_zoom, image_frame)
 
-        m_dir = re.search(r"/([^/]+)@([0-9.]+)$", posix_str)
+        m_dir = re.search(r"(?:^|/)([^/]+)@([0-9.]+)$", posix_str)
         if m_dir and p.is_dir():
             return (True, 0, m_dir.group(1), m_dir.group(2), "-dir")
 
-        m_map = re.search(r"/([^/]+)\.map$", posix_str)
+        m_map = re.search(r"(?:^|/)([^/]+)\.map$", posix_str)
         if m_map:
             map_name = m_map.group(1)
             if p.exists():
@@ -173,8 +183,11 @@ class AssetCache:
                 if entry.is_dir() and "@" in entry.name:
                     total += 1
                     del_all = False
-                    for frame_file in sorted(entry.glob(f"*.{self.image_format}")):
+                    frame_files = sorted(entry.glob(f"*.{self.image_format}"))
+                    for frame_file in frame_files:
                         total += 1
+                        if del_all:
+                            continue
                         _, frame_age, _, _, _ = self.cache_info(frame_file)
                         if days_old == "-update":
                             if frame_age <= self.cache_too_old_days:
@@ -182,7 +195,6 @@ class AssetCache:
                                 deleted += 1
                         elif isinstance(days_old, int) and frame_age >= days_old:
                             del_all = True
-                            break
                     if del_all:
                         shutil.rmtree(entry, ignore_errors=True)
                         deleted += 1
@@ -223,9 +235,28 @@ class AssetCache:
             with urllib.request.urlopen(req, context=ctx, timeout=30) as resp:
                 data = resp.read()
                 dest.parent.mkdir(parents=True, exist_ok=True)
-                dest.write_bytes(data)
-                now = time.time()
-                os.utime(dest, (now, now))
+                # Write to a temporary file in the same directory first, then atomically
+                # replace the target path via os.replace(). This ensures an interrupted
+                # download, disk error, or process crash never leaves a truncated/corrupt
+                # asset file at `dest`.
+                tmp_path: Path | None = None
+                try:
+                    with tempfile.NamedTemporaryFile(
+                        mode="wb",
+                        dir=dest.parent,
+                        prefix=f".{dest.name}.",
+                        suffix=".tmp",
+                        delete=False,
+                    ) as tmp_fp:
+                        tmp_path = Path(tmp_fp.name)
+                        tmp_fp.write(data)
+                    now = time.time()
+                    os.utime(tmp_path, (now, now))
+                    os.replace(tmp_path, dest)
+                    tmp_path = None
+                finally:
+                    if tmp_path is not None:
+                        tmp_path.unlink(missing_ok=True)
                 return True
         except urllib.error.HTTPError as err:
             if err.code == 304:
@@ -340,6 +371,12 @@ class AssetCache:
         if not self.scp_dest or not self.scp_server:
             raise ValueError("No upload server has been configured.")
 
+        # Validate `file_id` against a strict alphanumeric/dash/underscore allowlist
+        # before interpolating it into remote paths or SSH commands to prevent path
+        # traversal (`..`) and remote shell command injection.
+        if not _VALID_FILE_ID_RE.match(file_id):
+            raise ValueError(f"Invalid server file_id: {file_id!r}")
+
         local_path = Path(local_file)
         destdir = f"{self.scp_dest}/{file_id[0:1]}/{file_id[0:2]}"
         destfile = f"{destdir}/{file_id}.map"
@@ -357,7 +394,11 @@ class AssetCache:
                 ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
                 ssh.connect(host, username=user or None)
                 try:
-                    _, stdout, stderr = ssh.exec_command(f"{self.server_mkdir} -p {destdir}")
+                    # Quote `destdir` with shlex.quote() so spaces or special characters
+                    # in `scp_dest` cannot break or inject commands in the remote shell.
+                    _, stdout, stderr = ssh.exec_command(
+                        f"{self.server_mkdir} -p {shlex.quote(destdir)}"
+                    )
                     stdout.channel.recv_exit_status()
                     sftp = ssh.open_sftp()
                     try:
@@ -369,7 +410,11 @@ class AssetCache:
                     ssh.close()
                 return
             except ImportError:
-                pass
+                # Log an explicit warning instead of failing silently when the caller
+                # requested Paramiko SFTP but the optional `paramiko` package is missing.
+                logger.warning(
+                    "paramiko is not installed; falling back to external ssh/scp CLI for upload."
+                )
 
         destpath = f"{self.scp_server}:{destfile}"
         if self.scp_proxy:

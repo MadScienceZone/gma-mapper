@@ -819,12 +819,12 @@ def load_dice_presets_from_file(
                 return (meta, presets)
             rec_match = re.match(r"^\u00ab(.*?)\u00bb (.+)$", v)
             if not rec_match:
-                raise ValueError("invalid map file format: unexpected data")
+                raise ValueError("invalid die roll preset file format: unexpected data")
             record_type = rec_match.group(1)
             json_chunks = [rec_match.group(2)]
         else:
             if not record_type:
-                raise ValueError("invalid map file format: unexpected data")
+                raise ValueError("invalid die roll preset file format: unexpected data")
             json_chunks.append(v)
 
     raise ValueError("invalid die roll preset file: unexpected end of file")

@@ -15,13 +15,27 @@
 
 from __future__ import annotations
 
+import functools
 import html
 import re
-from typing import Sequence
+from typing import Sequence, overload
 
 BULLET_CHARS = ("\u2022", "\u2023", "\u2043", "\u25cb", "\u261e", "\u2605")
 
 _LIST_LINE_RE = re.compile(r"^([@#]+)\s*(.*)$")
+
+_FRACTIONS: dict[str, str] = {
+    "1/2": "\u00bd",
+    "1/4": "\u00bc",
+    "3/4": "\u00be",
+}
+_FRACTION_RE = re.compile(r"\b(?:(\d+)_)?(1/2|1/4|3/4)\b")
+
+
+def _replace_fraction(m: re.Match[str]) -> str:
+    whole = m.group(1) or ""
+    return f"{whole}{_FRACTIONS[m.group(2)]}"
+
 
 # Ordered replacement rules from bin/minimarkup.tcl
 _REPLACEMENTS: list[tuple[str, str | re.Pattern[str], str]] = [
@@ -43,12 +57,8 @@ _REPLACEMENTS: list[tuple[str, str | re.Pattern[str], str]] = [
     ("s", "[8]", "\u2078"),
     ("s", "[9]", "\u2079"),
     ("r", re.compile(r"-(\d)"), "\u2012\\1"),
-    ("r", re.compile(r"\b1/2\b"), "\u00bd"),
-    ("r", re.compile(r"\b1/4\b"), "\u00bc"),
-    ("r", re.compile(r"\b3/4\b"), "\u00be"),
-    ("r", re.compile(r"\b(\d+)_1/2\b"), "\\1\u00bd"),
-    ("r", re.compile(r"\b(\d+)_1/4\b"), "\\1\u00bc"),
-    ("r", re.compile(r"\b(\d+)_3/4\b"), "\\1\u00be"),
+    # Consolidated 6 separate fraction regexes into a single pass
+    ("f", _FRACTION_RE, ""),
     ("s", "^o", "\u00b0"),
     ("s", "[c]", "\u00a9"),
     ("s", "[R]", "\u00ae"),
@@ -76,12 +86,10 @@ _REPLACEMENTS: list[tuple[str, str | re.Pattern[str], str]] = [
 ]
 
 
-def render(mtext: str) -> list[tuple[str, str]]:
-    """Parse GMA minimarkup text into a list of `(style, text)` spans.
-
-    `style` is one of: `'normal'`, `'bold'`, `'italic'`, `'bolditalic'`, `'section'`, `'subsection'`.
-    Matches `::gma::minimarkup::render` in `bin/minimarkup.tcl`.
-    """
+# Cache parsed markup spans as an immutable tuple so repeated renders of static
+# descriptions/notes avoid re-running all replacement passes.
+@functools.lru_cache(maxsize=256)
+def _render_cached(mtext: str) -> tuple[tuple[str, str], ...]:
     lines = mtext.split("\n")
     levels: list[int] = []
     newlines: list[str] = []
@@ -111,6 +119,9 @@ def render(mtext: str) -> list[tuple[str, str]]:
         if kind == "r":
             assert isinstance(pattern, re.Pattern)
             srctext = pattern.sub(repl, srctext)
+        elif kind == "f":
+            assert isinstance(pattern, re.Pattern)
+            srctext = pattern.sub(_replace_fraction, srctext)
         else:
             assert isinstance(pattern, str)
             srctext = srctext.replace(pattern, repl)
@@ -159,7 +170,16 @@ def render(mtext: str) -> list[tuple[str, str]]:
 
         spans.append((style, text))
 
-    return spans
+    return tuple(spans)
+
+
+def render(mtext: str) -> list[tuple[str, str]]:
+    """Parse GMA minimarkup text into a list of `(style, text)` spans.
+
+    `style` is one of: `'normal'`, `'bold'`, `'italic'`, `'bolditalic'`, `'section'`, `'subsection'`.
+    Matches `::gma::minimarkup::render` in `bin/minimarkup.tcl`.
+    """
+    return list(_render_cached(mtext))
 
 
 def render_flat(mtext: str) -> list[str]:
@@ -171,7 +191,15 @@ def render_flat(mtext: str) -> list[str]:
     return flat
 
 
-def strip(rendered: Sequence[tuple[str, str] | str]) -> str:
+@overload
+def strip(rendered: Sequence[tuple[str, str]]) -> str: ...
+
+
+@overload
+def strip(rendered: Sequence[str]) -> str: ...
+
+
+def strip(rendered: Sequence[tuple[str, str]] | Sequence[str]) -> str:
     """Strip font style tags from rendered output, returning plain Unicode text.
 
     Accepts either `list[tuple[str, str]]` (from `render()`) or flat `list[str]` (from `render_flat()`).
@@ -181,11 +209,12 @@ def strip(rendered: Sequence[tuple[str, str] | str]) -> str:
         return ""
     first = rendered[0]
     if isinstance(first, tuple):
-        return "".join(text for _style, text in rendered)  # type: ignore[misc]
+        return "".join(item[1] for item in rendered if isinstance(item, tuple))
     # Flat list [style, text, style, text, ...]
     return "".join(str(rendered[i]) for i in range(1, len(rendered), 2))
 
 
+@functools.lru_cache(maxsize=256)
 def render_html(mtext: str) -> str:
     """Render GMA minimarkup text into an HTML snippet suitable for Qt rich text widgets."""
     parts: list[str] = []

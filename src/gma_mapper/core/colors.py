@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import functools
 import re
 
 # Raw (R, G, B, name) entries in the exact order defined in bin/gmacolors.tcl
@@ -718,6 +719,10 @@ def rgb_name(rgbcode: str) -> str:
     return _RGB_TO_NAME.get(rgbcode, _RGB_TO_NAME.get(rgbcode.lower(), rgbcode))
 
 
+# Cache color parsing and conversion hot paths: canvas rendering and token/grid
+# updates repeatedly resolve the same small set of color names and hex strings.
+# Returned tuples and strings are immutable, so caching is safe.
+@functools.lru_cache(maxsize=512)
 def parse_color_rgb(color: str) -> tuple[int, int, int]:
     """Parse an X11 color name or '#rgb' / '#rrggbb' / '#rrrrggggbbbb' string to 8-bit (R, G, B)."""
     s = color.strip()
@@ -751,12 +756,14 @@ def parse_color_rgb(color: str) -> tuple[int, int, int]:
     raise ValueError(f"Unknown color specification: {color!r}")
 
 
+@functools.lru_cache(maxsize=512)
 def color_to_hex(color: str) -> str:
     """Convert any X11 color name or hex color string into canonical lowercase '#rrggbb'."""
     r, g, b = parse_color_rgb(color)
     return f"#{r:02x}{g:02x}{b:02x}"
 
 
+@functools.lru_cache(maxsize=512)
 def contrasting_color(color: str) -> str:
     """Return 'black' or 'white' for best contrast against `color`.
 

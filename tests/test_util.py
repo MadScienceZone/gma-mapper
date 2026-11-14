@@ -15,6 +15,7 @@ from gma_mapper.core.util import (
     my_os,
     my_platform,
     ustar_gzip_contents,
+    ustar_gzip_extract,
     verify,
     version_compare,
 )
@@ -63,6 +64,19 @@ class TestUtil(unittest.TestCase):
             self.assertGreater(len(entries), 10)
             names = [e.name for e in entries]
             self.assertTrue(any("__checksums__" in n for n in names))
+
+            # Verify ustar_gzip_extract works within limits and rejects entries exceeding max_entry_size
+            extracted_count = 0
+
+            def _on_entry(_hdr: object, _data: bytes) -> None:
+                nonlocal extracted_count
+                extracted_count += 1
+
+            ustar_gzip_extract(tar_path, _on_entry)
+            self.assertEqual(extracted_count, len(entries))
+
+            with self.assertRaisesRegex(ValueError, "exceeds maximum allowed size"):
+                ustar_gzip_extract(tar_path, _on_entry, max_entry_size=10)
 
     def test_git_and_platform_helpers(self) -> None:
         repo_root = pathlib.Path(__file__).resolve().parents[1]
