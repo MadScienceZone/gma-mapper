@@ -1,14 +1,14 @@
 #!/usr/bin/env wish
 # DONE make sure that clearing all the targets can transmit a "clear the list to nil" signal that doesn't get cleared to something empty that looks like "there's nothing here to read at all".
 ########################################################################################
-#  _______  _______  _______                ___          ___    _______                #
-# (  ____ \(       )(  ___  ) Game         /   )        /   )  / ___   )               #
-# | (    \/| () () || (   ) | Master's    / /) |       / /) |  \/   )  |               #
-# | |      | || || || (___) | Assistant  / (_) (_     / (_) (_     /   )               #
-# | | ____ | |(_)| ||  ___  |           (____   _)   (____   _)  _/   /                #
-# | | \_  )| |   | || (   ) | VTT            ) (          ) (   /   _/                 #
-# | (___) || )   ( || )   ( | Mapper         | |   _      | |  (   (__/\               #
-# (_______)|/     \||/     \| Client         (_)  (_)     (_)  \_______/               #
+#  _______  _______  _______                ___          ___    _______      __        #
+# (  ____ \(       )(  ___  ) Game         /   )        /   )  / ___   )    /  \       #
+# | (    \/| () () || (   ) | Master's    / /) |       / /) |  \/   )  |    \/) )      #
+# | |      | || || || (___) | Assistant  / (_) (_     / (_) (_     /   )      | |      #
+# | | ____ | |(_)| ||  ___  |           (____   _)   (____   _)  _/   /       | |      #
+# | | \_  )| |   | || (   ) | VTT            ) (          ) (   /   _/        | |      #
+# | (___) || )   ( || )   ( | Mapper         | |   _      | |  (   (__/\ _  __) (_     #
+# (_______)|/     \||/     \| Client         (_)  (_)     (_)  \_______/(_) \____/     #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -18,10 +18,10 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.42.1-alpha.1}     ;# @@##@@
+set GMAMapperVersion {4.42.1}     ;# @@##@@
 set GMAMapperFileFormat {24}        ;# @@##@@
 set GMAMapperProtocol {428}         ;# @@##@@
-set CoreVersionNumber {6.48}            ;# @@##@@
+set CoreVersionNumber {6.49}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -19021,7 +19021,7 @@ proc _commit_AWCtK {w id condition limit mdata} {
 #
 #  called when rendering somone or advancing the initiative turn or updating target attribute
 #
-# @[00]@| GMA-Mapper 4.42
+# @[00]@| GMA-Mapper 4.42.1
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2026 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
