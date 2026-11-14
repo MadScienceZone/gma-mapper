@@ -1,14 +1,14 @@
 #!/usr/bin/env wish
 # DONE make sure that clearing all the targets can transmit a "clear the list to nil" signal that doesn't get cleared to something empty that looks like "there's nothing here to read at all".
 ########################################################################################
-#  _______  _______  _______                ___          ___    _______                #
-# (  ____ \(       )(  ___  ) Game         /   )        /   )  / ___   )               #
-# | (    \/| () () || (   ) | Master's    / /) |       / /) |  \/   )  |               #
-# | |      | || || || (___) | Assistant  / (_) (_     / (_) (_     /   )               #
-# | | ____ | |(_)| ||  ___  |           (____   _)   (____   _)  _/   /                #
-# | | \_  )| |   | || (   ) | VTT            ) (          ) (   /   _/                 #
-# | (___) || )   ( || )   ( | Mapper         | |   _      | |  (   (__/\               #
-# (_______)|/     \||/     \| Client         (_)  (_)     (_)  \_______/               #
+#  _______  _______  _______                ___          ___    _______      __        #
+# (  ____ \(       )(  ___  ) Game         /   )        /   )  / ___   )    /  \       #
+# | (    \/| () () || (   ) | Master's    / /) |       / /) |  \/   )  |    \/) )      #
+# | |      | || || || (___) | Assistant  / (_) (_     / (_) (_     /   )      | |      #
+# | | ____ | |(_)| ||  ___  |           (____   _)   (____   _)  _/   /       | |      #
+# | | \_  )| |   | || (   ) | VTT            ) (          ) (   /   _/        | |      #
+# | (___) || )   ( || )   ( | Mapper         | |   _      | |  (   (__/\ _  __) (_     #
+# (_______)|/     \||/     \| Client         (_)  (_)     (_)  \_______/(_) \____/     #
 #                                                                                      #
 ########################################################################################
 # TODO move needs to move entire animated stack (seems to do the right thing when mapper is restarted)
@@ -18,10 +18,10 @@
 # GMA Mapper Client with background I/O processing.
 #
 # Auto-configure values
-set GMAMapperVersion {4.42}     ;# @@##@@
+set GMAMapperVersion {4.42.1}     ;# @@##@@
 set GMAMapperFileFormat {24}        ;# @@##@@
 set GMAMapperProtocol {428}         ;# @@##@@
-set CoreVersionNumber {6.48}            ;# @@##@@
+set CoreVersionNumber {6.49}            ;# @@##@@
 encoding system utf-8
 #---------------------------[CONFIG]-------------------------------------------
 #
@@ -7090,8 +7090,8 @@ proc RefreshTargets {} {
 		} err]} {
 			DEBUG 0 "Unable to draw target source: $err"
 		}
-		puts "=> ActiveTargetSource   $ActiveTargetSource"
-		puts "=> ExplicitTargetSource $ExplicitTargetSource"
+		# TODO puts "=> ActiveTargetSource   $ActiveTargetSource"
+		# TODO puts "=> ExplicitTargetSource $ExplicitTargetSource"
 	} else {
 		$canvas delete MYTARG
 		foreach my_source $me {
@@ -11606,7 +11606,7 @@ proc DoCommandDD= {d} {
 			set dice_preset_data(delegates,$tkey) [dict get $d Delegates]
 			set dice_preset_data(delegate_for,$tkey) [dict get $d DelegateFor]
 			set wp [sframe content $dice_preset_data(cw,$tkey).p.preset.sf]
-			_render_die_roller $wp 0 0 preset $target $tkey -noclear
+			_render_die_roller $wp 0 0 preset $target $tkey -noclear -view * *
 		} err]} {
 			DEBUG 0 "Error updating die preset info for $target: $err"
 		}
@@ -12629,7 +12629,7 @@ proc DRPexpand {w tkey piname j for_user} {
 	set dice_preset_data(collapse,$tkey,$piname) \
 		[lreplace $dice_preset_data(collapse,$tkey,$piname) $j $j \
 			[expr ![lindex $dice_preset_data(collapse,$tkey,$piname) $j]]]
-	_render_die_roller $w 0 0 preset $for_user $tkey
+	_render_die_roller $w 0 0 preset $for_user $tkey -view * *
 }
 		
 proc SetTableColors {row fgvar bgvar} {
@@ -12644,6 +12644,11 @@ proc SetTableColors {row fgvar bgvar} {
 	}
 }
 
+# _render_die_roller ... ?-noclear? ?-view x y?
+# 	-noclear:  don't destroy the existing widgets
+# 	-view x y: set scrollbars to these values after building the presets
+# 	           if x or y are "*", use the current position of the scroll bar
+#
 proc _render_die_roller {w width height type for_user tkey args} {
 	global dice_preset_data last_known_size icon_delete icon_die16 icon_die16g
 	global dark_mode _preferences colortheme icon_blank
@@ -12652,7 +12657,8 @@ proc _render_die_roller {w width height type for_user tkey args} {
 #	puts "RDR::start dice_preset_data=[array get dice_preset_data sys,gvar_on,*]"
 #	puts "RDR::start DieRollPresetState=[array get DieRollPresetState *,*on,*]"
 #	puts "RDR::start DieRollPresetState=[array get DieRollPresetState *,apply_order]"
-
+	
+	
 	assert_last_known_size $tkey
 	if {$width <= 0} {
 		set width $last_known_size($tkey,$type,width)
@@ -12723,6 +12729,21 @@ $w.$i.extra configure -width [expr max(3,[string length [lindex [lindex $dice_pr
 			}
 		}
 		preset {
+			if {[set viewidx [lsearch -exact $args -view]] >= 0} {
+				set preset_scroller_base [winfo parent [winfo parent $w]]
+				set scroll_to_x [lindex $args [expr $viewidx+1]]
+				set scroll_to_y [lindex $args [expr $viewidx+2]]
+				if {$scroll_to_x eq "*"} {
+					set scroll_to_x [$preset_scroller_base.hs get]
+				}
+				if {$scroll_to_y eq "*"} {
+					set scroll_to_y [$preset_scroller_base.vs get]
+				}
+			} else {
+				set scroll_to_x {}
+				set scroll_to_y {}
+			}
+
 			global icon_bullet_arrow_down
 			global icon_bullet_arrow_right
 			set CONTINUE_OUTER_LOOP 42
@@ -12815,28 +12836,6 @@ $w.$i.extra configure -width [expr max(3,[string length [lindex [lindex $dice_pr
 					continue
 				}
 
-
-
-#				set dice_preset_data(w,$tkey,$pname) $wpi
-#				pack [frame $wpi] -side top -expand 0 -fill x
-#				set grplist [split [dict get $preset Group] "\u25B6"]
-#				if {![info exists dice_preset_data(collapse,$tkey,$piname)] || \
-#					[llength $dice_preset_data(collapse,$tkey,$piname)] != [llength $grplist]} {
-#						set dice_preset_data(collapse,$tkey,$piname) [lmap x $grplist { expr 0 }]
-#				}
-#				for {set j 0} {$j < [llength $grplist]} {incr j} {
-#					if {[lindex $dice_preset_data(collapse,$tkey,$piname) $j]} {
-#						pack [button $wpi.gb$j -image $icon_bullet_arrow_down -relief flat -command [list DRPexpand $w $tkey $piname]] [label $wpi.gl$j -text [lindex $grplist $j]] -side left
-#					} else {
-#						pack [button $wpi.gb$j -image $icon_bullet_arrow_right -relief flat -command [list DRPexpand $w $tkey $piname]] [label $wpi.gl$j -text [lindex $grplist $j]] -side left
-#						break
-#					}
-#				}
-#				if {$j < [llength $grplist]} {
-#					incr i
-#					continue
-#				}
-
 				if {$scope eq "g"} {
 					pack [button $wpi.tablename -text "##$dname" -command [list RollTable "##$dname" $for_user $tkey]] -side left
 				} {
@@ -12926,28 +12925,6 @@ $w.$i.extra configure -width [expr max(3,[string length [lindex [lindex $dice_pr
 					incr i
 					continue
 				}
-
-
-
-#				set dice_preset_data(w,$tkey,$pname) $wpi
-#				pack [frame $wpi] -side top -expand 0 -fill x
-#				set grplist [split [dict get $preset Group] "\u25B6"]
-#				if {![info exists dice_preset_data(collapse,$tkey,$piname)] || \
-#					[llength $dice_preset_data(collapse,$tkey,$piname)] != [llength $grplist]} {
-#						set dice_preset_data(collapse,$tkey,$piname) [lmap x $grplist { expr 0 }]
-#				}
-#				for {set j 0} {$j < [llength $grplist]} {incr j} {
-#					if {[lindex $dice_preset_data(collapse,$tkey,$piname) $j]} {
-#						pack [button $wpi.gb$j -image $icon_bullet_arrow_down -relief flat -command [list DRPexpand $w $tkey $piname]] [label $wpi.gl$j -text [lindex $grplist $j]] -side left
-#					} else {
-#						pack [button $wpi.gb$j -image $icon_bullet_arrow_right -relief flat -command [list DRPexpand $w $tkey $piname]] [label $wpi.gl$j -text [lindex $grplist $j]] -side left
-#						break
-#					}
-#				}
-#				if {$j < [llength $grplist]} {
-#					incr i
-#					continue
-#				}
 
 				if {[set id [string trim [dict get $preset Variable]]] eq {}} {
 					set id [dict get $preset DisplaySeq]
@@ -13146,7 +13123,21 @@ $w.$i.extra configure -width [expr max(3,[string length [lindex [lindex $dice_pr
 					incr i
 				}
 			}
-			::gmautil::trigger_size $w
+			if {$scroll_to_x ne {}} {
+				#$preset_scroller_base.hs set {*}$scroll_to_x
+				#$preset_scroller_base xview moveto .5
+				::scrolledframe::xview $preset_scroller_base.sf moveto [lindex $scroll_to_x 0]
+				update
+#				puts "::::SCROLL X $preset_scroller_base.hs set $scroll_to_x -> [$preset_scroller_base.hs get]"
+			}
+			if {$scroll_to_y ne {}} {
+				#$preset_scroller_base.vs set {*}$scroll_to_y
+				::scrolledframe::yview $preset_scroller_base.sf moveto [lindex $scroll_to_y 0]
+				update
+				#$preset_scroller_base yset {*}$scroll_to_y
+#			puts "::::SCROLL Y $preset_scroller_base.vs set $scroll_to_y -> [$preset_scroller_base.vs get]"
+			}
+			#::gmautil::trigger_size $w
 		}
 		default {
 			DEBUG 0 "_render_die_roller passed unknown type '$type'"
@@ -13176,7 +13167,7 @@ proc _resize_die_roller {w width height type for_user tkey} {
 	}
 	if {[catch {
 		global last_known_size
-		_render_die_roller $w $width $height $type $for_user $tkey
+		_render_die_roller $w $width $height $type $for_user $tkey -view * *
 		set last_known_size($tkey,$type,width) $width
 		set last_known_size($tkey,$type,height) $height
 	} err]} {
@@ -14325,6 +14316,7 @@ proc EDRTtblSave {rw tkey i wfld} {
 		return
 	}
 
+	set sort_table false
 	for {set r 0} {$r < $limit} {incr r} {
 		set v $dice_preset_data(tmp_presets,$tkey,T,$i,v$r)
 		set t $dice_preset_data(tmp_presets,$tkey,T,$i,t$r)
@@ -14348,13 +14340,30 @@ proc EDRTtblSave {rw tkey i wfld} {
 		}
 		if {$r == 0} {
 			set last $v
-		} elseif {$r < $lastidx && $v <= $last} {
-			tk_messageBox -parent $rw -type ok -icon error -title "Invalid table data" \
+		} elseif {$r < $lastidx && $v <= $last && !$sort_table} {
+			if {[tk_messageBox -parent $rw -type yesno -icon error -title "Invalid table data" \
 				-message "This table contains errors. Correct the problem before saving the table." \
-				-detail "The values in the left column must be increasing in order as you go down the table. In this case, the value $v appears after the value $last."
-			return
+				-detail "The values in the left column must be increasing in order as you go down the table. In this case, the value $v appears after the value $last. Would you like to fix this automatically by sorting all the rows of the table? selecting YES will re-sort the rows in order. Selecting NO will abort the save operation and allow you to continue editing the table yourself."] ne "yes"} {
+				return
+			}
+			set sort_table true
 		}
 		lappend newtable $v $t
+	}
+	if {$sort_table} {
+		array unset newtable_tmp
+		foreach {idx text} $newtable {
+			if {$idx ne "*"} {
+				set newtable_tmp($idx) $text
+			} else {
+				set last_text $text
+			}
+		}
+		set newtable {}
+		foreach idx [lsort -integer [array names newtable_tmp]] {
+			lappend newtable $idx $newtable_tmp($idx)
+		}
+		lappend newtable * $last_text
 	}
 	dict set dice_preset_data(tmp_presets,$tkey,T,$i,d) table $newtable
 	dict set dice_preset_data(tmp_presets,$tkey,T,$i,d) markup $dice_preset_data(tmp_presets,$tkey,T,$i,m)
@@ -19012,7 +19021,7 @@ proc _commit_AWCtK {w id condition limit mdata} {
 #
 #  called when rendering somone or advancing the initiative turn or updating target attribute
 #
-# @[00]@| GMA-Mapper 4.42
+# @[00]@| GMA-Mapper 4.42.1
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2026 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),

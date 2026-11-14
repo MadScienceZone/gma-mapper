@@ -3,11 +3,11 @@
 # Release Notes
 
 ## Current Version Information
- * This Package Version: 4.42          <!-- @@##@@ -->
- * Effective Date: 04-Oct-2026               <!-- @@##@@ -->
+ * This Package Version: 4.42.1          <!-- @@##@@ -->
+ * Effective Date: 14-Nov-2026               <!-- @@##@@ -->
 
 ## Compatibility
- * GMA Core API Library Version: 6.48 <!-- @@##@@ -->
+ * GMA Core API Library Version: 6.49 <!-- @@##@@ -->
  * GMA Mapper File Format: 24	     <!-- @@##@@ -->
  * GMA Mapper Protocol: 428        <!-- @@##@@ -->
  * GMA Mapper Preferences File Format: 15 <!-- @@##@@ -->
@@ -16,6 +16,13 @@
 The support for old server protocols (<400) has ended.
 If you are still running an ancient version of the server and clients, you need to upgrade to the latest
 versions.
+
+# v4.42.1
+## Fixes
+ * Corrects a bug in the handling of batched packets which contained multibyte Unicode characters.
+ * Now allows insertion of new die-roller table rows arbitrarily instead of only appending to the bottom.
+ * Corrects typos in the protocol spec document.
+ * Scrollbars on the die-roll preset pane stay put when die roll presets are updated instead of resetting the view to the top.
 
 # v4.42
 ## Adds

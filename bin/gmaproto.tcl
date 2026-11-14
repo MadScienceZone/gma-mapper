@@ -1,12 +1,12 @@
 ########################################################################################
-#  _______  _______  _______                ___          ___    _______                #
-# (  ____ \(       )(  ___  ) Game         /   )        /   )  / ___   )               #
-# | (    \/| () () || (   ) | Master's    / /) |       / /) |  \/   )  |               #
-# | |      | || || || (___) | Assistant  / (_) (_     / (_) (_     /   )               #
-# | | ____ | |(_)| ||  ___  |           (____   _)   (____   _)  _/   /                #
-# | | \_  )| |   | || (   ) | VTT            ) (          ) (   /   _/                 #
-# | (___) || )   ( || )   ( | Mapper         | |   _      | |  (   (__/\               #
-# (_______)|/     \||/     \| Client         (_)  (_)     (_)  \_______/               #
+#  _______  _______  _______                ___          ___    _______      __        #
+# (  ____ \(       )(  ___  ) Game         /   )        /   )  / ___   )    /  \       #
+# | (    \/| () () || (   ) | Master's    / /) |       / /) |  \/   )  |    \/) )      #
+# | |      | || || || (___) | Assistant  / (_) (_     / (_) (_     /   )      | |      #
+# | | ____ | |(_)| ||  ___  |           (____   _)   (____   _)  _/   /       | |      #
+# | | \_  )| |   | || (   ) | VTT            ) (          ) (   /   _/        | |      #
+# | (___) || )   ( || )   ( | Mapper         | |   _      | |  (   (__/\ _  __) (_     #
+# (_______)|/     \||/     \| Client         (_)  (_)     (_)  \_______/(_) \____/     #
 #                                                                                      #
 ########################################################################################
 #
@@ -481,12 +481,12 @@ proc ::gmaproto::_protocol_send {command args} {
 }
 proc ::gmaproto::_protocol_send_d {command dargs} {
 	set packet [::gmaproto::_protocol_encode $command $dargs]
-	if {[string length $packet] > $::gmaproto::maximum_message_length} {
+	if {[string bytelength $packet] > $::gmaproto::maximum_message_length} {
 		::gmaproto::DEBUG "$command packet length [string length $packet] exceeds maximum $::gmaproto::maximum_message_length"
 		if {[set delim [string first " " $packet]] < 0} {
 			error "malformed outgoing $command data packet (can't find delimiter)"
 		}
-		set blob [string range $packet $delim+1 end]
+		set blob [encoding convertto utf-8 [string range $packet $delim+1 end]]
 		set total_batches [expr [string length $blob] / $::gmaproto::frag_size]
 		if {([string length $blob] % $::gmaproto::frag_size) != 0} {
 			incr total_batches
@@ -1778,7 +1778,7 @@ proc ::gmaproto::_read_poll {} {
 				#::gmaproto::DEBUG "data now $data"
 			}
 			array unset ::gmaproto::_batch_storage $batch_group,*
-			set res [::gmaproto::_parse_data_packet "$cmd $data"]
+			set res [::gmaproto::_parse_data_packet "$cmd [encoding convertfrom utf-8 $data]"]
 			if {[lindex $res 0] eq {NIL}} {
 				::gmaproto::DEBUG "unable to restore command; got NIL"
 				return [list "" ""]
@@ -2527,7 +2527,7 @@ proc ::gmaproto::json_decode_special {special_type d} {
 	}
 }
 
-# @[00]@| GMA-Mapper 4.42
+# @[00]@| GMA-Mapper 4.42.1
 # @[01]@|
 # @[10]@| Overall GMA package Copyright © 1992–2026 by Steven L. Willoughby (AKA MadScienceZone)
 # @[11]@| steve@madscience.zone (previously AKA Software Alchemy),
