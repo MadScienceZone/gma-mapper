@@ -739,8 +739,17 @@ def save_dice_presets_to_file(
             save_dice_presets_to_file(fp, objlist)
         return
 
-    meta = dict(objlist[0] or {})
-    presets = objlist[1]
+    if (
+        isinstance(objlist, (tuple, list))
+        and len(objlist) == 2
+        and isinstance(objlist[0], dict)
+        and isinstance(objlist[1], list)
+    ):
+        meta = dict(objlist[0] or {})
+        presets = objlist[1]
+    else:
+        meta = {}
+        presets = list(objlist)
     if "Timestamp" not in meta or not meta["Timestamp"]:
         now = int(time.time())
         meta["Timestamp"] = now

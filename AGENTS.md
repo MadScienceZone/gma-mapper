@@ -4,7 +4,7 @@
 - **Virtual Environment**: Always use `c:\Users\mbutry\Documents\GMA\gma-mapper\.venv\Scripts\python.exe` (and `gma-mapper.exe` in `.venv\Scripts\`).
 - **Unit Test Suite**: Run all tests via:
   ```powershell
-  .\gma-mapper\.venv\Scripts\python.exe -m unittest discover -s gma-mapper\tests -v
+  .\.venv\Scripts\python.exe -m unittest discover -s tests -v
   ```
 - **Pure-Python Testability**: Keep core logic, protocol state machines (`ProtocolSession`), controllers (`MapperController`), and canvas geometry/menu helpers testable without requiring a visible display server.
 
@@ -26,4 +26,12 @@
 - **Protocol Framing & Batching**:
   - Sanitize `\r` and `\n` in outgoing protocol lines (`_raw_send`).
   - Slice and reassemble `BATCH` payloads as raw UTF-8 `bytes` before decoding to `str` so multi-byte UTF-8 code points split across fragment boundaries never fail.
+
+## Code Quality, Performance & Documentation Conventions
+- **Benchmark Before Optimizing**: Before applying performance optimizations, establish a reproducible baseline benchmark (e.g., using `time.perf_counter()` in a scratch script), then re-run the benchmark after the changes to verify and report the actual speedup.
+- **Explanatory Comments on Security & Architectural Changes**: Add clear inline comments explaining *why* security guards (atomic temp-file + `os.replace` writes, identifier regex allowlists, `shlex.quote`, archive entry size limits) and architectural optimizations exist.
+- **SMF Forum BBCode Exports**: When formatting RFCs or reviews in BBCode for Simple Machines Forum (SMF):
+  - Use `[font=courier new]...[/font]` for inline monospace text (SMF does not parse `[tt]`).
+  - Use `[list]` and `[list type=decimal]` with `[li]...[/li]` items (rather than `[list=1]` or `[*]`).
+
 

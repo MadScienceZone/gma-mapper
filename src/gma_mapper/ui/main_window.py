@@ -9,6 +9,7 @@ from typing import Any, Callable
 
 from gma_mapper import GMAMapperVersion
 from gma_mapper.core.cache import AssetCache
+from gma_mapper.core.dice import DicePresetBank, resolve_table_roll_reply
 from gma_mapper.core.file_io import (
     load_from_file,
     save_to_file,
@@ -41,7 +42,12 @@ from gma_mapper.ui.canvas.scene import CREATURE_GRID_SNAP_CHOICES, BattleMapScen
 from gma_mapper.ui.canvas.view import BattleMapView
 from gma_mapper.ui.dialogs.preferences import PreferencesDialog
 from gma_mapper.ui.dialogs.update_check import UpdateCheckDialog
-from gma_mapper.ui.panels.chat_dice import ChatDicePanel
+from gma_mapper.ui.dialogs.dice_dialogs import (
+    DiceModifierHelpDialog,
+    DiceSyntaxHelpDialog,
+    ManageDelegatesDialog,
+)
+from gma_mapper.ui.panels.chat_dice import ChatDicePanel, DelegatedDieRollerDialog
 from gma_mapper.ui.panels.clock import (
     GolarionCalendar,
     InitiativeClockPanel,
@@ -66,6 +72,7 @@ try:
         QInputDialog,
         QLineEdit,
         QMenu,
+        QMessageBox,
         QToolBar,
         QToolButton,
         QStatusBar,
@@ -105,7 +112,17 @@ class MapperController:
         self.calendar = GolarionCalendar()
         self.scene = BattleMapScene()
         self.clock_panel = InitiativeClockPanel(self.calendar)
-        self.chat_panel = ChatDicePanel()
+        self.shared_gvar_state: dict[str, bool] = {}
+        self.chat_panel = ChatDicePanel(
+            prefs=self.prefs,
+            shared_gvar_state=self.shared_gvar_state,
+        )
+        self.chat_panel.target_context_provider = self._target_context_snapshot
+        self.banks_by_tkey: dict[str, DicePresetBank] = {"": self.chat_panel.bank}
+        self.delegated_panels: dict[str, ChatDicePanel] = {}
+        self.delegates: list[str] = []
+        self.delegate_for: list[str] = []
+        self.peer_names: list[str] = []
         self.combat_panel = CombatPanel()
         self.server_settings: dict[str, Any] = {}
         self.pc_templates: dict[str, dict[str, Any]] = {}
@@ -113,9 +130,28 @@ class MapperController:
         self.polo_cb: Callable[[], None] | None = None
         self.combatant_moved_cb: Callable[[str], None] | None = None
         self.status_message_cb: Callable[[str], None] | None = None
+        self.table_reply_cb: Callable[[dict[str, Any]], None] | None = None
+        self.delegates_updated_cb: Callable[[], None] | None = None
         self.debug_level: int = 0
         self.debug_proto: bool = False
         self.apply_preferences(self.prefs)
+
+    def _target_context_snapshot(
+        self,
+    ) -> tuple[list[str], dict[str, dict[str, Any]], dict[str, str]]:
+        """Return `(my_names, mobs_by_id, mobs_by_name)` from active battle-map tokens."""
+        mobs_by_id: dict[str, dict[str, Any]] = {}
+        mobs_by_name: dict[str, str] = {}
+        for oid, tok in self.scene.tokens.items():
+            data = dict(tok.data)
+            mobs_by_id[oid] = data
+            name = str(data.get("Name") or oid)
+            if name:
+                mobs_by_name[name] = oid
+        names = list(self.my_names)
+        if not names and self.chat_panel.local_user:
+            names = [self.chat_panel.local_user]
+        return (names, mobs_by_id, mobs_by_name)
 
     def log_debug(self, level: int, msg: str) -> None:
         """Emit diagnostic message if ``level <= self.debug_level``."""
@@ -157,8 +193,10 @@ class MapperController:
         self.cache.image_format = str(self.prefs.get("image_format", "png") or "png")
         self.cache.curl_insecure = bool(self.prefs.get("curl_insecure", False))
         self.audio.enabled = not bool(self.prefs.get("no_ondeck_audio", False))
-        if hasattr(self.chat_panel, "preset_table"):
-            self.chat_panel.preset_table.setEnabled(not bool(self.prefs.get("no_dice", False)))
+        if hasattr(self.chat_panel, "set_preferences"):
+            self.chat_panel.set_preferences(self.prefs)
+        if hasattr(self.chat_panel, "presets_group"):
+            self.chat_panel.presets_group.setEnabled(not bool(self.prefs.get("no_dice", False)))
 
     def current_url_base(self) -> str:
         url = ""
@@ -290,12 +328,32 @@ class MapperController:
         elif cmd == "CONN":
             peers = payload.get("PeerList") or []
             if isinstance(peers, list):
+                new_peer_names: list[str] = []
                 for peer in peers:
-                    if isinstance(peer, dict) and peer.get("IsMe"):
-                        aka = peer.get("AKA") or []
+                    if isinstance(peer, dict):
                         user = str(peer.get("User") or "")
-                        self.my_names = [str(n) for n in aka if n] if aka else ([user] if user else [])
-                        self.clock_panel.my_names = list(self.my_names)
+                        aka = peer.get("AKA") or []
+                        if peer.get("IsMe"):
+                            self.my_names = [str(n) for n in aka if n] if aka else ([user] if user else [])
+                            self.clock_panel.my_names = list(self.my_names)
+                            if user:
+                                self.chat_panel.set_identity(user)
+                        else:
+                            if user:
+                                new_peer_names.append(user)
+                            for a in aka:
+                                if a:
+                                    new_peer_names.append(str(a))
+                clean_peers = sorted({p for p in new_peer_names if p})
+                if bool(self.prefs.get("notify_peers", False)) and self.peer_names:
+                    joined = sorted(set(clean_peers) - set(self.peer_names))
+                    left = sorted(set(self.peer_names) - set(clean_peers))
+                    for p in joined:
+                        self.chat_panel.append_notice(f"{p} connected.")
+                    for p in left:
+                        self.chat_panel.append_notice(f"{p} disconnected.")
+                self.peer_names = clean_peers
+                self.chat_panel.update_peer_list(clean_peers)
         elif cmd in ("LS-ARC", "LS-CIRC", "LS-LINE", "LS-POLY", "LS-RECT", "LS-SAO", "LS-SAOE", "LS-TEXT", "LS-TILE"):
             obj_id = str(payload.get("ID", ""))
             if obj_id:
@@ -502,19 +560,77 @@ class MapperController:
             if self.status_message_cb:
                 self.status_message_cb(f"Request failed: {reason}")
         elif cmd == "ROLL":
-            self.chat_panel.append_roll(payload, self.prefs.get("styles"))
+            self.chat_panel.append_roll(payload)
+            reply = resolve_table_roll_reply(
+                payload,
+                banks_by_tkey=self.banks_by_tkey,
+                default_bank=self.chat_panel.bank,
+                is_gm=self.chat_panel.is_gm,
+            )
+            if reply is not None and self.table_reply_cb is not None:
+                self.table_reply_cb(reply)
         elif cmd == "TO":
             self.chat_panel.append_chat(payload)
         elif cmd == "CC":
-            keep = int(payload.get("Keep", 0) or 0)
-            self.chat_panel.clear_messages(keep)
+            target_msgs = payload.get("TargetMessages")
+            if "Target" in payload:
+                target_val = int(payload.get("Target", 0) or 0)
+            elif "Keep" in payload:
+                keep_val = int(payload.get("Keep", 0) or 0)
+                target_val = -abs(keep_val) if keep_val else 0
+            else:
+                target_val = 0
+            self.chat_panel.clear_chat_history(
+                target=target_val,
+                target_messages=list(target_msgs) if isinstance(target_msgs, list) else None,
+                do_all=False,
+            )
+        elif cmd == "Y2":
+            min_id = payload.get("MinimumMessageID")
+            max_id = payload.get("MaximumMessageID")
+            self.chat_panel.prune_chat_history(min_id=min_id, max_id=max_id)
         elif cmd in ("DD", "DD=", "DD+"):
+            if "Delegates" in payload and isinstance(payload["Delegates"], list):
+                self.delegates = [str(x) for x in payload["Delegates"] if x]
+            if "DelegateFor" in payload and isinstance(payload["DelegateFor"], list):
+                self.delegate_for = [str(x) for x in payload["DelegateFor"] if x]
+                if self.delegates_updated_cb:
+                    self.delegates_updated_cb()
+
             presets = payload.get("Presets", payload.get("List", []))
             if isinstance(presets, list):
-                if cmd == "DD=":
-                    self.chat_panel.set_presets(presets)
+                is_global = bool(payload.get("Global", False))
+                for_user = str(payload.get("For", "") or "")
+                append_mode = (cmd == "DD+")
+
+                if is_global:
+                    sys_list = (
+                        [*self.chat_panel.bank.system_presets, *presets]
+                        if append_mode
+                        else presets
+                    )
+                    self.chat_panel.set_system_presets(sys_list)
+                    for del_panel in self.delegated_panels.values():
+                        del_panel.set_system_presets(sys_list)
+                elif for_user and for_user != self.chat_panel.local_user:
+                    bank = self.banks_by_tkey.setdefault(
+                        for_user, DicePresetBank(tkey=for_user)
+                    )
+                    bank.sys_gvar_on = self.shared_gvar_state
+                    bank.set_user_presets(
+                        [*bank.user_presets, *presets] if append_mode else presets
+                    )
+                    if for_user in self.delegated_panels:
+                        self.delegated_panels[for_user].set_user_presets(bank.user_presets)
                 else:
-                    self.chat_panel.set_presets(self.chat_panel.presets + presets)
+                    if append_mode:
+                        self.chat_panel.set_user_presets(
+                            [*self.chat_panel.bank.user_presets, *presets]
+                        )
+                    elif any(isinstance(p, dict) and p.get("Global") for p in presets):
+                        self.chat_panel.set_presets(presets)
+                    else:
+                        self.chat_panel.set_user_presets(presets)
         elif cmd == "PROGRESS":
             if payload.get("IsTimer"):
                 self.clock_panel.update_timer(payload)
@@ -576,6 +692,9 @@ if HAS_PYSIDE6:
             )
             self.controller.polo_cb = lambda: self.net_client.session.polo()
             self.controller.status_message_cb = lambda msg: self.statusBar().showMessage(msg)
+            self.controller.table_reply_cb = self._on_table_roll_reply
+            self.controller.delegates_updated_cb = self._rebuild_delegate_for_menu
+            self._delegated_dialogs: dict[str, DelegatedDieRollerDialog] = {}
             self._apply_debug_protocol()
 
             self.setWindowTitle(f"GMA Mapper {GMAMapperVersion}")
@@ -1070,8 +1189,37 @@ if HAS_PYSIDE6:
             act_deselect_all.triggered.connect(self.controller.scene.clear_mob_selection)
             play_menu.addAction(act_deselect_all)
 
+            play_menu.addSeparator()
+            act_edit_presets = QAction("Edit &Die Roll Presets...", self)
+            act_edit_presets.triggered.connect(
+                lambda: self.controller.chat_panel.open_preset_editor(system_mode=False)
+            )
+            play_menu.addAction(act_edit_presets)
+
+            act_edit_sys_presets = QAction("Edit &System Presets...", self)
+            act_edit_sys_presets.triggered.connect(
+                lambda: self.controller.chat_panel.open_preset_editor(system_mode=True)
+            )
+            play_menu.addAction(act_edit_sys_presets)
+
+            act_manage_delegates = QAction("Manage Die Roll D&elegates...", self)
+            act_manage_delegates.triggered.connect(self._on_manage_delegates)
+            play_menu.addAction(act_manage_delegates)
+
+            self.delegate_for_menu = play_menu.addMenu("Access Die Rolls &For")
+            self._rebuild_delegate_for_menu()
+
             # 5. Help Menu
             help_menu = menubar.addMenu("&Help")
+            act_dice_syntax = QAction("&Die Roller Syntax Reference...", self)
+            act_dice_syntax.triggered.connect(self._on_show_dice_syntax_help)
+            help_menu.addAction(act_dice_syntax)
+
+            act_dice_mod_help = QAction("Die Roll &Modifiers Help...", self)
+            act_dice_mod_help.triggered.connect(self._on_show_dice_modifier_help)
+            help_menu.addAction(act_dice_mod_help)
+
+            help_menu.addSeparator()
             act_update = QAction("Check for &Updates...", self)
             act_update.triggered.connect(self._on_check_updates)
             help_menu.addAction(act_update)
@@ -1236,23 +1384,7 @@ if HAS_PYSIDE6:
             self.map_view.sync_view_requested.connect(
                 lambda xv, yv, lbl: self.net_client.session.adjust_view(xv, yv, lbl)
             )
-            self.controller.chat_panel.rollRequested.connect(
-                lambda title, spec, targets: self.net_client.session.roll_dice(
-                    f"{spec} #{title}" if title else spec,
-                    recipients=targets,
-                    to_all=(not targets),
-                    blind_to_gm=("GM" in targets),
-                )
-            )
-            self.controller.chat_panel.chatSent.connect(
-                lambda text, targets: self.net_client.session.chat_message(
-                    text,
-                    recipients=targets,
-                    to_all=(not targets),
-                    to_gm=("GM" in targets),
-                    markup=True,
-                )
-            )
+            self._wire_chat_panel_signals(self.controller.chat_panel)
             # Initiative & Clock Dock signals
             self.controller.clock_panel.timeAdvanceRequested.connect(self._on_clock_time_advance)
             self.controller.clock_panel.nextSlotRequested.connect(self._on_clock_next_slot)
@@ -1839,14 +1971,146 @@ if HAS_PYSIDE6:
 
         def _on_open_dice(self) -> None:
             path, _ = QFileDialog.getOpenFileName(self, "Load Dice Presets", "", "Dice Files (*.dice);;All Files (*)")
-            if path:
-                presets, _meta = load_dice_presets_from_file(path)
+            if not path:
+                return
+            _meta, presets = load_dice_presets_from_file(path)
+            if not presets:
+                return
+            append_mode = False
+            if self.controller.chat_panel.bank.user_presets:
+                ans = QMessageBox.question(
+                    self,
+                    "Load Dice Presets",
+                    "Append loaded presets to existing presets? (Choose 'No' to replace existing presets.)",
+                    QMessageBox.StandardButton.Yes
+                    | QMessageBox.StandardButton.No
+                    | QMessageBox.StandardButton.Cancel,
+                )
+                if ans == QMessageBox.StandardButton.Cancel:
+                    return
+                append_mode = (ans == QMessageBox.StandardButton.Yes)
+
+            if append_mode:
+                merged = [*self.controller.chat_panel.bank.user_presets, *presets]
+                self.controller.chat_panel.set_user_presets(merged)
+            else:
                 self.controller.chat_panel.set_presets(presets)
+            self.net_client.session.define_dice_presets(
+                presets if append_mode else self.controller.chat_panel.bank.user_presets,
+                append_mode=append_mode,
+            )
 
         def _on_save_dice(self) -> None:
             path, _ = QFileDialog.getSaveFileName(self, "Save Dice Presets", "", "Dice Files (*.dice)")
             if path:
-                save_dice_presets_to_file(path, self.controller.chat_panel.presets)
+                save_dice_presets_to_file(path, self.controller.chat_panel.bank.user_presets)
+
+        def _wire_chat_panel_signals(self, panel: ChatDicePanel) -> None:
+            panel.send_roll_ex_requested.connect(
+                lambda spec, recips, to_all, to_gm, req_id, p=panel: self.net_client.session.roll_dice(
+                    spec,
+                    recipients=recips,
+                    to_all=to_all,
+                    blind_to_gm=to_gm,
+                    rid=req_id,
+                    for_user=p.for_user,
+                )
+            )
+            panel.send_chat_ex_requested.connect(
+                lambda text, recips, to_all, to_gm, markup, pin: self.net_client.session.chat_message(
+                    text,
+                    recipients=recips,
+                    to_all=to_all,
+                    to_gm=to_gm,
+                    markup=markup,
+                    pinned=pin,
+                )
+            )
+            panel.save_presets_requested.connect(
+                lambda plist, is_glob, for_user: self.net_client.session.define_dice_presets(
+                    plist,
+                    append_mode=False,
+                    for_user=for_user,
+                    globals_only=is_glob,
+                )
+            )
+            panel.refresh_presets_requested.connect(
+                lambda for_user: self.net_client.session.query_dice_presets(for_user=for_user)
+            )
+            panel.refresh_peers_requested.connect(self.net_client.session.query_peers)
+            panel.delete_message_requested.connect(
+                lambda msg_id: self.net_client.session.clear_chat_list(False, [msg_id])
+            )
+
+        def _on_table_roll_reply(self, reply: dict[str, Any]) -> None:
+            self.net_client.session.chat_message(
+                str(reply.get("text", "")),
+                recipients=list(reply.get("recipients") or []),
+                to_all=bool(reply.get("to_all", True)),
+                to_gm=bool(reply.get("to_gm", False)),
+                markup=bool(reply.get("markup", False)),
+            )
+
+        def _on_manage_delegates(self) -> None:
+            dlg = ManageDelegatesDialog(
+                current_delegates=self.controller.delegates,
+                known_peers=self.controller.peer_names,
+                parent=self,
+            )
+            if dlg.exec():
+                self.controller.delegates = dlg.delegates()
+                self.net_client.session.define_dice_delegates(
+                    self.controller.chat_panel.local_user,
+                    self.controller.delegates,
+                )
+
+        def _rebuild_delegate_for_menu(self) -> None:
+            if not hasattr(self, "delegate_for_menu"):
+                return
+            self.delegate_for_menu.clear()
+            if not self.controller.delegate_for:
+                act_empty = QAction("(No delegated players)", self.delegate_for_menu)
+                act_empty.setEnabled(False)
+                self.delegate_for_menu.addAction(act_empty)
+                return
+            for user in self.controller.delegate_for:
+                act = QAction(f"Die Rolls for {user}...", self.delegate_for_menu)
+                act.triggered.connect(
+                    lambda _c=False, u=user: self._open_delegated_die_roller(u)
+                )
+                self.delegate_for_menu.addAction(act)
+
+        def _open_delegated_die_roller(self, for_user: str) -> None:
+            if for_user in self._delegated_dialogs:
+                dlg = self._delegated_dialogs[for_user]
+                dlg.show()
+                dlg.raise_()
+                return
+            dlg = DelegatedDieRollerDialog(
+                for_user=for_user,
+                local_user=self.controller.chat_panel.local_user,
+                prefs=self.prefs,
+                shared_gvar_state=self.controller.shared_gvar_state,
+                parent=self,
+            )
+            dlg.panel.target_context_provider = self.controller._target_context_snapshot
+            dlg.panel.set_system_presets(self.controller.chat_panel.bank.system_presets)
+            if for_user in self.controller.banks_by_tkey:
+                dlg.panel.set_user_presets(self.controller.banks_by_tkey[for_user].user_presets)
+            self.controller.banks_by_tkey[for_user] = dlg.panel.bank
+            self.controller.delegated_panels[for_user] = dlg.panel
+            self._wire_chat_panel_signals(dlg.panel)
+            self._delegated_dialogs[for_user] = dlg
+            self.net_client.session.query_dice_presets(for_user=for_user)
+            dlg.show()
+
+        def _on_show_dice_syntax_help(self) -> None:
+            dlg = DiceSyntaxHelpDialog(self)
+            dlg.show()
+
+        def _on_show_dice_modifier_help(self) -> None:
+            dlg = DiceModifierHelpDialog(self)
+            dlg.show()
 
         def _configured_server_tuple(self, prefs: dict[str, Any]) -> tuple[str, int, str, str]:
             prof_name = prefs.get("current_profile") or prefs.get("current_server", "offline")

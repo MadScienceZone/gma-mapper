@@ -1,283 +1,1160 @@
-"""Chat and Dice Roller dockable panel and pure-Python roll result formatter.
+"""Chat, Pinned Messages, Recent Rolls, and Hierarchical Preset Die-Roller dock panel (`PySide6`).
 
-Ported from die-roll and chat display logic in ``bin/mapper.tcl``.
+Ported from `bin/mapper_legacy.tcl` (`_render_die_roller`, `SendDieRoll`, `_do_roll`,
+`DisplayDieRoll`, `DisplayChatMessage`, `_render_chat_message`, `UpdatePeerList`,
+`ClearChatHistory`, `PruneChatHistory`).
 """
 
 from __future__ import annotations
 
-import html
-from typing import Any
+from pathlib import Path
+from typing import Any, Callable
 
-from gma_mapper.core.minimarkup import render_html
-from gma_mapper.core.profile import default_styles
+from gma_mapper.core.dice import (
+    ChatHistoryManager,
+    DicePresetBank,
+    RollStatCollector,
+    cleanup_die_roll_spec,
+    prepare_die_roll,
+    render_chat_payload_html,
+    render_roll_payload_html,
+)
+from gma_mapper.core.file_io import load_dice_presets_from_file, save_dice_presets_to_file
+from gma_mapper.core.minimarkup import render_html as render_minimarkup_html
+from gma_mapper.core.profile import default_preferences, default_styles
 
 try:
-    from PySide6.QtCore import Qt, Signal
+    from PySide6.QtCore import QUrl, Qt, Signal
+    from PySide6.QtGui import QAction
     from PySide6.QtWidgets import (
-        QWidget,
-        QVBoxLayout,
+        QCheckBox,
+        QDialog,
+        QFileDialog,
+        QFrame,
+        QGroupBox,
         QHBoxLayout,
-        QTextBrowser,
-        QLineEdit,
-        QPushButton,
-        QComboBox,
-        QTableWidget,
-        QTableWidgetItem,
-        QHeaderView,
-        QSplitter,
         QLabel,
+        QLineEdit,
+        QMenu,
+        QMessageBox,
+        QPushButton,
+        QScrollArea,
+        QSplitter,
+        QTextBrowser,
+        QToolButton,
+        QVBoxLayout,
+        QWidget,
     )
-    HAS_PYSIDE6 = True
-except ImportError:
-    HAS_PYSIDE6 = False
+
+    from gma_mapper.ui.dialogs.dice_dialogs import (
+        DiceSyntaxHelpDialog,
+        EditColorBoxTitleDialog,
+        EditDieRollPresetsDialog,
+    )
+
+    QT_AVAILABLE = True
+except ImportError:  # pragma: no cover
+    QT_AVAILABLE = False
 
 
-def _apply_component_template(template: Any, value: str) -> str:
-    """Apply a component style dict (`{"format": "..."}`) or `[prefix, suffix]` template around `value`."""
-    if not template:
-        return value
-    if isinstance(template, dict):
-        fmt = str(template.get("format", "%s"))
-        if "%s" in fmt:
-            return fmt.replace("%s", value)
-        return f"{fmt}{value}"
-    if isinstance(template, (list, tuple)):
-        if len(template) == 1:
-            return f"{template[0]}{value}"
-        return f"{template[0]}{value}{template[1]}"
-    return value
+def _comp_style(
+    styles: dict[str, Any] | None,
+    comp: str,
+    dark: bool = True,
+) -> tuple[str, str, bool, bool]:
+    base = (styles or default_styles()).get("dierolls", {}).get("components", {})
+    cdict = base.get(comp, base.get("default", {}))
+    theme = "dark" if dark else "light"
+    colors = cdict.get(theme, {})
+    fg = colors.get("fg", "#ffffff" if dark else "#000000")
+    bg = colors.get("bg", "")
+    bold = bool(cdict.get("bold", False))
+    italic = bool(cdict.get("italic", False))
+    return fg, bg, bold, italic
 
 
-def format_roll_components(
-    components: list[dict[str, Any]],
-    comp_styles: dict[str, list[str]] | None = None,
+def _styled_span(
+    text: str,
+    comp: str,
+    styles: dict[str, Any] | None = None,
+    dark: bool = True,
 ) -> str:
-    """Format structured die-roll ``Details`` components into a rich HTML fragment."""
-    if comp_styles is None:
-        comp_styles = default_styles()["dierolls"]["components"]
-
-    parts: list[str] = []
-    for comp in components:
-        ctype = str(comp.get("Type", comp.get("type", "constant")))
-        val = comp.get("Value", comp.get("value", ""))
-        text_val = html.escape(str(val))
-        tpl = comp_styles.get(ctype)
-        if tpl:
-            parts.append(_apply_component_template(tpl, text_val))
-        else:
-            parts.append(text_val)
-    return " ".join(parts)
+    fg, bg, bold, italic = _comp_style(styles, comp, dark)
+    css = [f"color:{fg}"]
+    if bg:
+        css.append(f"background-color:{bg}")
+    if bold:
+        css.append("font-weight:bold")
+    if italic:
+        css.append("font-style:italic")
+    style_str = ";".join(css)
+    return f'<span style="{style_str}">{text}</span>'
 
 
 def format_roll_result(
     payload: dict[str, Any],
     styles: dict[str, Any] | None = None,
+    dark: bool = True,
 ) -> str:
-    """Format a ``ROLL`` server message payload into HTML for the chat/dice transcript."""
-    if styles is None:
-        styles = default_styles()
-    dieroll_styles = styles.get("dierolls", default_styles()["dierolls"])
-    comp_styles = dieroll_styles.get("components", default_styles()["dierolls"]["components"])
+    """Format a `ROLL` server payload into styled HTML spans."""
+    if (isinstance(payload.get("Result"), dict) or "RollData" in payload) and "Results" not in payload:
+        return render_roll_payload_html(payload, prefs={"styles": styles} if styles else None, dark=dark)
 
-    sender = html.escape(str(payload.get("Sender", payload.get("Origin", payload.get("From", "System")))))
-    title = render_html(str(payload.get("Title", "")))
-    recipients = payload.get("Recipients", payload.get("Targets", payload.get("To", [])))
-    to_prefix = ""
-    if recipients:
-        if isinstance(recipients, list):
-            rec_str = ", ".join(html.escape(str(r)) for r in recipients)
-        else:
-            rec_str = html.escape(str(recipients))
-        to_prefix = f" <i>(to {rec_str})</i>"
-    elif payload.get("ToGM"):
-        to_prefix = " <i>(to GM)</i>"
-
-    result_blocks: list[str] = []
+    origin = str(payload.get("Origin", payload.get("User", "Unknown")))
+    targets = payload.get("Targets", payload.get("Recipients", []))
+    title = str(payload.get("Title", ""))
     results = payload.get("Results", [])
-    if not results and isinstance(payload.get("Result"), dict):
-        results = [payload["Result"]]
+
+    parts: list[str] = [_styled_span(f"[{origin}]", "origin", styles, dark)]
+    if targets:
+        t_str = ", ".join(str(t) for t in targets)
+        parts.append(_styled_span(f" \u2192 {t_str}", "target", styles, dark))
+    if title:
+        parts.append(" " + _styled_span(render_minimarkup_html(title), "title", styles, dark))
+
     if isinstance(results, list) and results:
-        for res in results:
-            if isinstance(res, dict):
-                total = res.get("Result", res.get("Value", res.get("Total", "")))
-                details = res.get("Details", res.get("Components", []))
-                total_html = _apply_component_template(
-                    comp_styles.get("total", ["=", ""]),
-                    html.escape(str(total)),
-                )
-                if isinstance(details, list) and details:
-                    comp_html = format_roll_components(details, comp_styles)
-                    result_blocks.append(f"{comp_html} {total_html}")
-                else:
-                    result_blocks.append(total_html)
+        res_strs: list[str] = []
+        for r in results:
+            if isinstance(r, dict):
+                val = r.get("Value", r.get("Result", ""))
+                details = r.get("Details", r.get("Components", []))
+                comp_parts: list[str] = []
+                for c in details:
+                    if isinstance(c, dict):
+                        ctype = str(c.get("Type", "default"))
+                        cval = str(c.get("Value", c.get("Text", "")))
+                        comp_parts.append(_styled_span(cval, ctype, styles, dark))
+                    else:
+                        comp_parts.append(str(c))
+                detail_html = " ".join(comp_parts)
+                val_html = _styled_span(f"={val}", "result", styles, dark)
+                res_strs.append(f"{detail_html} {val_html}".strip())
             else:
-                result_blocks.append(html.escape(str(res)))
+                res_strs.append(_styled_span(str(r), "result", styles, dark))
+        parts.append(": " + "; ".join(res_strs))
     elif "Result" in payload or "Value" in payload:
         val = payload.get("Result", payload.get("Value", ""))
-        result_blocks.append(
-            _apply_component_template(comp_styles.get("total", ["=", ""]), html.escape(str(val)))
-        )
+        spec = payload.get("RollSpec", payload.get("Spec", ""))
+        if spec:
+            parts.append(f": {_styled_span(str(spec), 'default', styles, dark)} ")
+        parts.append(_styled_span(f"={val}", "result", styles, dark))
 
-    title_part = f" <b>{title}</b>:" if title else ":"
-    body_part = " ; ".join(result_blocks)
-    return f"<div class='roll-msg'><b>{sender}</b>{to_prefix}{title_part} {body_part}</div>"
-
-
-def format_chat_message(payload: dict[str, Any]) -> str:
-    """Format a ``TO`` chat message payload into HTML using ``minimarkup.render_html``."""
-    sender = html.escape(str(payload.get("Sender", payload.get("Origin", payload.get("From", "System")))))
-    raw_text = str(payload.get("Text", payload.get("Message", "")))
-    rendered = render_html(raw_text)
-    targets = payload.get("Recipients", payload.get("Targets", payload.get("To", [])))
-    to_prefix = ""
-    if targets:
-        if isinstance(targets, list):
-            rec_str = ", ".join(html.escape(str(r)) for r in targets)
-        else:
-            rec_str = html.escape(str(targets))
-        to_prefix = f" <i>(to {rec_str})</i>"
-    elif payload.get("ToGM"):
-        to_prefix = " <i>(to GM)</i>"
-    return f"<div class='chat-msg'><b>&lt;{sender}&gt;</b>{to_prefix} {rendered}</div>"
+    return "".join(parts)
 
 
-if HAS_PYSIDE6:
+def format_chat_message(
+    payload: dict[str, Any],
+    styles: dict[str, Any] | None = None,
+    dark: bool = True,
+) -> str:
+    """Format a `TO` (chat message) server payload into styled HTML."""
+    origin = str(payload.get("Origin", payload.get("From", payload.get("Sender", "Server"))))
+    targets = payload.get("Targets", payload.get("Recipients", []))
+    text = str(payload.get("Text", payload.get("Message", "")))
+    is_gm = bool(payload.get("ToGM", False))
+
+    parts: list[str] = [_styled_span(f"&lt;{origin}&gt;", "origin", styles, dark)]
+    if is_gm:
+        parts.append(" " + _styled_span("(to GM)", "GM", styles, dark))
+    elif targets:
+        t_str = ", ".join(str(t) for t in targets)
+        parts.append(" " + _styled_span(f"(to {t_str})", "target", styles, dark))
+
+    rendered_body = render_minimarkup_html(text)
+    parts.append(": " + _styled_span(rendered_body, "chat", styles, dark))
+    return "".join(parts)
+
+
+if QT_AVAILABLE:
 
     class ChatDicePanel(QWidget):
-        """Dockable panel combining Chat Transcript, Quick Roll / Message Bar, and Preset Table."""
+        """Interactive Chat, Pinned Messages, Recent Rolls, and Preset Die-Roller panel."""
 
-        rollRequested = Signal(str, str, list)      # (title, formula, targets)
-        chatSent = Signal(str, list)                # (message_text, targets)
-        clearChatRequested = Signal(int)            # keep_count
+        # Legacy 4-arg signals preserved for backward compatibility
+        send_chat_requested = Signal(str, list, bool, bool)  # text, recipients, to_all, to_gm
+        send_roll_requested = Signal(str, list, bool, bool)  # roll_spec, recipients, to_all, to_gm
+        rollRequested = Signal(str, str, list)  # title, spec, targets (legacy alias)
+        chatSent = Signal(str, list)  # text, targets (legacy alias)
 
-        def __init__(self, parent: QWidget | None = None) -> None:
+        # Extended signals carrying Markup/Pin and RequestID/Preset management
+        send_chat_ex_requested = Signal(str, list, bool, bool, bool, bool)  # text, recipients, to_all, to_gm, markup, pin
+        send_roll_ex_requested = Signal(str, list, bool, bool, str)  # roll_spec, recipients, to_all, to_gm, request_id
+        save_presets_requested = Signal(list, bool, str)  # presets, is_global, for_user
+        refresh_presets_requested = Signal(str)  # for_user
+        refresh_peers_requested = Signal()
+        delete_message_requested = Signal(int)  # msg_id (GM server-wide delete)
+
+        def __init__(
+            self,
+            parent: QWidget | None = None,
+            tkey: str = "",
+            for_user: str = "",
+            local_user: str = "",
+            prefs: dict[str, Any] | None = None,
+            shared_gvar_state: dict[str, bool] | None = None,
+            roll_only: bool = False,
+        ) -> None:
             super().__init__(parent)
-            self.presets: list[dict[str, Any]] = []
+            self.tkey: str = tkey
+            self.for_user: str = for_user
+            self.local_user: str = local_user
+            self.is_gm: bool = (local_user == "GM")
+            self.roll_only: bool = bool(roll_only)
+            self.prefs: dict[str, Any] = prefs or default_preferences()
+            self.dark: bool = bool(self.prefs.get("dark", True))
 
-            layout = QVBoxLayout(self)
-            layout.setContentsMargins(6, 6, 6, 6)
+            self.bank = DicePresetBank(tkey=tkey)
+            if shared_gvar_state is not None:
+                self.bank.sys_gvar_on = shared_gvar_state
 
-            splitter = QSplitter(Qt.Orientation.Vertical, self)
+            self.history_manager = ChatHistoryManager()
+            self.stat_collector = RollStatCollector()
+            self.recent_rolls: list[str] = []
+            self._req_seq: int = 0
+            self._peer_names: list[str] = []
+            self._selected_recipients: set[str] = set()
+            self._recip_mode: str = "all"  # "all" | "gm" | "custom"
 
-            # Upper pane: Chat & Roll Transcript
-            transcript_container = QWidget(splitter)
-            t_layout = QVBoxLayout(transcript_container)
-            t_layout.setContentsMargins(0, 0, 0, 0)
+            # Optional callback returning `(my_names, mobs_by_id, mobs_by_name)` from MapperController
+            self.target_context_provider: Callable[
+                [], tuple[list[str], dict[str, dict[str, Any]], dict[str, str]]
+            ] | None = None
 
-            self.transcript = QTextBrowser(transcript_container)
-            self.transcript.setOpenExternalLinks(False)
-            t_layout.addWidget(self.transcript, 1)
+            self._build_ui()
 
-            # Entry bar
-            entry_row = QHBoxLayout()
-            self.recipient_combo = QComboBox(transcript_container)
-            self.recipient_combo.addItem("All", [])
-            self.recipient_combo.addItem("GM Only", ["GM"])
-            self.recipient_combo.addItem("Self", ["SELF"])
-            entry_row.addWidget(self.recipient_combo)
+        @property
+        def presets(self) -> list[dict[str, Any]]:
+            """Return combined raw presets (backward-compatible property)."""
+            return self.bank.all_raw_presets(include_system=bool(self.bank.system_presets))
 
-            self.input_edit = QLineEdit(transcript_container)
-            self.input_edit.setPlaceholderText("Enter chat message or /roll 1d20+5 ...")
-            self.input_edit.returnPressed.connect(self._on_send_input)
-            entry_row.addWidget(self.input_edit, 1)
+        @presets.setter
+        def presets(self, value: list[dict[str, Any]]) -> None:
+            self.set_presets(value)
 
-            self.send_btn = QPushButton("Send", transcript_container)
-            self.send_btn.clicked.connect(self._on_send_input)
-            entry_row.addWidget(self.send_btn)
+        def _build_ui(self) -> None:
+            root_layout = QVBoxLayout(self)
+            root_layout.setContentsMargins(4, 4, 4, 4)
+            root_layout.setSpacing(4)
 
-            t_layout.addLayout(entry_row)
-            splitter.addWidget(transcript_container)
+            self.main_splitter = QSplitter(Qt.Orientation.Vertical, self)
+            root_layout.addWidget(self.main_splitter, stretch=1)
 
-            # Lower pane: Die-Roll Presets Table
-            preset_container = QWidget(splitter)
-            p_layout = QVBoxLayout(preset_container)
-            p_layout.setContentsMargins(0, 0, 0, 0)
+            # --- Pane 1: Pinned Messages (auto-shown when pinned messages exist) ---
+            self.pinned_group = QGroupBox("Pinned Messages", self.main_splitter)
+            pinned_layout = QVBoxLayout(self.pinned_group)
+            pinned_layout.setContentsMargins(4, 4, 4, 4)
+            self.pinned_log = QTextBrowser(self.pinned_group)
+            self.pinned_log.setOpenExternalLinks(False)
+            self.pinned_log.anchorClicked.connect(self._on_chat_anchor_clicked)
+            self.pinned_log.setMaximumHeight(120)
+            pinned_layout.addWidget(self.pinned_log)
+            self.pinned_group.setVisible(False)
+            if not self.roll_only:
+                self.main_splitter.addWidget(self.pinned_group)
 
-            p_header = QHBoxLayout()
-            p_header.addWidget(QLabel("Die-Roll Presets (Double-click to roll):", preset_container))
-            p_layout.addLayout(p_header)
+            # --- Pane 2: Chat Log + Chat & Roll Entry Controls ---
+            self.chat_container = QWidget(self.main_splitter)
+            chat_vbox = QVBoxLayout(self.chat_container)
+            chat_vbox.setContentsMargins(0, 0, 0, 0)
+            chat_vbox.setSpacing(4)
 
-            self.preset_table = QTableWidget(0, 3, preset_container)
-            self.preset_table.setHorizontalHeaderLabels(["Name", "Description", "Formula"])
-            self.preset_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-            self.preset_table.cellDoubleClicked.connect(self._on_preset_double_clicked)
-            p_layout.addWidget(self.preset_table, 1)
+            self.chat_log = QTextBrowser(self.chat_container)
+            self.chat_log.setOpenExternalLinks(False)
+            self.chat_log.anchorClicked.connect(self._on_chat_anchor_clicked)
+            if self.roll_only:
+                self.chat_log.setVisible(False)
+            else:
+                chat_vbox.addWidget(self.chat_log, stretch=1)
 
-            splitter.addWidget(preset_container)
-            layout.addWidget(splitter, 1)
+            # Recipient & Chat Input Bar
+            self.chat_bar_widget = QWidget(self.chat_container)
+            chat_row = QHBoxLayout(self.chat_bar_widget)
+            chat_row.setContentsMargins(0, 0, 0, 0)
+            chat_row.setSpacing(4)
 
-        def current_targets(self) -> list[str]:
-            data = self.recipient_combo.currentData()
-            return list(data) if isinstance(data, list) else []
+            self.to_menu_btn = QToolButton(self.chat_bar_widget)
+            self.to_menu_btn.setText("To: (all)")
+            self.to_menu_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+            self.to_menu = QMenu(self.to_menu_btn)
+            self.to_menu_btn.setMenu(self.to_menu)
+            self._rebuild_recipient_menu()
 
-        def _on_send_input(self) -> None:
-            text = self.input_edit.text().strip()
+            # Maintain `target_combo` alias for backward compatibility with older tests
+            self.target_combo = self._create_compat_target_combo()
+
+            self.chat_entry = QLineEdit(self.chat_bar_widget)
+            self.chat_entry.setPlaceholderText("Chat message (or /r 1d20+5)...")
+            self.chat_entry.returnPressed.connect(self._on_send_chat)
+
+            self.markup_btn = QToolButton(self.chat_bar_widget)
+            self.markup_btn.setText("M")
+            self.markup_btn.setCheckable(True)
+            self.markup_btn.setToolTip("Enable rich text markup (**bold**, //italic//, __underline__, `code`)")
+
+            self.pin_btn = QToolButton(self.chat_bar_widget)
+            self.pin_btn.setText("\u2605")
+            self.pin_btn.setCheckable(True)
+            self.pin_btn.setToolTip("Pin this chat message for all players")
+
+            self.send_btn = QPushButton("Send", self.chat_bar_widget)
+            self.send_btn.clicked.connect(self._on_send_chat)
+
+            chat_row.addWidget(self.to_menu_btn)
+            chat_row.addWidget(self.chat_entry, stretch=1)
+            chat_row.addWidget(self.markup_btn)
+            chat_row.addWidget(self.pin_btn)
+            chat_row.addWidget(self.send_btn)
+            if self.roll_only:
+                self.chat_bar_widget.setVisible(False)
+            else:
+                chat_vbox.addWidget(self.chat_bar_widget)
+
+            # Ad-hoc Die Roll Input Bar
+            roll_row = QHBoxLayout()
+            roll_row.setContentsMargins(0, 0, 0, 0)
+            roll_row.setSpacing(4)
+
+            self.colorbox_btn = QToolButton(self.chat_container)
+            self.colorbox_btn.setText("\U0001f3a8")
+            self.colorbox_btn.setToolTip("Edit multi-segment Color-Box Title for this roll...")
+            self.colorbox_btn.clicked.connect(self._on_edit_roll_entry_colorbox)
+
+            self.roll_entry = QLineEdit(self.chat_container)
+            self.roll_entry.setPlaceholderText("Die roll (e.g. Attack=1d20+7 1d8+4 |c, or #table)")
+            self.roll_entry.returnPressed.connect(self._on_send_roll)
+
+            self.gm_only_chk = QCheckBox("GM", self.chat_container)
+            self.gm_only_chk.setToolTip("Send blind roll only to the Game Master")
+
+            self.roll_btn = QPushButton("Roll", self.chat_container)
+            self.roll_btn.clicked.connect(self._on_send_roll)
+
+            self.syntax_help_btn = QToolButton(self.chat_container)
+            self.syntax_help_btn.setText("?")
+            self.syntax_help_btn.setToolTip("Show Die Roller Syntax Reference")
+            self.syntax_help_btn.clicked.connect(self._on_show_syntax_help)
+
+            roll_row.addWidget(self.colorbox_btn)
+            roll_row.addWidget(QLabel("Roll:"))
+            roll_row.addWidget(self.roll_entry, stretch=1)
+            roll_row.addWidget(self.gm_only_chk)
+            roll_row.addWidget(self.roll_btn)
+            roll_row.addWidget(self.syntax_help_btn)
+            chat_vbox.addLayout(roll_row)
+
+            self.main_splitter.addWidget(self.chat_container)
+
+            # --- Pane 3: Recent Rolls (up to 10 entries) ---
+            self.recent_group = QGroupBox("Recent Rolls", self.main_splitter)
+            recent_outer = QVBoxLayout(self.recent_group)
+            recent_outer.setContentsMargins(4, 4, 4, 4)
+            recent_outer.setSpacing(2)
+
+            self.recent_scroll = QScrollArea(self.recent_group)
+            self.recent_scroll.setWidgetResizable(True)
+            self.recent_scroll.setFrameShape(QFrame.Shape.NoFrame)
+            self.recent_list_host = QWidget(self.recent_scroll)
+            self.recent_list_layout = QVBoxLayout(self.recent_list_host)
+            self.recent_list_layout.setContentsMargins(0, 0, 0, 0)
+            self.recent_list_layout.setSpacing(2)
+            self.recent_list_layout.addStretch(1)
+            self.recent_scroll.setWidget(self.recent_list_host)
+            recent_outer.addWidget(self.recent_scroll)
+            self.recent_group.setMaximumHeight(150)
+            self.main_splitter.addWidget(self.recent_group)
+
+            # --- Pane 4: Preset Rolls (hierarchical groups, tables, modifiers, presets) ---
+            self.presets_group = QGroupBox(
+                f"Preset Rolls ({self.for_user})" if self.for_user else "Preset Rolls",
+                self.main_splitter,
+            )
+            presets_outer = QVBoxLayout(self.presets_group)
+            presets_outer.setContentsMargins(4, 4, 4, 4)
+            presets_outer.setSpacing(4)
+
+            self.presets_scroll = QScrollArea(self.presets_group)
+            self.presets_scroll.setWidgetResizable(True)
+            self.presets_scroll.setFrameShape(QFrame.Shape.NoFrame)
+            self.presets_host = QWidget(self.presets_scroll)
+            self.presets_layout = QVBoxLayout(self.presets_host)
+            self.presets_layout.setContentsMargins(0, 0, 0, 0)
+            self.presets_layout.setSpacing(2)
+            self.presets_layout.addStretch(1)
+            self.presets_scroll.setWidget(self.presets_host)
+            presets_outer.addWidget(self.presets_scroll, stretch=1)
+
+            # Bottom Preset Management Toolbar
+            toolbar_row = QHBoxLayout()
+            toolbar_row.setContentsMargins(0, 0, 0, 0)
+            toolbar_row.setSpacing(4)
+
+            self.btn_edit_presets = QPushButton("Edit...", self.presets_group)
+            self.btn_edit_presets.setToolTip("Edit die-roll presets, modifiers, variables, and lookup tables")
+            self.btn_edit_presets.clicked.connect(lambda: self.open_preset_editor(system_mode=False))
+
+            self.btn_edit_sys_presets = QPushButton("System...", self.presets_group)
+            self.btn_edit_sys_presets.setToolTip("Edit global system presets (GM)")
+            self.btn_edit_sys_presets.clicked.connect(lambda: self.open_preset_editor(system_mode=True))
+            self.btn_edit_sys_presets.setVisible(self.is_gm)
+
+            self.btn_import_presets = QPushButton("Import...", self.presets_group)
+            self.btn_import_presets.setToolTip("Import presets from a .dice file")
+            self.btn_import_presets.clicked.connect(self._on_import_presets_clicked)
+
+            self.btn_export_presets = QPushButton("Export...", self.presets_group)
+            self.btn_export_presets.setToolTip("Export presets to a .dice file")
+            self.btn_export_presets.clicked.connect(self._on_export_presets_clicked)
+
+            self.btn_refresh_presets = QPushButton("Refresh", self.presets_group)
+            self.btn_refresh_presets.setToolTip("Reload presets from server")
+            self.btn_refresh_presets.clicked.connect(
+                lambda: self.refresh_presets_requested.emit(self.for_user)
+            )
+
+            toolbar_row.addWidget(self.btn_edit_presets)
+            toolbar_row.addWidget(self.btn_edit_sys_presets)
+            toolbar_row.addWidget(self.btn_import_presets)
+            toolbar_row.addWidget(self.btn_export_presets)
+            toolbar_row.addWidget(self.btn_refresh_presets)
+            toolbar_row.addStretch(1)
+            presets_outer.addLayout(toolbar_row)
+
+            self.main_splitter.addWidget(self.presets_group)
+            self.main_splitter.setStretchFactor(1, 3)
+            self.main_splitter.setStretchFactor(3, 2)
+
+            self.set_theme(self.dark)
+            self._rebuild_recent_rolls_ui()
+            self._rebuild_presets_ui()
+
+        def _create_compat_target_combo(self) -> Any:
+            """Provide a lightweight compatibility proxy for `self.target_combo`."""
+            panel = self
+
+            class _CompatCombo:
+                def currentText(self) -> str:
+                    if panel._recip_mode == "gm":
+                        return "GM Only"
+                    return "All"
+
+                def setCurrentText(self, text: str) -> None:
+                    if text == "GM Only":
+                        panel._set_recipient_mode("gm")
+                    else:
+                        panel._set_recipient_mode("all")
+
+            return _CompatCombo()
+
+        # ------------------------------------------------------------------
+        # Theme & Preferences
+        # ------------------------------------------------------------------
+        def set_theme(self, dark: bool) -> None:
+            self.dark = bool(dark)
+            bg = "#000000" if self.dark else "#ffffff"
+            fg = "#ffffff" if self.dark else "#000000"
+            style = f"QTextBrowser {{ background-color: {bg}; color: {fg}; }}"
+            self.chat_log.setStyleSheet(style)
+            self.pinned_log.setStyleSheet(style)
+
+        def set_preferences(self, prefs: dict[str, Any]) -> None:
+            self.prefs = prefs
+            self.set_theme(bool(prefs.get("dark", True)))
+            self._rerender_history_views()
+
+        def set_identity(self, local_user: str, is_gm: bool | None = None) -> None:
+            self.local_user = local_user
+            self.is_gm = bool(is_gm) if is_gm is not None else (local_user == "GM")
+            self.btn_edit_sys_presets.setVisible(self.is_gm)
+
+        # ------------------------------------------------------------------
+        # Recipient Selection Menu (`To:` (all) / GM / Peers)
+        # ------------------------------------------------------------------
+        def update_peer_list(self, peers: list[str]) -> None:
+            """Update the dynamic list of connected peers in the `To:` recipient menu."""
+            clean = sorted({str(p).strip() for p in peers if str(p).strip()})
+            self._peer_names = clean
+            self._selected_recipients &= set(clean)
+            if self._recip_mode == "custom" and not self._selected_recipients:
+                self._recip_mode = "all"
+            self._rebuild_recipient_menu()
+            self._update_recipient_button_label()
+
+        def _rebuild_recipient_menu(self) -> None:
+            self.to_menu.clear()
+            act_all = QAction("To: (all)", self.to_menu)
+            act_all.setCheckable(True)
+            act_all.setChecked(self._recip_mode == "all")
+            act_all.triggered.connect(lambda: self._set_recipient_mode("all"))
+            self.to_menu.addAction(act_all)
+
+            act_gm = QAction("To: GM Only", self.to_menu)
+            act_gm.setCheckable(True)
+            act_gm.setChecked(self._recip_mode == "gm")
+            act_gm.triggered.connect(lambda: self._set_recipient_mode("gm"))
+            self.to_menu.addAction(act_gm)
+
+            if self._peer_names:
+                self.to_menu.addSeparator()
+                for peer in self._peer_names:
+                    act_peer = QAction(peer, self.to_menu)
+                    act_peer.setCheckable(True)
+                    act_peer.setChecked(
+                        self._recip_mode == "custom" and peer in self._selected_recipients
+                    )
+                    act_peer.triggered.connect(
+                        lambda checked, p=peer: self._toggle_peer_recipient(p, checked)
+                    )
+                    self.to_menu.addAction(act_peer)
+
+            self.to_menu.addSeparator()
+            act_refresh = QAction("Refresh Peer List", self.to_menu)
+            act_refresh.triggered.connect(self.refresh_peers_requested.emit)
+            self.to_menu.addAction(act_refresh)
+
+        def _set_recipient_mode(self, mode: str) -> None:
+            self._recip_mode = mode
+            if mode != "custom":
+                self._selected_recipients.clear()
+            self._rebuild_recipient_menu()
+            self._update_recipient_button_label()
+
+        def _toggle_peer_recipient(self, peer: str, checked: bool) -> None:
+            if checked:
+                self._selected_recipients.add(peer)
+                self._recip_mode = "custom"
+            else:
+                self._selected_recipients.discard(peer)
+                if not self._selected_recipients:
+                    self._recip_mode = "all"
+            self._rebuild_recipient_menu()
+            self._update_recipient_button_label()
+
+        def _update_recipient_button_label(self) -> None:
+            if self._recip_mode == "gm":
+                self.to_menu_btn.setText("To: GM")
+            elif self._recip_mode == "custom" and self._selected_recipients:
+                names = sorted(self._selected_recipients)
+                label = ", ".join(names) if len(names) <= 2 else f"{names[0]} +{len(names) - 1}"
+                self.to_menu_btn.setText(f"To: {label}")
+            else:
+                self.to_menu_btn.setText("To: (all)")
+
+        def current_recipient_routing(self, force_gm: bool = False) -> tuple[list[str], bool, bool]:
+            """Return `(recipients, to_all, to_gm)` for the current recipient selection."""
+            if force_gm or self._recip_mode == "gm":
+                return ([], False, True)
+            if self._recip_mode == "custom" and self._selected_recipients:
+                return (sorted(self._selected_recipients), False, False)
+            return ([], True, False)
+
+        # ------------------------------------------------------------------
+        # Presets & Hierarchical Tree Rendering
+        # ------------------------------------------------------------------
+        def set_presets(
+            self,
+            presets: list[dict[str, Any]],
+            is_global: bool | None = None,
+        ) -> None:
+            """Update presets from server `DD=` or file load and rebuild the hierarchical UI."""
+            if is_global is True:
+                self.bank.set_system_presets(presets)
+            elif is_global is False:
+                self.bank.set_user_presets(presets)
+            else:
+                self.bank.set_combined_presets(presets)
+            self._rebuild_presets_ui()
+
+        def set_user_presets(self, presets: list[dict[str, Any]]) -> None:
+            self.bank.set_user_presets(presets)
+            self._rebuild_presets_ui()
+
+        def set_system_presets(self, presets: list[dict[str, Any]]) -> None:
+            self.bank.set_system_presets(presets)
+            self._rebuild_presets_ui()
+
+        def _clear_layout(self, layout: QVBoxLayout) -> None:
+            while layout.count():
+                item = layout.takeAt(0)
+                w = item.widget()
+                if w is not None:
+                    w.deleteLater()
+
+        def _rebuild_recent_rolls_ui(self) -> None:
+            self._clear_layout(self.recent_list_layout)
+            if not self.recent_rolls:
+                empty_lbl = QLabel("No recent rolls yet.", self.recent_list_host)
+                empty_lbl.setStyleSheet("color: gray; font-style: italic;")
+                self.recent_list_layout.addWidget(empty_lbl)
+                self.recent_list_layout.addStretch(1)
+                return
+
+            for spec in self.recent_rolls[:10]:
+                row_w = QWidget(self.recent_list_host)
+                row_l = QHBoxLayout(row_w)
+                row_l.setContentsMargins(0, 0, 0, 0)
+                row_l.setSpacing(4)
+
+                roll_btn = QToolButton(row_w)
+                roll_btn.setText("\U0001f3b2")
+                roll_btn.setToolTip(f"Re-roll: {spec}")
+
+                extra_edit = QLineEdit(row_w)
+                extra_edit.setPlaceholderText("+mod")
+                extra_edit.setFixedWidth(64)
+                extra_edit.setToolTip("Optional ad-hoc modifier for this roll")
+
+                clean_text = cleanup_die_roll_spec(spec)
+                spec_lbl = QLabel(clean_text, row_w)
+                spec_lbl.setWordWrap(False)
+                spec_lbl.setToolTip(spec)
+
+                roll_btn.clicked.connect(
+                    lambda _chk=False, s=spec, e=extra_edit: self.trigger_roll(s, extra=e.text())
+                )
+                extra_edit.returnPressed.connect(
+                    lambda s=spec, e=extra_edit: self.trigger_roll(s, extra=e.text())
+                )
+
+                row_l.addWidget(roll_btn)
+                row_l.addWidget( QLabel("+", row_w))
+                row_l.addWidget(extra_edit)
+                row_l.addWidget(spec_lbl, stretch=1)
+                self.recent_list_layout.addWidget(row_w)
+
+            self.recent_list_layout.addStretch(1)
+
+        def _is_group_path_hidden(self, group_path: list[str]) -> bool:
+            """Return True if any ancestor prefix in `group_path` is collapsed."""
+            for depth in range(1, len(group_path) + 1):
+                prefix_key = "\u25b6".join(group_path[:depth])
+                if self.bank.group_collapsed.get(prefix_key, False):
+                    return True
+            return False
+
+        def _toggle_group_collapsed(self, group_key: str) -> None:
+            cur = bool(self.bank.group_collapsed.get(group_key, False))
+            self.bank.group_collapsed[group_key] = not cur
+            self._rebuild_presets_ui()
+
+        def _rebuild_presets_ui(self) -> None:
+            """Render collapsible groups, lookup tables, modifier checkboxes, and preset rolls."""
+            self._clear_layout(self.presets_layout)
+
+            all_items: list[tuple[str, dict[str, Any]]] = []
+            for tbl in self.bank.global_tables:
+                all_items.append(("global_table", tbl))
+            for tbl in self.bank.tables:
+                all_items.append(("table", tbl))
+            for mod in self.bank.global_modifiers:
+                all_items.append(("global_modifier", mod))
+            for mod in self.bank.modifiers:
+                all_items.append(("modifier", mod))
+            for r in self.bank.global_rolls:
+                all_items.append(("global_preset", r))
+            for r in self.bank.rolls:
+                all_items.append(("preset", r))
+
+            if not all_items:
+                empty_lbl = QLabel("No presets loaded.", self.presets_host)
+                empty_lbl.setStyleSheet("color: gray; font-style: italic;")
+                self.presets_layout.addWidget(empty_lbl)
+                self.presets_layout.addStretch(1)
+                return
+
+            rendered_groups: set[str] = set()
+
+            for item_kind, details in all_items:
+                group_path: list[str] = list(details.get("group") or [])
+                # Render any new ancestor group headers before this item
+                for depth in range(1, len(group_path) + 1):
+                    ancestor_Slice = group_path[:depth]
+                    if depth > 1 and self._is_group_path_hidden(group_path[: depth - 1]):
+                        break
+                    g_key = "\u25b6".join(ancestor_Slice)
+                    if g_key not in rendered_groups:
+                        rendered_groups.add(g_key)
+                        self._add_group_header_widget(ancestor_Slice, g_key)
+
+                if group_path and self._is_group_path_hidden(group_path):
+                    continue
+
+                indent_px = len(group_path) * 14
+                if item_kind in ("table", "global_table"):
+                    self._add_table_row_widget(details, is_global=(item_kind == "global_table"), indent_px=indent_px)
+                elif item_kind in ("modifier", "global_modifier"):
+                    self._add_modifier_row_widget(details, is_global=(item_kind == "global_modifier"), indent_px=indent_px)
+                else:
+                    self._add_preset_row_widget(details, is_global=(item_kind == "global_preset"), indent_px=indent_px)
+
+            self.presets_layout.addStretch(1)
+
+        def _add_group_header_widget(self, group_slice: list[str], group_key: str) -> None:
+            collapsed = bool(self.bank.group_collapsed.get(group_key, False))
+            arrow = "\u25b8" if collapsed else "\u25be"
+            indent_px = (len(group_slice) - 1) * 14
+            btn = QPushButton(f"{arrow} {' \u25b6 '.join(group_slice)}", self.presets_host)
+            btn.setFlat(True)
+            btn.setStyleSheet(
+                f"text-align: left; font-weight: bold; padding-left: {indent_px + 4}px;"
+            )
+            btn.clicked.connect(lambda _chk=False, k=group_key: self._toggle_group_collapsed(k))
+            self.presets_layout.addWidget(btn)
+
+        def _add_table_row_widget(
+            self,
+            details: dict[str, Any],
+            is_global: bool,
+            indent_px: int = 0,
+        ) -> None:
+            row_w = QWidget(self.presets_host)
+            row_l = QHBoxLayout(row_w)
+            row_l.setContentsMargins(indent_px, 0, 0, 0)
+            row_l.setSpacing(4)
+
+            prefix = "##" if is_global else "#"
+            tbl_name = details["name"]
+            desc = details.get("description") or tbl_name
+            roll_expr = details.get("dieroll") or "1d20"
+
+            roll_btn = QToolButton(row_w)
+            roll_btn.setText("\U0001f3b2")
+            roll_btn.setToolTip(f"Roll on table {prefix}{tbl_name} ({roll_expr})")
+
+            extra_edit = QLineEdit(row_w)
+            extra_edit.setPlaceholderText("+mod")
+            extra_edit.setFixedWidth(60)
+
+            lbl = QLabel(f"[{prefix}{tbl_name}] {desc} ({roll_expr})", row_w)
+            lbl.setToolTip(details.get("dieroll", ""))
+
+            roll_spec = f"{desc} = {prefix}{tbl_name}"
+            roll_btn.clicked.connect(
+                lambda _chk=False, s=roll_spec, e=extra_edit: self.trigger_roll(s, extra=e.text())
+            )
+            extra_edit.returnPressed.connect(
+                lambda s=roll_spec, e=extra_edit: self.trigger_roll(s, extra=e.text())
+            )
+
+            row_l.addWidget(roll_btn)
+            row_l.addWidget(QLabel("+", row_w))
+            row_l.addWidget(extra_edit)
+            row_l.addWidget(lbl, stretch=1)
+            self.presets_layout.addWidget(row_w)
+
+        def _add_modifier_row_widget(
+            self,
+            details: dict[str, Any],
+            is_global: bool,
+            indent_px: int = 0,
+        ) -> None:
+            row_w = QWidget(self.presets_host)
+            row_l = QHBoxLayout(row_w)
+            row_l.setContentsMargins(indent_px, 0, 0, 0)
+            row_l.setSpacing(4)
+
+            mod_id = details.get("mod_id", "")
+            var_name = details.get("var", "")
+            name = details.get("name", "")
+            spec = details.get("dieroll", "")
+            desc = details.get("description", "")
+
+            if var_name:
+                var_sigil = f"$${var_name}" if details.get("global") else f"${var_name}"
+                label_text = f"{name} (as {var_sigil}): {spec}"
+            else:
+                glob_tag = " [Global]" if is_global else ""
+                label_text = f"{name}{glob_tag}: {spec}"
+
+            chk = QCheckBox(label_text, row_w)
+            chk.setChecked(self.bank.is_mod_enabled(mod_id))
+            if desc:
+                chk.setToolTip(desc)
+            chk.toggled.connect(
+                lambda checked, mid=mod_id: self.bank.set_mod_enabled(mid, checked)
+            )
+            row_l.addWidget(chk, stretch=1)
+            self.presets_layout.addWidget(row_w)
+
+        def _add_preset_row_widget(
+            self,
+            details: dict[str, Any],
+            is_global: bool,
+            indent_px: int = 0,
+        ) -> None:
+            row_w = QWidget(self.presets_host)
+            row_l = QHBoxLayout(row_w)
+            row_l.setContentsMargins(indent_px, 0, 0, 0)
+            row_l.setSpacing(4)
+
+            name = details.get("name", "")
+            desc = details.get("description", "")
+            spec = details.get("dieroll", "")
+
+            roll_btn = QToolButton(row_w)
+            roll_btn.setText("\U0001f3b2")
+            roll_btn.setToolTip(desc or f"Roll {name}: {spec}")
+
+            extra_edit = QLineEdit(row_w)
+            extra_edit.setPlaceholderText("+mod")
+            extra_edit.setFixedWidth(60)
+            extra_edit.setToolTip("Optional ad-hoc modifier for this roll")
+
+            clean_spec = cleanup_die_roll_spec(spec)
+            prefix_tag = "[Sys] " if is_global else ""
+            lbl = QLabel(f"{prefix_tag}<b>{name}</b>: {clean_spec}", row_w)
+            lbl.setToolTip(f"{desc}\n{spec}".strip())
+
+            roll_btn.clicked.connect(
+                lambda _chk=False, s=spec, e=extra_edit: self.trigger_roll(s, extra=e.text())
+            )
+            extra_edit.returnPressed.connect(
+                lambda s=spec, e=extra_edit: self.trigger_roll(s, extra=e.text())
+            )
+
+            row_l.addWidget(roll_btn)
+            row_l.addWidget(QLabel("+", row_w))
+            row_l.addWidget(extra_edit)
+            row_l.addWidget(lbl, stretch=1)
+            self.presets_layout.addWidget(row_w)
+
+        # ------------------------------------------------------------------
+        # Roll & Chat Dispatch
+        # ------------------------------------------------------------------
+        def trigger_roll(self, raw_spec: str, extra: str = "") -> None:
+            """Execute the client-side die-roll pipeline and emit `send_roll_requested`."""
+            spec = raw_spec.strip()
+            if not spec:
+                return
+
+            # Record raw spec in recent rolls (newest first, max 10, deduplicated)
+            if spec in self.recent_rolls:
+                self.recent_rolls.remove(spec)
+            self.recent_rolls.insert(0, spec)
+            if len(self.recent_rolls) > 10:
+                self.recent_rolls = self.recent_rolls[:10]
+            self._rebuild_recent_rolls_ui()
+
+            my_names: list[str] = [self.local_user] if self.local_user else []
+            mobs_by_id: dict[str, dict[str, Any]] | None = None
+            mobs_by_name: dict[str, str] | None = None
+            if self.target_context_provider is not None:
+                my_names, mobs_by_id, mobs_by_name = self.target_context_provider()
+
+            self._req_seq += 1
+            req_id = f"r{self._req_seq}"
+            recipients, to_all, to_gm = self.current_recipient_routing(
+                force_gm=self.gm_only_chk.isChecked()
+            )
+
+            try:
+                prepared = prepare_die_roll(
+                    rollspec=spec,
+                    extra=extra,
+                    bank=self.bank,
+                    for_user=self.for_user,
+                    local_user=self.local_user,
+                    my_names=my_names,
+                    mobs_by_id=mobs_by_id,
+                    mobs_by_name=mobs_by_name,
+                    to_gm=to_gm,
+                    to_all=to_all,
+                    recipients=recipients,
+                    req_id=req_id,
+                )
+            except ValueError as exc:
+                self.append_notice(f"Roll Error: {exc}")
+                return
+
+            if prepared.get("warning"):
+                self.append_notice(str(prepared["warning"]))
+
+            final_spec = str(prepared["rollspec"])
+            final_req_id = str(prepared["request_id"])
+            final_recips = list(prepared["recipients"] or [])
+            final_to_all = bool(prepared["to_all"])
+            final_to_gm = bool(prepared["to_gm"])
+
+            self.send_roll_ex_requested.emit(
+                final_spec, final_recips, final_to_all, final_to_gm, final_req_id
+            )
+            self.send_roll_requested.emit(
+                final_spec, final_recips, final_to_all, final_to_gm
+            )
+            legacy_targets = ["GM"] if final_to_gm else final_recips
+            self.rollRequested.emit("", final_spec, legacy_targets)
+
+        def _on_send_chat(self) -> None:
+            text = self.chat_entry.text().strip()
             if not text:
                 return
-            self.input_edit.clear()
-            targets = self.current_targets()
-            if text.startswith("/roll ") or text.startswith("/r "):
+            self.chat_entry.clear()
+
+            if text.startswith("/r ") or text.startswith("/roll "):
                 spec = text.split(" ", 1)[1].strip()
-                self.rollRequested.emit("Custom Roll", spec, targets)
-            else:
-                self.chatSent.emit(text, targets)
+                self.trigger_roll(spec)
+                return
 
-        def _on_preset_double_clicked(self, row: int, _col: int) -> None:
-            if 0 <= row < len(self.presets):
-                preset = self.presets[row]
-                name = str(preset.get("Name", ""))
-                spec = str(preset.get("DieRollSpec", ""))
-                if spec:
-                    self.rollRequested.emit(name, spec, self.current_targets())
+            recipients, to_all, to_gm = self.current_recipient_routing()
+            markup = self.markup_btn.isChecked()
+            pin = self.pin_btn.isChecked()
+            if pin:
+                self.pin_btn.setChecked(False)
 
-        def set_presets(self, presets: list[dict[str, Any]]) -> None:
-            """Populate the die-roll presets table from ``DD`` / ``DD=`` or local ``.dice`` file.
+            self.send_chat_ex_requested.emit(text, recipients, to_all, to_gm, markup, pin)
+            self.send_chat_requested.emit(text, recipients, to_all, to_gm)
+            legacy_targets = ["GM"] if to_gm else recipients
+            self.chatSent.emit(text, legacy_targets)
 
-            Preserves horizontal and vertical scrollbar positions across updates.
-            """
-            v_bar = self.preset_table.verticalScrollBar()
-            h_bar = self.preset_table.horizontalScrollBar()
-            v_pos = v_bar.value() if v_bar is not None else 0
-            h_pos = h_bar.value() if h_bar is not None else 0
-            self.presets = list(presets)
-            self.preset_table.setRowCount(len(self.presets))
-            for idx, p in enumerate(self.presets):
-                self.preset_table.setItem(idx, 0, QTableWidgetItem(str(p.get("Name", ""))))
-                self.preset_table.setItem(idx, 1, QTableWidgetItem(str(p.get("Description", ""))))
-                self.preset_table.setItem(idx, 2, QTableWidgetItem(str(p.get("DieRollSpec", ""))))
-            if v_bar is not None:
-                v_bar.setValue(v_pos)
-            if h_bar is not None:
-                h_bar.setValue(h_pos)
+        def _on_send_roll(self) -> None:
+            spec = self.roll_entry.text().strip()
+            if not spec:
+                return
+            self.roll_entry.clear()
+            self.trigger_roll(spec)
 
-        def append_roll(self, payload: dict[str, Any], styles: dict[str, Any] | None = None) -> None:
-            self.transcript.append(format_roll_result(payload, styles))
-
+        # ------------------------------------------------------------------
+        # Rich Display, Pinned Messages, History Clearing & Pruning
+        # ------------------------------------------------------------------
         def append_chat(self, payload: dict[str, Any]) -> None:
-            self.transcript.append(format_chat_message(payload))
+            """Record and display an incoming `TO` chat payload."""
+            entry = self.history_manager.add_chat_message(payload)
+            msg_id = entry.get("MessageID")
+            is_local_pin = False
+            if msg_id is not None:
+                try:
+                    is_local_pin = int(msg_id) in self.history_manager.pin_list
+                except (TypeError, ValueError):
+                    pass
 
-        def clear_messages(self, keep_last: int = 0) -> None:
-            if keep_last <= 0:
-                self.transcript.clear()
+            html_line = render_chat_payload_html(
+                entry,
+                prefs=self.prefs,
+                dark=self.dark,
+                is_pinned_view=False,
+                is_locally_pinned=is_local_pin,
+                is_gm=self.is_gm,
+            )
+            self.chat_log.append(html_line)
+            if bool(entry.get("Pin", False)) or is_local_pin:
+                self._refresh_pinned_view()
 
-else:
+        def append_roll(self, payload: dict[str, Any], _styles: Any = None) -> None:
+            """Record, collect stats for, and display an incoming `ROLL` payload."""
+            stats_line = self.stat_collector.collect(payload)
+            entry = self.history_manager.add_roll_message(payload, stats_line=stats_line)
+            html_line = render_roll_payload_html(
+                entry,
+                prefs=self.prefs,
+                dark=self.dark,
+                stats_line=stats_line,
+            )
+            self.chat_log.append(html_line)
 
-    class ChatDicePanel:  # type: ignore[no-redef]
-        def __init__(self, parent: Any = None) -> None:
-            self.presets: list[dict[str, Any]] = []
-            self.messages: list[str] = []
+        def clear_messages(self, keep: int = 0) -> None:
+            """Legacy alias for `clear_chat_history`."""
+            target = -abs(int(keep)) if keep else 0
+            self.clear_chat_history(target=target)
 
-        def set_presets(self, presets: list[dict[str, Any]]) -> None:
-            self.presets = list(presets)
+        def append_notice(self, text: str) -> None:
+            """Display a local status/warning notice in the chat log."""
+            self.history_manager.add_notice(text)
+            color = "#ffcc00" if self.dark else "#995500"
+            self.chat_log.append(
+                f'<div><span style="color:{color};font-style:italic;">* {text}</span></div>'
+            )
 
-        def append_roll(self, payload: dict[str, Any], styles: dict[str, Any] | None = None) -> None:
-            self.messages.append(format_roll_result(payload, styles))
+        def clear_chat_history(
+            self,
+            target: int = 0,
+            target_messages: list[int] | None = None,
+            do_all: bool = False,
+        ) -> None:
+            """Apply `CC` clearing rules and re-render chat and pinned panes."""
+            self.history_manager.clear_chat_history(
+                target=target,
+                target_messages=target_messages,
+                do_all=do_all,
+            )
+            self._rerender_history_views()
 
-        def append_chat(self, payload: dict[str, Any]) -> None:
-            self.messages.append(format_chat_message(payload))
+        def prune_chat_history(self, min_id: int | None, max_id: int | None) -> None:
+            """Apply `Y2` message pruning and re-render chat and pinned panes."""
+            self.history_manager.prune_chat_history(min_id=min_id, max_id=max_id)
+            self._rerender_history_views()
 
-        def clear_messages(self, keep_last: int = 0) -> None:
-            if keep_last <= 0:
-                self.messages.clear()
+        def _rerender_history_views(self) -> None:
+            self.chat_log.clear()
+            for entry in self.history_manager.visible_entries():
+                kind = entry.get("kind", "chat")
+                if kind == "roll":
+                    self.chat_log.append(
+                        render_roll_payload_html(
+                            entry,
+                            prefs=self.prefs,
+                            dark=self.dark,
+                            stats_line=entry.get("stats_line"),
+                        )
+                    )
+                elif kind == "notice":
+                    color = "#ffcc00" if self.dark else "#995500"
+                    self.chat_log.append(
+                        f'<div><span style="color:{color};font-style:italic;">* {entry.get("Text", "")}</span></div>'
+                    )
+                else:
+                    mid = entry.get("MessageID")
+                    is_local_pin = False
+                    if mid is not None:
+                        try:
+                            is_local_pin = int(mid) in self.history_manager.pin_list
+                        except (TypeError, ValueError):
+                            pass
+                    self.chat_log.append(
+                        render_chat_payload_html(
+                            entry,
+                            prefs=self.prefs,
+                            dark=self.dark,
+                            is_pinned_view=False,
+                            is_locally_pinned=is_local_pin,
+                            is_gm=self.is_gm,
+                        )
+                    )
+            self._refresh_pinned_view()
+
+        def _refresh_pinned_view(self) -> None:
+            pinned = self.history_manager.pinned_entries()
+            self.pinned_log.clear()
+            if not pinned or self.roll_only:
+                self.pinned_group.setVisible(False)
+                return
+            self.pinned_group.setVisible(True)
+            for entry in pinned:
+                mid = entry.get("MessageID")
+                is_local_pin = int(mid) in self.history_manager.pin_list if mid is not None else False
+                self.pinned_log.append(
+                    render_chat_payload_html(
+                        entry,
+                        prefs=self.prefs,
+                        dark=self.dark,
+                        is_pinned_view=True,
+                        is_locally_pinned=is_local_pin,
+                        is_gm=self.is_gm,
+                    )
+                )
+
+        def _on_chat_anchor_clicked(self, url: QUrl) -> None:
+            raw = url.toString()
+            if ":" not in raw:
+                return
+            action, raw_id = raw.split(":", 1)
+            try:
+                msg_id = int(raw_id)
+            except ValueError:
+                return
+            if action == "pin":
+                self.history_manager.pin_message(msg_id)
+                self._rerender_history_views()
+            elif action == "unpin":
+                self.history_manager.unpin_message(msg_id)
+                self._rerender_history_views()
+            elif action == "hide":
+                self.history_manager.hide_message(msg_id)
+                self._rerender_history_views()
+            elif action == "del":
+                self.delete_message_requested.emit(msg_id)
+
+        # ------------------------------------------------------------------
+        # Dialog Launchers & Import / Export
+        # ------------------------------------------------------------------
+        def _on_edit_roll_entry_colorbox(self) -> None:
+            cur_spec = self.roll_entry.text()
+            dlg = EditColorBoxTitleDialog(cur_spec, self)
+            if dlg.exec():
+                self.roll_entry.setText(dlg.updated_roll_spec(cur_spec))
+
+        def _on_show_syntax_help(self) -> None:
+            dlg = DiceSyntaxHelpDialog(self)
+            dlg.show()
+
+        def open_preset_editor(self, system_mode: bool = False) -> None:
+            dlg = EditDieRollPresetsDialog(
+                bank=self.bank,
+                system_mode=system_mode,
+                for_user=self.for_user,
+                parent=self,
+            )
+            if dlg.exec():
+                new_presets = dlg.encoded_presets()
+                if system_mode:
+                    self.bank.set_system_presets(new_presets)
+                else:
+                    self.bank.set_user_presets(new_presets)
+                self._rebuild_presets_ui()
+                self.save_presets_requested.emit(new_presets, system_mode, self.for_user)
+
+        def _on_import_presets_clicked(self) -> None:
+            path, _ = QFileDialog.getOpenFileName(
+                self, "Import Dice Presets", "", "Dice Files (*.dice);;All Files (*)"
+            )
+            if not path:
+                return
+            _meta, loaded = load_dice_presets_from_file(path)
+            if not loaded:
+                return
+            if self.bank.user_presets:
+                ans = QMessageBox.question(
+                    self,
+                    "Import Dice Presets",
+                    "Append imported presets to existing presets? (Choose 'No' to replace existing presets.)",
+                    QMessageBox.StandardButton.Yes
+                    | QMessageBox.StandardButton.No
+                    | QMessageBox.StandardButton.Cancel,
+                )
+                if ans == QMessageBox.StandardButton.Cancel:
+                    return
+                if ans == QMessageBox.StandardButton.Yes:
+                    merged = [*self.bank.user_presets, *loaded]
+                else:
+                    merged = loaded
             else:
-                self.messages = self.messages[-keep_last:]
+                merged = loaded
+
+            self.bank.set_user_presets(merged)
+            self._rebuild_presets_ui()
+            self.save_presets_requested.emit(self.bank.user_presets, False, self.for_user)
+
+        def _on_export_presets_clicked(self) -> None:
+            path, _ = QFileDialog.getSaveFileName(
+                self, "Export Dice Presets", "", "Dice Files (*.dice)"
+            )
+            if not path:
+                return
+            save_dice_presets_to_file(Path(path), self.bank.user_presets)
+
+    class DelegatedDieRollerDialog(QDialog):
+        """Secondary die-roller window for rolling on behalf of another player (`DelegateFor`)."""
+
+        def __init__(
+            self,
+            for_user: str,
+            local_user: str = "",
+            prefs: dict[str, Any] | None = None,
+            shared_gvar_state: dict[str, bool] | None = None,
+            parent: QWidget | None = None,
+        ) -> None:
+            super().__init__(parent)
+            self.for_user = for_user
+            self.setWindowTitle(f"Die Roller for {for_user}")
+            self.resize(480, 560)
+
+            layout = QVBoxLayout(self)
+            layout.setContentsMargins(4, 4, 4, 4)
+            self.panel = ChatDicePanel(
+                parent=self,
+                tkey=for_user,
+                for_user=for_user,
+                local_user=local_user,
+                prefs=prefs,
+                shared_gvar_state=shared_gvar_state,
+                roll_only=True,
+            )
+            layout.addWidget(self.panel, stretch=1)
