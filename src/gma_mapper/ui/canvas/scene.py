@@ -15,6 +15,7 @@ from gma_mapper.ui.canvas.items import (
     BASE_GRID_SCALE,
     CreatureTokenItem,
     MapElementItem,
+    compute_combat_threat_arrows,
 )
 
 DISCRETE_ZOOM_STEPS: list[float] = [
@@ -172,8 +173,13 @@ def ping_marker_radius(seq: int) -> float | None:
 
 try:
     from PySide6.QtCore import QLineF, QPointF, QRectF, Qt, QTimer, Signal
-    from PySide6.QtGui import QBrush, QColor, QFont, QPainter, QPen, QPixmap
-    from PySide6.QtWidgets import QGraphicsEllipseItem, QGraphicsLineItem, QGraphicsScene
+    from PySide6.QtGui import QBrush, QColor, QFont, QPainter, QPen, QPixmap, QPolygonF
+    from PySide6.QtWidgets import (
+        QGraphicsEllipseItem,
+        QGraphicsLineItem,
+        QGraphicsPolygonItem,
+        QGraphicsScene,
+    )
 
     class BattleMapScene(QGraphicsScene):
         """Hardware-accelerated 2D battle map scene."""
@@ -432,6 +438,7 @@ try:
 
             if mob_id in self.creatures:
                 token = self.creatures[mob_id]
+                token.combat_mode = self.combat_mode
                 token.update_data(data)
             else:
                 token = CreatureTokenItem(data, pixmap_provider=self.get_pixmap)
@@ -585,11 +592,50 @@ try:
                 )
                 tok.update()
             self.refresh_targets()
+            self.update()
 
         def refresh_targets(self) -> None:
             for item in self._target_lines:
                 self.removeItem(item)
             self._target_lines.clear()
+
+            # 0. In Combat Mode, draw red melee threat arrows (MArrows) between opposing tokens in melee range
+            if self.combat_mode and self.creatures:
+                creatures_data = {cid: tok.data for cid, tok in self.creatures.items()}
+                threat_color = QColor("#ff0000")
+                threat_pen = QPen(threat_color, 5.0)
+                head_size = 15.0
+                wing = 8.0
+                for _src_id, _dst_id, aox, aoy, adx, ady in compute_combat_threat_arrows(
+                    creatures_data, BASE_GRID_SCALE
+                ):
+                    shaft = self.addLine(aox, aoy, adx, ady, threat_pen)
+                    shaft.setZValue(2_000_000_007)
+                    self._target_lines.append(shaft)
+
+                    dx = adx - aox
+                    dy = ady - aoy
+                    length = math.hypot(dx, dy)
+                    if length > 1e-3:
+                        ux = dx / length
+                        uy = dy / length
+                        px = -uy
+                        py = ux
+                        bx = adx - ux * head_size
+                        by = ady - uy * head_size
+                        poly = QPolygonF(
+                            [
+                                QPointF(adx, ady),
+                                QPointF(bx + px * wing, by + py * wing),
+                                QPointF(bx - px * wing, by - py * wing),
+                            ]
+                        )
+                        head = QGraphicsPolygonItem(poly)
+                        head.setPen(QPen(threat_color, 1))
+                        head.setBrush(QBrush(threat_color))
+                        head.setZValue(2_000_000_007)
+                        self.addItem(head)
+                        self._target_lines.append(head)
 
             # 1. Draw green dotted SRCTARG box around active_target_source (or active_actor_id)
             src_id = self.active_target_source or self.active_actor_id
@@ -728,6 +774,11 @@ except ImportError:
 
         def flash_mark(self, x: float, y: float) -> None:
             self.marks.append((float(x), float(y)))
+
+        def set_combat_state(self, enabled: bool, active_actor_id: str = "") -> None:
+            self.combat_mode = bool(enabled)
+            if active_actor_id or not enabled:
+                self.active_actor_id = active_actor_id if enabled else ""
 
         @property
         def tokens(self) -> dict[str, _HeadlessItem]:

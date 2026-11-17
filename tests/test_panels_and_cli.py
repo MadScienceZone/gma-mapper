@@ -341,6 +341,123 @@ class TestPanelsAndCLI(unittest.TestCase):
         ctrl.dispatch_command("RM", {"ObjID": "m1"})
         self.assertNotIn("m1", ctrl.combat_panel.combatants)
 
+    def test_map_save_load_merge_unload_and_server_l(self) -> None:
+        import tempfile
+
+        src_ctrl = MapperController()
+        src_ctrl.scene.add_or_update_element(
+            "rect1",
+            "LS-RECT",
+            {
+                "ID": "rect1",
+                "Points": [{"X": 100.0, "Y": 100.0}, {"X": 200.0, "Y": 200.0}],
+                "Color": "#ff0000",
+                "Fill": "#00ff00",
+                "_spread": True,
+            },
+        )
+        src_ctrl.scene.add_or_update_element(
+            "circ1",
+            "LS-CIRC",
+            {
+                "ID": "circ1",
+                "Points": [{"X": 300.0, "Y": 300.0}, {"X": 350.0, "Y": 350.0}],
+                "Color": "#0000ff",
+            },
+        )
+        src_ctrl.scene.add_or_update_token(
+            "tok1",
+            {
+                "ID": "tok1",
+                "Name": "Goblin Scout",
+                "Gx": 3.0,
+                "Gy": 4.0,
+                "CreatureType": 2,
+                "Health": {"MaxHP": 12},
+            },
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            map_path = Path(tmpdir) / "roundtrip.map"
+            count = src_ctrl.save_map_file(map_path)
+            self.assertEqual(count, 3)
+            raw_text = map_path.read_text(encoding="utf-8")
+            self.assertNotIn("_spread", raw_text)
+
+            # Load into a fresh controller (merge=False clears existing objects)
+            dst_ctrl = MapperController()
+            dst_ctrl.scene.add_or_update_element(
+                "old_line",
+                "LS-LINE",
+                {"ID": "old_line", "Points": [{"X": 0.0, "Y": 0.0}, {"X": 50.0, "Y": 50.0}]},
+            )
+            dst_ctrl.apply_loaded_map_file(map_path, merge=False)
+            self.assertNotIn("old_line", dst_ctrl.scene.elements)
+            self.assertIn("rect1", dst_ctrl.scene.elements)
+            self.assertIn("circ1", dst_ctrl.scene.elements)
+            self.assertEqual(dst_ctrl.scene.elements["rect1"].gma_type, "RECT")
+            self.assertEqual(dst_ctrl.scene.elements["circ1"].gma_type, "CIRC")
+            self.assertIn("tok1", dst_ctrl.scene.tokens)
+            self.assertEqual(dst_ctrl.scene.tokens["tok1"].data.get("Name"), "Goblin Scout")
+            self.assertIn("tok1", dst_ctrl.combat_panel.combatants)
+
+            # Merge=True preserves existing objects
+            dst_ctrl.scene.add_or_update_element(
+                "keep_line",
+                "LS-LINE",
+                {"ID": "keep_line", "Points": [{"X": 10.0, "Y": 10.0}, {"X": 60.0, "Y": 60.0}]},
+            )
+            dst_ctrl.apply_loaded_map_file(map_path, merge=True)
+            self.assertIn("keep_line", dst_ctrl.scene.elements)
+            self.assertIn("rect1", dst_ctrl.scene.elements)
+
+            # Unload removes only objects from map_path
+            removed = dst_ctrl.unload_map_file(map_path)
+            self.assertEqual(set(removed), {"rect1", "circ1", "tok1"})
+            self.assertIn("keep_line", dst_ctrl.scene.elements)
+            self.assertNotIn("rect1", dst_ctrl.scene.elements)
+            self.assertNotIn("tok1", dst_ctrl.scene.tokens)
+            self.assertNotIn("tok1", dst_ctrl.combat_panel.combatants)
+
+            # Server L command dispatch (synchronous fallback when async_fetch_map_cb is None)
+            srv_ctrl = MapperController()
+            srv_ctrl.server_settings["ImageBaseURL"] = "http://example.invalid/maps"
+            srv_ctrl.cache.fetch_map_file = lambda _fid: map_path  # type: ignore[method-assign]
+            srv_ctrl.dispatch_command(
+                "L", {"File": "testmap", "Merge": False, "CacheOnly": False}
+            )
+            self.assertIn("rect1", srv_ctrl.scene.elements)
+            self.assertEqual(srv_ctrl.scene.elements["rect1"].gma_type, "RECT")
+            self.assertIn("tok1", srv_ctrl.scene.tokens)
+
+    def test_battle_map_view_adjust_view_top_left(self) -> None:
+        import os
+
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        try:
+            from PySide6.QtWidgets import QApplication
+            from gma_mapper.ui.canvas.scene import BattleMapScene
+            from gma_mapper.ui.canvas.view import BattleMapView
+        except ImportError:
+            self.skipTest("PySide6 not available")
+
+        _app = QApplication.instance() or QApplication([])
+        scene = BattleMapScene()
+        view = BattleMapView(scene)
+        view.resize(800, 600)
+
+        view.adjust_view("C12", 0.0, 0.0)
+        self.assertEqual(view.top_left_grid_label(), "C12")
+
+        # Fraction fallback (empty grid label) aligns top-left to (xview, yview) of sceneRect
+        sr = scene.sceneRect()
+        target_sx = 4 * 50.0  # Column E (gx=4)
+        target_sy = 6 * 50.0  # Row 7 (gy=6)
+        xv = (target_sx - sr.left()) / sr.width()
+        yv = (target_sy - sr.top()) / sr.height()
+        view.adjust_view("", xv, yv)
+        self.assertEqual(view.top_left_grid_label(), "E7")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -268,14 +268,21 @@ try:
             self.sync_view_requested.emit(xview, yview, lbl)
             self.status_message.emit(f"Synchronized others' views to {lbl}")
 
-        def adjust_view(self, grid: str, xview: float, yview: float) -> None:
-            """Handle incoming `AV` command (`AdjustView`) to scroll our viewport to match the sender."""
+        def adjust_view(
+            self, grid: str = "", xview: float = 0.0, yview: float = 0.0
+        ) -> None:
+            """Handle incoming `AV` command (`AdjustView`) to scroll our viewport to match the sender.
+
+            Matches `AdjustView` in `bin/mapper_legacy.tcl`, aligning the target grid square or
+            `(xview, yview)` scrollregion fraction at the top-left corner of the viewport.
+            """
             if grid and self.scroll_to_grid_label(grid):
                 return
             sr = self.map_scene.sceneRect()
             sx = sr.left() + xview * sr.width()
             sy = sr.top() + yview * sr.height()
-            self.centerOn(sx, sy)
+            self.horizontalScrollBar().setValue(int((sx - sr.left()) * self._zoom))
+            self.verticalScrollBar().setValue(int((sy - sr.top()) * self._zoom))
 
         def ensure_scene_xy_visible(
             self, sx: float, sy: float, margin_px: float = 100.0
@@ -658,20 +665,6 @@ try:
                     f"Dash style: {self.draw_dash or 'solid'}"
                 )
             self.tool_options_changed.emit()
-
-        def adjust_view(self, grid_label: str = "", xview: float = 0.0, yview: float = 0.0) -> None:
-            """Scroll viewport to `grid_label` or `(xview, yview)` from `AV` server command."""
-            if grid_label:
-                try:
-                    gx, gy = letter_label_to_grid_xy(grid_label)
-                    self.centerOn(gx * BASE_GRID_SCALE, gy * BASE_GRID_SCALE)
-                    return
-                except ValueError:
-                    pass
-            srect = self.map_scene.sceneRect()
-            cx = srect.left() + xview * srect.width()
-            cy = srect.top() + yview * srect.height()
-            self.centerOn(cx, cy)
 
         def wheelEvent(self, event: QWheelEvent) -> None:
             if event.modifiers() & Qt.KeyboardModifier.ControlModifier:

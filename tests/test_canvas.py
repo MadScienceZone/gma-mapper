@@ -35,9 +35,12 @@ from gma_mapper.ui.canvas.drawing import (
     translate_element_coords,
 )
 from gma_mapper.ui.canvas.items import (
+    are_opposing_creatures,
+    compute_combat_threat_arrows,
     creature_image_candidates,
     creature_status_conditions,
     creature_status_transparent,
+    creature_threat_boxes,
     resolve_condition_markers,
 )
 from gma_mapper.ui.canvas.scene import (
@@ -432,6 +435,154 @@ class TestCanvasHelpers(unittest.TestCase):
             scene = BattleMapScene()
             scene.flash_mark(120.0, 160.0)
             self.assertEqual(scene.marks, [(120.0, 160.0)])
+
+    def test_combat_mode_threat_boxes_for_pcs_and_npcs(self) -> None:
+        # Medium PC (1x1 icon at [0, 50) x [0, 50)) threatens 1 square (50 px) on each side -> (-50, -50, 150, 150)
+        pc_boxes = creature_threat_boxes(
+            {"ID": "p1", "Name": "Valeros", "Size": "M", "CreatureType": 2, "Reach": 0}
+        )
+        self.assertEqual(pc_boxes, {"natural": (-50.0, -50.0, 150.0, 150.0)})
+
+        # NPC without explicit Size defaults to Medium ("M") natural threat box
+        npc_default = creature_threat_boxes({"ID": "m1", "Name": "Goblin #1", "CreatureType": 1})
+        self.assertEqual(npc_default, {"natural": (-50.0, -50.0, 150.0, 150.0)})
+
+        # Medium creature with Extended Reach active (Reach=1) has both natural and extended boxes
+        reach_boxes = creature_threat_boxes(
+            {"ID": "p2", "Name": "Seoni", "Size": "M", "CreatureType": 2, "Reach": 1}
+        )
+        self.assertEqual(
+            reach_boxes,
+            {
+                "natural": (-50.0, -50.0, 150.0, 150.0),
+                "extended": (-100.0, -100.0, 250.0, 250.0),
+            },
+        )
+
+        # Large (tall) NPC (2x2 icon at [0, 100) x [0, 100), 2-square natural reach) -> (-100, -100, 300, 300)
+        large_npc = creature_threat_boxes(
+            {"ID": "m2", "Name": "Ogre", "Size": "L", "CreatureType": 1, "Reach": 0}
+        )
+        self.assertEqual(large_npc, {"natural": (-100.0, -100.0, 300.0, 300.0)})
+
+        # Killed creatures do not threaten any area
+        killed_boxes = creature_threat_boxes(
+            {"ID": "m3", "Name": "Dead Orc", "Size": "M", "CreatureType": 1, "Killed": True}
+        )
+        self.assertEqual(killed_boxes, {})
+
+        try:
+            from PySide6.QtGui import QImage, QPainter
+            from PySide6.QtWidgets import QApplication, QStyleOptionGraphicsItem
+
+            _app = QApplication.instance() or QApplication([])
+            scene = BattleMapScene()
+            pc_tok = scene.place_someone(
+                {
+                    "ID": "p1",
+                    "Name": "Valeros",
+                    "Gx": 3.0,
+                    "Gy": 3.0,
+                    "Size": "M",
+                    "Color": "green",
+                    "CreatureType": 2,
+                }
+            )
+            npc_tok = scene.place_someone(
+                {
+                    "ID": "m1",
+                    "Name": "Goblin #1",
+                    "Gx": 6.0,
+                    "Gy": 3.0,
+                    "Size": "M",
+                    "Color": "red",
+                    "CreatureType": 1,
+                }
+            )
+
+            def _render_token(tok: object) -> QImage:
+                img = QImage(200, 200, QImage.Format.Format_ARGB32_Premultiplied)
+                img.fill(0)
+                p = QPainter(img)
+                p.translate(75.0, 75.0)
+                opt = QStyleOptionGraphicsItem()
+                tok.paint(p, opt, None)  # type: ignore[attr-defined]
+                p.end()
+                return img
+
+            img_no_combat = _render_token(pc_tok)
+            # At local (-50, 0) -> image (25, 75), outside the [0, 50] token icon, pixel is transparent when not in combat
+            self.assertEqual(img_no_combat.pixelColor(25, 75).alpha(), 0)
+
+            scene.set_combat_state(True)
+            self.assertTrue(pc_tok.combat_mode)
+            self.assertTrue(npc_tok.combat_mode)
+
+            img_pc_combat = _render_token(pc_tok)
+            img_npc_combat = _render_token(npc_tok)
+            # In combat mode (even when not active turn), the threat box border at local (-50, 0) -> image (25, 75) is drawn
+            self.assertGreater(img_pc_combat.pixelColor(25, 75).alpha(), 0)
+            self.assertGreater(img_npc_combat.pixelColor(25, 75).alpha(), 0)
+        except ImportError:
+            pass
+
+    def test_combat_melee_threat_arrows_between_opposing_creatures(self) -> None:
+        pc1 = {"ID": "p1", "Name": "Valeros", "Gx": 2.0, "Gy": 2.0, "Size": "M", "Color": "green", "CreatureType": 2}
+        pc2 = {"ID": "p2", "Name": "Kyra", "Gx": 2.0, "Gy": 3.0, "Size": "M", "Color": "green", "CreatureType": 2}
+        gob1 = {"ID": "m1", "Name": "Goblin #1", "Gx": 3.0, "Gy": 2.0, "Size": "M", "Color": "red", "CreatureType": 1}
+        gob_far = {"ID": "m2", "Name": "Goblin #2", "Gx": 7.0, "Gy": 2.0, "Size": "M", "Color": "red", "CreatureType": 1}
+
+        self.assertFalse(are_opposing_creatures(pc1, pc2))
+        self.assertTrue(are_opposing_creatures(pc1, gob1))
+        # Also opposing if same CreatureType (or 0) but different colors
+        self.assertTrue(
+            are_opposing_creatures(
+                {"ID": "a", "Color": "blue", "CreatureType": 0},
+                {"ID": "b", "Color": "red", "CreatureType": 0},
+            )
+        )
+
+        # pc1 (2,2), pc2 (2,3), and gob1 (3,2) are all within 1-square melee range of gob1,
+        # while pc1 and pc2 are allies (same color/type) so they do not threaten each other,
+        # and gob_far (7,2) is out of range.
+        arrows = compute_combat_threat_arrows({"p1": pc1, "p2": pc2, "m1": gob1, "m2": gob_far})
+        pairs = {(src, dst) for src, dst, *_ in arrows}
+        self.assertEqual(pairs, {("p1", "m1"), ("m1", "p1"), ("p2", "m1"), ("m1", "p2")})
+        for _src, _dst, x0, y0, x1, y1 in arrows:
+            self.assertGreater(abs(x1 - x0) + abs(y1 - y0), 10.0)
+
+        # When gob1 moves out of melee range to (5, 2), no threat arrows remain
+        gob1_moved = dict(gob1, Gx=5.0, Gy=2.0)
+        self.assertEqual(
+            compute_combat_threat_arrows({"p1": pc1, "p2": pc2, "m1": gob1_moved}),
+            [],
+        )
+
+        # If pc1 activates a reach weapon (Reach=1, 2-square reach) and gob1 is 2 squares away at (4, 2),
+        # pc1 threatens gob1, but gob1 (1-square reach) does not threaten pc1
+        pc1_reach = dict(pc1, Reach=1)
+        gob1_two_sq = dict(gob1, Gx=4.0, Gy=2.0)
+        reach_arrows = compute_combat_threat_arrows({"p1": pc1_reach, "m1": gob1_two_sq})
+        self.assertEqual([(s, d) for s, d, *_ in reach_arrows], [("p1", "m1")])
+
+        try:
+            from PySide6.QtWidgets import QApplication
+
+            _app = QApplication.instance() or QApplication([])
+            scene = BattleMapScene()
+            scene.place_someone(pc1)
+            scene.place_someone(gob1)
+            self.assertEqual(len(scene._target_lines), 0)
+
+            scene.set_combat_state(True)
+            # 2 threat arrows (p1->m1 and m1->p1), each consisting of 1 shaft line + 1 arrowhead polygon = 4 items
+            self.assertEqual(len(scene._target_lines), 4)
+
+            # Moving m1 out of range clears the red melee threat arrows
+            scene.move_object("m1", 8.0, 8.0)
+            self.assertEqual(len(scene._target_lines), 0)
+        except ImportError:
+            pass
 
 
 if __name__ == "__main__":

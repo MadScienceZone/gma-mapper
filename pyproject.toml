@@ -38,3 +38,23 @@ where = ["src"]
 testpaths = ["tests"]
 pythonpath = ["src"]
 
+[tool.pylint.main]
+extension-pkg-allow-list = ["PySide6"]
+ignore-patterns = ["^.*\\.egg-info$"]
+
+[tool.pylint.format]
+max-line-length = 120
+
+[tool.pylint.typecheck]
+generated-members = [
+    ".*\\.connect",
+    ".*\\.disconnect",
+    ".*\\.emit",
+]
+
+[tool.pylint.messages_control]
+disable = [
+    "C",  # Convention (formatting, naming, docstrings)
+    "R",  # Refactor (complexity, duplicate code, design)
+]
+

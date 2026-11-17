@@ -11,6 +11,7 @@ from gma_mapper import GMAMapperVersion
 from gma_mapper.core.cache import AssetCache
 from gma_mapper.core.dice import DicePresetBank, resolve_table_roll_reply
 from gma_mapper.core.file_io import (
+    DATA_PAYLOAD,
     load_from_file,
     save_to_file,
     load_dice_presets_from_file,
@@ -129,6 +130,7 @@ class MapperController:
         self.my_names: list[str] = []
         self.polo_cb: Callable[[], None] | None = None
         self.combatant_moved_cb: Callable[[str], None] | None = None
+        self.combat_mode_changed_cb: Callable[[bool], None] | None = None
         self.status_message_cb: Callable[[str], None] | None = None
         self.table_reply_cb: Callable[[dict[str, Any]], None] | None = None
         self.delegates_updated_cb: Callable[[], None] | None = None
@@ -259,15 +261,38 @@ class MapperController:
             if self.query_image_cb:
                 self.query_image_cb(cand, zoom)
 
+    @staticmethod
+    def _read_map_records(
+        local_map: str | Path,
+    ) -> tuple[list[tuple[str, dict[str, Any]]], list[dict[str, Any]], dict[str, Any]]:
+        """Read a `.map` file via `load_from_file` and partition records into `(elements, creatures, meta)`.
+
+        `elements` is a list of `(record_type, record_data)` tuples (e.g. `("RECT", {...})`),
+        preserving each shape's record type since `.map` payloads do not embed a `GMAType` key.
+        Recursive `MAP` reference records are skipped.
+        """
+        meta, objlist = load_from_file(local_map)
+        elements: list[tuple[str, dict[str, Any]]] = []
+        creatures: list[dict[str, Any]] = []
+        for record_type, record_data in objlist:
+            if record_type == "CREATURE":
+                creatures.append(record_data)
+            elif record_type == "MAP":
+                # Nested MAP file references are intentionally skipped here.
+                continue
+            else:
+                elements.append((record_type, record_data))
+        return elements, creatures, meta
+
     def apply_loaded_map_file(self, local_map: str | Path, merge: bool = False) -> None:
         """Load elements and creatures from a local/cached map file into the scene on the GUI thread."""
-        elements, creatures, _meta = load_from_file(local_map)
+        elements, creatures, _meta = self._read_map_records(local_map)
         if not merge:
             self.scene.clear_all()
             self.combat_panel.clear_combatants()
-        for el in elements:
+        for record_type, el in elements:
             oid = str(el.get("ID", ""))
-            gtype = str(el.get("GMAType", "LS-LINE"))
+            gtype = record_type or str(el.get("GMAType", "LS-LINE"))
             if oid:
                 self.scene.add_or_update_element(oid, gtype, el)
                 if gtype in ("LS-TILE", "TILE"):
@@ -281,9 +306,9 @@ class MapperController:
 
     def unload_map_file(self, local_map: str | Path) -> list[str]:
         """Remove elements and creatures whose IDs appear in `local_map` (`unloadfile` in `bin/mapper_legacy.tcl`)."""
-        elements, creatures, _meta = load_from_file(local_map)
+        elements, creatures, _meta = self._read_map_records(local_map)
         removed_ids: list[str] = []
-        for el in elements:
+        for _record_type, el in elements:
             oid = str(el.get("ID", ""))
             if oid and oid in self.scene.elements:
                 self.scene.remove_object(oid)
@@ -295,6 +320,22 @@ class MapperController:
                 self.combat_panel.remove_combatant(oid)
                 removed_ids.append(oid)
         return removed_ids
+
+    def save_map_file(self, path: str | Path, meta: dict[str, Any] | None = None) -> int:
+        """Serialize current scene elements and creature tokens to a `.map` file and return record count."""
+        objlist: list[tuple[str, dict[str, Any]]] = []
+        non_element_types = {"__META__", "__DMETA__", "PRESET", "CREATURE", "MAP"}
+        for item in self.scene.elements.values():
+            raw_type = getattr(item, "gma_type", "") or str(item.data.get("GMAType", ""))
+            clean_type = raw_type.replace("LS-", "")
+            # Skip any unrecognized or non-element record type so a single odd item cannot abort saving.
+            if not clean_type or clean_type in non_element_types or clean_type not in DATA_PAYLOAD:
+                continue
+            objlist.append((clean_type, dict(item.data)))
+        for token in self.scene.tokens.values():
+            objlist.append(("CREATURE", dict(token.data)))
+        save_to_file(path, (dict(meta or {}), objlist))
+        return len(objlist)
 
     def _sync_token_to_combat_panel(self, obj_id: str) -> None:
         if obj_id in self.scene.tokens:
@@ -364,10 +405,17 @@ class MapperController:
         elif cmd == "AC":
             obj_id = str(payload.get("ID", payload.get("Name", "")))
             if obj_id:
-                self.pc_templates[obj_id] = dict(payload)
+                pc_d = dict(payload)
+                if not int(pc_d.get("CreatureType", 0) or 0):
+                    pc_d["CreatureType"] = 2
+                if not pc_d.get("Color"):
+                    pc_d["Color"] = "green"
+                if not pc_d.get("Size"):
+                    pc_d["Size"] = "M"
+                self.pc_templates[obj_id] = pc_d
                 if any(k in payload for k in ("GX", "GY", "Gx", "Gy")):
-                    self.scene.add_or_update_token(obj_id, payload)
-                self.combat_panel.update_combatant(combatant_state_from_token_data(obj_id, payload))
+                    self.scene.add_or_update_token(obj_id, pc_d)
+                self.combat_panel.update_combatant(combatant_state_from_token_data(obj_id, pc_d))
         elif cmd == "PS":
             obj_id = str(payload.get("ID", payload.get("Name", "")))
             if obj_id:
@@ -510,12 +558,20 @@ class MapperController:
                 combat_mode=payload.get("CombatMode"),
                 running=payload.get("Running"),
             )
+            if payload.get("CombatMode") is not None:
+                enabled = bool(payload.get("CombatMode"))
+                if hasattr(self.scene, "set_combat_state"):
+                    self.scene.set_combat_state(enabled, getattr(self.scene, "active_actor_id", ""))
+                if self.combat_mode_changed_cb:
+                    self.combat_mode_changed_cb(enabled)
             self.clock_panel.refresh()
         elif cmd == "CO":
             enabled = bool(payload.get("Enabled", payload.get("CombatMode", False)))
             self.calendar.set_time(combat_mode=enabled)
             if hasattr(self.scene, "set_combat_state"):
-                self.scene.set_combat_state(enabled)
+                self.scene.set_combat_state(enabled, getattr(self.scene, "active_actor_id", ""))
+            if self.combat_mode_changed_cb:
+                self.combat_mode_changed_cb(enabled)
             self._update_ondeck_and_audio()
             self.clock_panel.refresh()
         elif cmd == "IL":
@@ -707,6 +763,7 @@ if HAS_PYSIDE6:
             self.map_view = BattleMapView(self.controller.scene, self)
             self.map_view.pc_templates_provider = lambda: self.controller.pc_templates
             self.controller.combatant_moved_cb = self.map_view.scroll_to_combatant
+            self.controller.combat_mode_changed_cb = self._sync_combat_mode_action
             self.setCentralWidget(self.map_view)
 
             self._create_docks()
@@ -1934,12 +1991,15 @@ if HAS_PYSIDE6:
             self.controller.scene.refresh_targets()
             self.controller.scene.update()
 
-        def _on_toggle_combat_mode(self, checked: bool) -> None:
-            enabled = bool(checked)
+        def _sync_combat_mode_action(self, enabled: bool) -> None:
             if hasattr(self, "act_combat_mode"):
                 self.act_combat_mode.blockSignals(True)
-                self.act_combat_mode.setChecked(enabled)
+                self.act_combat_mode.setChecked(bool(enabled))
                 self.act_combat_mode.blockSignals(False)
+
+        def _on_toggle_combat_mode(self, checked: bool) -> None:
+            enabled = bool(checked)
+            self._sync_combat_mode_action(enabled)
             self.controller.calendar.set_time(combat_mode=enabled)
             self.controller.scene.set_combat_state(enabled, self.controller.scene.active_actor_id)
             self.controller._update_ondeck_and_audio()
@@ -1965,9 +2025,13 @@ if HAS_PYSIDE6:
         def _on_save_map(self) -> None:
             path, _ = QFileDialog.getSaveFileName(self, "Save Map File", "", "GMA Maps (*.map)")
             if path:
-                elements = [item.data for item in self.controller.scene.elements.values()]
-                creatures = [item.data for item in self.controller.scene.tokens.values()]
-                save_to_file(path, elements, creatures)
+                try:
+                    count = self.controller.save_map_file(path)
+                    self.statusBar().showMessage(
+                        f"Saved {count} map object(s) to {Path(path).name}"
+                    )
+                except (OSError, ValueError) as exc:
+                    self.statusBar().showMessage(f"Error saving map: {exc}")
 
         def _on_open_dice(self) -> None:
             path, _ = QFileDialog.getOpenFileName(self, "Load Dice Presets", "", "Dice Files (*.dice);;All Files (*)")

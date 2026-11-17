@@ -209,7 +209,7 @@ def build_spawned_creatures(
     sizes_str: str = "M",
     color: str = "red",
     creature_type: str = "monster",
-    reach: int = 1,
+    reach: int = 0,
     known_pc_ids: dict[str, str] | None = None,
 ) -> list[dict[str, Any]]:
     """Build one or more `PS` creature dictionaries from `name_spec` (supporting `Goblin #1-4` batch syntax).
@@ -361,7 +361,7 @@ try:
             form.addRow("Threat Zone Color:", self.color_edit)
 
             self.reach_check = QCheckBox("Extended Reach Active", self)
-            self.reach_check.setChecked(True)
+            self.reach_check.setChecked(False)
             form.addRow("", self.reach_check)
 
             buttons = QDialogButtonBox(
@@ -1109,10 +1109,14 @@ try:
                     d["ID"] = tpl_id
                     d["Gx"] = snap_gx
                     d["Gy"] = snap_gy
-                    d.setdefault("Color", "green")
-                    d.setdefault("Size", "M")
-                    d.setdefault("DispSize", d["Size"])
-                    d.setdefault("CreatureType", to_enum("CreatureType", "player"))
+                    if not d.get("Color"):
+                        d["Color"] = "green"
+                    if not d.get("Size"):
+                        d["Size"] = "M"
+                    if not d.get("DispSize"):
+                        d["DispSize"] = d["Size"]
+                    if not int(d.get("CreatureType", 0) or 0):
+                        d["CreatureType"] = to_enum("CreatureType", "player")
                     on_spawn_mob(d)
 
                 act_pc.triggered.connect(_spawn_known_pc)

@@ -640,51 +640,66 @@ if QT_AVAILABLE:
             """Render collapsible groups, lookup tables, modifier checkboxes, and preset rolls."""
             self._clear_layout(self.presets_layout)
 
-            all_items: list[tuple[str, dict[str, Any]]] = []
-            for tbl in self.bank.global_tables:
-                all_items.append(("global_table", tbl))
-            for tbl in self.bank.tables:
-                all_items.append(("table", tbl))
-            for mod in self.bank.global_modifiers:
-                all_items.append(("global_modifier", mod))
-            for mod in self.bank.modifiers:
-                all_items.append(("modifier", mod))
-            for r in self.bank.global_rolls:
-                all_items.append(("global_preset", r))
-            for r in self.bank.rolls:
-                all_items.append(("preset", r))
+            sections: list[tuple[str, list[tuple[str, dict[str, Any]]]]] = [
+                (
+                    "tables",
+                    [("global_table", tbl) for tbl in self.bank.global_tables]
+                    + [("table", tbl) for tbl in self.bank.tables],
+                ),
+                (
+                    "modifiers",
+                    [("global_modifier", mod) for mod in self.bank.global_modifiers]
+                    + [("modifier", mod) for mod in self.bank.modifiers],
+                ),
+                (
+                    "rolls",
+                    [("global_preset", r) for r in self.bank.global_rolls]
+                    + [("preset", r) for r in self.bank.rolls],
+                ),
+            ]
 
-            if not all_items:
+            if not any(items for _sec, items in sections):
                 empty_lbl = QLabel("No presets loaded.", self.presets_host)
                 empty_lbl.setStyleSheet("color: gray; font-style: italic;")
                 self.presets_layout.addWidget(empty_lbl)
                 self.presets_layout.addStretch(1)
                 return
 
-            rendered_groups: set[str] = set()
+            for _sec_name, sec_items in sections:
+                prev_group_path: list[str] = []
+                for item_kind, details in sec_items:
+                    group_path: list[str] = list(details.get("group") or [])
+                    # Find first level where group_path differs from prev_group_path
+                    common_depth = 0
+                    for a, b in zip(prev_group_path, group_path):
+                        if a == b:
+                            common_depth += 1
+                        else:
+                            break
+                    for depth in range(common_depth + 1, len(group_path) + 1):
+                        ancestor_slice = group_path[:depth]
+                        if depth > 1 and self._is_group_path_hidden(group_path[: depth - 1]):
+                            break
+                        g_key = "\u25b6".join(ancestor_slice)
+                        self._add_group_header_widget(ancestor_slice, g_key)
+                    prev_group_path = group_path
 
-            for item_kind, details in all_items:
-                group_path: list[str] = list(details.get("group") or [])
-                # Render any new ancestor group headers before this item
-                for depth in range(1, len(group_path) + 1):
-                    ancestor_Slice = group_path[:depth]
-                    if depth > 1 and self._is_group_path_hidden(group_path[: depth - 1]):
-                        break
-                    g_key = "\u25b6".join(ancestor_Slice)
-                    if g_key not in rendered_groups:
-                        rendered_groups.add(g_key)
-                        self._add_group_header_widget(ancestor_Slice, g_key)
+                    if group_path and self._is_group_path_hidden(group_path):
+                        continue
 
-                if group_path and self._is_group_path_hidden(group_path):
-                    continue
-
-                indent_px = len(group_path) * 14
-                if item_kind in ("table", "global_table"):
-                    self._add_table_row_widget(details, is_global=(item_kind == "global_table"), indent_px=indent_px)
-                elif item_kind in ("modifier", "global_modifier"):
-                    self._add_modifier_row_widget(details, is_global=(item_kind == "global_modifier"), indent_px=indent_px)
-                else:
-                    self._add_preset_row_widget(details, is_global=(item_kind == "global_preset"), indent_px=indent_px)
+                    indent_px = len(group_path) * 14
+                    if item_kind in ("table", "global_table"):
+                        self._add_table_row_widget(
+                            details, is_global=(item_kind == "global_table"), indent_px=indent_px
+                        )
+                    elif item_kind in ("modifier", "global_modifier"):
+                        self._add_modifier_row_widget(
+                            details, is_global=(item_kind == "global_modifier"), indent_px=indent_px
+                        )
+                    else:
+                        self._add_preset_row_widget(
+                            details, is_global=(item_kind == "global_preset"), indent_px=indent_px
+                        )
 
             self.presets_layout.addStretch(1)
 

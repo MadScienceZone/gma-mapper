@@ -256,6 +256,185 @@ def resolve_condition_markers(
     return result
 
 
+def creature_threat_boxes(
+    creature_data: dict[str, Any],
+    grid_scale: float = BASE_GRID_SCALE,
+) -> dict[str, tuple[float, float, float, float]]:
+    """Return local `(x, y, width, height)` threatened area box(es) around a creature's icon.
+
+    Coordinates are in item-local scene units where the creature icon occupies `[0, s) x [0, s)`.
+    Dead (`Killed == True`) creatures do not threaten any area and return `{}`.
+    """
+    if bool(creature_data.get("Killed", False)):
+        return {}
+    info = full_creature_area_info(creature_data)
+    if info is None:
+        fallback = dict(creature_data)
+        fallback["Size"] = "M"
+        fallback.pop("DispSize", None)
+        info = full_creature_area_info(fallback)
+    if info is None:
+        return {}
+
+    mob_size = float(info.space)
+    mob_area = int(info.natural)
+    mob_reach = int(info.extended)
+    s = mob_size * grid_scale
+    reach_mode = int(creature_data.get("Reach", 0) or 0)
+
+    boxes: dict[str, tuple[float, float, float, float]] = {}
+    if mob_area > 0:
+        nat_offset = mob_area * grid_scale
+        nat_size = s + 2.0 * nat_offset
+        boxes["natural"] = (-nat_offset, -nat_offset, nat_size, nat_size)
+    if reach_mode > 0 and mob_reach > 0:
+        ext_offset = mob_reach * grid_scale
+        ext_size = s + 2.0 * ext_offset
+        boxes["extended"] = (-ext_offset, -ext_offset, ext_size, ext_size)
+    return boxes
+
+
+def _resolved_area_info(creature_data: dict[str, Any]) -> Any:
+    info = full_creature_area_info(creature_data)
+    if info is None:
+        fallback = dict(creature_data)
+        fallback["Size"] = "M"
+        fallback.pop("DispSize", None)
+        info = full_creature_area_info(fallback)
+    return info
+
+
+def are_opposing_creatures(mob_a: dict[str, Any], mob_b: dict[str, Any]) -> bool:
+    """Return True if `mob_a` and `mob_b` are on opposing sides (opposing colors or opposing CreatureType)."""
+    type_a = int(mob_a.get("CreatureType", 0) or 0)
+    type_b = int(mob_b.get("CreatureType", 0) or 0)
+    def_col_a = "green" if type_a == 2 else "red"
+    def_col_b = "green" if type_b == 2 else "red"
+    col_a = color_to_hex(str(mob_a.get("Color") or def_col_a)).lower()
+    col_b = color_to_hex(str(mob_b.get("Color") or def_col_b)).lower()
+    if col_a != col_b:
+        return True
+    if type_a in (1, 2) and type_b in (1, 2) and type_a != type_b:
+        return True
+    return False
+
+
+def compute_combat_threat_arrows(
+    creatures_by_id: dict[str, dict[str, Any]],
+    grid_scale: float = BASE_GRID_SCALE,
+) -> list[tuple[str, str, float, float, float, float]]:
+    """Compute melee threat arrows `(threatener_id, target_id, x0, y0, x1, y1)` for Combat Mode.
+
+    Matches the `MArrows` threat-zone loop in `RenderSomeone` (`bin/mapper_legacy.tcl` lines 7232-7247
+    and 7916-8009):
+    - Maps every living, visible creature's occupied grid squares into `where_is_mob`.
+    - For each living, visible creature, scans its threat matrix (`matbit = 2` for normal melee,
+      `1` for `Reach == 1`, `3` for `Reach >= 2`) for opposing creatures.
+    - Returns scene-coordinate arrow segments connecting the threatener's token circle to the
+      threatened target's token circle.
+    """
+    where_is_mob: dict[tuple[int, int], list[str]] = {}
+    mob_info_map: dict[str, Any] = {}
+    for mob_id, mob_data in creatures_by_id.items():
+        if bool(mob_data.get("Killed", False)) or bool(mob_data.get("Hidden", False)):
+            continue
+        info = _resolved_area_info(mob_data)
+        if info is None:
+            continue
+        mob_info_map[mob_id] = info
+        gx = float(mob_data.get("Gx", mob_data.get("GX", 0.0)) or 0.0)
+        gy = float(mob_data.get("Gy", mob_data.get("GY", 0.0)) or 0.0)
+        xx = int(math.floor(gx))
+        yy = int(math.floor(gy))
+        span = max(1, int(math.ceil(float(info.space))))
+        for xi in range(span):
+            for yi in range(span):
+                where_is_mob.setdefault((xx + xi, yy + yi), []).append(mob_id)
+
+    arrows: list[tuple[str, str, float, float, float, float]] = []
+    for threatening_id, threatening_data in creatures_by_id.items():
+        info = mob_info_map.get(threatening_id)
+        if info is None:
+            continue
+        sz = float(info.space)
+        ar = int(info.natural)
+        re = int(info.extended)
+        mat = info.matrix
+        if not mat:
+            continue
+
+        gx = float(threatening_data.get("Gx", threatening_data.get("GX", 0.0)) or 0.0)
+        gy = float(threatening_data.get("Gy", threatening_data.get("GY", 0.0)) or 0.0)
+        offset = max(ar, re)
+        x_start = int(math.floor(gx)) - offset
+        y_start = int(math.floor(gy)) - offset
+
+        reach_mode = int(threatening_data.get("Reach", 0) or 0)
+        if reach_mode == 1:
+            matbit = 1
+        elif reach_mode >= 2:
+            matbit = 3
+        else:
+            matbit = 2
+
+        targets: dict[str, int] = {}
+        for r_idx, row in enumerate(mat):
+            yy = y_start + r_idx
+            for c_idx, col in enumerate(row):
+                if col & matbit:
+                    xx = x_start + c_idx
+                    for target_id in where_is_mob.get((xx, yy), ()):
+                        if target_id == threatening_id:
+                            continue
+                        target_data = creatures_by_id[target_id]
+                        if are_opposing_creatures(threatening_data, target_data):
+                            if target_id not in targets or targets[target_id] < col:
+                                targets[target_id] = col
+
+        r_src = sz / 2.0
+        xc = (gx + r_src) * grid_scale
+        yc = (gy + r_src) * grid_scale
+        rc = r_src * grid_scale
+
+        for target_id, threat_val in targets.items():
+            if threat_val <= 0:
+                continue
+            t_info = mob_info_map.get(target_id)
+            target_data = creatures_by_id[target_id]
+            t_sz = float(t_info.space) if t_info is not None else 1.0
+            t_r = t_sz / 2.0
+            t_gx = float(target_data.get("Gx", target_data.get("GX", 0.0)) or 0.0)
+            t_gy = float(target_data.get("Gy", target_data.get("GY", 0.0)) or 0.0)
+            txc = (t_gx + t_r) * grid_scale
+            tyc = (t_gy + t_r) * grid_scale
+            trc = t_r * grid_scale
+
+            dx = txc - xc
+            dy = tyc - yc
+            dist = math.hypot(dx, dy)
+            if dist <= 1e-6:
+                continue
+            ux = dx / dist
+            uy = dy / dist
+            # Place endpoints on the token circles (matching MOBCenterPoint in mapper_legacy.tcl),
+            # while keeping a minimum 20px shaft when two token circles touch orthogonally.
+            min_len = 20.0
+            if rc + trc + min_len <= dist:
+                r_start = rc
+                r_end = trc
+            else:
+                scale = max(0.0, (dist - min_len) / (rc + trc)) if (rc + trc) > 0 else 0.0
+                r_start = rc * scale
+                r_end = trc * scale
+            aox = xc + r_start * ux
+            aoy = yc + r_start * uy
+            adx = txc - r_end * ux
+            ady = tyc - r_end * uy
+            arrows.append((threatening_id, target_id, aox, aoy, adx, ady))
+
+    return arrows
+
+
 try:
     from PySide6.QtCore import QPointF, QRectF, Qt
     from PySide6.QtGui import (
@@ -677,7 +856,7 @@ try:
             self.setPos(gx * BASE_GRID_SCALE, gy * BASE_GRID_SCALE)
             self.setZValue(2_000_000_000)
             self.setVisible(not bool(self.data.get("Hidden", False)))
-            if creature_status_transparent(self.data) or self.data.get("Dim"):
+            if creature_status_transparent(self.data):
                 self.setOpacity(0.55)
             else:
                 self.setOpacity(1.0)
@@ -686,7 +865,12 @@ try:
         def _area_info(self) -> tuple[float, int, int, list[list[int]], dict[str, Any]]:
             info = full_creature_area_info(self.data)
             if not info:
-                return (1.0, 0, 1, [[2]], {})
+                fallback = dict(self.data)
+                fallback["Size"] = "M"
+                fallback.pop("DispSize", None)
+                info = full_creature_area_info(fallback)
+            if not info:
+                return (1.0, 1, 2, [[2]], {})
             return (
                 float(info.space),
                 int(info.natural),
@@ -722,29 +906,66 @@ try:
         ) -> None:
             mob_size, mob_area, mob_reach, mob_matrix, _ = self._area_info()
             s = mob_size * BASE_GRID_SCALE
-            mob_color_hex = color_to_hex(str(self.data.get("Color") or "red"))
+            ctype = int(self.data.get("CreatureType", 0) or 0)
+            default_color = "#0000ff" if ctype == 2 else "#ff0000"
+            mob_color_hex = color_to_hex(str(self.data.get("Color") or default_color))
             mob_qcolor = QColor(mob_color_hex)
+            is_killed = bool(self.data.get("Killed", False))
+            sc = self.scene()
+            in_combat = self.combat_mode or bool(sc is not None and getattr(sc, "combat_mode", False))
+            reach_mode = int(self.data.get("Reach", 0) or 0)
 
-            # 1. Threat / Reach zones in combat mode
-            if self.combat_mode and self.is_active_turn and mob_matrix:
-                start_offset = -max(mob_area, mob_reach) * BASE_GRID_SCALE
-                for r_idx, row in enumerate(mob_matrix):
-                    for c_idx, cell in enumerate(row):
-                        if cell == 0:
-                            continue
-                        rx = start_offset + c_idx * BASE_GRID_SCALE
-                        ry = start_offset + r_idx * BASE_GRID_SCALE
-                        cell_rect = QRectF(rx, ry, BASE_GRID_SCALE, BASE_GRID_SCALE)
-                        if cell == 2:
-                            c2 = QColor(mob_qcolor)
-                            c2.setAlpha(55)
-                            painter.fillRect(cell_rect, c2)
-                        elif cell == 1 and mob_reach > 0:
-                            c1 = QColor(mob_qcolor)
-                            c1.setAlpha(30)
-                            painter.fillRect(cell_rect, c1)
-                            painter.setPen(QPen(mob_qcolor, 1, Qt.PenStyle.DotLine))
-                            painter.drawRect(cell_rect)
+            # 1. Threat / Reach zones in combat mode for PCs and NPCs
+            if in_combat and not is_killed:
+                if self.is_active_turn and mob_matrix:
+                    start_offset = -max(mob_area, mob_reach) * BASE_GRID_SCALE
+                    for r_idx, row in enumerate(mob_matrix):
+                        for c_idx, cell in enumerate(row):
+                            if cell == 0:
+                                continue
+                            rx = start_offset + c_idx * BASE_GRID_SCALE
+                            ry = start_offset + r_idx * BASE_GRID_SCALE
+                            cell_rect = QRectF(rx, ry, BASE_GRID_SCALE, BASE_GRID_SCALE)
+                            if cell == 2 and reach_mode != 1:
+                                c2 = QColor(mob_qcolor)
+                                c2.setAlpha(55)
+                                painter.fillRect(cell_rect, c2)
+                            elif cell == 1 and reach_mode > 0 and mob_reach > 0:
+                                c1 = QColor(mob_qcolor)
+                                c1.setAlpha(30)
+                                painter.fillRect(cell_rect, c1)
+                                painter.setPen(QPen(mob_qcolor, 1, Qt.PenStyle.DotLine))
+                                painter.drawRect(cell_rect)
+
+                threat_boxes = creature_threat_boxes(self.data, BASE_GRID_SCALE)
+                if "extended" in threat_boxes:
+                    ex, ey, ew, eh = threat_boxes["extended"]
+                    ext_rect = QRectF(ex, ey, ew, eh)
+                    if not self.is_active_turn:
+                        ext_fill = QColor(mob_qcolor)
+                        ext_fill.setAlpha(18)
+                        painter.fillRect(ext_rect, ext_fill)
+                    ext_pen_col = QColor("#00cc00") if self.is_active_turn else mob_qcolor
+                    painter.setPen(QPen(ext_pen_col, 2.0, Qt.PenStyle.DotLine))
+                    painter.setBrush(Qt.BrushStyle.NoBrush)
+                    painter.drawRect(ext_rect)
+
+                if "natural" in threat_boxes:
+                    nx, ny, nw, nh = threat_boxes["natural"]
+                    nat_rect = QRectF(nx, ny, nw, nh)
+                    if not self.is_active_turn:
+                        nat_fill = QColor(mob_qcolor)
+                        nat_fill.setAlpha(28)
+                        painter.fillRect(nat_rect, nat_fill)
+                    painter.setPen(
+                        QPen(
+                            mob_qcolor,
+                            3.0 if self.is_active_turn else 2.5,
+                            Qt.PenStyle.DashLine,
+                        )
+                    )
+                    painter.setBrush(Qt.BrushStyle.NoBrush)
+                    painter.drawRect(nat_rect)
 
             # 2. AoE and _AoE perimeter-emanation grid cross-hatches (matches RenderSomeone lines 7278-7342)
             orig_x = self.gx * BASE_GRID_SCALE
