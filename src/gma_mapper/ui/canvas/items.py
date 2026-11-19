@@ -937,35 +937,23 @@ try:
                                 painter.setPen(QPen(mob_qcolor, 1, Qt.PenStyle.DotLine))
                                 painter.drawRect(cell_rect)
 
+                # Draw circular threat/reach outlines (matching RenderSomeone in bin/mapper_legacy.tcl)
                 threat_boxes = creature_threat_boxes(self.data, BASE_GRID_SCALE)
                 if "extended" in threat_boxes:
                     ex, ey, ew, eh = threat_boxes["extended"]
                     ext_rect = QRectF(ex, ey, ew, eh)
-                    if not self.is_active_turn:
-                        ext_fill = QColor(mob_qcolor)
-                        ext_fill.setAlpha(18)
-                        painter.fillRect(ext_rect, ext_fill)
                     ext_pen_col = QColor("#00cc00") if self.is_active_turn else mob_qcolor
-                    painter.setPen(QPen(ext_pen_col, 2.0, Qt.PenStyle.DotLine))
+                    painter.setPen(QPen(ext_pen_col, 3.0, Qt.PenStyle.DotLine))
                     painter.setBrush(Qt.BrushStyle.NoBrush)
-                    painter.drawRect(ext_rect)
+                    painter.drawEllipse(ext_rect)
 
                 if "natural" in threat_boxes:
                     nx, ny, nw, nh = threat_boxes["natural"]
                     nat_rect = QRectF(nx, ny, nw, nh)
-                    if not self.is_active_turn:
-                        nat_fill = QColor(mob_qcolor)
-                        nat_fill.setAlpha(28)
-                        painter.fillRect(nat_rect, nat_fill)
-                    painter.setPen(
-                        QPen(
-                            mob_qcolor,
-                            3.0 if self.is_active_turn else 2.5,
-                            Qt.PenStyle.DashLine,
-                        )
-                    )
+                    nat_pen_col = QColor("#ff0000") if self.is_active_turn else mob_qcolor
+                    painter.setPen(QPen(nat_pen_col, 3.0, Qt.PenStyle.DotLine))
                     painter.setBrush(Qt.BrushStyle.NoBrush)
-                    painter.drawRect(nat_rect)
+                    painter.drawEllipse(nat_rect)
 
             # 2. AoE and _AoE perimeter-emanation grid cross-hatches (matches RenderSomeone lines 7278-7342)
             orig_x = self.gx * BASE_GRID_SCALE

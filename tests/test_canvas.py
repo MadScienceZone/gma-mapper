@@ -511,8 +511,8 @@ class TestCanvasHelpers(unittest.TestCase):
                 return img
 
             img_no_combat = _render_token(pc_tok)
-            # At local (-50, 0) -> image (25, 75), outside the [0, 50] token icon, pixel is transparent when not in combat
-            self.assertEqual(img_no_combat.pixelColor(25, 75).alpha(), 0)
+            # At local (-50, 25) -> image (25, 100), left midpoint of the threat circle is transparent when not in combat
+            self.assertEqual(img_no_combat.pixelColor(25, 100).alpha(), 0)
 
             scene.set_combat_state(True)
             self.assertTrue(pc_tok.combat_mode)
@@ -520,9 +520,14 @@ class TestCanvasHelpers(unittest.TestCase):
 
             img_pc_combat = _render_token(pc_tok)
             img_npc_combat = _render_token(npc_tok)
-            # In combat mode (even when not active turn), the threat box border at local (-50, 0) -> image (25, 75) is drawn
-            self.assertGreater(img_pc_combat.pixelColor(25, 75).alpha(), 0)
-            self.assertGreater(img_npc_combat.pixelColor(25, 75).alpha(), 0)
+            # In combat mode, the threat circle is drawn along the ellipse inscribed in (-50, -50, 150, 150):
+            # check left tangent arc around local (-50, 25) -> image (25, 95..105), and verify corner (-50, -50) -> (25, 25) is empty
+            pc_arc_drawn = any(img_pc_combat.pixelColor(25, y).alpha() > 0 for y in range(95, 106))
+            npc_arc_drawn = any(img_npc_combat.pixelColor(25, y).alpha() > 0 for y in range(95, 106))
+            self.assertTrue(pc_arc_drawn)
+            self.assertTrue(npc_arc_drawn)
+            self.assertEqual(img_pc_combat.pixelColor(25, 25).alpha(), 0)
+            self.assertEqual(img_npc_combat.pixelColor(25, 25).alpha(), 0)
         except ImportError:
             pass
 
