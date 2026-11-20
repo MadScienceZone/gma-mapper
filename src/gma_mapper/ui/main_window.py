@@ -52,7 +52,8 @@ from gma_mapper.ui.panels.chat_dice import ChatDicePanel, DelegatedDieRollerDial
 from gma_mapper.ui.panels.clock import (
     GolarionCalendar,
     InitiativeClockPanel,
-     strip_nameplate_prefix,
+    PlayerClockWindow,
+    strip_nameplate_prefix,
 )
 from gma_mapper.ui.panels.combat import (
     CombatantState,
@@ -113,6 +114,7 @@ class MapperController:
         self.calendar = GolarionCalendar()
         self.scene = BattleMapScene()
         self.clock_panel = InitiativeClockPanel(self.calendar)
+        self.player_clock_window: PlayerClockWindow | None = None
         self.shared_gvar_state: dict[str, bool] = {}
         self.chat_panel = ChatDicePanel(
             prefs=self.prefs,
@@ -131,6 +133,7 @@ class MapperController:
         self.polo_cb: Callable[[], None] | None = None
         self.combatant_moved_cb: Callable[[str], None] | None = None
         self.combat_mode_changed_cb: Callable[[bool], None] | None = None
+        self.identity_changed_cb: Callable[[str, bool], None] | None = None
         self.status_message_cb: Callable[[str], None] | None = None
         self.table_reply_cb: Callable[[dict[str, Any]], None] | None = None
         self.delegates_updated_cb: Callable[[], None] | None = None
@@ -155,6 +158,26 @@ class MapperController:
             names = [self.chat_panel.local_user]
         return (names, mobs_by_id, mobs_by_name)
 
+    def refresh_clocks(self) -> None:
+        """Refresh both the GM clock dock and the standalone player Game Clock window if open."""
+        self.clock_panel.refresh()
+        if self.player_clock_window is not None:
+            self.player_clock_window.my_names = list(self.clock_panel.my_names)
+            self.player_clock_window.refresh()
+
+    def set_timer_scope(self, scope: str) -> None:
+        """Apply timer visibility scope (`'none'`, `'mine'`, `'all'`) to both clock views."""
+        self.clock_panel.set_timer_scope(scope)
+        if self.player_clock_window is not None:
+            self.player_clock_window.my_names = list(self.clock_panel.my_names)
+            self.player_clock_window.set_timer_scope(scope)
+
+    def sync_player_clock_timers(self) -> None:
+        """Synchronize active timer records from `clock_panel` into `player_clock_window`."""
+        if self.player_clock_window is not None:
+            self.player_clock_window.my_names = list(self.clock_panel.my_names)
+            self.player_clock_window.sync_timers(self.clock_panel.timers)
+
     def log_debug(self, level: int, msg: str) -> None:
         """Emit diagnostic message if ``level <= self.debug_level``."""
         if level <= self.debug_level:
@@ -172,6 +195,8 @@ class MapperController:
         self.scene.grid_color = preferred_color(self.prefs, "grid", theme) or self.scene.grid_color
         self.scene.grid_minor_color = preferred_color(self.prefs, "grid_minor", theme) or self.scene.grid_minor_color
         self.scene.grid_major_color = preferred_color(self.prefs, "grid_major", theme) or self.scene.grid_major_color
+        if self.player_clock_window is not None:
+            self.player_clock_window.apply_styles(self.prefs, dark)
 
         guide_lines = self.prefs.get("guide_lines")
         if isinstance(guide_lines, dict):
@@ -361,11 +386,19 @@ class MapperController:
         elif cmd == "MARCO":
             if self.polo_cb:
                 self.polo_cb()
+        elif cmd == "GRANTED":
+            user = str(payload.get("User") or "")
+            if user:
+                self.chat_panel.set_identity(user)
+                if self.identity_changed_cb:
+                    self.identity_changed_cb(user, self.chat_panel.is_gm)
         elif cmd == "AKA":
             names = payload.get("Names") or []
             if isinstance(names, list) and names:
                 self.my_names = [str(n) for n in names if n]
                 self.clock_panel.my_names = list(self.my_names)
+                if self.player_clock_window is not None:
+                    self.player_clock_window.my_names = list(self.my_names)
         elif cmd == "CONN":
             peers = payload.get("PeerList") or []
             if isinstance(peers, list):
@@ -377,8 +410,12 @@ class MapperController:
                         if peer.get("IsMe"):
                             self.my_names = [str(n) for n in aka if n] if aka else ([user] if user else [])
                             self.clock_panel.my_names = list(self.my_names)
+                            if self.player_clock_window is not None:
+                                self.player_clock_window.my_names = list(self.my_names)
                             if user:
                                 self.chat_panel.set_identity(user)
+                                if self.identity_changed_cb:
+                                    self.identity_changed_cb(user, self.chat_panel.is_gm)
                         else:
                             if user:
                                 new_peer_names.append(user)
@@ -509,7 +546,7 @@ class MapperController:
                         self._ensure_creature_images_loaded(td, 1.0)
                     self._sync_token_to_combat_panel(obj_id)
                 if self.calendar.track_health_change(obj_id, attrs):
-                    self.clock_panel.refresh()
+                    self.refresh_clocks()
         elif cmd == "OA+":
             obj_id = str(payload.get("ObjID", payload.get("ID", payload.get("Target", ""))))
             attr_name = payload.get("AttrName")
@@ -564,7 +601,7 @@ class MapperController:
                     self.scene.set_combat_state(enabled, getattr(self.scene, "active_actor_id", ""))
                 if self.combat_mode_changed_cb:
                     self.combat_mode_changed_cb(enabled)
-            self.clock_panel.refresh()
+            self.refresh_clocks()
         elif cmd == "CO":
             enabled = bool(payload.get("Enabled", payload.get("CombatMode", False)))
             self.calendar.set_time(combat_mode=enabled)
@@ -573,13 +610,13 @@ class MapperController:
             if self.combat_mode_changed_cb:
                 self.combat_mode_changed_cb(enabled)
             self._update_ondeck_and_audio()
-            self.clock_panel.refresh()
+            self.refresh_clocks()
         elif cmd == "IL":
             slots = payload.get("InitiativeList", payload.get("Slots", payload.get("List", [])))
             if isinstance(slots, list):
                 self.calendar.initiative_slots = slots
                 self._update_ondeck_and_audio()
-                self.clock_panel.refresh()
+                self.refresh_clocks()
                 if hasattr(self.scene, "refresh_targets"):
                     self.scene.refresh_targets()
         elif cmd in ("TURN", "I"):
@@ -602,7 +639,7 @@ class MapperController:
                 if self.combatant_moved_cb and primary_id:
                     self.combatant_moved_cb(primary_id)
             self._update_ondeck_and_audio()
-            self.clock_panel.refresh()
+            self.refresh_clocks()
             if payload.get("OnDeck") is not None:
                 self.audio.play_ondeck(int(payload["OnDeck"]))
         elif cmd == "HPACK":
@@ -690,6 +727,7 @@ class MapperController:
         elif cmd == "PROGRESS":
             if payload.get("IsTimer"):
                 self.clock_panel.update_timer(payload)
+                self.sync_player_clock_timers()
             else:
                 title = str(payload.get("Title", "Working"))
                 cur = int(payload.get("Value", payload.get("Current", 0)) or 0)
@@ -764,6 +802,7 @@ if HAS_PYSIDE6:
             self.map_view.pc_templates_provider = lambda: self.controller.pc_templates
             self.controller.combatant_moved_cb = self.map_view.scroll_to_combatant
             self.controller.combat_mode_changed_cb = self._sync_combat_mode_action
+            self.controller.identity_changed_cb = self._on_identity_changed
             self.setCentralWidget(self.map_view)
 
             self._create_docks()
@@ -819,6 +858,8 @@ if HAS_PYSIDE6:
             self.chat_dock = QDockWidget("Chat & Dice Roller", self)
             self.chat_dock.setWidget(self.controller.chat_panel)
             self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.chat_dock)
+
+            self._sync_role_ui()
 
         def _create_menus_and_toolbar(self) -> None:
             menubar = self.menuBar()
@@ -1133,7 +1174,7 @@ if HAS_PYSIDE6:
                 if t_scope == self.controller.clock_panel.timer_scope:
                     act_tm.setChecked(True)
                 act_tm.triggered.connect(
-                    lambda _c=False, sc=t_scope: self.controller.clock_panel.set_timer_scope(sc)
+                    lambda _c=False, sc=t_scope: self.controller.set_timer_scope(sc)
                 )
                 timers_group.addAction(act_tm)
                 timers_menu.addAction(act_tm)
@@ -1194,6 +1235,11 @@ if HAS_PYSIDE6:
             self.act_combat_mode.setChecked(self.controller.scene.combat_mode)
             self.act_combat_mode.triggered.connect(self._on_toggle_combat_mode)
             play_menu.addAction(self.act_combat_mode)
+
+            self.act_show_player_clock = QAction("Show &Initiative Clock", self)
+            self.act_show_player_clock.setShortcut(QKeySequence("Alt+C"))
+            self.act_show_player_clock.triggered.connect(self.show_player_clock_window)
+            play_menu.addAction(self.act_show_player_clock)
 
             _add_tool_action(
                 play_menu,
@@ -1487,7 +1533,7 @@ if HAS_PYSIDE6:
         def _on_clock_time_advance(self, delta_seconds: int, delta_turns: int) -> None:
             cal = self.controller.calendar
             cal.advance_time(delta_seconds=delta_seconds, delta_turns=delta_turns)
-            self.controller.clock_panel.refresh()
+            self.controller.refresh_clocks()
             self.net_client.session.update_clock(
                 float(cal.absolute), float(cal.relative), cal.running
             )
@@ -1503,7 +1549,7 @@ if HAS_PYSIDE6:
                 self.controller.scene.set_combat_state(cal.combat_mode, actor_name)
                 self._on_clock_slot_activated(actor_name)
             self.controller._update_ondeck_and_audio()
-            self.controller.clock_panel.refresh()
+            self.controller.refresh_clocks()
 
         def _on_clock_slot_selected(self, actor_name: str) -> None:
             resolved = self.controller.scene.resolve_actor_mob_ids(actor_name)
@@ -1561,7 +1607,7 @@ if HAS_PYSIDE6:
                 self.net_client.session.update_obj_attributes(obj_id, {"Health": new_health})
                 self.controller._sync_token_to_combat_panel(obj_id)
                 if self.controller.calendar.track_health_change(obj_id, {"Health": new_health}):
-                    self.controller.clock_panel.refresh()
+                    self.controller.refresh_clocks()
 
         def _on_combat_full_heal(self, obj_id: str) -> None:
             if obj_id in self.controller.scene.tokens:
@@ -1571,7 +1617,7 @@ if HAS_PYSIDE6:
                 self.net_client.session.update_obj_attributes(obj_id, {"Health": new_health})
                 self.controller._sync_token_to_combat_panel(obj_id)
                 if self.controller.calendar.track_health_change(obj_id, {"Health": new_health}):
-                    self.controller.clock_panel.refresh()
+                    self.controller.refresh_clocks()
 
         def _on_combat_health_attrs(self, obj_id: str, health_diff: dict[str, Any]) -> None:
             if obj_id in self.controller.scene.tokens:
@@ -1582,7 +1628,7 @@ if HAS_PYSIDE6:
                 self.net_client.session.update_obj_attributes(obj_id, {"Health": new_health})
                 self.controller._sync_token_to_combat_panel(obj_id)
                 if self.controller.calendar.track_health_change(obj_id, {"Health": new_health}):
-                    self.controller.clock_panel.refresh()
+                    self.controller.refresh_clocks()
 
         def _on_combat_killed_toggled(self, obj_id: str, killed: bool) -> None:
             if obj_id in self.controller.scene.tokens:
@@ -1668,6 +1714,10 @@ if HAS_PYSIDE6:
                         self.connect_to_configured_server()
 
         def _on_login_successful(self) -> None:
+            user = str(getattr(self.net_client.session, "username", "") or "")
+            if user:
+                self.controller.chat_panel.set_identity(user)
+                self._on_identity_changed(user, self.controller.chat_panel.is_gm)
             msg = (
                 f"Connected to {self.net_client.session.host}:{self.net_client.session.port} "
                 f"(Protocol {self.net_client.session.protocol})"
@@ -1920,15 +1970,55 @@ if HAS_PYSIDE6:
         def _on_cycle_width(self) -> None:
             self._set_draw_width((int(self.map_view.draw_width) + 1) % 10)
 
-        def _on_toggle_chat_dock(self) -> None:
+        def _on_toggle_chat_dock(self, _checked: bool = False) -> None:
             if self.chat_dock.isHidden():
                 self.chat_dock.show()
-            self.chat_dock.raise_()
+                self.chat_dock.raise_()
+            else:
+                self.chat_dock.hide()
 
-        def _on_toggle_clock_dock(self) -> None:
+        def _sync_role_ui(self) -> None:
+            is_gm = bool(self.controller.chat_panel.is_gm)
+            if hasattr(self, "clock_dock"):
+                self.clock_dock.setVisible(is_gm)
+
+        def _on_identity_changed(self, _user: str, _is_gm: bool) -> None:
+            self._sync_role_ui()
+
+        def show_player_clock_window(self) -> PlayerClockWindow:
+            """Open or raise the standalone read-only 'Game Clock' window (`display_initiative_clock`)."""
+            win = self.controller.player_clock_window
+            if win is None:
+                win = PlayerClockWindow(
+                    self.controller.calendar,
+                    prefs=self.prefs,
+                    icon_catalog=self.icon_catalog,
+                    parent=self,
+                )
+                self.controller.player_clock_window = win
+            win.my_names = list(self.controller.clock_panel.my_names)
+            win.timer_scope = self.controller.clock_panel.timer_scope
+            win.sync_timers(self.controller.clock_panel.timers)
+            win.apply_styles(self.prefs, bool(self.prefs.get("dark", False)))
+            win.refresh()
+            win.show()
+            win.raise_()
+            win.activateWindow()
+            return win
+
+        def _on_toggle_clock_dock(self, _checked: bool = False) -> None:
+            if not self.controller.chat_panel.is_gm:
+                win = self.controller.player_clock_window
+                if win is None or win.isHidden():
+                    self.show_player_clock_window()
+                else:
+                    win.hide()
+                return
             if self.clock_dock.isHidden():
                 self.clock_dock.show()
-            self.clock_dock.raise_()
+                self.clock_dock.raise_()
+            else:
+                self.clock_dock.hide()
 
         def _on_toggle_saf_mode(self, checked: bool) -> None:
             self._saf_mode = bool(checked)
@@ -2003,7 +2093,7 @@ if HAS_PYSIDE6:
             self.controller.calendar.set_time(combat_mode=enabled)
             self.controller.scene.set_combat_state(enabled, self.controller.scene.active_actor_id)
             self.controller._update_ondeck_and_audio()
-            self.controller.clock_panel.refresh()
+            self.controller.refresh_clocks()
             self.net_client.session.combat_mode(enabled)
 
         def _on_open_map(self, merge: bool = False) -> None:

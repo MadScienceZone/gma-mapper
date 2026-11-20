@@ -458,6 +458,136 @@ class TestPanelsAndCLI(unittest.TestCase):
         view.adjust_view("", xv, yv)
         self.assertEqual(view.top_left_grid_label(), "E7")
 
+    def test_player_clock_window_helpers_and_role_behavior(self) -> None:
+        from gma_mapper.ui.panels.clock import (
+            GolarionCalendar,
+            compute_visible_initiative_slots,
+            format_gmaclock_date,
+            format_gmaclock_delta,
+            resolve_slot_visual_state,
+        )
+
+        cal = GolarionCalendar(absolute=3661, relative=12, combat_mode=True)
+        self.assertEqual(format_gmaclock_date(cal), "01-ABA-4700 01:01:01.0")
+        self.assertEqual(format_gmaclock_delta(12), "+00:12.0  2.0r")
+        self.assertEqual(format_gmaclock_delta(3660), "+01:01:00.0 610.0r")
+
+        slots = [
+            {"Slot": 1, "Name": "mob_Goblin #1", "CurrentHP": 8, "IsFlatFooted": False},
+            {"Slot": 2, "Name": "Valeros", "CurrentHP": 32, "IsHolding": True, "HasReadiedAction": False},
+            {"Slot": 3, "Name": "Seoni", "CurrentHP": 0, "IsHolding": True, "HasReadiedAction": True},
+            {"Slot": 4, "Name": "Kyra", "CurrentHP": -3, "IsFlatFooted": False},
+            {"Slot": 5, "Name": "Merisiel", "CurrentHP": 20, "IsFlatFooted": True},
+        ]
+
+        # When limit < len(slots) and active slot is at the end of the round, window wraps and inserts NEXT ROUND
+        visible = compute_visible_initiative_slots(slots, current_slot=4, limit=4, active_actor="Merisiel")
+        seps = [e for e in visible if e.get("is_separator")]
+        self.assertEqual(len(seps), 1)
+        self.assertEqual(seps[0]["label"], "NEXT ROUND")
+        names = [e["slot"]["Name"] for e in visible if not e.get("is_separator")]
+        self.assertEqual(names, ["Seoni", "Kyra", "Merisiel", "mob_Goblin #1"])
+
+        # Visual state checks (public nameplate only, no raw HP numbers, legacy icons + 4px borders)
+        vis_active = resolve_slot_visual_state(slots[0], is_current=True)
+        self.assertEqual(vis_active.display_name, "Goblin #1")
+        self.assertEqual(vis_active.icon_name, "bullet_go")
+        self.assertEqual(vis_active.border_width, 0)
+
+        vis_hold = resolve_slot_visual_state(slots[1], is_current=False)
+        self.assertEqual(vis_hold.icon_name, "hourglass")
+
+        vis_ready_zero = resolve_slot_visual_state(slots[2], is_current=False)
+        self.assertEqual(vis_ready_zero.icon_name, "hourglass_go")
+        self.assertEqual(vis_ready_zero.border_width, 4)
+
+        vis_dying = resolve_slot_visual_state(slots[3], is_current=False)
+        self.assertEqual(vis_dying.icon_name, "cross")
+        self.assertEqual(vis_dying.border_width, 4)
+
+        vis_ff = resolve_slot_visual_state(slots[4], is_current=False)
+        self.assertEqual(vis_ff.icon_name, "blank")
+        self.assertEqual(vis_ff.border_width, 4)
+
+        import os
+
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        try:
+            from PySide6.QtWidgets import QApplication, QLabel, QPushButton
+            from gma_mapper.ui.main_window import GMAMapperMainWindow
+            from gma_mapper.ui.panels.clock import PlayerClockWindow
+        except ImportError:
+            self.skipTest("PySide6 not available")
+
+        _app = QApplication.instance() or QApplication([])
+        win = GMAMapperMainWindow()
+        try:
+            # Non-GM by default: GM clock_dock is hidden, toolbar Clock action opens PlayerClockWindow
+            self.assertFalse(win.controller.chat_panel.is_gm)
+            self.assertTrue(win.clock_dock.isHidden())
+            self.assertIsNone(win.controller.player_clock_window)
+
+            win._on_toggle_clock_dock()
+            pwin = win.controller.player_clock_window
+            self.assertIsInstance(pwin, PlayerClockWindow)
+            assert pwin is not None
+            self.assertEqual(pwin.windowTitle(), "Game Clock")
+            # Player clock window is read-only: no GM control buttons
+            self.assertEqual(pwin.findChildren(QPushButton), [])
+
+            # Live sync on CS, CO, IL, I, OA, PROGRESS (IsTimer=True)
+            win.controller.dispatch_command("CS", {"Absolute": 3661, "Relative": 12, "Running": False})
+            self.assertEqual(pwin.timedisp_label.text(), "01-ABA-4700 01:01:01.0")
+            self.assertEqual(pwin.turndisp_label.text(), "")
+
+            win.controller.dispatch_command("CO", {"Enabled": True})
+            win.controller.dispatch_command("IL", {"InitiativeList": slots})
+            win.controller.dispatch_command("I", {"ActorID": "Valeros", "Slot": 1, "Rounds": 2})
+            self.assertEqual(pwin.turndisp_label.text(), "+00:12.0  2.0r")
+
+            slot_texts = [lbl.text() for lbl in pwin.slots_container.findChildren(QLabel) if lbl.text()]
+            self.assertIn("Goblin #1", slot_texts)
+            self.assertIn("Valeros", slot_texts)
+            # Raw HP numbers must not be exposed in player clock slot labels
+            self.assertFalse(any("HP" in t or "32" in t for t in slot_texts))
+
+            win.controller.dispatch_command(
+                "PROGRESS",
+                {"OperationID": "tm1", "Title": "Haste", "Value": 5, "MaxValue": 10, "IsTimer": True, "IsDone": False},
+            )
+            self.assertFalse(pwin.timers_group.isHidden())
+            self.assertEqual(pwin.timers_layout.count(), 1)
+
+            # Switching identity to GM via _on_login_successful (ProtocolSession.username) shows the GM clock_dock
+            win.net_client.session.username = "GM"
+            win._on_login_successful()
+            self.assertTrue(win.controller.chat_panel.is_gm)
+            self.assertFalse(win.clock_dock.isHidden())
+            # Toolbar Clock icon toggles GM clock_dock visibility when GM
+            win.act_open_clock_dock.trigger()
+            self.assertTrue(win.clock_dock.isHidden())
+            win.act_open_clock_dock.trigger()
+            self.assertFalse(win.clock_dock.isHidden())
+            # Toolbar Chat icon toggles chat_dock visibility
+            chat_was_hidden = win.chat_dock.isHidden()
+            win.act_open_chat_dock.trigger()
+            self.assertEqual(win.chat_dock.isHidden(), not chat_was_hidden)
+            win.act_open_chat_dock.trigger()
+            self.assertEqual(win.chat_dock.isHidden(), chat_was_hidden)
+            # Switching back to non-GM via GRANTED hides the GM clock_dock, and toolbar Clock icon toggles PlayerClockWindow
+            win.controller.dispatch_command("GRANTED", {"User": "Valeros"})
+            self.assertFalse(win.controller.chat_panel.is_gm)
+            self.assertTrue(win.clock_dock.isHidden())
+            self.assertFalse(pwin.isHidden())
+            win.act_open_clock_dock.trigger()
+            self.assertTrue(pwin.isHidden())
+            win.act_open_clock_dock.trigger()
+            self.assertFalse(pwin.isHidden())
+        finally:
+            if win.controller.player_clock_window is not None:
+                win.controller.player_clock_window.close()
+            win.close()
+
 
 if __name__ == "__main__":
     unittest.main()

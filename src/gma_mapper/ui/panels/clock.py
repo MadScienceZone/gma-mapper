@@ -10,16 +10,19 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+from gma_mapper.core.colors import color_to_hex
+from gma_mapper.core.profile import default_color, default_styles
 from gma_mapper.net.protocol import new_id
 
 try:
-    from PySide6.QtCore import Qt, QPointF, QRectF, QTimer, Signal
-    from PySide6.QtGui import QAction, QBrush, QColor, QFont, QPainter, QPen
+    from PySide6.QtCore import Qt, QPointF, QRectF, QSize, QTimer, Signal
+    from PySide6.QtGui import QAction, QBrush, QColor, QFont, QFontMetrics, QPainter, QPen
     from PySide6.QtWidgets import (
         QCheckBox,
         QDialog,
         QDialogButtonBox,
         QFormLayout,
+        QFrame,
         QGroupBox,
         QHBoxLayout,
         QHeaderView,
@@ -51,6 +54,21 @@ MONTH_NAMES: list[str] = [
     "Lamashan",
     "Neth",
     "Kuthona",
+]
+
+MONTH_ABBREVS: list[str] = [
+    "ABA",
+    "CAL",
+    "PHA",
+    "GOZ",
+    "DES",
+    "SAR",
+    "ERA",
+    "ARO",
+    "ROV",
+    "LAM",
+    "NET",
+    "KUT",
 ]
 
 DAY_NAMES: list[str] = [
@@ -172,6 +190,189 @@ def slot_status_summary(slot: dict[str, Any]) -> str:
     if slot.get("FlatFooted") or slot.get("IsFlatFooted"):
         parts.append("Flat-Footed")
     return " | ".join(parts)
+
+
+def format_gmaclock_date(cal: GolarionCalendar) -> str:
+    """Format Golarion date/time in legacy `gmaclock::to_string` style 2 (`dd-MMM-yyyy HH:MM:SS.T`)."""
+    mon_abbr = MONTH_ABBREVS[cal.month % 12]
+    tick = int(cal.frame) % 10
+    return f"{cal.day:02d}-{mon_abbr}-{cal.year} {cal.hour:02d}:{cal.minute:02d}:{cal.second:02d}.{tick}"
+
+
+def format_gmaclock_delta(relative_seconds: int) -> str:
+    """Format combat elapsed seconds in legacy `gmaclock::delta_string` format (`+MM:SS.T  R.Rr`)."""
+    sign = "-" if relative_seconds < 0 else "+"
+    s = abs(int(relative_seconds))
+    days = s // 86400
+    hours = (s // 3600) % 24
+    minutes = (s // 60) % 60
+    seconds = s % 60
+    rounds = s / 6.0
+    prefix = sign
+    if days > 0:
+        prefix += f"{days}d "
+    if days > 0 or hours > 0:
+        prefix += f"{hours:02d}:"
+    return f"{prefix}{minutes:02d}:{seconds:02d}.0 {rounds:4.1f}r"
+
+
+def compute_visible_initiative_slots(
+    slots: list[dict[str, Any]],
+    current_slot: int,
+    limit: int,
+    active_actor: str = "",
+    delta_seconds: int = 0,
+) -> list[dict[str, Any]]:
+    """Compute the centered, wrapped initiative display slice with `NEXT ROUND` separator.
+
+    Ports `dlist` windowing from `gmaclock::update_initiative_slots` (`bin/gmaclock.tcl` lines 699-731).
+    """
+    if not slots or limit <= 0:
+        return []
+
+    indexed: list[tuple[int, int, dict[str, Any]]] = []
+    for idx, slot in enumerate(slots):
+        sort_key = int(slot.get("Slot", idx) if slot.get("Slot") is not None else idx)
+        indexed.append((sort_key, idx, slot))
+    indexed.sort(key=lambda t: (t[0], t[1]))
+
+    cur_pos = -1
+    if active_actor:
+        clean_actor = strip_nameplate_prefix(active_actor)
+        for pos, (_sk, _orig_idx, slot) in enumerate(indexed):
+            sname = str(slot.get("Name", ""))
+            if sname == active_actor or strip_nameplate_prefix(sname) == clean_actor:
+                cur_pos = pos
+                break
+    if cur_pos < 0 and 0 <= current_slot < len(slots):
+        for pos, (_sk, orig_idx, _slot) in enumerate(indexed):
+            if orig_idx == current_slot:
+                cur_pos = pos
+                break
+
+    first_slot_key: int | None = None
+    display_entries = list(indexed)
+    if cur_pos >= 0:
+        if len(display_entries) > limit:
+            first_slot_key = display_entries[0][0]
+            half = limit // 2
+            if cur_pos < half:
+                if delta_seconds >= 6:
+                    cur_shifted = cur_pos + len(display_entries)
+                    doubled = display_entries + display_entries
+                    display_entries = doubled[cur_shifted - half : cur_shifted - half + limit]
+                else:
+                    display_entries = display_entries[:limit]
+            else:
+                doubled = display_entries + display_entries
+                display_entries = doubled[cur_pos - half : cur_pos - half + limit]
+    else:
+        display_entries = display_entries[:limit]
+
+    result: list[dict[str, Any]] = []
+    for sort_key, orig_idx, slot in display_entries:
+        if first_slot_key is not None and sort_key == first_slot_key:
+            result.append({"is_separator": True, "label": "NEXT ROUND"})
+        is_current = (
+            (bool(active_actor) and (
+                str(slot.get("Name", "")) == active_actor
+                or strip_nameplate_prefix(str(slot.get("Name", ""))) == strip_nameplate_prefix(active_actor)
+            ))
+            or (not active_actor and orig_idx == current_slot)
+        )
+        result.append(
+            {
+                "is_separator": False,
+                "slot": slot,
+                "orig_idx": orig_idx,
+                "is_current": is_current,
+            }
+        )
+    return result
+
+
+@dataclass(frozen=True)
+class SlotVisualState:
+    """Resolved player-facing visual style for a single initiative slot row."""
+
+    display_name: str
+    bg_color: str
+    fg_color: str
+    border_color: str
+    border_width: int
+    icon_name: str
+
+
+def _clock_style_color(
+    styles_clocks: dict[str, Any] | None, key: str, dark_mode: bool
+) -> str:
+    theme = "dark" if dark_mode else "light"
+    if isinstance(styles_clocks, dict):
+        entry = styles_clocks.get(key)
+        if isinstance(entry, dict) and entry.get(theme):
+            return color_to_hex(str(entry[theme]))
+        if isinstance(entry, str) and entry:
+            return color_to_hex(entry)
+    return color_to_hex(default_color(key, theme))
+
+
+def resolve_slot_visual_state(
+    slot: dict[str, Any],
+    is_current: bool,
+    styles_clocks: dict[str, Any] | None = None,
+    dark_mode: bool = False,
+) -> SlotVisualState:
+    """Resolve legacy `gmaclock::update_initiative_slots` colors, icon, and 4px border for a slot.
+
+    Player-facing: displays only the stripped nameplate (never raw HP numbers).
+    """
+    display_name = strip_nameplate_prefix(str(slot.get("Name", slot.get("name", ""))))
+    bg = _clock_style_color(styles_clocks, "flist_bg", dark_mode)
+    fg = _clock_style_color(styles_clocks, "flist_fg", dark_mode)
+    icon_name = "blank"
+    border_color = ""
+    border_width = 0
+
+    is_hold = bool(slot.get("IsHold") or slot.get("IsHolding") or slot.get("hold"))
+    is_ready = bool(slot.get("IsReady") or slot.get("HasReadiedAction") or slot.get("ready"))
+    is_ff = bool(slot.get("FlatFooted") or slot.get("IsFlatFooted"))
+
+    if is_current:
+        bg = _clock_style_color(styles_clocks, "cur_bg", dark_mode)
+        icon_name = "bullet_go"
+    elif is_hold or is_ready:
+        if is_ready:
+            bg = _clock_style_color(styles_clocks, "ready_bg", dark_mode)
+            icon_name = "hourglass_go"
+        else:
+            bg = _clock_style_color(styles_clocks, "hold_bg", dark_mode)
+            icon_name = "hourglass"
+
+    cur_hp = slot.get("CurrentHP")
+    if cur_hp is None and "MaxHP" in slot and slot.get("MaxHP"):
+        cur_hp = int(slot.get("MaxHP", 0)) - int(slot.get("LethalDamage", 0))
+
+    if cur_hp is not None and int(cur_hp) == 0:
+        border_color = _clock_style_color(styles_clocks, "zero_hp", dark_mode)
+        border_width = 4
+    elif cur_hp is not None and int(cur_hp) < 0:
+        border_color = _clock_style_color(styles_clocks, "negative_hp", dark_mode)
+        border_width = 4
+        bg = _clock_style_color(styles_clocks, "slot_bg", dark_mode)
+        fg = _clock_style_color(styles_clocks, "slot_fg", dark_mode)
+        icon_name = "cross"
+    elif is_ff:
+        border_color = _clock_style_color(styles_clocks, "flat_footed", dark_mode)
+        border_width = 4
+
+    return SlotVisualState(
+        display_name=display_name,
+        bg_color=bg,
+        fg_color=fg,
+        border_color=border_color,
+        border_width=border_width,
+        icon_name=icon_name,
+    )
 
 
 @dataclass
@@ -457,10 +658,25 @@ if HAS_PYSIDE6:
     class ClockWidget(QWidget):
         """Analog 12-hour clock and 60-second / 10-round combat sweep face."""
 
-        def __init__(self, calendar: GolarionCalendar, parent: QWidget | None = None) -> None:
+        def __init__(
+            self,
+            calendar: GolarionCalendar,
+            parent: QWidget | None = None,
+            clock_styles: dict[str, Any] | None = None,
+            dark_mode: bool = False,
+        ) -> None:
             super().__init__(parent)
             self.calendar = calendar
+            self.clock_styles: dict[str, Any] | None = clock_styles
+            self.dark_mode: bool = dark_mode
             self.setMinimumSize(130, 130)
+
+        def set_style_options(
+            self, clock_styles: dict[str, Any] | None, dark_mode: bool
+        ) -> None:
+            self.clock_styles = clock_styles
+            self.dark_mode = bool(dark_mode)
+            self.update()
 
         def paintEvent(self, event: Any) -> None:
             painter = QPainter(self)
@@ -473,9 +689,15 @@ if HAS_PYSIDE6:
             radius = side / 2.0
 
             # Outer dial
-            bg_color = QColor("#1e2430") if self.calendar.pm else QColor("#f5f0e1")
-            fg_color = QColor("#e8ecf2") if self.calendar.pm else QColor("#222222")
-            painter.setPen(QPen(QColor("#666666"), 2.0))
+            if self.clock_styles is not None:
+                bg_color = QColor("#232323" if self.dark_mode else "#f5f0e1")
+                fg_color = QColor(_clock_style_color(self.clock_styles, "hand_color", self.dark_mode))
+                tick_color = QColor(_clock_style_color(self.clock_styles, "tick_color", self.dark_mode))
+            else:
+                bg_color = QColor("#1e2430") if self.calendar.pm else QColor("#f5f0e1")
+                fg_color = QColor("#e8ecf2") if self.calendar.pm else QColor("#222222")
+                tick_color = fg_color
+            painter.setPen(QPen(fg_color, 2.5 if self.clock_styles is not None else 2.0))
             painter.setBrush(QBrush(bg_color))
             painter.drawEllipse(QPointF(cx, cy), radius, radius)
 
@@ -497,7 +719,7 @@ if HAS_PYSIDE6:
                         painter.drawPie(rect, 90 * 16, int(-360.0 * frac * 16))
 
                 # 10 decimal round ticks
-                painter.setPen(QPen(fg_color, 1.5))
+                painter.setPen(QPen(tick_color, 1.5))
                 for i in range(10):
                     angle = math.radians(i * 36.0 - 90.0)
                     r1 = radius * 0.82
@@ -508,7 +730,7 @@ if HAS_PYSIDE6:
                     )
             else:
                 # Standard 12-hour ticks
-                painter.setPen(QPen(fg_color, 1.5))
+                painter.setPen(QPen(tick_color, 1.5))
                 for i in range(12):
                     angle = math.radians(i * 30.0 - 90.0)
                     r1 = radius * 0.82
@@ -908,11 +1130,345 @@ if HAS_PYSIDE6:
                 self.refresh()
                 self.slotAttributeToggled.emit(actor_name, key, enabled)
 
+    class PlayerClockWindow(QWidget):
+        """Standalone read-only 'Game Clock' & Initiative display window for non-GM players.
+
+        Ported from `display_initiative_clock` in `bin/mapper_legacy.tcl` (lines 17883-17922)
+        and `::gmaclock::initiative_display_window` in `bin/gmaclock.tcl` (lines 489-1120).
+        """
+
+        def __init__(
+            self,
+            calendar: GolarionCalendar,
+            prefs: dict[str, Any] | None = None,
+            icon_catalog: Any = None,
+            parent: QWidget | None = None,
+        ) -> None:
+            super().__init__(parent, Qt.WindowType.Window)
+            self.setWindowTitle("Game Clock")
+            self.resize(290, 520)
+            self.setMinimumWidth(220)
+
+            self.calendar = calendar
+            self.prefs: dict[str, Any] = dict(prefs or {})
+            self.icon_catalog = icon_catalog
+            self.dark_mode: bool = bool(self.prefs.get("dark", False))
+            self.timers: dict[str, TimerRecord] = {}
+            self.timer_scope: str = "mine"
+            self.my_names: list[str] = []
+            self.slot_limit: int = 20
+
+            self._autosize_timer = QTimer(self)
+            self._autosize_timer.setSingleShot(True)
+            self._autosize_timer.setInterval(120)
+            self._autosize_timer.timeout.connect(self._recalc_autosize)
+
+            self._realtime_timer = QTimer(self)
+            self._realtime_timer.setInterval(1000)
+            self._realtime_timer.timeout.connect(self._on_realtime_tick)
+
+            root = QVBoxLayout(self)
+            root.setContentsMargins(6, 6, 6, 6)
+            root.setSpacing(4)
+
+            # 1. Centered 150x150 analog / combat sweep clock face
+            clock_row = QHBoxLayout()
+            clock_row.addStretch(1)
+            self.clock_widget = ClockWidget(
+                self.calendar,
+                self,
+                clock_styles=self._clock_styles(),
+                dark_mode=self.dark_mode,
+            )
+            self.clock_widget.setFixedSize(150, 150)
+            clock_row.addWidget(self.clock_widget, 0)
+            clock_row.addStretch(1)
+            root.addLayout(clock_row, 0)
+
+            # 2. Absolute date/time display (dd-MMM-yyyy HH:MM:SS.T)
+            self.timedisp_label = QLabel("", self)
+            self.timedisp_label.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
+            root.addWidget(self.timedisp_label, 0)
+
+            # 3. Combat elapsed / round display (blank outside combat)
+            self.turndisp_label = QLabel("", self)
+            self.turndisp_label.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
+            root.addWidget(self.turndisp_label, 0)
+
+            # 4. Auto-sized centered initiative slot stack (Combat Mode only)
+            self.slots_container = QWidget(self)
+            self.slots_layout = QVBoxLayout(self.slots_container)
+            self.slots_layout.setContentsMargins(2, 2, 2, 2)
+            self.slots_layout.setSpacing(2)
+            self.slots_layout.addStretch(1)
+            root.addWidget(self.slots_container, 1)
+
+            # 5. Active Timers group (bottom)
+            self.timers_group = QGroupBox("Timers", self)
+            self.timers_layout = QVBoxLayout(self.timers_group)
+            self.timers_layout.setContentsMargins(4, 4, 4, 4)
+            self.timers_group.setVisible(False)
+            root.addWidget(self.timers_group, 0)
+
+            self.apply_styles(self.prefs, self.dark_mode)
+            self.refresh()
+
+        def _clock_styles(self) -> dict[str, Any]:
+            styles = self.prefs.get("styles")
+            if isinstance(styles, dict) and isinstance(styles.get("clocks"), dict):
+                return styles["clocks"]
+            return default_styles()["clocks"]
+
+        def _font_from_prefs(self, style_key: str, fallback_pt: int) -> QFont:
+            cstyles = self._clock_styles()
+            font_name = str(cstyles.get(style_key, "") or "")
+            fonts = self.prefs.get("fonts")
+            if isinstance(fonts, dict) and font_name in fonts and isinstance(fonts[font_name], dict):
+                fd = fonts[font_name]
+                fam = str(fd.get("Family", "Helvetica") or "Helvetica")
+                sz = max(8, int(fd.get("Size", fallback_pt) or fallback_pt))
+                qf = QFont(fam, sz)
+                if fd.get("Weight"):
+                    qf.setBold(True)
+                if fd.get("Slant"):
+                    qf.setItalic(True)
+                return qf
+            return QFont("Helvetica", fallback_pt)
+
+        def apply_styles(self, prefs: dict[str, Any] | None, dark_mode: bool | None = None) -> None:
+            """Apply `styles.clocks`, fonts, and dark/light theme preferences."""
+            if prefs is not None:
+                self.prefs = dict(prefs)
+            if dark_mode is not None:
+                self.dark_mode = bool(dark_mode)
+            else:
+                self.dark_mode = bool(self.prefs.get("dark", False))
+
+            cstyles = self._clock_styles()
+            self.clock_widget.set_style_options(cstyles, self.dark_mode)
+            self.timedisp_label.setFont(self._font_from_prefs("timedisp_font", 14))
+            self.turndisp_label.setFont(self._font_from_prefs("turndisp_font", 14))
+            bg_hex = "#232323" if self.dark_mode else "#f0f0f0"
+            fg_hex = "#ffffff" if self.dark_mode else "#000000"
+            self.setStyleSheet(
+                f"PlayerClockWindow {{ background-color: {bg_hex}; color: {fg_hex}; }}"
+            )
+            self.refresh()
+
+        def set_timer_scope(self, scope: str) -> None:
+            self.timer_scope = scope
+            self._rebuild_timers_ui()
+            self._recalc_autosize()
+
+        def sync_timers(self, timers: dict[str, TimerRecord]) -> None:
+            self.timers = dict(timers)
+            self._rebuild_timers_ui()
+            self._recalc_autosize()
+
+        def _is_timer_visible(self, rec: TimerRecord) -> bool:
+            if self.timer_scope == "none":
+                return False
+            if self.timer_scope == "all" or not rec.targets:
+                return True
+            if self.timer_scope == "mine":
+                if not self.my_names:
+                    return True
+                clean_mine = {strip_nameplate_prefix(n) for n in self.my_names} | set(self.my_names)
+                return any(
+                    t in clean_mine or strip_nameplate_prefix(t) in clean_mine
+                    for t in rec.targets
+                )
+            return True
+
+        def _rebuild_timers_ui(self) -> None:
+            while self.timers_layout.count():
+                child = self.timers_layout.takeAt(0)
+                if child.widget():
+                    child.widget().deleteLater()
+
+            visible_records = [r for r in self.timers.values() if self._is_timer_visible(r)]
+            if not visible_records:
+                self.timers_group.setVisible(False)
+                return
+
+            self.timers_group.setVisible(True)
+            for rec in visible_records:
+                bar = QProgressBar(self.timers_group)
+                if rec.max_value <= 0:
+                    bar.setRange(0, 0)
+                    bar.setFormat(f"{rec.title}: ...")
+                elif rec.is_expired:
+                    bar.setRange(0, 100)
+                    bar.setValue(100)
+                    bar.setFormat(f"{rec.title}: EXPIRED")
+                    bar.setStyleSheet("QProgressBar::chunk { background-color: #c53030; }")
+                else:
+                    bar.setRange(0, rec.max_value)
+                    bar.setValue(rec.value)
+                    bar.setFormat(f"{rec.title}: %p%")
+                self.timers_layout.addWidget(bar)
+
+        def _slot_icon_pixmap(self, icon_name: str, list_font: QFont) -> Any:
+            x_w = QFontMetrics(list_font).horizontalAdvance("x")
+            if x_w < 8:
+                px, suffix = 16, ""
+            elif x_w < 20:
+                px, suffix = 30, "_30"
+            else:
+                px, suffix = 40, "_40"
+
+            if self.icon_catalog is not None and icon_name and icon_name != "blank":
+                qicon = self.icon_catalog.icon(f"{icon_name}{suffix}")
+                if qicon.isNull() and suffix:
+                    qicon = self.icon_catalog.icon(icon_name)
+                if not qicon.isNull():
+                    return qicon.pixmap(QSize(px, px))
+            return None
+
+        def _recalc_autosize(self) -> None:
+            list_font = self._font_from_prefs("default_font", 18)
+            row_h = max(28, QFontMetrics(list_font).height() + 14)
+            used_h = (
+                self.clock_widget.height()
+                + self.timedisp_label.sizeHint().height()
+                + self.turndisp_label.sizeHint().height()
+                + (self.timers_group.sizeHint().height() if self.timers_group.isVisible() else 0)
+                + 28
+            )
+            avail_h = max(row_h, self.height() - used_h)
+            new_limit = max(1, int(avail_h // row_h))
+            if new_limit != self.slot_limit:
+                self.slot_limit = new_limit
+            self._rebuild_slots_ui()
+
+        def resizeEvent(self, event: Any) -> None:
+            super().resizeEvent(event)
+            self._autosize_timer.start()
+
+        def _on_realtime_tick(self) -> None:
+            if self.calendar.running and not self.calendar.combat_mode:
+                self.timedisp_label.setText(format_gmaclock_date(self.calendar))
+                self.clock_widget.update()
+
+        def _rebuild_slots_ui(self) -> None:
+            while self.slots_layout.count():
+                item = self.slots_layout.takeAt(0)
+                w = item.widget()
+                if w is not None:
+                    w.deleteLater()
+
+            if not self.calendar.combat_mode or not self.calendar.initiative_slots:
+                self.slots_layout.addStretch(1)
+                return
+
+            cstyles = self._clock_styles()
+            list_font = self._font_from_prefs("default_font", 18)
+            next_bg = _clock_style_color(cstyles, "next_bg", self.dark_mode)
+            next_fg = _clock_style_color(cstyles, "next_fg", self.dark_mode)
+
+            visible = compute_visible_initiative_slots(
+                self.calendar.initiative_slots,
+                self.calendar.current_slot,
+                self.slot_limit,
+                active_actor=self.calendar.active_actor,
+                delta_seconds=self.calendar.relative,
+            )
+
+            for entry in visible:
+                if entry.get("is_separator"):
+                    sep = QLabel(str(entry.get("label", "NEXT ROUND")), self.slots_container)
+                    sep.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                    sep.setStyleSheet(
+                        f"background-color: {next_bg}; color: {next_fg}; "
+                        "border: 1px solid #000000; padding: 2px; font-weight: bold;"
+                    )
+                    self.slots_layout.addWidget(sep, 0)
+                    continue
+
+                vis = resolve_slot_visual_state(
+                    entry["slot"],
+                    bool(entry.get("is_current", False)),
+                    styles_clocks=cstyles,
+                    dark_mode=self.dark_mode,
+                )
+                row_frame = QFrame(self.slots_container)
+                row_frame.setObjectName("playerSlotRow")
+                border_css = (
+                    f"{vis.border_width}px solid {vis.border_color}"
+                    if vis.border_width > 0 and vis.border_color
+                    else "1px solid #444444"
+                )
+                row_frame.setStyleSheet(
+                    f"QFrame#playerSlotRow {{ background-color: {vis.bg_color}; border: {border_css}; }}"
+                )
+                row_layout = QHBoxLayout(row_frame)
+                row_layout.setContentsMargins(4, 2, 4, 2)
+                row_layout.setSpacing(6)
+
+                icon_lbl = QLabel(row_frame)
+                icon_lbl.setStyleSheet(f"background-color: {vis.bg_color}; border: none;")
+                pm = self._slot_icon_pixmap(vis.icon_name, list_font)
+                if pm is not None:
+                    icon_lbl.setPixmap(pm)
+                    icon_lbl.setFixedWidth(pm.width() + 2)
+                else:
+                    fallback_glyphs = {
+                        "bullet_go": "\u25b6",
+                        "hourglass_go": "\u23f2",
+                        "hourglass": "\u23f8",
+                        "cross": "\u271a",
+                        "blank": "",
+                    }
+                    icon_lbl.setText(fallback_glyphs.get(vis.icon_name, ""))
+                    icon_lbl.setStyleSheet(
+                        f"background-color: {vis.bg_color}; color: {vis.fg_color}; border: none;"
+                    )
+                    icon_lbl.setFixedWidth(22)
+                icon_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                row_layout.addWidget(icon_lbl, 0)
+
+                name_lbl = QLabel(vis.display_name, row_frame)
+                name_lbl.setFont(list_font)
+                name_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                name_lbl.setStyleSheet(
+                    f"background-color: {vis.bg_color}; color: {vis.fg_color}; border: none;"
+                )
+                row_layout.addWidget(name_lbl, 1)
+
+                self.slots_layout.addWidget(row_frame, 0)
+
+            self.slots_layout.addStretch(1)
+
+        def refresh(self) -> None:
+            """Refresh clock face, date/turn labels, and initiative slot stack."""
+            if self.calendar.running and not self.calendar.combat_mode:
+                if not self._realtime_timer.isActive():
+                    self._realtime_timer.start()
+            else:
+                self._realtime_timer.stop()
+
+            self.timedisp_label.setText(format_gmaclock_date(self.calendar))
+            if self.calendar.combat_mode:
+                self.turndisp_label.setText(format_gmaclock_delta(self.calendar.relative))
+            else:
+                self.turndisp_label.setText("")
+
+            self.clock_widget.update()
+            self._rebuild_slots_ui()
+
 else:
 
     class ClockWidget:  # type: ignore[no-redef]
-        def __init__(self, calendar: GolarionCalendar, parent: Any = None) -> None:
+        def __init__(
+            self,
+            calendar: GolarionCalendar,
+            parent: Any = None,
+            clock_styles: dict[str, Any] | None = None,
+            dark_mode: bool = False,
+        ) -> None:
             self.calendar = calendar
+            self.clock_styles = clock_styles
+            self.dark_mode = dark_mode
 
     class InitiativeClockPanel:  # type: ignore[no-redef]
         def __init__(self, calendar: GolarionCalendar | None = None, parent: Any = None) -> None:
@@ -939,6 +1495,38 @@ else:
                         max_value=int(payload.get("MaxValue", 0) or 0),
                         targets=list(payload.get("Targets", []) or []),
                     )
+
+        def refresh(self) -> None:
+            pass
+
+    class PlayerClockWindow:  # type: ignore[no-redef]
+        def __init__(
+            self,
+            calendar: GolarionCalendar,
+            prefs: dict[str, Any] | None = None,
+            icon_catalog: Any = None,
+            parent: Any = None,
+        ) -> None:
+            self.calendar = calendar
+            self.prefs = dict(prefs or {})
+            self.icon_catalog = icon_catalog
+            self.dark_mode = bool(self.prefs.get("dark", False))
+            self.timers: dict[str, TimerRecord] = {}
+            self.timer_scope: str = "mine"
+            self.my_names: list[str] = []
+            self.slot_limit: int = 20
+
+        def apply_styles(self, prefs: dict[str, Any] | None, dark_mode: bool | None = None) -> None:
+            if prefs is not None:
+                self.prefs = dict(prefs)
+            if dark_mode is not None:
+                self.dark_mode = bool(dark_mode)
+
+        def set_timer_scope(self, scope: str) -> None:
+            self.timer_scope = scope
+
+        def sync_timers(self, timers: dict[str, TimerRecord]) -> None:
+            self.timers = dict(timers)
 
         def refresh(self) -> None:
             pass
