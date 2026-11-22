@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 from gma_mapper.core.dice import (
     ChatHistoryManager,
@@ -19,6 +21,7 @@ from gma_mapper.core.dice import (
     encode_preset_details,
     format_component_html,
     get_preset_details,
+    merge_preset_lists,
     parse_color_blocks,
     prepare_die_roll,
     render_chat_payload_html,
@@ -98,6 +101,60 @@ class TestPresetCodec(unittest.TestCase):
         decoded_again = get_preset_details(encoded)
         self.assertEqual(decoded_again["type"], "table")
         self.assertEqual(decoded_again["table"], ["10", "Low; result", "*", "High; result"])
+
+    def test_encode_seq_padding_area_client_and_merge(self) -> None:
+        encoded_roll = encode_preset_details(
+            {
+                "type": "preset",
+                "seq": "5",
+                "area": "combat",
+                "group": ["Melee"],
+                "name": "Bite",
+                "description": "Primary bite",
+                "dieroll": "1d20+6",
+            }
+        )
+        self.assertEqual(encoded_roll["Name"], "$[combat]005\u25b6Melee|Bite")
+        decoded_roll = get_preset_details(encoded_roll)
+        self.assertEqual(decoded_roll["seq"], "005")
+        self.assertEqual(decoded_roll["area"], "combat")
+
+        encoded_custom_seq = encode_preset_details(
+            {
+                "type": "modifier",
+                "seq": "abc",
+                "client": "myclient",
+                "name": "Inspire",
+                "description": "Bardic song",
+                "var": "insp",
+                "enabled": True,
+                "dieroll": "+2",
+            }
+        )
+        self.assertEqual(encoded_custom_seq["Name"], "\u00a7abc;insp;e;myclient|Inspire")
+        self.assertEqual(encoded_custom_seq["Description"], "Bardic song")
+        decoded_mod = get_preset_details(encoded_custom_seq)
+        self.assertEqual(decoded_mod["client"], "myclient")
+        self.assertEqual(decoded_mod["description"], "Bardic song")
+
+        existing = [
+            {"Name": "010|Attack", "Description": "Old", "DieRollSpec": "1d20+5"},
+            {"Name": "020|Damage", "Description": "Slash", "DieRollSpec": "1d8+3"},
+        ]
+        incoming = [
+            {"Name": "010|Attack", "Description": "Updated", "DieRollSpec": "1d20+7"},
+            {"Name": "030|Init", "Description": "Initiative", "DieRollSpec": "1d20+4"},
+        ]
+        merged = merge_preset_lists(existing, incoming)
+        self.assertEqual(
+            [p["Name"] for p in merged],
+            ["010|Attack", "020|Damage", "030|Init"],
+        )
+        self.assertEqual(merged[0]["Description"], "Updated")
+        self.assertEqual(merged[0]["DieRollSpec"], "1d20+7")
+        # Ensure deep copy (mutating merged does not mutate inputs)
+        merged[1]["Description"] = "Mutated"
+        self.assertEqual(existing[1]["Description"], "Slash")
 
     def test_cleanup_die_roll_spec_and_search(self) -> None:
         spec = "Attack\u2261white\u2261red\u2016Full Round\u2261yellow=1d20+10"
@@ -545,6 +602,242 @@ class TestDicePanelAndControllerIntegration(unittest.TestCase):
             panel._rebuild_presets_ui()
             self.assertEqual(len(panel.bank.rolls), 2)
             self.assertEqual(panel.bank.rolls[0]["name"], "1-StaffDam")
+
+    def test_editor_preserves_metadata_and_cancel_confirmation(self) -> None:
+        from PySide6.QtWidgets import QMessageBox
+        from gma_mapper.ui.dialogs.dice_dialogs import EditDieRollPresetsDialog
+
+        bank = DicePresetBank()
+        bank.set_user_presets(
+            [
+                {
+                    "Name": "$[arena]005\u25b6Melee|Slash",
+                    "Description": "Primary slash",
+                    "DieRollSpec": "1d20+8",
+                },
+                {
+                    "Name": "\u00a7015;pa;e;cmeta|Power Attack",
+                    "Description": "Trade accuracy for damage",
+                    "DieRollSpec": "-2|+4",
+                },
+                {
+                    "Name": "#025;m;tmeta|tbl1",
+                    "Description": "Table 1",
+                    "DieRollSpec": ";1d4;2;Low;*;High;",
+                },
+            ]
+        )
+        ed_dlg = EditDieRollPresetsDialog(bank=bank, system_mode=False)
+        encoded_before = ed_dlg.encoded_presets()
+        self.assertEqual(encoded_before[0]["Name"], "$[arena]005\u25b6Melee|Slash")
+        self.assertEqual(encoded_before[1]["Description"], "Trade accuracy for damage")
+        self.assertEqual(encoded_before[1]["Name"], "\u00a7015;pa;e;cmeta|Power Attack")
+        self.assertEqual(encoded_before[2]["Name"], "#025;m;tmeta|tbl1")
+
+        # Auto-resequence keeps UserRole metadata (`area` / `client`) intact
+        ed_dlg._auto_resequence(ed_dlg.rolls_table)
+        ed_dlg._auto_resequence(ed_dlg.mods_table)
+        ed_dlg._auto_resequence(ed_dlg.tables_table)
+        reseq = ed_dlg.encoded_presets()
+        self.assertEqual(reseq[0]["Name"], "$[arena]010\u25b6Melee|Slash")
+        self.assertEqual(reseq[1]["Name"], "\u00a7010;pa;e;cmeta|Power Attack")
+        self.assertEqual(reseq[2]["Name"], "#010;m;tmeta|tbl1")
+
+        # Unmodified reject closes immediately without prompting
+        clean_dlg = EditDieRollPresetsDialog(bank=bank, system_mode=False)
+        with patch.object(QMessageBox, "question") as q_mock:
+            clean_dlg.reject()
+            q_mock.assert_not_called()
+
+        # Modified reject prompts confirmation and respects Yes/No
+        dirty_dlg = EditDieRollPresetsDialog(bank=bank, system_mode=False)
+        dirty_dlg.rolls_table.item(0, 2).setText("Edited Slash")
+        with patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.No) as q_no:
+            dirty_dlg.reject()
+            q_no.assert_called_once()
+        with patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes) as q_yes:
+            dirty_dlg.reject()
+            q_yes.assert_called_once()
+
+    def test_quick_save_dialog_and_panel_workflows(self) -> None:
+        from PySide6.QtWidgets import QDialogButtonBox, QMessageBox
+        from gma_mapper.ui.dialogs.dice_dialogs import (
+            EditDieRollPresetsDialog,
+            QuickSavePresetDialog,
+        )
+        from gma_mapper.ui.panels.chat_dice import ChatDicePanel
+
+        qs_dlg = QuickSavePresetDialog(initial_spec="Attack\u2261gold=1d20+5")
+        qs_buttons = qs_dlg.findChild(QDialogButtonBox)
+        self.assertIsNotNone(qs_buttons)
+        self.assertEqual(
+            qs_buttons.button(QDialogButtonBox.StandardButton.Save).text(),
+            "Save to Server",
+        )
+        self.assertEqual(qs_dlg.name_edit.text(), "Attack")
+        qs_dlg.group_edit.setText("Combat \u25b6 Melee")
+        qs_dlg.seq_edit.setText("7")
+        qs_dlg.desc_edit.setText("Sword swing")
+        encoded = qs_dlg.encoded_preset()
+        self.assertEqual(encoded["Name"], "007\u25b6Combat\u25b6Melee|Attack")
+        self.assertEqual(encoded["Description"], "Sword swing")
+        self.assertEqual(encoded["DieRollSpec"], "Attack\u2261gold=1d20+5")
+
+        # Validation rejects empty name or spec
+        invalid_dlg = QuickSavePresetDialog(initial_spec="1d20")
+        self.assertEqual(invalid_dlg.name_edit.text(), "")
+        with patch.object(QMessageBox, "warning") as warn_mock:
+            invalid_dlg._on_accept()
+            warn_mock.assert_called_once()
+            invalid_dlg.name_edit.setText("Test")
+            invalid_dlg.spec_edit.setText("")
+            invalid_dlg._on_accept()
+            self.assertEqual(warn_mock.call_count, 2)
+
+        # Panel quick-save merges locally and emits DD+ and DR signals
+        panel = ChatDicePanel(for_user="Valeros", local_user="Valeros")
+        self.assertEqual(panel.btn_save_to_server.text(), "Save to Server")
+        self.assertEqual(panel.btn_export_presets.text(), "Save to File...")
+        self.assertEqual(panel.btn_import_presets.text(), "Import File...")
+        self.assertEqual(panel.btn_refresh_presets.text(), "Reload from Server")
+        self.assertEqual(panel.save_roll_preset_btn.text(), "Save Preset...")
+
+        appended: list[tuple[list[dict[str, Any]], bool, str]] = []
+        saved: list[tuple[list[dict[str, Any]], bool, str]] = []
+        refreshed: list[str] = []
+        panel.append_presets_requested.connect(lambda p, g, u: appended.append((p, g, u)))
+        panel.save_presets_requested.connect(lambda p, g, u: saved.append((p, g, u)))
+        panel.refresh_presets_requested.connect(refreshed.append)
+
+        panel.save_single_preset(encoded)
+        self.assertEqual(len(panel.bank.user_presets), 1)
+        self.assertEqual(len(appended), 1)
+        self.assertEqual(appended[0], ([encoded], False, "Valeros"))
+        self.assertEqual(refreshed, ["Valeros"])
+
+        panel.push_presets_to_server()
+        self.assertEqual(len(saved), 1)
+        self.assertEqual(saved[0], (panel.bank.user_presets, False, "Valeros"))
+
+        ed_dlg = EditDieRollPresetsDialog(bank=panel.bank, system_mode=False)
+        ed_buttons = ed_dlg.findChild(QDialogButtonBox)
+        self.assertIsNotNone(ed_buttons)
+        self.assertEqual(
+            ed_buttons.button(QDialogButtonBox.StandardButton.Save).text(),
+            "Save to Server",
+        )
+
+        # Non-GM guard blocks opening system preset editor
+        with patch.object(QMessageBox, "warning") as warn_mock:
+            panel.open_preset_editor(system_mode=True)
+            warn_mock.assert_called_once()
+
+        # File import with merge overwrites matching Name without duplicates
+        from gma_mapper.core.file_io import save_dice_presets_to_file
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dice_file = Path(tmpdir) / "merge.dice"
+            save_dice_presets_to_file(
+                dice_file,
+                [
+                    {
+                        "Name": "007\u25b6Combat\u25b6Melee|Attack",
+                        "Description": "Upgraded sword",
+                        "DieRollSpec": "1d20+9",
+                    },
+                    {
+                        "Name": "020|Fort",
+                        "Description": "Fortitude save",
+                        "DieRollSpec": "1d20+6",
+                    },
+                ],
+            )
+            merged = panel.import_presets_from_file(dice_file, merge=True)
+            self.assertEqual(len(merged), 2)
+            self.assertEqual(merged[0]["Description"], "Upgraded sword")
+            self.assertEqual(len(saved), 2)
+            self.assertEqual(len(saved[1][0]), 2)
+            self.assertEqual(refreshed, ["Valeros", "Valeros"])
+
+    def test_controller_denied_and_delegated_mixed_dd(self) -> None:
+        ctrl = MapperController()
+        statuses: list[str] = []
+        ctrl.status_message_cb = statuses.append
+
+        ctrl.dispatch_command("CONN", {"PeerList": [{"User": "Ezren", "IsMe": True}]})
+        ctrl.dispatch_command("DENIED", {"Reason": "Only GM may edit system presets"})
+        self.assertTrue(any("Permission denied" in s for s in statuses))
+
+        ctrl.dispatch_command(
+            "DD=",
+            {
+                "For": "Valeros",
+                "Presets": [
+                    {"Name": "001|SysRoll", "Description": "Sys", "DieRollSpec": "1d20", "Global": True},
+                    {"Name": "010|UserRoll", "Description": "Usr", "DieRollSpec": "1d8", "Global": False},
+                ],
+            },
+        )
+        del_bank = ctrl.banks_by_tkey["Valeros"]
+        self.assertEqual([p["Name"] for p in del_bank.system_presets], ["001|SysRoll"])
+        self.assertEqual([p["Name"] for p in del_bank.user_presets], ["010|UserRoll"])
+
+        ctrl.dispatch_command(
+            "DD+",
+            {
+                "For": "Valeros",
+                "Presets": [
+                    {"Name": "010|UserRoll", "Description": "Usr2", "DieRollSpec": "1d10"},
+                ],
+            },
+        )
+        self.assertEqual(len(del_bank.user_presets), 1)
+        self.assertEqual(del_bank.user_presets[0]["DieRollSpec"], "1d10")
+
+    def test_protocol_define_dice_presets_wire_and_batch(self) -> None:
+        from gma_mapper.net.client import ProtocolSession
+
+        sent: list[str] = []
+        session = ProtocolSession(send_line_cb=sent.append)
+        session.reset_for_connection("localhost", 2323, "Valeros", "")
+        session.is_connected = True
+        session.pending_login = False
+
+        preset_with_global = {
+            "Name": "010|Attack",
+            "Description": "Slash",
+            "DieRollSpec": "1d20+5",
+            "Global": False,
+        }
+        session.define_dice_presets([preset_with_global], append_mode=False, for_user="Valeros")
+        self.assertEqual(len(sent), 1)
+        self.assertTrue(sent[0].startswith("DD "))
+        payload = json.loads(sent[0][3:])
+        self.assertEqual(payload["For"], "Valeros")
+        self.assertNotIn("Global", payload["Presets"][0])
+
+        sent.clear()
+        session.define_dice_presets([preset_with_global], append_mode=True, globals_only=True)
+        self.assertEqual(len(sent), 1)
+        self.assertTrue(sent[0].startswith("DD+ "))
+        sys_payload = json.loads(sent[0][4:])
+        self.assertTrue(sys_payload["Global"])
+        self.assertNotIn("For", sys_payload)
+        self.assertNotIn("Global", sys_payload["Presets"][0])
+
+        # Large preset lists automatically split into BATCH packets
+        sent.clear()
+        big_presets = [
+            {
+                "Name": f"{i:03d}|Preset_{i}",
+                "Description": "X" * 1000,
+                "DieRollSpec": "1d20+5",
+            }
+            for i in range(75)
+        ]
+        session.define_dice_presets(big_presets, append_mode=False, for_user="Valeros")
+        self.assertGreater(len(sent), 1)
+        self.assertTrue(all(line.startswith("BATCH ") for line in sent))
 
 
 if __name__ == "__main__":

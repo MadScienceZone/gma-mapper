@@ -15,6 +15,7 @@ from gma_mapper.core.dice import (
     DicePresetBank,
     RollStatCollector,
     cleanup_die_roll_spec,
+    merge_preset_lists,
     prepare_die_roll,
     render_chat_payload_html,
     render_roll_payload_html,
@@ -50,6 +51,7 @@ try:
         DiceSyntaxHelpDialog,
         EditColorBoxTitleDialog,
         EditDieRollPresetsDialog,
+        QuickSavePresetDialog,
     )
 
     QT_AVAILABLE = True
@@ -180,6 +182,7 @@ if QT_AVAILABLE:
         send_chat_ex_requested = Signal(str, list, bool, bool, bool, bool)  # text, recipients, to_all, to_gm, markup, pin
         send_roll_ex_requested = Signal(str, list, bool, bool, str)  # roll_spec, recipients, to_all, to_gm, request_id
         save_presets_requested = Signal(list, bool, str)  # presets, is_global, for_user
+        append_presets_requested = Signal(list, bool, str)  # presets, is_global, for_user (`DD+`)
         refresh_presets_requested = Signal(str)  # for_user
         refresh_peers_requested = Signal()
         delete_message_requested = Signal(int)  # msg_id (GM server-wide delete)
@@ -329,6 +332,13 @@ if QT_AVAILABLE:
             self.roll_btn = QPushButton("Roll", self.chat_container)
             self.roll_btn.clicked.connect(self._on_send_roll)
 
+            self.save_roll_preset_btn = QToolButton(self.chat_container)
+            self.save_roll_preset_btn.setText("Save Preset...")
+            self.save_roll_preset_btn.setToolTip("Save this die roll as a preset on the GMA server")
+            self.save_roll_preset_btn.clicked.connect(
+                lambda: self.open_quick_save_preset(self.roll_entry.text())
+            )
+
             self.syntax_help_btn = QToolButton(self.chat_container)
             self.syntax_help_btn.setText("?")
             self.syntax_help_btn.setToolTip("Show Die Roller Syntax Reference")
@@ -339,6 +349,7 @@ if QT_AVAILABLE:
             roll_row.addWidget(self.roll_entry, stretch=1)
             roll_row.addWidget(self.gm_only_chk)
             roll_row.addWidget(self.roll_btn)
+            roll_row.addWidget(self.save_roll_preset_btn)
             roll_row.addWidget(self.syntax_help_btn)
             chat_vbox.addLayout(roll_row)
 
@@ -389,30 +400,37 @@ if QT_AVAILABLE:
             toolbar_row.setSpacing(4)
 
             self.btn_edit_presets = QPushButton("Edit...", self.presets_group)
-            self.btn_edit_presets.setToolTip("Edit die-roll presets, modifiers, variables, and lookup tables")
+            self.btn_edit_presets.setToolTip(
+                "Edit die-roll presets, modifiers, variables, and lookup tables (saves to server)"
+            )
             self.btn_edit_presets.clicked.connect(lambda: self.open_preset_editor(system_mode=False))
 
             self.btn_edit_sys_presets = QPushButton("System...", self.presets_group)
-            self.btn_edit_sys_presets.setToolTip("Edit global system presets (GM)")
+            self.btn_edit_sys_presets.setToolTip("Edit global system presets (saves to server, GM only)")
             self.btn_edit_sys_presets.clicked.connect(lambda: self.open_preset_editor(system_mode=True))
             self.btn_edit_sys_presets.setVisible(self.is_gm)
 
-            self.btn_import_presets = QPushButton("Import...", self.presets_group)
-            self.btn_import_presets.setToolTip("Import presets from a .dice file")
+            self.btn_save_to_server = QPushButton("Save to Server", self.presets_group)
+            self.btn_save_to_server.setToolTip("Save current die-roll presets to the GMA server")
+            self.btn_save_to_server.clicked.connect(self.push_presets_to_server)
+
+            self.btn_import_presets = QPushButton("Import File...", self.presets_group)
+            self.btn_import_presets.setToolTip("Import presets from a local .dice file and save to server")
             self.btn_import_presets.clicked.connect(self._on_import_presets_clicked)
 
-            self.btn_export_presets = QPushButton("Export...", self.presets_group)
-            self.btn_export_presets.setToolTip("Export presets to a .dice file")
+            self.btn_export_presets = QPushButton("Save to File...", self.presets_group)
+            self.btn_export_presets.setToolTip("Save/export presets to a local .dice file on disk")
             self.btn_export_presets.clicked.connect(self._on_export_presets_clicked)
 
-            self.btn_refresh_presets = QPushButton("Refresh", self.presets_group)
-            self.btn_refresh_presets.setToolTip("Reload presets from server")
+            self.btn_refresh_presets = QPushButton("Reload from Server", self.presets_group)
+            self.btn_refresh_presets.setToolTip("Reload presets from the GMA server")
             self.btn_refresh_presets.clicked.connect(
                 lambda: self.refresh_presets_requested.emit(self.for_user)
             )
 
             toolbar_row.addWidget(self.btn_edit_presets)
             toolbar_row.addWidget(self.btn_edit_sys_presets)
+            toolbar_row.addWidget(self.btn_save_to_server)
             toolbar_row.addWidget(self.btn_import_presets)
             toolbar_row.addWidget(self.btn_export_presets)
             toolbar_row.addWidget(self.btn_refresh_presets)
@@ -615,10 +633,18 @@ if QT_AVAILABLE:
                     lambda s=spec, e=extra_edit: self.trigger_roll(s, extra=e.text())
                 )
 
+                save_btn = QToolButton(row_w)
+                save_btn.setText("Save...")
+                save_btn.setToolTip(f"Save as preset on server: {spec}")
+                save_btn.clicked.connect(
+                    lambda _chk=False, s=spec: self.open_quick_save_preset(s)
+                )
+
                 row_l.addWidget(roll_btn)
-                row_l.addWidget( QLabel("+", row_w))
+                row_l.addWidget(QLabel("+", row_w))
                 row_l.addWidget(extra_edit)
                 row_l.addWidget(spec_lbl, stretch=1)
+                row_l.addWidget(save_btn)
                 self.recent_list_layout.addWidget(row_w)
 
             self.recent_list_layout.addStretch(1)
@@ -1091,6 +1117,14 @@ if QT_AVAILABLE:
             dlg.show()
 
         def open_preset_editor(self, system_mode: bool = False) -> None:
+            if system_mode and not self.is_gm:
+                self.append_notice("You are not authorized to edit system presets.")
+                QMessageBox.warning(
+                    self,
+                    "Authorization Required",
+                    "You are not authorized to edit system presets.",
+                )
+                return
             dlg = EditDieRollPresetsDialog(
                 bank=self.bank,
                 system_mode=system_mode,
@@ -1106,44 +1140,120 @@ if QT_AVAILABLE:
                 self._rebuild_presets_ui()
                 self.save_presets_requested.emit(new_presets, system_mode, self.for_user)
 
+        def _known_group_paths(self) -> list[list[str]]:
+            paths: list[list[str]] = []
+            for entry in [*self.bank.rolls, *self.bank.modifiers, *self.bank.tables]:
+                grp = entry.get("group") or []
+                if grp:
+                    paths.append(list(grp))
+            return paths
+
+        def push_presets_to_server(self) -> None:
+            """Explicitly push the current user presets to the GMA server (`DD`)."""
+            self.save_presets_requested.emit(self.bank.user_presets, False, self.for_user)
+
+        def save_single_preset(self, preset: dict[str, Any]) -> None:
+            """Merge a single encoded preset into the local bank and emit `DD+` + `DR` signals."""
+            merged = merge_preset_lists(self.bank.user_presets, [preset])
+            self.bank.set_user_presets(merged)
+            self._rebuild_presets_ui()
+            self.append_presets_requested.emit([preset], False, self.for_user)
+            self.refresh_presets_requested.emit(self.for_user)
+
+        def open_quick_save_preset(self, initial_spec: str = "") -> bool:
+            """Open the lightweight quick-save preset dialog and push via `DD+` on Save."""
+            dlg = QuickSavePresetDialog(
+                initial_spec=initial_spec,
+                known_group_paths=self._known_group_paths(),
+                for_user=self.for_user or self.local_user,
+                parent=self,
+            )
+            if dlg.exec():
+                self.save_single_preset(dlg.encoded_preset())
+                return True
+            return False
+
+        def _apply_imported_presets(
+            self, loaded: list[dict[str, Any]], merge: bool = True
+        ) -> list[dict[str, Any]]:
+            merged = (
+                merge_preset_lists(self.bank.user_presets, loaded)
+                if merge
+                else [dict(p) for p in loaded]
+            )
+            self.bank.set_user_presets(merged)
+            self._rebuild_presets_ui()
+            self.save_presets_requested.emit(self.bank.user_presets, False, self.for_user)
+            self.refresh_presets_requested.emit(self.for_user)
+            return merged
+
+        def import_presets_from_file(
+            self, path: str | Path, merge: bool = True
+        ) -> list[dict[str, Any]]:
+            """Load presets from `path`, merge or replace locally, and emit `DD` + `DR` signals."""
+            _meta, loaded = load_dice_presets_from_file(path)
+            if not loaded:
+                return []
+            return self._apply_imported_presets(loaded, merge=merge)
+
         def _on_import_presets_clicked(self) -> None:
             path, _ = QFileDialog.getOpenFileName(
                 self, "Import Dice Presets", "", "Dice Files (*.dice);;All Files (*)"
             )
             if not path:
                 return
-            _meta, loaded = load_dice_presets_from_file(path)
+            try:
+                _meta, loaded = load_dice_presets_from_file(path)
+            except (OSError, ValueError) as exc:
+                QMessageBox.critical(
+                    self,
+                    "Error Loading Preset File",
+                    f"Error loading file: {exc}",
+                )
+                return
             if not loaded:
                 return
+            merge = True
             if self.bank.user_presets:
+                count = len(self.bank.user_presets)
+                noun = "preset" if count == 1 else "presets"
                 ans = QMessageBox.question(
                     self,
-                    "Import Dice Presets",
-                    "Append imported presets to existing presets? (Choose 'No' to replace existing presets.)",
+                    "Merge with existing presets?",
+                    f"You already have {count} {noun} defined. Do you want the new ones to be MERGED with those?\n\n"
+                    "Yes: overwrite matching names and add new presets.\n"
+                    "No: delete all current presets and replace them with the file contents.",
                     QMessageBox.StandardButton.Yes
                     | QMessageBox.StandardButton.No
                     | QMessageBox.StandardButton.Cancel,
+                    QMessageBox.StandardButton.Yes,
                 )
                 if ans == QMessageBox.StandardButton.Cancel:
                     return
-                if ans == QMessageBox.StandardButton.Yes:
-                    merged = [*self.bank.user_presets, *loaded]
-                else:
-                    merged = loaded
-            else:
-                merged = loaded
-
-            self.bank.set_user_presets(merged)
-            self._rebuild_presets_ui()
-            self.save_presets_requested.emit(self.bank.user_presets, False, self.for_user)
+                merge = ans == QMessageBox.StandardButton.Yes
+            self._apply_imported_presets(loaded, merge=merge)
 
         def _on_export_presets_clicked(self) -> None:
+            if not self.bank.user_presets:
+                QMessageBox.information(
+                    self,
+                    "No Presets to Save",
+                    "You have no presets to save.",
+                )
+                return
             path, _ = QFileDialog.getSaveFileName(
                 self, "Export Dice Presets", "", "Dice Files (*.dice)"
             )
             if not path:
                 return
-            save_dice_presets_to_file(Path(path), self.bank.user_presets)
+            try:
+                save_dice_presets_to_file(Path(path), self.bank.user_presets)
+            except OSError as exc:
+                QMessageBox.critical(
+                    self,
+                    "Error Saving Preset File",
+                    f"Unable to save {path}: {exc}",
+                )
 
     class DelegatedDieRollerDialog(QDialog):
         """Secondary die-roller window for rolling on behalf of another player (`DelegateFor`)."""

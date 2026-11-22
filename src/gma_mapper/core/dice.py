@@ -212,7 +212,9 @@ def encode_preset_details(details: dict[str, Any]) -> dict[str, Any]:
 
     ptype = d.get("type", "preset")
     name = str(d.get("name", "") or "")
-    seq = str(d.get("seq", "") or "")
+    seq = str(d.get("seq", "") or "").strip()
+    if seq.isdigit():
+        seq = f"{int(seq):03d}"
     groups = list(d.get("group") or [])
     area = str(d.get("area", "") or "")
     seq_with_area = f"$[{area}]{seq}" if area else seq
@@ -297,6 +299,33 @@ def encode_preset_details(details: dict[str, Any]) -> dict[str, Any]:
         }
 
     raise ValueError(f"Unsupported preset type: {ptype!r}")
+
+
+def merge_preset_lists(
+    existing: list[dict[str, Any]],
+    incoming: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Merge `incoming` presets into `existing` by `Name`, matching legacy `LoadDieRollPresets`.
+
+    Preserves existing order, overwrites matching `Name` entries in place, appends new
+    entries in order, and returns deep copies so callers do not share mutable dicts.
+    """
+    merged: list[dict[str, Any]] = [copy.deepcopy(p) for p in existing]
+    index_by_name: dict[str, int] = {}
+    for idx, preset in enumerate(merged):
+        name = str(preset.get("Name", "") or "")
+        if name not in index_by_name:
+            index_by_name[name] = idx
+
+    for preset in incoming:
+        copied = copy.deepcopy(preset)
+        name = str(copied.get("Name", "") or "")
+        if name in index_by_name:
+            merged[index_by_name[name]] = copied
+        else:
+            index_by_name[name] = len(merged)
+            merged.append(copied)
+    return merged
 
 
 def cleanup_die_roll_spec(spec: str) -> str:

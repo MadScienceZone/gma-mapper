@@ -15,6 +15,7 @@ from gma_mapper.core.dice import (
     DICE_SYNTAX_HELP_SECTIONS,
     DicePresetBank,
     build_color_box_title,
+    cleanup_die_roll_spec,
     encode_preset_details,
     get_preset_details,
     parse_color_blocks,
@@ -559,9 +560,12 @@ if QT_AVAILABLE:
             bottom_bar.addStretch(1)
 
             buttons = QDialogButtonBox(
-                QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel,
+                QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel,
                 self,
             )
+            save_btn = buttons.button(QDialogButtonBox.StandardButton.Save)
+            if save_btn is not None:
+                save_btn.setText("Save to Server")
             bottom_bar.addWidget(buttons)
             layout.addLayout(bottom_bar)
 
@@ -571,6 +575,24 @@ if QT_AVAILABLE:
             buttons.rejected.connect(self.reject)
 
             self._populate_tables()
+            self._initial_snapshot: list[dict[str, Any]] = self.encoded_presets()
+
+        def reject(self) -> None:
+            try:
+                dirty = self.encoded_presets() != self._initial_snapshot
+            except ValueError:
+                dirty = True
+            if dirty:
+                ans = QMessageBox.question(
+                    self,
+                    "Confirm Cancel",
+                    "Are you sure you wish to abandon any changes you made to the die-roll preset list?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No,
+                )
+                if ans != QMessageBox.StandardButton.Yes:
+                    return
+            super().reject()
 
         def _create_rolls_tab(self) -> QTableWidget:
             tbl = QTableWidget(0, 5, self)
@@ -583,17 +605,27 @@ if QT_AVAILABLE:
             return tbl
 
         def _create_modifiers_tab(self) -> QTableWidget:
-            tbl = QTableWidget(0, 7, self)
+            tbl = QTableWidget(0, 8, self)
             tbl.setHorizontalHeaderLabels(
-                ["Seq", "Group", "Name", "Variable ($)", "Default On", "Global", "Modifier / Value Spec"]
+                [
+                    "Seq",
+                    "Group",
+                    "Name",
+                    "Description",
+                    "Variable ($)",
+                    "Default On",
+                    "Global",
+                    "Modifier / Value Spec",
+                ]
             )
             tbl.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
             tbl.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
             tbl.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
-            tbl.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+            tbl.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
             tbl.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
             tbl.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
-            tbl.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeMode.Stretch)
+            tbl.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)
+            tbl.horizontalHeader().setSectionResizeMode(7, QHeaderView.ResizeMode.Stretch)
             return tbl
 
         def _create_tables_tab(self) -> QTableWidget:
@@ -687,7 +719,9 @@ if QT_AVAILABLE:
                 if dtype == "preset":
                     r = self.rolls_table.rowCount()
                     self.rolls_table.insertRow(r)
-                    self.rolls_table.setItem(r, 0, QTableWidgetItem(str(d.get("seq", ""))))
+                    seq_item = QTableWidgetItem(str(d.get("seq", "")))
+                    seq_item.setData(Qt.ItemDataRole.UserRole, {"area": str(d.get("area", "") or "")})
+                    self.rolls_table.setItem(r, 0, seq_item)
                     self.rolls_table.setItem(r, 1, QTableWidgetItem(group_str))
                     self.rolls_table.setItem(r, 2, QTableWidgetItem(str(d.get("name", ""))))
                     self.rolls_table.setItem(r, 3, QTableWidgetItem(str(d.get("description", ""))))
@@ -695,26 +729,31 @@ if QT_AVAILABLE:
                 elif dtype == "modifier":
                     r = self.mods_table.rowCount()
                     self.mods_table.insertRow(r)
-                    self.mods_table.setItem(r, 0, QTableWidgetItem(str(d.get("seq", ""))))
+                    seq_item = QTableWidgetItem(str(d.get("seq", "")))
+                    seq_item.setData(Qt.ItemDataRole.UserRole, {"client": str(d.get("client", "") or "")})
+                    self.mods_table.setItem(r, 0, seq_item)
                     self.mods_table.setItem(r, 1, QTableWidgetItem(group_str))
                     self.mods_table.setItem(r, 2, QTableWidgetItem(str(d.get("name", ""))))
-                    self.mods_table.setItem(r, 3, QTableWidgetItem(str(d.get("var", ""))))
+                    self.mods_table.setItem(r, 3, QTableWidgetItem(str(d.get("description", ""))))
+                    self.mods_table.setItem(r, 4, QTableWidgetItem(str(d.get("var", ""))))
 
                     chk_en = QTableWidgetItem()
                     chk_en.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
                     chk_en.setCheckState(Qt.CheckState.Checked if d.get("enabled") else Qt.CheckState.Unchecked)
-                    self.mods_table.setItem(r, 4, chk_en)
+                    self.mods_table.setItem(r, 5, chk_en)
 
                     chk_gl = QTableWidgetItem()
                     chk_gl.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
                     chk_gl.setCheckState(Qt.CheckState.Checked if d.get("global") else Qt.CheckState.Unchecked)
-                    self.mods_table.setItem(r, 5, chk_gl)
+                    self.mods_table.setItem(r, 6, chk_gl)
 
-                    self.mods_table.setItem(r, 6, QTableWidgetItem(str(d.get("dieroll", ""))))
+                    self.mods_table.setItem(r, 7, QTableWidgetItem(str(d.get("dieroll", ""))))
                 elif dtype == "table":
                     r = self.tables_table.rowCount()
                     self.tables_table.insertRow(r)
-                    self.tables_table.setItem(r, 0, QTableWidgetItem(str(d.get("seq", ""))))
+                    seq_item = QTableWidgetItem(str(d.get("seq", "")))
+                    seq_item.setData(Qt.ItemDataRole.UserRole, {"client": str(d.get("client", "") or "")})
+                    self.tables_table.setItem(r, 0, seq_item)
                     self.tables_table.setItem(r, 1, QTableWidgetItem(group_str))
                     self.tables_table.setItem(r, 2, QTableWidgetItem(str(d.get("name", ""))))
                     self.tables_table.setItem(r, 3, QTableWidgetItem(str(d.get("description", ""))))
@@ -749,27 +788,34 @@ if QT_AVAILABLE:
             table.insertRow(r)
             seq_str = f"{(r + 1) * 10:03d}"
             if tab_kind == "preset":
-                table.setItem(r, 0, QTableWidgetItem(seq_str))
+                seq_item = QTableWidgetItem(seq_str)
+                seq_item.setData(Qt.ItemDataRole.UserRole, {})
+                table.setItem(r, 0, seq_item)
                 table.setItem(r, 1, QTableWidgetItem(""))
                 table.setItem(r, 2, QTableWidgetItem("New Roll"))
                 table.setItem(r, 3, QTableWidgetItem(""))
                 table.setItem(r, 4, QTableWidgetItem("1d20"))
             elif tab_kind == "modifier":
-                table.setItem(r, 0, QTableWidgetItem(seq_str))
+                seq_item = QTableWidgetItem(seq_str)
+                seq_item.setData(Qt.ItemDataRole.UserRole, {})
+                table.setItem(r, 0, seq_item)
                 table.setItem(r, 1, QTableWidgetItem(""))
                 table.setItem(r, 2, QTableWidgetItem("New Modifier"))
                 table.setItem(r, 3, QTableWidgetItem(""))
+                table.setItem(r, 4, QTableWidgetItem(""))
                 chk_en = QTableWidgetItem()
                 chk_en.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
                 chk_en.setCheckState(Qt.CheckState.Unchecked)
-                table.setItem(r, 4, chk_en)
+                table.setItem(r, 5, chk_en)
                 chk_gl = QTableWidgetItem()
                 chk_gl.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
                 chk_gl.setCheckState(Qt.CheckState.Unchecked)
-                table.setItem(r, 5, chk_gl)
-                table.setItem(r, 6, QTableWidgetItem("+2"))
+                table.setItem(r, 6, chk_gl)
+                table.setItem(r, 7, QTableWidgetItem("+2"))
             elif tab_kind == "table":
-                table.setItem(r, 0, QTableWidgetItem(seq_str))
+                seq_item = QTableWidgetItem(seq_str)
+                seq_item.setData(Qt.ItemDataRole.UserRole, {})
+                table.setItem(r, 0, seq_item)
                 table.setItem(r, 1, QTableWidgetItem(""))
                 table.setItem(r, 2, QTableWidgetItem("new_table"))
                 table.setItem(r, 3, QTableWidgetItem("New Lookup Table"))
@@ -823,7 +869,12 @@ if QT_AVAILABLE:
 
         def _auto_resequence(self, table: QTableWidget) -> None:
             for r in range(table.rowCount()):
-                table.setItem(r, 0, QTableWidgetItem(f"{(r + 1) * 10:03d}"))
+                seq_text = f"{(r + 1) * 10:03d}"
+                existing_item = table.item(r, 0)
+                if existing_item is not None:
+                    existing_item.setText(seq_text)
+                else:
+                    table.setItem(r, 0, QTableWidgetItem(seq_text))
 
         def _known_group_paths(self) -> list[list[str]]:
             paths: list[list[str]] = []
@@ -893,6 +944,12 @@ if QT_AVAILABLE:
             dlg = DiceModifierHelpDialog(self)
             dlg.exec()
 
+        @staticmethod
+        def _row_meta(table: QTableWidget, row: int) -> dict[str, Any]:
+            item = table.item(row, 0)
+            data = item.data(Qt.ItemDataRole.UserRole) if item is not None else None
+            return data if isinstance(data, dict) else {}
+
         def encoded_presets(self) -> list[dict[str, Any]]:
             """Encode all tabs back into raw GMA protocol preset dictionaries."""
             out: list[dict[str, Any]] = []
@@ -907,11 +964,13 @@ if QT_AVAILABLE:
                 spec = (self.rolls_table.item(r, 4).text() if self.rolls_table.item(r, 4) else "").strip()
                 if not name and not spec:
                     continue
+                meta = self._row_meta(self.rolls_table, r)
                 out.append(
                     encode_preset_details(
                         {
                             "type": "preset",
                             "seq": seq,
+                            "area": str(meta.get("area", "") or ""),
                             "group": groups,
                             "name": name,
                             "description": desc,
@@ -927,21 +986,25 @@ if QT_AVAILABLE:
                 grp_raw = (self.mods_table.item(r, 1).text() if self.mods_table.item(r, 1) else "").strip()
                 groups = [g.strip() for g in grp_raw.split("\u25b6") if g.strip()]
                 name = (self.mods_table.item(r, 2).text() if self.mods_table.item(r, 2) else "").strip()
-                var_name = (self.mods_table.item(r, 3).text() if self.mods_table.item(r, 3) else "").strip()
-                en_item = self.mods_table.item(r, 4)
-                gl_item = self.mods_table.item(r, 5)
+                desc = (self.mods_table.item(r, 3).text() if self.mods_table.item(r, 3) else "").strip()
+                var_name = (self.mods_table.item(r, 4).text() if self.mods_table.item(r, 4) else "").strip()
+                en_item = self.mods_table.item(r, 5)
+                gl_item = self.mods_table.item(r, 6)
                 enabled = bool(en_item and en_item.checkState() == Qt.CheckState.Checked)
                 is_glob = bool(gl_item and gl_item.checkState() == Qt.CheckState.Checked)
-                spec = (self.mods_table.item(r, 6).text() if self.mods_table.item(r, 6) else "").strip()
+                spec = (self.mods_table.item(r, 7).text() if self.mods_table.item(r, 7) else "").strip()
                 if not name and not spec:
                     continue
+                meta = self._row_meta(self.mods_table, r)
                 out.append(
                     encode_preset_details(
                         {
                             "type": "modifier",
                             "seq": seq,
+                            "client": str(meta.get("client", "") or ""),
                             "group": groups,
                             "name": name,
+                            "description": desc,
                             "var": var_name,
                             "enabled": enabled,
                             "global": is_glob,
@@ -968,11 +1031,13 @@ if QT_AVAILABLE:
                 ) or {"dieroll": "1d20", "table": ["1", "Low", "*", "High"], "delim": ";"}
                 if not name:
                     continue
+                meta = self._row_meta(self.tables_table, r)
                 out.append(
                     encode_preset_details(
                         {
                             "type": "table",
                             "seq": seq,
+                            "client": str(meta.get("client", "") or ""),
                             "group": groups,
                             "name": name,
                             "description": desc,
@@ -1084,3 +1149,120 @@ if QT_AVAILABLE:
                 for i in range(self.list_widget.count())
                 if self.list_widget.item(i).text().strip()
             ]
+
+    class QuickSavePresetDialog(QDialog):
+        """Lightweight single-preset save dialog ported from `AddDieRollPreset` / `CommitNewPreset`."""
+
+        def __init__(
+            self,
+            initial_spec: str = "",
+            initial_name: str = "",
+            initial_description: str = "",
+            known_group_paths: list[list[str]] | None = None,
+            for_user: str = "",
+            parent: QWidget | None = None,
+        ) -> None:
+            super().__init__(parent)
+            self._known_group_paths = known_group_paths or []
+            self.for_user = for_user
+            self.setWindowTitle(
+                f"Save Die-Roll Preset to Server ({for_user})"
+                if for_user
+                else "Save Die-Roll Preset to Server"
+            )
+            self.resize(480, 240)
+
+            suggested_name = initial_name.strip()
+            if not suggested_name and "=" in initial_spec:
+                suggested_name = cleanup_die_roll_spec(initial_spec).split("=", 1)[0].strip()
+
+            layout = QVBoxLayout(self)
+            form = QFormLayout()
+
+            self.seq_edit = QLineEdit(self)
+            self.seq_edit.setPlaceholderText("Optional (e.g. 010)")
+            form.addRow("Sequence:", self.seq_edit)
+
+            grp_row = QHBoxLayout()
+            self.group_edit = QLineEdit(self)
+            self.group_edit.setPlaceholderText("Optional (e.g. Attacks \u25b6 Melee)")
+            self.btn_edit_group = QPushButton("Groups...", self)
+            self.btn_edit_group.clicked.connect(self._edit_group)
+            grp_row.addWidget(self.group_edit, stretch=1)
+            grp_row.addWidget(self.btn_edit_group)
+            form.addRow("Group:", grp_row)
+
+            self.name_edit = QLineEdit(suggested_name, self)
+            self.name_edit.setPlaceholderText("Required preset name")
+            form.addRow("Preset Name:", self.name_edit)
+
+            self.desc_edit = QLineEdit(initial_description, self)
+            self.desc_edit.setPlaceholderText("Optional description")
+            form.addRow("Description:", self.desc_edit)
+
+            spec_row = QHBoxLayout()
+            self.spec_edit = QLineEdit(initial_spec.strip(), self)
+            self.spec_edit.setPlaceholderText("Required die roll specification")
+            self.btn_colorbox = QPushButton("Color-Box...", self)
+            self.btn_colorbox.clicked.connect(self._edit_colorbox)
+            spec_row.addWidget(self.spec_edit, stretch=1)
+            spec_row.addWidget(self.btn_colorbox)
+            form.addRow("Die Roll Spec:", spec_row)
+
+            layout.addLayout(form)
+
+            buttons = QDialogButtonBox(
+                QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel,
+                self,
+            )
+            save_btn = buttons.button(QDialogButtonBox.StandardButton.Save)
+            if save_btn is not None:
+                save_btn.setText("Save to Server")
+            buttons.accepted.connect(self._on_accept)
+            buttons.rejected.connect(self.reject)
+            layout.addWidget(buttons)
+
+        def _edit_group(self) -> None:
+            cur_groups = [
+                g.strip() for g in self.group_edit.text().split("\u25b6") if g.strip()
+            ]
+            dlg = EditPresetGroupDialog(cur_groups, self._known_group_paths, self)
+            if dlg.exec():
+                self.group_edit.setText(" \u25b6 ".join(dlg.group_list()))
+
+        def _edit_colorbox(self) -> None:
+            cur_spec = self.spec_edit.text()
+            dlg = EditColorBoxTitleDialog(cur_spec, self)
+            if dlg.exec():
+                self.spec_edit.setText(dlg.updated_roll_spec(cur_spec))
+
+        def _on_accept(self) -> None:
+            if not self.name_edit.text().strip():
+                QMessageBox.warning(
+                    self,
+                    "Preset Name Required",
+                    "The preset name must be provided. If it matches an existing preset, it will replace the old one.",
+                )
+                return
+            if not self.spec_edit.text().strip():
+                QMessageBox.warning(
+                    self,
+                    "Die Roll Required",
+                    "A die-roll specification must be provided.",
+                )
+                return
+            self.accept()
+
+        def encoded_preset(self) -> dict[str, Any]:
+            groups = [g.strip() for g in self.group_edit.text().split("\u25b6") if g.strip()]
+            return encode_preset_details(
+                {
+                    "type": "preset",
+                    "seq": self.seq_edit.text().strip(),
+                    "group": groups,
+                    "name": self.name_edit.text().strip(),
+                    "description": self.desc_edit.text().strip(),
+                    "dieroll": self.spec_edit.text().strip(),
+                    "system": False,
+                }
+            )

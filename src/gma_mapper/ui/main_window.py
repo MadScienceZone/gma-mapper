@@ -9,7 +9,7 @@ from typing import Any, Callable
 
 from gma_mapper import GMAMapperVersion
 from gma_mapper.core.cache import AssetCache
-from gma_mapper.core.dice import DicePresetBank, resolve_table_roll_reply
+from gma_mapper.core.dice import DicePresetBank, merge_preset_lists, resolve_table_roll_reply
 from gma_mapper.core.file_io import (
     DATA_PAYLOAD,
     load_from_file,
@@ -652,6 +652,11 @@ class MapperController:
             reason = str(payload.get("Reason", "Operation failed"))
             if self.status_message_cb:
                 self.status_message_cb(f"Request failed: {reason}")
+        elif cmd == "DENIED":
+            reason = str(payload.get("Reason", "Permission denied"))
+            if self.status_message_cb:
+                self.status_message_cb(f"Permission denied: {reason}")
+            self.chat_panel.append_notice(f"Permission denied: {reason}")
         elif cmd == "ROLL":
             self.chat_panel.append_roll(payload)
             reply = resolve_table_roll_reply(
@@ -698,7 +703,7 @@ class MapperController:
 
                 if is_global:
                     sys_list = (
-                        [*self.chat_panel.bank.system_presets, *presets]
+                        merge_preset_lists(self.chat_panel.bank.system_presets, presets)
                         if append_mode
                         else presets
                     )
@@ -710,15 +715,26 @@ class MapperController:
                         for_user, DicePresetBank(tkey=for_user)
                     )
                     bank.sys_gvar_on = self.shared_gvar_state
-                    bank.set_user_presets(
-                        [*bank.user_presets, *presets] if append_mode else presets
-                    )
-                    if for_user in self.delegated_panels:
-                        self.delegated_panels[for_user].set_user_presets(bank.user_presets)
+                    if append_mode:
+                        bank.set_user_presets(merge_preset_lists(bank.user_presets, presets))
+                        if for_user in self.delegated_panels:
+                            self.delegated_panels[for_user].set_user_presets(bank.user_presets)
+                    elif any(isinstance(p, dict) and p.get("Global") for p in presets):
+                        sys_only = [p for p in presets if isinstance(p, dict) and p.get("Global")]
+                        user_only = [p for p in presets if isinstance(p, dict) and not p.get("Global")]
+                        bank.set_system_presets(sys_only)
+                        bank.set_user_presets(user_only)
+                        if for_user in self.delegated_panels:
+                            self.delegated_panels[for_user].set_system_presets(bank.system_presets)
+                            self.delegated_panels[for_user].set_user_presets(bank.user_presets)
+                    else:
+                        bank.set_user_presets(presets)
+                        if for_user in self.delegated_panels:
+                            self.delegated_panels[for_user].set_user_presets(bank.user_presets)
                 else:
                     if append_mode:
                         self.chat_panel.set_user_presets(
-                            [*self.chat_panel.bank.user_presets, *presets]
+                            merge_preset_lists(self.chat_panel.bank.user_presets, presets)
                         )
                     elif any(isinstance(p, dict) and p.get("Global") for p in presets):
                         self.chat_panel.set_presets(presets)
@@ -807,6 +823,7 @@ if HAS_PYSIDE6:
 
             self._create_docks()
             self._create_menus_and_toolbar()
+            self._sync_role_ui()
             self._wire_signals()
             self.setStatusBar(QStatusBar(self))
             self.statusBar().showMessage("Ready")
@@ -896,11 +913,13 @@ if HAS_PYSIDE6:
             file_menu.addAction(act_unload_map)
 
             file_menu.addSeparator()
-            act_open_dice = QAction("Load &Dice Presets...", self)
+            act_open_dice = QAction("Load &Dice Presets from File...", self)
+            act_open_dice.setStatusTip("Import die-roll presets from a local .dice file and save to server")
             act_open_dice.triggered.connect(self._on_open_dice)
             file_menu.addAction(act_open_dice)
 
-            act_save_dice = QAction("Save Dice &Presets As...", self)
+            act_save_dice = QAction("Save Dice &Presets to File...", self)
+            act_save_dice.setStatusTip("Export die-roll presets to a local .dice file on disk")
             act_save_dice.triggered.connect(self._on_save_dice)
             file_menu.addAction(act_save_dice)
 
@@ -1293,21 +1312,33 @@ if HAS_PYSIDE6:
             play_menu.addAction(act_deselect_all)
 
             play_menu.addSeparator()
-            act_edit_presets = QAction("Edit &Die Roll Presets...", self)
-            act_edit_presets.triggered.connect(
+            self.act_edit_presets = QAction("Edit &Die Roll Presets...", self)
+            self.act_edit_presets.triggered.connect(
                 lambda: self.controller.chat_panel.open_preset_editor(system_mode=False)
             )
-            play_menu.addAction(act_edit_presets)
+            play_menu.addAction(self.act_edit_presets)
 
-            act_edit_sys_presets = QAction("Edit &System Presets...", self)
-            act_edit_sys_presets.triggered.connect(
+            self.act_edit_sys_presets = QAction("Edit &System Presets...", self)
+            self.act_edit_sys_presets.triggered.connect(
                 lambda: self.controller.chat_panel.open_preset_editor(system_mode=True)
             )
-            play_menu.addAction(act_edit_sys_presets)
+            play_menu.addAction(self.act_edit_sys_presets)
+
+            self.act_save_presets_server = QAction("Save Die Roll Presets to &Server", self)
+            self.act_save_presets_server.triggered.connect(
+                self.controller.chat_panel.push_presets_to_server
+            )
+            play_menu.addAction(self.act_save_presets_server)
 
             act_manage_delegates = QAction("Manage Die Roll D&elegates...", self)
             act_manage_delegates.triggered.connect(self._on_manage_delegates)
             play_menu.addAction(act_manage_delegates)
+
+            self.act_refresh_presets = QAction("Refresh Die-Roll and Delegate Data from Server", self)
+            self.act_refresh_presets.triggered.connect(
+                lambda: self._on_refresh_presets_from_server("")
+            )
+            play_menu.addAction(self.act_refresh_presets)
 
             self.delegate_for_menu = play_menu.addMenu("Access Die Rolls &For")
             self._rebuild_delegate_for_menu()
@@ -1981,6 +2012,13 @@ if HAS_PYSIDE6:
             is_gm = bool(self.controller.chat_panel.is_gm)
             if hasattr(self, "clock_dock"):
                 self.clock_dock.setVisible(is_gm)
+            if hasattr(self, "act_edit_sys_presets"):
+                self.act_edit_sys_presets.setEnabled(is_gm)
+            if hasattr(self, "act_edit_presets"):
+                user = self.controller.chat_panel.local_user
+                self.act_edit_presets.setText(
+                    f"Edit &Die Roll Presets for {user}..." if user else "Edit &Die Roll Presets..."
+                )
 
         def _on_identity_changed(self, _user: str, _is_gm: bool) -> None:
             self._sync_role_ui()
@@ -2124,40 +2162,44 @@ if HAS_PYSIDE6:
                     self.statusBar().showMessage(f"Error saving map: {exc}")
 
         def _on_open_dice(self) -> None:
-            path, _ = QFileDialog.getOpenFileName(self, "Load Dice Presets", "", "Dice Files (*.dice);;All Files (*)")
-            if not path:
-                return
-            _meta, presets = load_dice_presets_from_file(path)
-            if not presets:
-                return
-            append_mode = False
-            if self.controller.chat_panel.bank.user_presets:
-                ans = QMessageBox.question(
-                    self,
-                    "Load Dice Presets",
-                    "Append loaded presets to existing presets? (Choose 'No' to replace existing presets.)",
-                    QMessageBox.StandardButton.Yes
-                    | QMessageBox.StandardButton.No
-                    | QMessageBox.StandardButton.Cancel,
-                )
-                if ans == QMessageBox.StandardButton.Cancel:
-                    return
-                append_mode = (ans == QMessageBox.StandardButton.Yes)
-
-            if append_mode:
-                merged = [*self.controller.chat_panel.bank.user_presets, *presets]
-                self.controller.chat_panel.set_user_presets(merged)
-            else:
-                self.controller.chat_panel.set_presets(presets)
-            self.net_client.session.define_dice_presets(
-                presets if append_mode else self.controller.chat_panel.bank.user_presets,
-                append_mode=append_mode,
-            )
+            self.controller.chat_panel._on_import_presets_clicked()
 
         def _on_save_dice(self) -> None:
             path, _ = QFileDialog.getSaveFileName(self, "Save Dice Presets", "", "Dice Files (*.dice)")
             if path:
                 save_dice_presets_to_file(path, self.controller.chat_panel.bank.user_presets)
+
+        def _on_save_presets_to_server(
+            self,
+            plist: list[dict[str, Any]],
+            is_glob: bool,
+            for_user: str,
+            append_mode: bool = False,
+            panel: ChatDicePanel | None = None,
+        ) -> None:
+            target_panel = panel or self.controller.chat_panel
+            target_user = "" if is_glob else (for_user or self.controller.chat_panel.local_user)
+            if not self.net_client.session.is_ready():
+                warn = "Not connected to server — die presets updated locally only and NOT saved to server."
+                self.statusBar().showMessage(warn)
+                target_panel.append_notice(warn)
+                return
+            self.net_client.session.define_dice_presets(
+                plist,
+                append_mode=append_mode,
+                for_user=target_user,
+                globals_only=is_glob,
+            )
+            verb = "Added" if append_mode else "Saved"
+            scope = "system" if is_glob else (target_user or "user")
+            self.statusBar().showMessage(f"{verb} {len(plist)} {scope} die preset(s) to server.")
+
+        def _on_refresh_presets_from_server(self, for_user: str = "") -> None:
+            target_user = for_user or self.controller.chat_panel.local_user
+            if not self.net_client.session.is_ready():
+                self.statusBar().showMessage("Not connected to server — cannot refresh die presets.")
+                return
+            self.net_client.session.query_dice_presets(for_user=target_user)
 
         def _wire_chat_panel_signals(self, panel: ChatDicePanel) -> None:
             panel.send_roll_ex_requested.connect(
@@ -2181,16 +2223,16 @@ if HAS_PYSIDE6:
                 )
             )
             panel.save_presets_requested.connect(
-                lambda plist, is_glob, for_user: self.net_client.session.define_dice_presets(
-                    plist,
-                    append_mode=False,
-                    for_user=for_user,
-                    globals_only=is_glob,
+                lambda plist, is_glob, for_user, p=panel: self._on_save_presets_to_server(
+                    plist, is_glob, for_user, append_mode=False, panel=p
                 )
             )
-            panel.refresh_presets_requested.connect(
-                lambda for_user: self.net_client.session.query_dice_presets(for_user=for_user)
+            panel.append_presets_requested.connect(
+                lambda plist, is_glob, for_user, p=panel: self._on_save_presets_to_server(
+                    plist, is_glob, for_user, append_mode=True, panel=p
+                )
             )
+            panel.refresh_presets_requested.connect(self._on_refresh_presets_from_server)
             panel.refresh_peers_requested.connect(self.net_client.session.query_peers)
             panel.delete_message_requested.connect(
                 lambda msg_id: self.net_client.session.clear_chat_list(False, [msg_id])
