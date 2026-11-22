@@ -950,6 +950,72 @@ class TestPanelsAndCLI(unittest.TestCase):
                 win._ping_dialog.close()
             win.close()
 
+    def test_view_menu_dock_toggles(self) -> None:
+        import os
+
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        try:
+            from PySide6.QtGui import QKeySequence
+            from PySide6.QtWidgets import QApplication
+            from gma_mapper.ui.main_window import GMAMapperMainWindow
+        except ImportError:
+            self.skipTest("PySide6 not available")
+
+        _app = QApplication.instance() or QApplication([])
+        win = GMAMapperMainWindow()
+        try:
+            # Find &View menu and check dock toggleViewAction objects
+            view_menus = [
+                act.menu()
+                for act in win.menuBar().actions()
+                if act.text() == "&View" and act.menu() is not None
+            ]
+            self.assertEqual(len(view_menus), 1)
+            view_actions = view_menus[0].actions()
+
+            self.assertIs(win.act_view_chat_dock, win.chat_dock.toggleViewAction())
+            self.assertIs(win.act_view_combat_dock, win.combat_dock.toggleViewAction())
+            self.assertIs(win.act_view_clock_dock, win.clock_dock.toggleViewAction())
+            self.assertIn(win.act_view_chat_dock, view_actions)
+            self.assertIn(win.act_view_combat_dock, view_actions)
+            self.assertIn(win.act_view_clock_dock, view_actions)
+
+            # Shortcuts do not collide
+            self.assertEqual(win.act_view_chat_dock.shortcut(), QKeySequence("Alt+D"))
+            self.assertEqual(win.act_view_clock_dock.shortcut(), QKeySequence("Alt+Shift+C"))
+            self.assertEqual(win.act_show_player_clock.shortcut(), QKeySequence("Alt+C"))
+
+            # Toggling Chat and Combat dock actions hides and restores docks
+            win.show()
+            _app.processEvents()
+            chat_visible = not win.chat_dock.isHidden()
+            win.act_view_chat_dock.trigger()
+            self.assertEqual(win.chat_dock.isHidden(), chat_visible)
+            win.act_view_chat_dock.trigger()
+            self.assertEqual(win.chat_dock.isHidden(), not chat_visible)
+
+            combat_visible = not win.combat_dock.isHidden()
+            win.act_view_combat_dock.trigger()
+            self.assertEqual(win.combat_dock.isHidden(), combat_visible)
+            win.act_view_combat_dock.trigger()
+            self.assertEqual(win.combat_dock.isHidden(), not combat_visible)
+
+            # Non-GM: clock dock toggle is hidden & disabled
+            self.assertFalse(win.act_view_clock_dock.isVisible())
+            self.assertFalse(win.act_view_clock_dock.isEnabled())
+
+            # GM login enables & shows clock dock toggle and allows toggling clock_dock
+            win.controller.dispatch_command("GRANTED", {"User": "GM"})
+            self.assertTrue(win.act_view_clock_dock.isVisible())
+            self.assertTrue(win.act_view_clock_dock.isEnabled())
+            self.assertFalse(win.clock_dock.isHidden())
+            win.act_view_clock_dock.trigger()
+            self.assertTrue(win.clock_dock.isHidden())
+            win.act_view_clock_dock.trigger()
+            self.assertFalse(win.clock_dock.isHidden())
+        finally:
+            win.close()
+
 
 if __name__ == "__main__":
     unittest.main()

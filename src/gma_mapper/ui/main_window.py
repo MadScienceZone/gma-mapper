@@ -1282,6 +1282,22 @@ if HAS_PYSIDE6:
             self.act_toolbar_icons.triggered.connect(self._on_toggle_toolbar_icons)
             view_menu.addAction(self.act_toolbar_icons)
 
+            view_menu.addSeparator()
+            self.act_view_chat_dock = self.chat_dock.toggleViewAction()
+            self.act_view_chat_dock.setShortcut(QKeySequence("Alt+D"))
+            view_menu.addAction(self.act_view_chat_dock)
+
+            self.act_view_combat_dock = self.combat_dock.toggleViewAction()
+            view_menu.addAction(self.act_view_combat_dock)
+
+            # Play -> Show Initiative Clock already owns Alt+C (standalone player clock window),
+            # so bind the GM-only Initiative & Clock dock toggle to Alt+Shift+C to avoid an
+            # ambiguous Qt shortcut collision.
+            self.act_view_clock_dock = self.clock_dock.toggleViewAction()
+            self.act_view_clock_dock.setShortcut(QKeySequence("Alt+Shift+C"))
+            view_menu.addAction(self.act_view_clock_dock)
+            view_menu.addSeparator()
+
             self.act_show_grid = QAction("Show Map &Grid", self)
             self.act_show_grid.setIconText("Grid")
             self.act_show_grid.setCheckable(True)
@@ -2205,6 +2221,9 @@ if HAS_PYSIDE6:
             is_gm = bool(self.controller.chat_panel.is_gm)
             if hasattr(self, "clock_dock"):
                 self.clock_dock.setVisible(is_gm)
+            if hasattr(self, "act_view_clock_dock"):
+                self.act_view_clock_dock.setVisible(is_gm)
+                self.act_view_clock_dock.setEnabled(is_gm)
             if hasattr(self, "act_edit_sys_presets"):
                 self.act_edit_sys_presets.setEnabled(is_gm)
             if hasattr(self, "act_edit_presets"):

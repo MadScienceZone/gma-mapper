@@ -23,7 +23,7 @@
   - [x] *"Save Diagnostic Messages As..."* (`SaveDebugText` — capture diagnostic log buffer and export to `.txt`).
 
 ## 3. View Menu Dock Toggles
-- [ ] Add `clock_dock.toggleViewAction()` (`Alt+C`), `combat_dock.toggleViewAction()`, and `chat_dock.toggleViewAction()` (`Alt+D`) to the **View** menu so closed dock panels can be easily reopened.
+- [x] Add `clock_dock.toggleViewAction()` (`Alt+Shift+C`; `Alt+C` remains on Play -> Show Initiative Clock), `combat_dock.toggleViewAction()`, and `chat_dock.toggleViewAction()` (`Alt+D`) to the **View** menu so closed dock panels can be easily reopened.
 
 ## 4. Help Menu Reference Dialogs
 - [ ] *"About GMA Mapper..."* (`F1`)
