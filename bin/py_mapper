@@ -3,6 +3,15 @@
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 REPO_ROOT="$(dirname -- "$SCRIPT_DIR")"
 
+if [ -x "${REPO_ROOT}/.venv/bin/gma-mapper" ]; then
+    exec "${REPO_ROOT}/.venv/bin/gma-mapper" "$@"
+fi
+
+if [ -x "${REPO_ROOT}/.venv/bin/python" ]; then
+    export PYTHONPATH="${REPO_ROOT}/src${PYTHONPATH:+:$PYTHONPATH}"
+    exec "${REPO_ROOT}/.venv/bin/python" -m gma_mapper "$@"
+fi
+
 if command -v gma-mapper >/dev/null 2>&1; then
     exec gma-mapper "$@"
 fi
@@ -13,4 +22,3 @@ if command -v python3 >/dev/null 2>&1; then
 else
     exec python -m gma_mapper "$@"
 fi
-

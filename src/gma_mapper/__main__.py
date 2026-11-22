@@ -21,6 +21,7 @@ from gma_mapper.core.profile import (
     load as load_preferences,
     find_server_index,
     empty_server_profile,
+    list_server_names,
 )
 
 
@@ -44,6 +45,7 @@ class MapperCLIOptions:
     geometry: str | None = None
     display: str | None = None
     chat_Transcript: str | None = None
+    list_profiles: bool = False
     extra_args: list[str] = field(default_factory=list)
 
 
@@ -57,6 +59,8 @@ def normalize_legacy_argv(argv: Sequence[str]) -> list[str]:
         "-user": "--user",
         "-password": "--password",
         "-profile": "--profile",
+        "-select": "--select",
+        "-list-profiles": "--list-profiles",
         "-dark": "--dark",
         "-preload": "--preload",
         "-button-size": "--button-size",
@@ -99,7 +103,14 @@ def parse_cli_args(argv: Sequence[str] | None = None) -> MapperCLIOptions:
     parser.add_argument("-p", "--port", dest="port", type=int, help="Server TCP port")
     parser.add_argument("-u", "--user", dest="user", help="Login username")
     parser.add_argument("-P", "--password", dest="password", help="Login password")
-    parser.add_argument("--profile", dest="profile", help="Server profile name")
+    parser.add_argument("-S", "--select", "--profile", dest="profile", help="Server profile name")
+    parser.add_argument(
+        "-L",
+        "--list-profiles",
+        action="store_true",
+        dest="list_profiles",
+        help="Print available server profiles and exit",
+    )
     parser.add_argument("-f", "--config", dest="config_path", help="Path to preferences.json")
     parser.add_argument("--dark", action="store_true", help="Enable dark UI mode")
     parser.add_argument("--preload", action="store_true", help="Preload map/image assets")
@@ -134,6 +145,7 @@ def parse_cli_args(argv: Sequence[str] | None = None) -> MapperCLIOptions:
         geometry=ns.geometry,
         display=ns.display,
         chat_Transcript=ns.chat_transcript,
+        list_profiles=bool(ns.list_profiles),
         extra_args=extra,
     )
 
@@ -206,6 +218,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             prefs = default_preferences()
     except Exception:
         prefs = default_preferences()
+
+    if opts.list_profiles:
+        for name in list_server_names(prefs):
+            if name:
+                print(name)
+        return 0
 
     apply_cli_overrides(prefs, opts)
 

@@ -140,6 +140,33 @@ class TestPanelsAndCLI(unittest.TestCase):
         apply_cli_overrides(prefs_txt, opts_txt)
         self.assertTrue(prefs_txt["toolbar_text"])
 
+        # Legacy -S / --select / -select and -L / --list-profiles flags
+        self.assertEqual(parse_cli_args(["--select", "Liberte"]).profile, "Liberte")
+        self.assertEqual(parse_cli_args(["-S", "Liberte"]).profile, "Liberte")
+        self.assertEqual(parse_cli_args(["-select", "Liberte"]).profile, "Liberte")
+        self.assertTrue(parse_cli_args(["--list-profiles"]).list_profiles)
+        self.assertTrue(parse_cli_args(["-L"]).list_profiles)
+
+        import contextlib
+        import io
+        import tempfile
+        from gma_mapper.__main__ import main as cli_main
+        from gma_mapper.core.profile import save as save_preferences
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cfg_path = Path(tmpdir) / "prefs.json"
+            cfg_prefs = default_preferences()
+            cfg_prefs["profiles"] = [
+                {"name": "offline", "host": "", "port": 2323},
+                {"name": "Liberte", "host": "liberte.example.org", "port": 2325},
+            ]
+            save_preferences(cfg_path, cfg_prefs)
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                rc = cli_main(["--list-profiles", "-f", str(cfg_path)])
+            self.assertEqual(rc, 0)
+            self.assertEqual(buf.getvalue().splitlines(), ["offline", "Liberte"])
+
     def test_toolbar_icons_and_display_mode_toggle(self) -> None:
         from gma_mapper.ui.icons import (
             HAS_PYSIDE6,

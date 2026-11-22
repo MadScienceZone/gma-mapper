@@ -97,9 +97,10 @@ Run the unit test suite to ensure all tests pass:
 python -m unittest discover -s tests -v
 ```
 
-Check that the CLI command is recognized:
+Check that the CLI command and repository launcher are recognized:
 ```powershell
 gma-mapper --help
+python bin\py_mapper.py --version
 ```
 
 ---
@@ -112,10 +113,30 @@ gma-mapper --help
 ```powershell
 gma-mapper
 ```
-Or directly with Python:
+Or via the repository launcher or Python module:
+```powershell
+python bin\py_mapper.py
+```
 ```powershell
 python -m gma_mapper
 ```
+On Linux / macOS:
+```bash
+./bin/py_mapper
+```
+
+### Listing & Selecting Saved Server Profiles:
+List the saved server profiles from `preferences.json`:
+```powershell
+python bin\py_mapper.py --list-profiles
+```
+*(Short flag `-L` and legacy `-list-profiles` or `gma-mapper --list-profiles` are also supported.)*
+
+Launch directly into a saved server profile:
+```powershell
+python bin\py_mapper.py --select Liberte
+```
+*(Also supports `-S`, `--profile`, and legacy `-select` / `-profile`. Pass `-f path\to\preferences.json` or `--config` to use a custom preferences file.)*
 
 ### Opening an existing `.map` file:
 ```powershell
@@ -137,12 +158,39 @@ You can also launch `gma-mapper-gui.exe`:
 .\.venv\Scripts\gma-mapper-gui.exe
 ```
 
+### Running Side-by-Side with the Legacy Tcl/Tk Mapper:
+`bin/mapper.tcl` remains the legacy Tcl/Tk client (matching `main`), while `bin/py_mapper.py` (Windows / cross-platform) and `bin/py_mapper` (Linux / macOS) launch the Python/PySide6 port. To run both side-by-side in separate terminals for feature comparison:
+
+- **Legacy Tcl/Tk mapper:**
+  ```powershell
+  C:\Users\mbutry\Documents\GMA\gma-mapper\bin\mapper.tcl --select Liberte
+  ```
+- **Python / PySide6 mapper:**
+  ```powershell
+  C:\Users\mbutry\Documents\GMA\gma-mapper\bin\py_mapper.py --select Liberte
+  ```
+  *(Use `python bin\py_mapper.py --select Liberte` if `.py` files are not associated with Python, or `./bin/py_mapper --select Liberte` on Linux/macOS.)*
+
+> **Note on shared preferences:** Both clients read the same default `preferences.json`, so your saved server profiles work in both. If you intend to modify Preferences while both clients are open simultaneously, pass `-f path\to\preferences-copy.json` to `py_mapper.py` so they do not overwrite each other's saved settings.
+
 ---
 
 ## 8. Direct Invocation Shortcut
 
-Once set up, you do not need to activate the virtual environment each time; you can invoke the executable directly:
+Once `.venv` is set up, you do not need to activate the virtual environment each time. The repository launchers (`bin\py_mapper.py` on Windows/cross-platform and `bin/py_mapper` on Linux/macOS) automatically detect and delegate to `.venv`, or you can invoke the installed `.venv` executables directly:
 
 ```powershell
+c:\Users\mbutry\Documents\GMA\gma-mapper\bin\py_mapper.py --select Liberte
+```
+*(Or `python c:\Users\mbutry\Documents\GMA\gma-mapper\bin\py_mapper.py --select Liberte`.)*
+
+On Linux / macOS:
+```bash
+./bin/py_mapper --select Liberte
+```
+
+Installed `.venv` executables on Windows:
+```powershell
 c:\Users\mbutry\Documents\GMA\gma-mapper\.venv\Scripts\gma-mapper.exe
+c:\Users\mbutry\Documents\GMA\gma-mapper\.venv\Scripts\gma-mapper-gui.exe
 ```
