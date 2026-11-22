@@ -236,3 +236,36 @@ def render_html(mtext: str) -> str:
             parts.append(esc)
     return "".join(parts)
 
+
+MARKUP_SYNTAX_HELP_HTML: str = """
+<h2>GMA Markup Syntax</h2>
+<p>The Mapper supports a subset of the GMA Markup formatting codes in chat messages.
+Recipients whose clients do not support markup formatting will not see the codes in their messages.</p>
+
+<h3>Basic Formatting</h3>
+<ul>
+  <li><b>Bold</b>: <code>**bold text**</code></li>
+  <li><b>Italic</b>: <code>//italic text//</code></li>
+  <li><b>Combined Bold &amp; Italic</b>: <code>**//bold italic text//**</code></li>
+</ul>
+
+<h3>Special Characters, Dashes &amp; Quotes</h3>
+<ul>
+  <li><b>Smart quotes</b>: <code>``</code>, <code>''</code>, <code>`</code>, <code>'</code> produce &ldquo;, &rdquo;, &lsquo;, and &rsquo;.</li>
+  <li><b>Dashes &amp; minus</b>: <code>---</code> (&mdash; em dash), <code>--</code> (&ndash; en dash), and <code>-</code><i>digit</i> (&#x2012; minus sign when immediately followed by a digit).</li>
+  <li><b>Multiplication</b>: <code>[x]</code> produces &times;, and <code>x</code> immediately before or after a digit (e.g. <code>x2</code> or <code>2x</code>) converts automatically to &times;2 or 2&times;.</li>
+  <li><b>Superscripts</b>: <code>[0]</code>..<code>[9]</code> produce &deg;, &sup1;, &sup2;, &sup3;, &#x2074;..&#x2079;.</li>
+  <li><b>Fractions</b>: <code>1/2</code> (&frac12;), <code>1/4</code> (&frac14;), <code>3/4</code> (&frac34;); separate from preceding digits with an underscore (e.g. <code>12_1/2</code> &rarr; 12&frac12;, <code>42_1/4</code> &rarr; 42&frac14;, <code>9_3/4</code> &rarr; 9&frac34;).</li>
+  <li><b>Symbols</b>: <code>[S]</code> (&sect;), <code>+/-</code> (&plusmn;), <code>[c]</code> (&copy;), <code>[R]</code> (&reg;), <code>^o</code> (&deg;), <code>[&lt;&lt;]</code> (&laquo;), <code>[&gt;&gt;]</code> (&raquo;), <code>AE</code> (&AElig;), <code>ae</code> (&aelig;), <code>^.</code> (&bull;), <code>[/]</code> (&divide;), <code>[+]</code> (&dagger;), <code>[++]</code> (&Dagger;).</li>
+</ul>
+
+<h3>Escapes, Headings, Links &amp; Lists</h3>
+<ul>
+  <li><b>Escapes</b>: literal <code>\\</code> and <code>|</code> may be written as <code>\\e</code> and <code>\\v</code>; <code>\\.</code> inserts a zero-width separator so adjacent characters are not parsed as markup.</li>
+  <li><b>Section headings</b>: <code>==[Section Title]==</code> and <code>==(Subsection Title)==</code>.</li>
+  <li><b>Hyperlinks</b>: <code>[[link]]</code> or <code>[[link|custom text]]</code> (rendered in italics).</li>
+  <li><b>Lists</b>: lines beginning with <code>@</code> (bulleted) or <code>#</code> (numbered), repeated for nested levels (<code>@@@</code>, <code>###</code>, <code>#@#</code>).</li>
+</ul>
+<p><i>Note: multi-line paragraphs and tables are not supported in chat messages. Requires GMA Mapper 4.29+ and Server 5.27.0+.</i></p>
+""".strip()
+

@@ -42,6 +42,7 @@ from gma_mapper.ui.canvas.items import creature_image_candidates
 from gma_mapper.ui.canvas.scene import CREATURE_GRID_SNAP_CHOICES, BattleMapScene
 from gma_mapper.ui.canvas.view import BattleMapView
 from gma_mapper.ui.dialogs.aka_dialog import SelectAKADialog
+from gma_mapper.ui.dialogs.help_dialogs import AboutMapperDialog, MarkupSyntaxHelpDialog
 from gma_mapper.ui.dialogs.ping_dialog import ServerPingDialog
 from gma_mapper.ui.dialogs.preferences import PreferencesDialog
 from gma_mapper.ui.dialogs.update_check import UpdateCheckDialog
@@ -1482,6 +1483,10 @@ if HAS_PYSIDE6:
             self.delegate_for_menu = play_menu.addMenu("Access Die Rolls &For")
             self._rebuild_delegate_for_menu()
 
+            play_menu.addSeparator()
+            self.server_profile_menu = play_menu.addMenu("Server &Profile")
+            self._rebuild_server_profile_menu()
+
             # 5. Tools Menu (ported from bin/mapper_legacy.tcl lines 1339-1360)
             tools_menu = menubar.addMenu("&Tools")
             self.act_check_updates = QAction("Check for &Updates...", self)
@@ -1559,13 +1564,25 @@ if HAS_PYSIDE6:
 
             # 6. Help Menu
             help_menu = menubar.addMenu("&Help")
-            act_dice_syntax = QAction("&Die Roller Syntax Reference...", self)
-            act_dice_syntax.triggered.connect(self._on_show_dice_syntax_help)
-            help_menu.addAction(act_dice_syntax)
+            self.act_about_mapper = QAction("&About GMA Mapper...", self)
+            self.act_about_mapper.setShortcut(QKeySequence("F1"))
+            self.act_about_mapper.triggered.connect(self._on_show_about_mapper)
+            help_menu.addAction(self.act_about_mapper)
 
-            act_dice_mod_help = QAction("Die Roll &Modifiers Help...", self)
-            act_dice_mod_help.triggered.connect(self._on_show_dice_modifier_help)
-            help_menu.addAction(act_dice_mod_help)
+            help_menu.addSeparator()
+            self.act_dice_syntax = QAction("&Die Roller Syntax...", self)
+            self.act_dice_syntax.setShortcut(QKeySequence("?"))
+            self.act_dice_syntax.triggered.connect(self._on_show_dice_syntax_help)
+            help_menu.addAction(self.act_dice_syntax)
+
+            self.act_dice_mod_help = QAction("Die Roll &Modifiers and Conditions...", self)
+            self.act_dice_mod_help.triggered.connect(self._on_show_dice_modifier_help)
+            help_menu.addAction(self.act_dice_mod_help)
+
+            self.act_markup_syntax = QAction("Text &Markup Syntax...", self)
+            self.act_markup_syntax.setShortcut(QKeySequence("Alt+?"))
+            self.act_markup_syntax.triggered.connect(self._on_show_markup_syntax_help)
+            help_menu.addAction(self.act_markup_syntax)
 
             # 7. Tools Toolbar (ported from bin/mapper_legacy.tcl lines 2835-2880)
             toolbar = QToolBar("Tools", self)
@@ -2512,6 +2529,11 @@ if HAS_PYSIDE6:
             self.net_client.session.query_dice_presets(for_user=for_user)
             dlg.show()
 
+        def _on_show_about_mapper(self) -> AboutMapperDialog:
+            dlg = AboutMapperDialog(self.net_client.session, self)
+            dlg.show()
+            return dlg
+
         def _on_show_dice_syntax_help(self) -> None:
             dlg = DiceSyntaxHelpDialog(self)
             dlg.show()
@@ -2519,6 +2541,102 @@ if HAS_PYSIDE6:
         def _on_show_dice_modifier_help(self) -> None:
             dlg = DiceModifierHelpDialog(self)
             dlg.show()
+
+        def _on_show_markup_syntax_help(self) -> MarkupSyntaxHelpDialog:
+            dlg = MarkupSyntaxHelpDialog(self)
+            dlg.show()
+            return dlg
+
+        def _rebuild_server_profile_menu(self) -> None:
+            if not hasattr(self, "server_profile_menu"):
+                return
+            self.server_profile_menu.clear()
+            prof_group = QActionGroup(self.server_profile_menu)
+            prof_group.setExclusive(True)
+
+            cur_name = str(
+                self.prefs.get("current_profile")
+                or self.prefs.get("current_server")
+                or "offline"
+            )
+            saw_offline = False
+            for prof in self.prefs.get("profiles", []):
+                if not isinstance(prof, dict):
+                    continue
+                name = str(prof.get("name") or "").strip()
+                if not name:
+                    continue
+                if name == "offline":
+                    saw_offline = True
+                safe_name = name.replace("&", "&&")
+                host = str(prof.get("host") or "").strip()
+                port = int(prof.get("port") or 0)
+                label = f"{safe_name} ({host}:{port})" if host and port else f"{safe_name} (offline)"
+                act = QAction(label, self.server_profile_menu)
+                act.setCheckable(True)
+                act.setChecked(name == cur_name)
+                act.triggered.connect(
+                    lambda _c=False, p=name: self.switch_server_profile(p)
+                )
+                prof_group.addAction(act)
+                self.server_profile_menu.addAction(act)
+
+            if not saw_offline:
+                act_off = QAction("Offline", self.server_profile_menu)
+                act_off.setCheckable(True)
+                act_off.setChecked(cur_name == "offline")
+                act_off.triggered.connect(
+                    lambda _c=False: self.switch_server_profile("offline")
+                )
+                prof_group.addAction(act_off)
+                self.server_profile_menu.addAction(act_off)
+
+            self.server_profile_menu.addSeparator()
+            self.act_reconnect_server = QAction(
+                "&Reconnect to Current Server", self.server_profile_menu
+            )
+            self.act_reconnect_server.triggered.connect(self.reconnect_current_server)
+            self.server_profile_menu.addAction(self.act_reconnect_server)
+
+            self.act_disconnect_server = QAction(
+                "&Disconnect (Go Offline)", self.server_profile_menu
+            )
+            self.act_disconnect_server.triggered.connect(self.disconnect_server)
+            self.server_profile_menu.addAction(self.act_disconnect_server)
+
+        def switch_server_profile(self, profile_name: str) -> bool:
+            """Switch active server profile in preferences, persist, and reconnect/hang up."""
+            self.prefs["current_profile"] = profile_name
+            self.prefs["current_server"] = profile_name
+            self.controller.apply_preferences(self.prefs)
+            if self.prefs_path:
+                save_preferences(self.prefs_path, self.prefs)
+            self._rebuild_server_profile_menu()
+            self.net_client.hangup()
+            host, port, _u, _p = self._configured_server_tuple(self.prefs)
+            if host and port:
+                self.connect_to_configured_server()
+            else:
+                self.statusBar().showMessage("Switched to offline profile.")
+            return True
+
+        def reconnect_current_server(self) -> bool:
+            """Drop any active socket and dial the currently configured server profile."""
+            host, port, _u, _p = self._configured_server_tuple(self.prefs)
+            if not (host and port):
+                self.statusBar().showMessage(
+                    "Current profile is offline — no server configured."
+                )
+                return False
+            self.net_client.hangup()
+            self.connect_to_configured_server()
+            return True
+
+        def disconnect_server(self) -> None:
+            """Disconnect from the GMA server and enter offline state."""
+            self.net_client.hangup()
+            self.controller.log_info("Disconnected from server.")
+            self.statusBar().showMessage("Disconnected (offline).")
 
         def _configured_server_tuple(self, prefs: dict[str, Any]) -> tuple[str, int, str, str]:
             prof_name = prefs.get("current_profile") or prefs.get("current_server", "offline")
@@ -2545,6 +2663,7 @@ if HAS_PYSIDE6:
                 self.controller.apply_preferences(self.prefs)
                 self._refresh_toolbar_appearance()
                 self._apply_debug_protocol()
+                self._rebuild_server_profile_menu()
                 if self.prefs_path:
                     save_preferences(self.prefs_path, self.prefs)
                 new_srv = self._configured_server_tuple(self.prefs)

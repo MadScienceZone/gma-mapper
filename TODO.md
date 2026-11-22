@@ -7,7 +7,7 @@
 - [x] **Die-Roll Preset Delegation**:
   - [x] *"Manage Die-Roll Preset Delegates..."* (`DDD`).
   - [x] *"Access Die Rolls For..."* and *"Refresh Die-Roll and Delegate Data from Server"* (`DR`).
-- [ ] **Quick Server Profile Switcher**: Submenu in the Play menu to switch between saved server profiles or reconnect without opening `PreferencesDialog`.
+- [x] **Quick Server Profile Switcher**: Submenu in the Play menu to switch between saved server profiles or reconnect without opening `PreferencesDialog`.
 
 ## 2. Tools Menu (Cache, Chat & Diagnostics)
 - [x] **Top-level Tools Menu**: Add `&Tools` menu to `GMAMapperMainWindow` (including *"Check for Updates..."* currently under Help, if moving/mirroring to match legacy).
@@ -26,8 +26,8 @@
 - [x] Add `clock_dock.toggleViewAction()` (`Alt+Shift+C`; `Alt+C` remains on Play -> Show Initiative Clock), `combat_dock.toggleViewAction()`, and `chat_dock.toggleViewAction()` (`Alt+D`) to the **View** menu so closed dock panels can be easily reopened.
 
 ## 4. Help Menu Reference Dialogs
-- [ ] *"About GMA Mapper..."* (`F1`)
-- [ ] *"Die Roller Syntax..."* (`?`)
+- [x] *"About GMA Mapper..."* (`F1`)
+- [x] *"Die Roller Syntax..."* (`?`)
 - [x] *"Die Modifiers and Conditions..."*
-- [ ] *"Text Markup Syntax..."* (`Alt+?`)
+- [x] *"Text Markup Syntax..."* (`Alt+?`)
 

@@ -40,6 +40,7 @@ from gma_mapper.core.file_io import (
     save_to_file,
 )
 from gma_mapper.core.minimarkup import (
+    MARKUP_SYNTAX_HELP_HTML,
     render as render_minimarkup,
     render_html as render_minimarkup_html,
     strip as strip_minimarkup,
@@ -66,6 +67,7 @@ __all__ = [
     "DICE_MODIFIER_HELP_TEXT",
     "DICE_SYNTAX_HELP_SECTIONS",
     "DicePresetBank",
+    "MARKUP_SYNTAX_HELP_HTML",
     "RollStatCollector",
     "SizeParams",
     "add_to_die_roll_title",

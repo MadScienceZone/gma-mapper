@@ -1016,6 +1016,138 @@ class TestPanelsAndCLI(unittest.TestCase):
         finally:
             win.close()
 
+    def test_profile_switcher_and_help_reference_dialogs(self) -> None:
+        import os
+        from unittest.mock import MagicMock
+
+        from gma_mapper.core.minimarkup import MARKUP_SYNTAX_HELP_HTML
+        from gma_mapper.net.client import ProtocolSession
+        from gma_mapper.ui.dialogs.help_dialogs import format_about_mapper_info
+
+        # 1. format_about_mapper_info across all 4 connection states
+        msg_off, detail_off = format_about_mapper_info(None)
+        self.assertIn("GMA VTT Mapper Client", msg_off)
+        self.assertEqual(detail_off, "This mapper is running offline.")
+
+        sess = ProtocolSession()
+        sess.host = "gma.example.org"
+        sess.port = 2325
+        sess.username = "Valeros"
+        _, detail_disc = format_about_mapper_info(sess)
+        self.assertIn("has not yet connected", detail_disc)
+
+        sess.is_connected = True
+        sess.pending_login = True
+        _, detail_neg = format_about_mapper_info(sess)
+        self.assertIn("negotiating its connection", detail_neg)
+
+        sess.pending_login = False
+        sess.server_version = "5.31.0"
+        sess.protocol = 428
+        _, detail_ready = format_about_mapper_info(sess)
+        self.assertIn("Connected to gma.example.org:2325 as Valeros", detail_ready)
+        self.assertIn("5.31.0", detail_ready)
+
+        # 2. Markup syntax reference content
+        for token in ("**", "//", "==[", "[[", "12_1/2"):
+            self.assertIn(token, MARKUP_SYNTAX_HELP_HTML)
+
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        try:
+            from PySide6.QtGui import QKeySequence
+            from PySide6.QtWidgets import QApplication
+            from gma_mapper.ui.dialogs.help_dialogs import (
+                AboutMapperDialog,
+                MarkupSyntaxHelpDialog,
+            )
+            from gma_mapper.ui.main_window import GMAMapperMainWindow
+        except ImportError:
+            self.skipTest("PySide6 not available")
+
+        _app = QApplication.instance() or QApplication([])
+
+        about_dlg = AboutMapperDialog(sess)
+        self.assertEqual(about_dlg.windowTitle(), "About GMA Mapper")
+        self.assertIn("Valeros", about_dlg.connection_label.text())
+        about_dlg.close()
+
+        markup_dlg = MarkupSyntaxHelpDialog()
+        self.assertEqual(markup_dlg.windowTitle(), "Markup Syntax Information")
+        self.assertIn("GMA Markup Syntax", markup_dlg.browser.toPlainText())
+        markup_dlg.close()
+
+        prefs = default_preferences()
+        prefs["profiles"] = [
+            {"name": "offline", "host": "", "port": 2323},
+            {"name": "Home", "host": "home.example.org", "port": 2323, "username": "Alice", "password": "pw1"},
+            {"name": "GameNight", "host": "game.example.org", "port": 2325, "username": "Bob", "password": "pw2"},
+        ]
+        prefs["current_profile"] = "Home"
+        prefs["current_server"] = "Home"
+
+        win = GMAMapperMainWindow(prefs=prefs)
+        open_about = None
+        open_markup = None
+        try:
+            # 3. Help menu shortcuts & actions
+            self.assertEqual(win.act_about_mapper.shortcut(), QKeySequence("F1"))
+            self.assertEqual(win.act_dice_syntax.shortcut(), QKeySequence("?"))
+            self.assertEqual(win.act_markup_syntax.shortcut(), QKeySequence("Alt+?"))
+            open_about = win._on_show_about_mapper()
+            open_markup = win._on_show_markup_syntax_help()
+            self.assertEqual(open_about.windowTitle(), "About GMA Mapper")
+            self.assertEqual(open_markup.windowTitle(), "Markup Syntax Information")
+
+            # 4. Quick Server Profile Switcher submenu & switching/reconnect/disconnect
+            prof_texts = [a.text() for a in win.server_profile_menu.actions() if not a.isSeparator()]
+            self.assertTrue(any("Home (home.example.org:2323)" in t for t in prof_texts))
+            self.assertTrue(any("GameNight (game.example.org:2325)" in t for t in prof_texts))
+            self.assertIn("&Reconnect to Current Server", prof_texts)
+            self.assertIn("&Disconnect (Go Offline)", prof_texts)
+
+            win.net_client.dial = MagicMock()
+            win.net_client.hangup = MagicMock()
+
+            self.assertTrue(win.switch_server_profile("GameNight"))
+            self.assertEqual(win.prefs["current_profile"], "GameNight")
+            self.assertEqual(win.prefs["current_server"], "GameNight")
+            win.net_client.hangup.assert_called_once()
+            win.net_client.dial.assert_called_once()
+            self.assertEqual(win.net_client.dial.call_args.kwargs["host"], "game.example.org")
+            self.assertEqual(win.net_client.dial.call_args.kwargs["port"], 2325)
+
+            gn_actions = [
+                a for a in win.server_profile_menu.actions()
+                if "GameNight" in a.text()
+            ]
+            self.assertEqual(len(gn_actions), 1)
+            self.assertTrue(gn_actions[0].isChecked())
+
+            win.net_client.dial.reset_mock()
+            win.net_client.hangup.reset_mock()
+            self.assertTrue(win.reconnect_current_server())
+            win.net_client.hangup.assert_called_once()
+            win.net_client.dial.assert_called_once()
+
+            win.net_client.dial.reset_mock()
+            win.net_client.hangup.reset_mock()
+            win.disconnect_server()
+            win.net_client.hangup.assert_called_once()
+            win.net_client.dial.assert_not_called()
+
+            win.net_client.dial.reset_mock()
+            win.net_client.hangup.reset_mock()
+            self.assertTrue(win.switch_server_profile("offline"))
+            win.net_client.hangup.assert_called_once()
+            win.net_client.dial.assert_not_called()
+            self.assertFalse(win.reconnect_current_server())
+        finally:
+            if open_about is not None:
+                open_about.close()
+            if open_markup is not None:
+                open_markup.close()
+            win.close()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -12,11 +12,17 @@ from .dice_dialogs import (
     QuickSavePresetDialog,
     validate_and_sort_table_rows,
 )
+from .help_dialogs import (
+    AboutMapperDialog,
+    MarkupSyntaxHelpDialog,
+    format_about_mapper_info,
+)
 from .ping_dialog import ServerPingDialog, compute_ping_metrics, parse_rfc3339_seconds
 from .preferences import PreferencesDialog
 from .update_check import UpdateCheckDialog, verify_and_unpack_update
 
 __all__ = [
+    "AboutMapperDialog",
     "DiceModifierHelpDialog",
     "DiceSyntaxHelpDialog",
     "EditColorBoxTitleDialog",
@@ -24,12 +30,14 @@ __all__ = [
     "EditLookupTableDialog",
     "EditPresetGroupDialog",
     "ManageDelegatesDialog",
+    "MarkupSyntaxHelpDialog",
     "PreferencesDialog",
     "QuickSavePresetDialog",
     "SelectAKADialog",
     "ServerPingDialog",
     "UpdateCheckDialog",
     "compute_ping_metrics",
+    "format_about_mapper_info",
     "parse_custom_aka_names",
     "parse_rfc3339_seconds",
     "validate_and_sort_table_rows",
