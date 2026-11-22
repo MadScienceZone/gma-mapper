@@ -31,7 +31,7 @@ class AnimatedTileRecord:
         if next_f >= self.frames:
             next_f = 0
             self.current_loop += 1
-            if self.loops > 0 and self.current_loop >= self.loops:
+            if 0 < self.loops <= self.current_loop:
                 self.running = False
                 return False
         self.current_frame = next_f

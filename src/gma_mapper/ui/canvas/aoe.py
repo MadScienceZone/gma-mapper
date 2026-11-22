@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from collections import deque
 import math
-from typing import Any, Callable
+from typing import Any
 
 from gma_mapper.core.zones import creature_displayed_size, monster_size_value
 
@@ -61,13 +61,11 @@ def _segment_intersects_rect(
             if pi < 0.0:
                 if t > u2:
                     return False
-                if t > u1:
-                    u1 = t
+                u1 = max(u1, t)
             else:
                 if t < u1:
                     return False
-                if t < u2:
-                    u2 = t
+                u2 = min(u2, t)
     return u1 <= u2
 
 
@@ -310,7 +308,7 @@ def compute_aoe_grids(
             for dg_y in range(-radius_grids, 0):
                 x = dg_x * grid_scale
                 y = dg_y * grid_scale
-                if (x < 0 and x >= y) or (x >= 0 and x < -y):
+                if (y <= x < 0) or (0 <= x < -y):
                     if _segment_overlaps_pie_slice(
                         x0 + x + fuzz, y0 + y, x0 + x + grid_scale - fuzz, y0 + y, x0, y0, r, theta0
                     ):
@@ -320,7 +318,7 @@ def compute_aoe_grids(
             for dg_y in range(-radius_grids, radius_grids):
                 x = dg_x * grid_scale
                 y = dg_y * grid_scale
-                if (y < 0 and y >= x) or (y >= 0 and y < -x):
+                if (x <= y < 0) or (0 <= y < -x):
                     if _segment_overlaps_pie_slice(
                         x0 + x, y0 + y + fuzz, x0 + x, y0 + y + grid_scale - fuzz, x0, y0, r, theta0
                     ):
@@ -330,7 +328,7 @@ def compute_aoe_grids(
             for dg_y in range(0, radius_grids):
                 x = dg_x * grid_scale
                 y = dg_y * grid_scale
-                if (x < 0 and -x - grid_scale <= y) or (x >= 0 and x <= y):
+                if (x < 0 and -x - grid_scale <= y) or (0 <= x <= y):
                     if _segment_overlaps_pie_slice(
                         x0 + x + fuzz,
                         y0 + y + grid_scale,
@@ -347,7 +345,7 @@ def compute_aoe_grids(
             for dg_y in range(-radius_grids, radius_grids):
                 x = dg_x * grid_scale
                 y = dg_y * grid_scale
-                if (y < 0 and x >= -y - grid_scale) or (y >= 0 and x >= y):
+                if (y < 0 and x >= -y - grid_scale) or (0 <= y <= x):
                     if _segment_overlaps_pie_slice(
                         x0 + x + grid_scale,
                         y0 + y + fuzz,

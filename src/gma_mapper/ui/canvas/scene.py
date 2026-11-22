@@ -9,7 +9,7 @@ import math
 from typing import Any
 
 from gma_mapper.core.colors import color_to_hex
-from gma_mapper.core.util import letter_label, letter_label_to_grid_xy
+from gma_mapper.core.util import letter_label
 from gma_mapper.core.zones import creature_displayed_size, monster_size_value
 from gma_mapper.ui.canvas.items import (
     BASE_GRID_SCALE,
@@ -176,7 +176,6 @@ try:
     from PySide6.QtGui import QBrush, QColor, QFont, QPainter, QPen, QPixmap, QPolygonF
     from PySide6.QtWidgets import (
         QGraphicsEllipseItem,
-        QGraphicsLineItem,
         QGraphicsPolygonItem,
         QGraphicsScene,
     )
@@ -236,7 +235,7 @@ try:
             item = self.elements.get("AOE_GLOBAL_BOUND")
             if item is None or item.data.get("Hidden"):
                 return []
-            pts = item._all_points()
+            pts = item.all_points()
             segs: list[tuple[float, float, float, float]] = []
             for i in range(len(pts) - 1):
                 segs.append((pts[i].x(), pts[i].y(), pts[i + 1].x(), pts[i + 1].y()))
@@ -294,7 +293,7 @@ try:
             for cid, tok in self.creatures.items():
                 if not tok.isVisible():
                     continue
-                mob_size, _, _, _, _ = tok._area_info()
+                mob_size, _, _, _, _ = tok.area_info()
                 s = max(0.5, mob_size) * BASE_GRID_SCALE
                 x0 = tok.gx * BASE_GRID_SCALE
                 y0 = tok.gy * BASE_GRID_SCALE
@@ -642,7 +641,7 @@ try:
             if src_id and src_id in self.creatures:
                 stok = self.creatures[src_id]
                 if not stok.data.get("Hidden"):
-                    ssz, _, _, _, _ = stok._area_info()
+                    ssz, _, _, _, _ = stok.area_info()
                     srect = self.addRect(
                         stok.gx * BASE_GRID_SCALE,
                         stok.gy * BASE_GRID_SCALE,
@@ -662,7 +661,7 @@ try:
                 targets = tok.data.get("Targets") or []
                 if not targets:
                     continue
-                src_size, _, _, _, _ = tok._area_info()
+                src_size, _, _, _, _ = tok.area_info()
                 sx = (tok.gx + src_size / 2.0) * BASE_GRID_SCALE
                 sy = (tok.gy + src_size / 2.0) * BASE_GRID_SCALE
                 is_primary = (cid == src_id) or tok.is_active_turn
@@ -672,7 +671,7 @@ try:
                     ttok = self.creatures.get(tid)
                     if not ttok or ttok.data.get("Hidden"):
                         continue
-                    tsize, _, _, _, _ = ttok._area_info()
+                    tsize, _, _, _, _ = ttok.area_info()
                     tx = (ttok.gx + tsize / 2.0) * BASE_GRID_SCALE
                     ty = (ttok.gy + tsize / 2.0) * BASE_GRID_SCALE
                     ring = self.addEllipse(
@@ -764,6 +763,7 @@ except ImportError:
         """Headless fallback scene when PySide6 is not installed."""
 
         def __init__(self, parent: Any = None) -> None:
+            self.parent = parent
             self.elements: dict[str, _HeadlessItem] = {}
             self.element_types: dict[str, str] = {}
             self.creatures: dict[str, _HeadlessItem] = {}

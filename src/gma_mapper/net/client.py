@@ -14,13 +14,11 @@ from gma_mapper.core.util import my_arch, my_os, my_platform
 from gma_mapper.net.protocol import (
     ALL_MESSAGES,
     MAX_MAX_PROTOCOL,
-    MAX_PROTOCOL,
     MIN_PROTOCOL,
     PROTOCOL,
     BatchCollector,
     _attribute_encode,
     _parse_data_packet,
-    _protocol_encode,
     auth_response,
     encode_with_batching,
     new_id,
@@ -245,20 +243,7 @@ class ProtocolSession:
                     },
                 )
         elif cmd == "UPDATES":
-            for pkg in params.get("Packages", []):
-                if pkg.get("Name") != "mapper":
-                    continue
-                for inst in pkg.get("Instances", []):
-                    inst_os = inst.get("OS", "")
-                    inst_arch = inst.get("Arch", "")
-                    if inst_os in ("", my_os()) and inst_arch in ("", my_arch()):
-                        if self._update_ready:
-                            if (inst_os and not self._update_ready.get("OS")) or (
-                                inst_arch and not self._update_ready.get("Arch")
-                            ):
-                                self._update_ready = inst
-                        else:
-                            self._update_ready = inst
+            self._handle_updates_packet(params)
         elif cmd == "READY":
             self.pending_login = False
             self._redirect_count = 0
@@ -270,6 +255,21 @@ class ProtocolSession:
                 self.upgrade_cb(self._update_ready)
             if self.login_success_cb:
                 self.login_success_cb()
+
+    def _handle_updates_packet(self, params: dict[str, Any]) -> None:
+        for pkg in params.get("Packages", []):
+            if pkg.get("Name") != "mapper":
+                continue
+            for inst in pkg.get("Instances", []):
+                inst_os = inst.get("OS", "")
+                inst_arch = inst.get("Arch", "")
+                if inst_os not in ("", my_os()) or inst_arch not in ("", my_arch()):
+                    continue
+                if not self._update_ready or (
+                    (inst_os and not self._update_ready.get("OS"))
+                    or (inst_arch and not self._update_ready.get("Arch"))
+                ):
+                    self._update_ready = inst
 
     def _apply_redirect(self, params: Any) -> None:
         newhost = str(params.get("Host", "")).strip()
@@ -363,6 +363,7 @@ class ProtocolSession:
         markup: bool = False,
         pinned: bool = False,
     ) -> None:
+        _ = sender
         self.send_command(
             "TO",
             {
@@ -646,11 +647,11 @@ try:
 
             self.session = ProtocolSession(
                 send_line_cb=self._write_line,
-                dispatch_cb=lambda cmd, params: self.command_received.emit(cmd, params),
-                progress_cb=lambda msg: self.progress_message.emit(msg),
-                notice_cb=lambda msg: self.server_notice.emit(msg),
-                upgrade_cb=lambda inst: self.upgrade_available.emit(inst),
-                login_success_cb=lambda: self.login_successful.emit(),
+                dispatch_cb=self.command_received.emit,
+                progress_cb=self.progress_message.emit,
+                notice_cb=self.server_notice.emit,
+                upgrade_cb=self.upgrade_available.emit,
+                login_success_cb=self.login_successful.emit,
                 redirect_cb=self._on_redirect,
             )
 
@@ -765,7 +766,7 @@ try:
                     self.progress_message.emit(str(exc))
                     self.hangup()
                     return
-                except Exception as exc:
+                except Exception as exc:  # pylint: disable=broad-exception-caught
                     self.progress_message.emit(str(exc))
 
         def _on_disconnected(self) -> None:
@@ -793,7 +794,7 @@ try:
         def _on_redial_timeout(self) -> None:
             self.redial()
 
-        def _on_redirect(self, newhost: str, newport: int, _reason: str) -> None:
+        def _on_redirect(self, _newhost: str, _newport: int, _reason: str) -> None:
             self.redial()
 
 except ImportError:

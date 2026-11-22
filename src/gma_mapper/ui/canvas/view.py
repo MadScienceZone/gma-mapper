@@ -47,7 +47,6 @@ try:
     from PySide6.QtCore import QLineF, QPointF, QRectF, Qt, Signal
     from PySide6.QtGui import (
         QColor,
-        QCursor,
         QFont,
         QKeyEvent,
         QMouseEvent,
@@ -308,7 +307,7 @@ try:
             tok = self.map_scene.creatures.get(mob_id)
             if tok is None or not tok.isVisible():
                 return
-            sx, sy = tok._center_scene_xy()
+            sx, sy = tok.center_scene_xy()
             self.ensure_scene_xy_visible(sx, sy)
 
         def refresh_display(self) -> None:
@@ -321,7 +320,7 @@ try:
         def _next_element_z(self) -> int:
             for item in self.map_scene.elements.values():
                 z = int(float(item.data.get("Z", 0) or 0))
-                if z < 500_000_000 and z >= self._next_z:
+                if self._next_z <= z < 500_000_000:
                     self._next_z = z + 1
             self._next_z += 1
             return self._next_z + (999_999_999 if self.force_elements_to_top else 0)
@@ -540,7 +539,7 @@ try:
                 on_mutate_mob=self._mutate_mob,
                 on_remove_mob=self._remove_mob,
                 on_spawn_mob=self._spawn_mob,
-                on_hp_request=lambda req: self.hp_request_sent.emit(req),
+                on_hp_request=self.hp_request_sent.emit,
                 pc_templates=pc_tpls,
             )
             menu.exec(global_pos)
@@ -1308,7 +1307,7 @@ try:
                         self.map_scene.refresh_targets()
                         self.token_dragged.emit(tok.mob_id, snap_gx, snap_gy)
                     else:
-                        tok._sync_position()
+                        tok.sync_position()
                 event.accept()
                 return
 

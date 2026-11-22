@@ -19,7 +19,6 @@ import base64
 import gzip
 import hashlib
 import hmac
-import io
 import os
 import platform
 import re
@@ -134,7 +133,7 @@ def verify(data: bytes, signature: bytes, public_key_pem: str = PUBLIC_KEY_PEM) 
             if hmac.compare_digest(em, expected_em):
                 return True
         return False
-    except Exception:
+    except Exception:  # pylint: disable=broad-exception-caught
         return False
 
 
@@ -443,7 +442,7 @@ def _ustar_parse_header(stream: BinaryIO) -> UstarEntry | None:
     cblock = block[:148] + b"        " + block[156:]
     usum = sum(cblock)
     ssum = sum((b - 256 if b >= 128 else b) for b in cblock)
-    if usum != chk and ssum != chk:
+    if chk not in (usum, ssum):
         raise ValueError(f"ustar._parse_header: bad checksum ({chk} in header; u={usum} s={ssum})")
 
     if magic == "ustar":

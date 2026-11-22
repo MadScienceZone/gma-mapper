@@ -216,7 +216,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             prefs = load_preferences(prefs_file)
         else:
             prefs = default_preferences()
-    except Exception:
+    except Exception:  # pylint: disable=broad-exception-caught
         prefs = default_preferences()
 
     if opts.list_profiles:
@@ -249,12 +249,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             ctypes.windll.user32.ShowWindow(hwnd, 5)  # SW_SHOW
             ctypes.windll.user32.SetForegroundWindow(hwnd)
             print(f"[gma-mapper] Window shown (hwnd={hwnd})", flush=True)
-        except Exception as exc:
+        except Exception as exc:  # pylint: disable=broad-exception-caught
             print(f"[gma-mapper] Window show warning: {exc}", flush=True)
-    QTimer_connect = getattr(win, "connect_to_configured_server", None)
-    if QTimer_connect:
-        from PySide6.QtCore import QTimer
-        QTimer.singleShot(100, win.connect_to_configured_server)
+    from PySide6.QtCore import QTimer
+    QTimer.singleShot(100, win.connect_to_configured_server)
     return app.exec()
 
 

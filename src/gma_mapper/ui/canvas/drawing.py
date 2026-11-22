@@ -141,7 +141,7 @@ def compute_nudge_z(
 
     max_z: int | None = None
     min_z: int | None = None
-    for oid, d in elements_data.items():
+    for _oid, d in elements_data.items():
         z = int(d.get("Z", 0) or 0)
         if max_z is None or min_z is None:
             min_z = z

@@ -506,7 +506,6 @@ class DicePresetBank:
         for raw in combined:
             is_sys = bool(raw.get("Global", False))
             raw_name = str(raw.get("Name", "") or "")
-            raw_desc = str(raw.get("Description", "") or "")
             raw_spec = str(raw.get("DieRollSpec", "") or "")
 
             details = get_preset_details(raw)
@@ -1440,10 +1439,7 @@ def render_roll_components_html(
             ctype = "default"
             cval = str(item)
 
-        if ctype in SYMBOLS:
-            cval_str = SYMBOLS[ctype]
-        else:
-            cval_str = str(cval)
+        cval_str = SYMBOLS.get(ctype, str(cval))
 
         if "\u2016" in cval_str or "\u2261" in cval_str:
             blocks = parse_color_blocks(cval_str)

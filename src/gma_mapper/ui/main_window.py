@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-import sys
 from typing import Any, Callable
 
 from gma_mapper import GMAMapperVersion
@@ -14,7 +13,6 @@ from gma_mapper.core.file_io import (
     DATA_PAYLOAD,
     load_from_file,
     save_to_file,
-    load_dice_presets_from_file,
     save_dice_presets_to_file,
 )
 from gma_mapper.core.profile import (
@@ -56,10 +54,8 @@ from gma_mapper.ui.panels.clock import (
     GolarionCalendar,
     InitiativeClockPanel,
     PlayerClockWindow,
-    strip_nameplate_prefix,
 )
 from gma_mapper.ui.panels.combat import (
-    CombatantState,
     CombatPanel,
     apply_local_hp_adjustment,
     combatant_state_from_token_data,
@@ -123,7 +119,7 @@ class MapperController:
             prefs=self.prefs,
             shared_gvar_state=self.shared_gvar_state,
         )
-        self.chat_panel.target_context_provider = self._target_context_snapshot
+        self.chat_panel.target_context_provider = self.target_context_snapshot
         self.banks_by_tkey: dict[str, DicePresetBank] = {"": self.chat_panel.bank}
         self.delegated_panels: dict[str, ChatDicePanel] = {}
         self.delegates: list[str] = []
@@ -208,7 +204,7 @@ class MapperController:
                 return False
         return True
 
-    def _target_context_snapshot(
+    def target_context_snapshot(
         self,
     ) -> tuple[list[str], dict[str, dict[str, Any]], dict[str, str]]:
         """Return `(my_names, mobs_by_id, mobs_by_name)` from active battle-map tokens."""
@@ -227,6 +223,8 @@ class MapperController:
             if not names and self.chat_panel.local_user:
                 names = [self.chat_panel.local_user]
         return (names, mobs_by_id, mobs_by_name)
+
+    _target_context_snapshot = target_context_snapshot
 
     def refresh_clocks(self) -> None:
         """Refresh both the GM clock dock and the standalone player Game Clock window if open."""
@@ -343,7 +341,7 @@ class MapperController:
             self.cache.curl_server = url
         return url
 
-    def _ensure_pixmap_loaded(self, image_name: str, zoom: float = 1.0) -> None:
+    def ensure_pixmap_loaded(self, image_name: str, zoom: float = 1.0) -> None:
         if not image_name:
             return
         if hasattr(self.scene, "get_pixmap") and self.scene.get_pixmap(image_name) is not None:
@@ -356,12 +354,14 @@ class MapperController:
                     if not pm.isNull():
                         self.scene.register_pixmap(image_name, pm)
                         return
-            except Exception:
+            except Exception:  # pylint: disable=broad-exception-caught
                 pass
         if self.query_image_cb:
             self.query_image_cb(image_name, zoom)
 
-    def _ensure_creature_images_loaded(self, creature_data: dict[str, Any], zoom: float = 1.0) -> None:
+    _ensure_pixmap_loaded = ensure_pixmap_loaded
+
+    def ensure_creature_images_loaded(self, creature_data: dict[str, Any], zoom: float = 1.0) -> None:
         candidates = creature_image_candidates(creature_data)
         if not candidates:
             return
@@ -377,12 +377,14 @@ class MapperController:
                         if not pm.isNull():
                             self.scene.register_pixmap(cand, pm)
                             return
-                except Exception:
+                except Exception:  # pylint: disable=broad-exception-caught
                     pass
         # Otherwise query the primary prefixed candidate (e.g. '#Name') and fallback
         for cand in candidates[:2]:
             if self.query_image_cb:
                 self.query_image_cb(cand, zoom)
+
+    _ensure_creature_images_loaded = ensure_creature_images_loaded
 
     @staticmethod
     def _read_map_records(
@@ -419,12 +421,12 @@ class MapperController:
             if oid:
                 self.scene.add_or_update_element(oid, gtype, el)
                 if gtype in ("LS-TILE", "TILE"):
-                    self._ensure_pixmap_loaded(str(el.get("Image", "")), 1.0)
+                    self.ensure_pixmap_loaded(str(el.get("Image", "")), 1.0)
         for cr in creatures:
             oid = str(cr.get("ID", cr.get("Name", "")))
             if oid:
                 self.scene.add_or_update_token(oid, cr)
-                self._ensure_creature_images_loaded(cr, 1.0)
+                self.ensure_creature_images_loaded(cr, 1.0)
                 self.combat_panel.update_combatant(combatant_state_from_token_data(oid, cr))
 
     def unload_map_file(self, local_map: str | Path) -> list[str]:
@@ -460,12 +462,14 @@ class MapperController:
         save_to_file(path, (dict(meta or {}), objlist))
         return len(objlist)
 
-    def _sync_token_to_combat_panel(self, obj_id: str) -> None:
+    def sync_token_to_combat_panel(self, obj_id: str) -> None:
         if obj_id in self.scene.tokens:
             td = self.scene.tokens[obj_id].data
             self.combat_panel.update_combatant(combatant_state_from_token_data(obj_id, td))
 
-    def _update_ondeck_and_audio(self) -> None:
+    _sync_token_to_combat_panel = sync_token_to_combat_panel
+
+    def update_ondeck_and_audio(self) -> None:
         prev = self.calendar.ondeck_status
         if self.im_not_playing:
             names: list[str] = []
@@ -477,6 +481,103 @@ class MapperController:
         new_status = self.calendar.compute_ondeck_status(names)
         if new_status in (0, 1, 2) and new_status != prev:
             self.audio.play_ondeck(new_status)
+
+    _update_ondeck_and_audio = update_ondeck_and_audio
+
+    def _handle_conn_command(self, payload: dict[str, Any]) -> None:
+        peers = payload.get("PeerList") or []
+        if not isinstance(peers, list):
+            return
+        self.peer_aka.clear()
+        self.peer_not_playing.clear()
+        new_peer_names: list[str] = []
+        for peer in peers:
+            if not isinstance(peer, dict):
+                continue
+            user = str(peer.get("User") or "")
+            aka = peer.get("AKA") or []
+            aka_list = (
+                [str(n).strip() for n in aka if str(n).strip()]
+                if isinstance(aka, list)
+                else []
+            )
+            not_playing = bool(peer.get("NotPlaying", False))
+            if peer.get("IsMe"):
+                if user:
+                    self.chat_panel.set_identity(user)
+                    if self.identity_changed_cb:
+                        self.identity_changed_cb(user, self.chat_panel.is_gm)
+                self.apply_local_aka(aka_list, not_playing=not_playing)
+                continue
+            if user:
+                new_peer_names.append(user)
+                self.peer_aka[user] = aka_list
+                self.peer_not_playing[user] = not_playing
+            if not not_playing:
+                new_peer_names.extend(aka_list)
+        clean_peers = sorted({p for p in new_peer_names if p})
+        if bool(self.prefs.get("notify_peers", False)) and self.peer_names:
+            joined = sorted(set(clean_peers) - set(self.peer_names))
+            left = sorted(set(self.peer_names) - set(clean_peers))
+            for p in joined:
+                self.chat_panel.append_notice(f"{p} connected.")
+            for p in left:
+                self.chat_panel.append_notice(f"{p} disconnected.")
+        self.peer_names = clean_peers
+        self.chat_panel.update_peer_list(clean_peers)
+
+    def _handle_ai_command(self, payload: dict[str, Any]) -> None:
+        name = str(payload.get("Name", ""))
+        sizes = payload.get("Sizes", [])
+        url_base = self.current_url_base()
+        if not (name and sizes and url_base and HAS_PYSIDE6):
+            return
+        for sz in sizes:
+            file_id = str(sz.get("File", ""))
+            zoom = float(sz.get("Zoom", 1.0) or 1.0)
+            if not file_id or sz.get("IsLocalFile"):
+                continue
+            if self.async_fetch_image_cb:
+                self.async_fetch_image_cb(name, zoom, file_id, url_base)
+                continue
+            try:
+                local_img = self.cache.fetch_image(name, zoom, file_id)
+                if local_img and Path(local_img).is_file():
+                    pm = QPixmap(str(local_img))
+                    if not pm.isNull() and hasattr(self.scene, "register_pixmap"):
+                        self.scene.register_pixmap(name, pm)
+                        break
+            except Exception:  # pylint: disable=broad-exception-caught
+                pass
+
+    def _handle_oa_list_delta(self, payload: dict[str, Any], add_mode: bool) -> None:
+        obj_id = str(payload.get("ObjID", payload.get("ID", payload.get("Target", ""))))
+        attr_name = payload.get("AttrName")
+        values = payload.get("Values")
+        scene_method = "add_object_attribute_values" if add_mode else "remove_object_attribute_values"
+        if attr_name and isinstance(values, list) and hasattr(self.scene, scene_method):
+            getattr(self.scene, scene_method)(obj_id, str(attr_name), values)
+            self.sync_token_to_combat_panel(obj_id)
+            return
+        attrs = (
+            {str(attr_name): values}
+            if attr_name and isinstance(values, list)
+            else payload.get("Attributes", payload)
+        )
+        if obj_id not in self.scene.tokens or not isinstance(attrs, dict):
+            self.sync_token_to_combat_panel(obj_id)
+            return
+        tok = self.scene.tokens[obj_id]
+        for k, v in attrs.items():
+            if not isinstance(v, list):
+                continue
+            if add_mode:
+                cur = list(tok.data.get(k, []))
+                cur.extend(item for item in v if item not in cur)
+                tok.data[k] = cur
+            else:
+                tok.data[k] = [x for x in tok.data.get(k, []) if x not in v]
+        self.sync_token_to_combat_panel(obj_id)
 
     def dispatch_command(self, cmd: str, payload: dict[str, Any]) -> None:
         """Route a parsed server protocol command (`cmd`, `payload`) to the appropriate subsystem."""
@@ -508,51 +609,14 @@ class MapperController:
                 self.peer_aka[user] = clean_names
                 self.peer_not_playing[user] = not_playing
         elif cmd == "CONN":
-            peers = payload.get("PeerList") or []
-            if isinstance(peers, list):
-                self.peer_aka.clear()
-                self.peer_not_playing.clear()
-                new_peer_names: list[str] = []
-                for peer in peers:
-                    if isinstance(peer, dict):
-                        user = str(peer.get("User") or "")
-                        aka = peer.get("AKA") or []
-                        aka_list = (
-                            [str(n).strip() for n in aka if str(n).strip()]
-                            if isinstance(aka, list)
-                            else []
-                        )
-                        not_playing = bool(peer.get("NotPlaying", False))
-                        if peer.get("IsMe"):
-                            if user:
-                                self.chat_panel.set_identity(user)
-                                if self.identity_changed_cb:
-                                    self.identity_changed_cb(user, self.chat_panel.is_gm)
-                            self.apply_local_aka(aka_list, not_playing=not_playing)
-                        else:
-                            if user:
-                                new_peer_names.append(user)
-                                self.peer_aka[user] = aka_list
-                                self.peer_not_playing[user] = not_playing
-                            if not not_playing:
-                                new_peer_names.extend(aka_list)
-                clean_peers = sorted({p for p in new_peer_names if p})
-                if bool(self.prefs.get("notify_peers", False)) and self.peer_names:
-                    joined = sorted(set(clean_peers) - set(self.peer_names))
-                    left = sorted(set(self.peer_names) - set(clean_peers))
-                    for p in joined:
-                        self.chat_panel.append_notice(f"{p} connected.")
-                    for p in left:
-                        self.chat_panel.append_notice(f"{p} disconnected.")
-                self.peer_names = clean_peers
-                self.chat_panel.update_peer_list(clean_peers)
+            self._handle_conn_command(payload)
         elif cmd in ("LS-ARC", "LS-CIRC", "LS-LINE", "LS-POLY", "LS-RECT", "LS-SAO", "LS-SAOE", "LS-TEXT", "LS-TILE"):
             obj_id = str(payload.get("ID", ""))
             if obj_id:
                 self.scene.add_or_update_element(obj_id, cmd, payload)
                 if cmd == "LS-TILE":
                     img_name = str(payload.get("Image", payload.get("File", "")))
-                    self._ensure_pixmap_loaded(img_name, 1.0)
+                    self.ensure_pixmap_loaded(img_name, 1.0)
         elif cmd == "AC":
             obj_id = str(payload.get("ID", payload.get("Name", "")))
             if obj_id:
@@ -571,29 +635,10 @@ class MapperController:
             obj_id = str(payload.get("ID", payload.get("Name", "")))
             if obj_id:
                 self.scene.add_or_update_token(obj_id, payload)
-                self._ensure_creature_images_loaded(payload, 1.0)
+                self.ensure_creature_images_loaded(payload, 1.0)
                 self.combat_panel.update_combatant(combatant_state_from_token_data(obj_id, payload))
         elif cmd == "AI":
-            name = str(payload.get("Name", ""))
-            sizes = payload.get("Sizes", [])
-            url_base = self.current_url_base()
-            if name and sizes and url_base and HAS_PYSIDE6:
-                for sz in sizes:
-                    file_id = str(sz.get("File", ""))
-                    zoom = float(sz.get("Zoom", 1.0) or 1.0)
-                    if file_id and not sz.get("IsLocalFile"):
-                        if self.async_fetch_image_cb:
-                            self.async_fetch_image_cb(name, zoom, file_id, url_base)
-                        else:
-                            try:
-                                local_img = self.cache.fetch_image(name, zoom, file_id)
-                                if local_img and Path(local_img).is_file():
-                                    pm = QPixmap(str(local_img))
-                                    if not pm.isNull() and hasattr(self.scene, "register_pixmap"):
-                                        self.scene.register_pixmap(name, pm)
-                                        break
-                            except Exception:
-                                pass
+            self._handle_ai_command(payload)
         elif cmd == "L":
             file_id = str(payload.get("File", ""))
             merge = bool(payload.get("Merge", False))
@@ -607,7 +652,7 @@ class MapperController:
                         local_map = self.cache.fetch_map_file(file_id)
                         if not cache_only and local_map and Path(local_map).is_file():
                             self.apply_loaded_map_file(local_map, merge)
-                    except Exception:
+                    except Exception:  # pylint: disable=broad-exception-caught
                         pass
         elif cmd == "MV":
             obj_id = str(payload.get("ID", payload.get("ObjID", payload.get("Target", ""))))
@@ -657,51 +702,14 @@ class MapperController:
                     if any(k in attrs for k in ("Gx", "Gy", "GX", "GY")) and self.combatant_moved_cb:
                         self.combatant_moved_cb(obj_id)
                     if "Skin" in attrs or "Killed" in attrs:
-                        self._ensure_creature_images_loaded(td, 1.0)
-                    self._sync_token_to_combat_panel(obj_id)
+                        self.ensure_creature_images_loaded(td, 1.0)
+                    self.sync_token_to_combat_panel(obj_id)
                 if self.calendar.track_health_change(obj_id, attrs):
                     self.refresh_clocks()
         elif cmd == "OA+":
-            obj_id = str(payload.get("ObjID", payload.get("ID", payload.get("Target", ""))))
-            attr_name = payload.get("AttrName")
-            values = payload.get("Values")
-            if attr_name and isinstance(values, list) and hasattr(self.scene, "add_object_attribute_values"):
-                self.scene.add_object_attribute_values(obj_id, str(attr_name), values)
-            else:
-                attrs = (
-                    {str(attr_name): values}
-                    if attr_name and isinstance(values, list)
-                    else payload.get("Attributes", payload)
-                )
-                if obj_id in self.scene.tokens and isinstance(attrs, dict):
-                    tok = self.scene.tokens[obj_id]
-                    for k, v in attrs.items():
-                        if isinstance(v, list):
-                            cur = list(tok.data.get(k, []))
-                            for item in v:
-                                if item not in cur:
-                                    cur.append(item)
-                            tok.data[k] = cur
-            self._sync_token_to_combat_panel(obj_id)
+            self._handle_oa_list_delta(payload, add_mode=True)
         elif cmd == "OA-":
-            obj_id = str(payload.get("ObjID", payload.get("ID", payload.get("Target", ""))))
-            attr_name = payload.get("AttrName")
-            values = payload.get("Values")
-            if attr_name and isinstance(values, list) and hasattr(self.scene, "remove_object_attribute_values"):
-                self.scene.remove_object_attribute_values(obj_id, str(attr_name), values)
-            else:
-                attrs = (
-                    {str(attr_name): values}
-                    if attr_name and isinstance(values, list)
-                    else payload.get("Attributes", payload)
-                )
-                if obj_id in self.scene.tokens and isinstance(attrs, dict):
-                    tok = self.scene.tokens[obj_id]
-                    for k, v in attrs.items():
-                        if isinstance(v, list):
-                            cur = [x for x in tok.data.get(k, []) if x not in v]
-                            tok.data[k] = cur
-            self._sync_token_to_combat_panel(obj_id)
+            self._handle_oa_list_delta(payload, add_mode=False)
         elif cmd == "CS":
             self.calendar.set_time(
                 absolute=payload.get("Absolute"),
@@ -723,13 +731,13 @@ class MapperController:
                 self.scene.set_combat_state(enabled, getattr(self.scene, "active_actor_id", ""))
             if self.combat_mode_changed_cb:
                 self.combat_mode_changed_cb(enabled)
-            self._update_ondeck_and_audio()
+            self.update_ondeck_and_audio()
             self.refresh_clocks()
         elif cmd == "IL":
             slots = payload.get("InitiativeList", payload.get("Slots", payload.get("List", [])))
             if isinstance(slots, list):
                 self.calendar.initiative_slots = slots
-                self._update_ondeck_and_audio()
+                self.update_ondeck_and_audio()
                 self.refresh_clocks()
                 if hasattr(self.scene, "refresh_targets"):
                     self.scene.refresh_targets()
@@ -752,7 +760,7 @@ class MapperController:
                 self.combat_panel.select_creature(primary_id)
                 if self.combatant_moved_cb and primary_id:
                     self.combatant_moved_cb(primary_id)
-            self._update_ondeck_and_audio()
+            self.update_ondeck_and_audio()
             self.refresh_clocks()
             if payload.get("OnDeck") is not None:
                 self.audio.play_ondeck(int(payload["OnDeck"]))
@@ -907,17 +915,18 @@ if HAS_PYSIDE6:
             )
             self._download_pool = ThreadPoolExecutor(max_workers=4)
             self._auth_prompt_pending = False
+            self.act_reconnect_server: Any = None
+            self.act_disconnect_server: Any = None
             self.net_client = GMANetworkClient(self)
             self.controller = MapperController(
                 self.prefs,
                 self.cache,
                 self.audio,
-                query_image_cb=lambda name, zoom: self.net_client.session.query_image(name, zoom),
-                adjust_view_cb=lambda grid, xv, yv: self.map_view.adjust_view(grid, xv, yv),
+                query_image_cb=self.net_client.session.query_image,
                 async_fetch_image_cb=self._submit_image_download,
                 async_fetch_map_cb=self._submit_map_download,
             )
-            self.controller.polo_cb = lambda: self.net_client.session.polo()
+            self.controller.polo_cb = self.net_client.session.polo
             self.controller.status_message_cb = lambda msg: self.statusBar().showMessage(msg)
             self.controller.table_reply_cb = self._on_table_roll_reply
             self.controller.delegates_updated_cb = self._rebuild_delegate_for_menu
@@ -935,6 +944,7 @@ if HAS_PYSIDE6:
             # Central Battle Map View
             self.map_view = BattleMapView(self.controller.scene, self)
             self.map_view.pc_templates_provider = lambda: self.controller.pc_templates
+            self.controller.adjust_view_cb = self.map_view.adjust_view
             self.controller.combatant_moved_cb = self.map_view.scroll_to_combatant
             self.controller.combat_mode_changed_cb = self._sync_combat_mode_action
             self.controller.identity_changed_cb = self._on_identity_changed
@@ -954,7 +964,7 @@ if HAS_PYSIDE6:
                     local_img = self.cache.fetch_image(name, zoom, file_id)
                     if local_img and Path(local_img).is_file():
                         self._image_downloaded.emit(name, str(local_img))
-                except Exception:
+                except Exception:  # pylint: disable=broad-exception-caught
                     pass
 
             self._download_pool.submit(_worker)
@@ -966,7 +976,7 @@ if HAS_PYSIDE6:
                     local_map = self.cache.fetch_map_file(file_id)
                     if not cache_only and local_map and Path(local_map).is_file():
                         self._map_downloaded.emit(str(local_map), merge)
-                except Exception:
+                except Exception:  # pylint: disable=broad-exception-caught
                     pass
 
             self._download_pool.submit(_worker)
@@ -979,7 +989,7 @@ if HAS_PYSIDE6:
         def _on_map_downloaded(self, local_path: str, merge: bool) -> None:
             try:
                 self.controller.apply_loaded_map_file(local_path, merge)
-            except Exception as exc:
+            except Exception as exc:  # pylint: disable=broad-exception-caught
                 self.statusBar().showMessage(f"Error loading map: {exc}")
 
         def _create_docks(self) -> None:
@@ -1704,7 +1714,7 @@ if HAS_PYSIDE6:
                 lambda obj_id, gx, gy: self.net_client.session.update_obj_attributes(obj_id, {"Gx": gx, "Gy": gy})
             )
             self.map_view.token_selected.connect(
-                lambda obj_id: self.controller.combat_panel.select_creature(obj_id)
+                self.controller.combat_panel.select_creature
             )
             self.map_view.mob_attributes_changed.connect(
                 self._on_mob_attributes_changed
@@ -1713,25 +1723,25 @@ if HAS_PYSIDE6:
                 self._on_mob_removed
             )
             self.map_view.mob_spawned.connect(
-                lambda mob_d: self._on_mob_spawned(mob_d)
+                self._on_mob_spawned
             )
             self.map_view.hp_request_sent.connect(
-                lambda req_d: self.net_client.session.hit_point_request_d(req_d)
+                self.net_client.session.hit_point_request_d
             )
             self.map_view.mark_requested.connect(
-                lambda sx, sy: self.net_client.session.mark(sx, sy)
+                self.net_client.session.mark
             )
             self.map_view.element_drawn.connect(
-                lambda gma_type, data: self.net_client.session.ls(gma_type, data)
+                self.net_client.session.ls
             )
             self.map_view.element_attributes_changed.connect(
-                lambda obj_id, attrs: self.net_client.session.update_obj_attributes(obj_id, attrs)
+                self.net_client.session.update_obj_attributes
             )
             self.map_view.element_removed.connect(
-                lambda obj_id: self.net_client.session.clear(obj_id)
+                self.net_client.session.clear
             )
             self.map_view.tile_image_requested.connect(
-                lambda img_name, z: self.controller._ensure_pixmap_loaded(img_name, z)
+                self.controller.ensure_pixmap_loaded
             )
             self.map_view.tool_changed.connect(self._on_tool_changed)
             self.map_view.tool_options_changed.connect(self._update_toolbar_dynamic_states)
@@ -1742,7 +1752,7 @@ if HAS_PYSIDE6:
                 lambda msg: self.statusBar().showMessage(msg)
             )
             self.map_view.sync_view_requested.connect(
-                lambda xv, yv, lbl: self.net_client.session.adjust_view(xv, yv, lbl)
+                self.net_client.session.adjust_view
             )
             self._wire_chat_panel_signals(self.controller.chat_panel)
             # Initiative & Clock Dock signals
@@ -1771,16 +1781,16 @@ if HAS_PYSIDE6:
 
         def _on_mob_attributes_changed(self, obj_id: str, attrs: dict[str, Any]) -> None:
             self.net_client.session.update_obj_attributes(obj_id, attrs)
-            self.controller._sync_token_to_combat_panel(obj_id)
+            self.controller.sync_token_to_combat_panel(obj_id)
             if ("Skin" in attrs or "Killed" in attrs) and obj_id in self.controller.scene.tokens:
-                self.controller._ensure_creature_images_loaded(
+                self.controller.ensure_creature_images_loaded(
                     self.controller.scene.tokens[obj_id].data, 1.0
                 )
 
         def _on_mob_spawned(self, mob_d: dict[str, Any]) -> None:
             self.net_client.session.place_someone_d(mob_d)
             name = str(mob_d.get("Name", ""))
-            self.controller._ensure_creature_images_loaded(mob_d, 1.0)
+            self.controller.ensure_creature_images_loaded(mob_d, 1.0)
             oid = str(mob_d.get("ID", name))
             if oid:
                 self.controller.combat_panel.update_combatant(
@@ -1805,7 +1815,7 @@ if HAS_PYSIDE6:
             if actor_name:
                 self.controller.scene.set_combat_state(cal.combat_mode, actor_name)
                 self._on_clock_slot_activated(actor_name)
-            self.controller._update_ondeck_and_audio()
+            self.controller.update_ondeck_and_audio()
             self.controller.refresh_clocks()
 
         def _on_clock_slot_selected(self, actor_name: str) -> None:
@@ -1821,7 +1831,7 @@ if HAS_PYSIDE6:
             self.controller.combat_panel.select_creature(target_id)
             if target_id in self.controller.scene.tokens:
                 tok = self.controller.scene.tokens[target_id]
-                sz, _, _, _, _ = tok._area_info()
+                sz, _, _, _, _ = tok.area_info()
                 cx = (tok.gx + sz * 0.5) * 50.0
                 cy = (tok.gy + sz * 0.5) * 50.0
                 self.map_view.centerOn(cx, cy)
@@ -1837,7 +1847,7 @@ if HAS_PYSIDE6:
                         health["IsFlatFooted"] = enabled
                         tok.update_data({"Health": health})
                         self.net_client.session.update_obj_attributes(mid, {"Health": health})
-                        self.controller._sync_token_to_combat_panel(mid)
+                        self.controller.sync_token_to_combat_panel(mid)
 
         def _on_open_timer_request_dialog(self) -> None:
             names = list(self.controller.my_names)
@@ -1862,7 +1872,7 @@ if HAS_PYSIDE6:
                 )
                 tok.update_data({"Health": new_health})
                 self.net_client.session.update_obj_attributes(obj_id, {"Health": new_health})
-                self.controller._sync_token_to_combat_panel(obj_id)
+                self.controller.sync_token_to_combat_panel(obj_id)
                 if self.controller.calendar.track_health_change(obj_id, {"Health": new_health}):
                     self.controller.refresh_clocks()
 
@@ -1872,7 +1882,7 @@ if HAS_PYSIDE6:
                 new_health = apply_local_hp_adjustment(tok.data, full_heal=True)
                 tok.update_data({"Health": new_health})
                 self.net_client.session.update_obj_attributes(obj_id, {"Health": new_health})
-                self.controller._sync_token_to_combat_panel(obj_id)
+                self.controller.sync_token_to_combat_panel(obj_id)
                 if self.controller.calendar.track_health_change(obj_id, {"Health": new_health}):
                     self.controller.refresh_clocks()
 
@@ -1883,7 +1893,7 @@ if HAS_PYSIDE6:
                 new_health.update(health_diff)
                 tok.update_data({"Health": new_health})
                 self.net_client.session.update_obj_attributes(obj_id, {"Health": new_health})
-                self.controller._sync_token_to_combat_panel(obj_id)
+                self.controller.sync_token_to_combat_panel(obj_id)
                 if self.controller.calendar.track_health_change(obj_id, {"Health": new_health}):
                     self.controller.refresh_clocks()
 
@@ -1900,13 +1910,13 @@ if HAS_PYSIDE6:
             else:
                 self.controller.scene.remove_object_attribute_values(obj_id, "StatusList", [cond])
                 self.net_client.session.remove_obj_attributes(obj_id, "StatusList", [cond])
-            self.controller._sync_token_to_combat_panel(obj_id)
+            self.controller.sync_token_to_combat_panel(obj_id)
 
         def _on_combat_clear_conditions(self, obj_id: str) -> None:
             if obj_id in self.controller.scene.tokens:
                 self.controller.scene.tokens[obj_id].update_data({"StatusList": []})
             self.net_client.session.update_obj_attributes(obj_id, {"StatusList": []})
-            self.controller._sync_token_to_combat_panel(obj_id)
+            self.controller.sync_token_to_combat_panel(obj_id)
 
         def _on_combat_locate(self, obj_id: str) -> None:
             self._on_clock_slot_activated(obj_id)
@@ -1916,7 +1926,7 @@ if HAS_PYSIDE6:
                 self.controller.scene.tokens[obj_id].update_data({"Targets": list(targets)})
                 self.controller.scene.refresh_targets()
             self.net_client.session.update_obj_attributes(obj_id, {"Targets": list(targets)})
-            self.controller._sync_token_to_combat_panel(obj_id)
+            self.controller.sync_token_to_combat_panel(obj_id)
 
         def _on_open_hp_request_dialog(self, obj_id: str = "", is_temp: bool = False) -> None:
             cid = obj_id or (self.controller.combat_panel.current_creature_id() or "")
@@ -2359,7 +2369,7 @@ if HAS_PYSIDE6:
             self._sync_combat_mode_action(enabled)
             self.controller.calendar.set_time(combat_mode=enabled)
             self.controller.scene.set_combat_state(enabled, self.controller.scene.active_actor_id)
-            self.controller._update_ondeck_and_audio()
+            self.controller.update_ondeck_and_audio()
             self.controller.refresh_clocks()
             self.net_client.session.combat_mode(enabled)
 
@@ -2391,7 +2401,7 @@ if HAS_PYSIDE6:
                     self.statusBar().showMessage(f"Error saving map: {exc}")
 
         def _on_open_dice(self) -> None:
-            self.controller.chat_panel._on_import_presets_clicked()
+            self.controller.chat_panel.prompt_import_presets_from_file()
 
         def _on_save_dice(self) -> None:
             path, _ = QFileDialog.getSaveFileName(self, "Save Dice Presets", "", "Dice Files (*.dice)")
@@ -2518,7 +2528,7 @@ if HAS_PYSIDE6:
                 shared_gvar_state=self.controller.shared_gvar_state,
                 parent=self,
             )
-            dlg.panel.target_context_provider = self.controller._target_context_snapshot
+            dlg.panel.target_context_provider = self.controller.target_context_snapshot
             dlg.panel.set_system_presets(self.controller.chat_panel.bank.system_presets)
             if for_user in self.controller.banks_by_tkey:
                 dlg.panel.set_user_presets(self.controller.banks_by_tkey[for_user].user_presets)

@@ -416,7 +416,7 @@ if QT_AVAILABLE:
 
             self.btn_import_presets = QPushButton("Import File...", self.presets_group)
             self.btn_import_presets.setToolTip("Import presets from a local .dice file and save to server")
-            self.btn_import_presets.clicked.connect(self._on_import_presets_clicked)
+            self.btn_import_presets.clicked.connect(self.prompt_import_presets_from_file)
 
             self.btn_export_presets = QPushButton("Save to File...", self.presets_group)
             self.btn_export_presets.setToolTip("Save/export presets to a local .dice file on disk")
@@ -451,15 +451,15 @@ if QT_AVAILABLE:
 
             class _CompatCombo:
                 def currentText(self) -> str:
-                    if panel._recip_mode == "gm":
+                    if panel.recipient_mode() == "gm":
                         return "GM Only"
                     return "All"
 
                 def setCurrentText(self, text: str) -> None:
                     if text == "GM Only":
-                        panel._set_recipient_mode("gm")
+                        panel.set_recipient_mode("gm")
                     else:
-                        panel._set_recipient_mode("all")
+                        panel.set_recipient_mode("all")
 
             return _CompatCombo()
 
@@ -502,13 +502,13 @@ if QT_AVAILABLE:
             act_all = QAction("To: (all)", self.to_menu)
             act_all.setCheckable(True)
             act_all.setChecked(self._recip_mode == "all")
-            act_all.triggered.connect(lambda: self._set_recipient_mode("all"))
+            act_all.triggered.connect(lambda: self.set_recipient_mode("all"))
             self.to_menu.addAction(act_all)
 
             act_gm = QAction("To: GM Only", self.to_menu)
             act_gm.setCheckable(True)
             act_gm.setChecked(self._recip_mode == "gm")
-            act_gm.triggered.connect(lambda: self._set_recipient_mode("gm"))
+            act_gm.triggered.connect(lambda: self.set_recipient_mode("gm"))
             self.to_menu.addAction(act_gm)
 
             if self._peer_names:
@@ -529,12 +529,19 @@ if QT_AVAILABLE:
             act_refresh.triggered.connect(self.refresh_peers_requested.emit)
             self.to_menu.addAction(act_refresh)
 
-        def _set_recipient_mode(self, mode: str) -> None:
+        def recipient_mode(self) -> str:
+            """Return the active chat recipient mode (`'all'`, `'gm'`, or `'custom'`)."""
+            return self._recip_mode
+
+        def set_recipient_mode(self, mode: str) -> None:
+            """Set chat recipient mode (`'all'`, `'gm'`, or `'custom'`) and refresh UI."""
             self._recip_mode = mode
             if mode != "custom":
                 self._selected_recipients.clear()
             self._rebuild_recipient_menu()
             self._update_recipient_button_label()
+
+        _set_recipient_mode = set_recipient_mode
 
         def _toggle_peer_recipient(self, peer: str, checked: bool) -> None:
             if checked:
@@ -1202,7 +1209,8 @@ if QT_AVAILABLE:
                 return []
             return self._apply_imported_presets(loaded, merge=merge)
 
-        def _on_import_presets_clicked(self) -> None:
+        def prompt_import_presets_from_file(self) -> None:
+            """Prompt for a local `.dice` file and import presets."""
             path, _ = QFileDialog.getOpenFileName(
                 self, "Import Dice Presets", "", "Dice Files (*.dice);;All Files (*)"
             )
@@ -1238,6 +1246,8 @@ if QT_AVAILABLE:
                     return
                 merge = ans == QMessageBox.StandardButton.Yes
             self._apply_imported_presets(loaded, merge=merge)
+
+        _on_import_presets_clicked = prompt_import_presets_from_file
 
         def _on_export_presets_clicked(self) -> None:
             if not self.bank.user_presets:

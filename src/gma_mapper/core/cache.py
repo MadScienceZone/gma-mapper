@@ -162,6 +162,27 @@ class AssetCache:
 
         return (False, 0, "", "", "")
 
+    def _cleanup_animation_dir(self, entry: Path, days_old: int | str) -> tuple[int, int]:
+        """Clean expired or outdated frames inside an `@` animation directory."""
+        deleted = 0
+        total = 1
+        del_all = False
+        for frame_file in sorted(entry.glob(f"*.{self.image_format}")):
+            total += 1
+            if del_all:
+                continue
+            _, frame_age, _, _, _ = self.cache_info(frame_file)
+            if days_old == "-update":
+                if frame_age <= self.cache_too_old_days:
+                    frame_file.unlink(missing_ok=True)
+                    deleted += 1
+            elif isinstance(days_old, int) and frame_age >= days_old:
+                del_all = True
+        if del_all:
+            shutil.rmtree(entry, ignore_errors=True)
+            deleted += 1
+        return deleted, total
+
     def cleanup_image_cache(
         self, days_old: int | str = 0
     ) -> tuple[int, int, list[tuple[str, float]]]:
@@ -181,23 +202,9 @@ class AssetCache:
                 continue
             for entry in sorted(cache_subdir.iterdir()):
                 if entry.is_dir() and "@" in entry.name:
-                    total += 1
-                    del_all = False
-                    frame_files = sorted(entry.glob(f"*.{self.image_format}"))
-                    for frame_file in frame_files:
-                        total += 1
-                        if del_all:
-                            continue
-                        _, frame_age, _, _, _ = self.cache_info(frame_file)
-                        if days_old == "-update":
-                            if frame_age <= self.cache_too_old_days:
-                                frame_file.unlink(missing_ok=True)
-                                deleted += 1
-                        elif isinstance(days_old, int) and frame_age >= days_old:
-                            del_all = True
-                    if del_all:
-                        shutil.rmtree(entry, ignore_errors=True)
-                        deleted += 1
+                    d_delta, t_delta = self._cleanup_animation_dir(entry, days_old)
+                    deleted += d_delta
+                    total += t_delta
                 elif entry.suffix == f".{self.image_format}":
                     total += 1
                     _, img_age, img_name, img_zoom, _ = self.cache_info(entry)
@@ -396,7 +403,7 @@ class AssetCache:
                 try:
                     # Quote `destdir` with shlex.quote() so spaces or special characters
                     # in `scp_dest` cannot break or inject commands in the remote shell.
-                    _, stdout, stderr = ssh.exec_command(
+                    _, stdout, _stderr = ssh.exec_command(
                         f"{self.server_mkdir} -p {shlex.quote(destdir)}"
                     )
                     stdout.channel.recv_exit_status()

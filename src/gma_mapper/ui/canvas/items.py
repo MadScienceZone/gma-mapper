@@ -10,7 +10,7 @@ import re
 from typing import Any
 
 from gma_mapper.core.colors import color_to_hex, contrasting_color, darken_color
-from gma_mapper.core.zones import full_creature_area_info
+from gma_mapper.core.zones import creature_displayed_size, full_creature_area_info
 from gma_mapper.net.protocol import from_enum
 from gma_mapper.ui.canvas.aoe import (
     aoe_grid_hatch_lines,
@@ -319,6 +319,33 @@ def are_opposing_creatures(mob_a: dict[str, Any], mob_b: dict[str, Any]) -> bool
     return False
 
 
+def _collect_threat_targets(
+    threatening_id: str,
+    threatening_data: dict[str, Any],
+    mat: list[list[int]],
+    matbit: int,
+    x_start: int,
+    y_start: int,
+    where_is_mob: dict[tuple[int, int], list[str]],
+    creatures_by_id: dict[str, dict[str, Any]],
+) -> dict[str, int]:
+    """Scan a creature's reach matrix and collect highest threat level per opposing target."""
+    targets: dict[str, int] = {}
+    for r_idx, row in enumerate(mat):
+        yy = y_start + r_idx
+        for c_idx, col in enumerate(row):
+            if not col & matbit:
+                continue
+            xx = x_start + c_idx
+            for target_id in where_is_mob.get((xx, yy), ()):
+                if target_id == threatening_id:
+                    continue
+                if not are_opposing_creatures(threatening_data, creatures_by_id[target_id]):
+                    continue
+                targets[target_id] = max(targets.get(target_id, 0), col)
+    return targets
+
+
 def compute_combat_threat_arrows(
     creatures_by_id: dict[str, dict[str, Any]],
     grid_scale: float = BASE_GRID_SCALE,
@@ -358,14 +385,14 @@ def compute_combat_threat_arrows(
             continue
         sz = float(info.space)
         ar = int(info.natural)
-        re = int(info.extended)
+        reach_ext = int(info.extended)
         mat = info.matrix
         if not mat:
             continue
 
         gx = float(threatening_data.get("Gx", threatening_data.get("GX", 0.0)) or 0.0)
         gy = float(threatening_data.get("Gy", threatening_data.get("GY", 0.0)) or 0.0)
-        offset = max(ar, re)
+        offset = max(ar, reach_ext)
         x_start = int(math.floor(gx)) - offset
         y_start = int(math.floor(gy)) - offset
 
@@ -377,19 +404,16 @@ def compute_combat_threat_arrows(
         else:
             matbit = 2
 
-        targets: dict[str, int] = {}
-        for r_idx, row in enumerate(mat):
-            yy = y_start + r_idx
-            for c_idx, col in enumerate(row):
-                if col & matbit:
-                    xx = x_start + c_idx
-                    for target_id in where_is_mob.get((xx, yy), ()):
-                        if target_id == threatening_id:
-                            continue
-                        target_data = creatures_by_id[target_id]
-                        if are_opposing_creatures(threatening_data, target_data):
-                            if target_id not in targets or targets[target_id] < col:
-                                targets[target_id] = col
+        targets = _collect_threat_targets(
+            threatening_id,
+            threatening_data,
+            mat,
+            matbit,
+            x_start,
+            y_start,
+            where_is_mob,
+            creatures_by_id,
+        )
 
         r_src = sz / 2.0
         xc = (gx + r_src) * grid_scale
@@ -433,6 +457,44 @@ def compute_combat_threat_arrows(
             arrows.append((threatening_id, target_id, aox, aoy, adx, ady))
 
     return arrows
+
+
+def build_token_tooltip(mob_data: dict[str, Any]) -> str:
+    """Build a detailed hover tooltip for a creature token matching `bin/mapper_legacy.tcl`."""
+    name = str(mob_data.get("Name", "Unknown"))
+    disp_size = creature_displayed_size(mob_data)
+    lines = [f"{name} (Size: {disp_size})"]
+    if mob_data.get("Killed"):
+        lines.append("Status: KILLED / Dead")
+    statuses = list(mob_data.get("StatusList") or [])
+    if statuses:
+        lines.append(f"Conditions: {', '.join(statuses)}")
+    elev = int(mob_data.get("Elev", 0) or 0)
+    if elev != 0:
+        lines.append(f"Elevation: {elev:+d} ft")
+    mmode = from_enum("MoveMode", int(mob_data.get("MoveMode", 0) or 0))
+    if mmode:
+        lines.append(f"Movement: {mmode.capitalize()}")
+    note = str(mob_data.get("Note", "") or "")
+    if note:
+        lines.append(f"Tag: {note}")
+    health = mob_data.get("Health") or {}
+    if isinstance(health, dict) and int(health.get("MaxHP", 0) or 0) > 0:
+        max_hp = int(health.get("MaxHP", 0))
+        lethal = int(health.get("LethalDamage", 0) or 0)
+        nl = int(health.get("NonLethalDamage", 0) or 0)
+        tmp = int(health.get("TmpHP", 0) or 0)
+        cur = max_hp - lethal
+        hp_line = f"HP: {cur}/{max_hp}"
+        if tmp > 0:
+            hp_line += f" (+{tmp} tmp)"
+        if nl > 0:
+            hp_line += f" [{nl} NL]"
+        lines.append(hp_line)
+    targets = list(mob_data.get("Targets") or [])
+    if targets:
+        lines.append(f"Currently targeting: {', '.join(str(t) for t in targets)}")
+    return "\n".join(lines)
 
 
 try:
@@ -547,14 +609,16 @@ try:
             self.setZValue(z)
             self.setVisible(not bool(self.data.get("Hidden", False)))
 
-        def _all_points(self) -> list[QPointF]:
+        def all_points(self) -> list[QPointF]:
             pts = [QPointF(float(self.data.get("X", 0.0)), float(self.data.get("Y", 0.0)))]
             for p in self.data.get("Points") or []:
                 pts.append(QPointF(float(p.get("X", 0.0)), float(p.get("Y", 0.0))))
             return pts
 
+        _all_points = all_points
+
         def boundingRect(self) -> QRectF:
-            pts = self._all_points()
+            pts = self.all_points()
             if self.gma_type == "TILE":
                 x0 = pts[0].x()
                 y0 = pts[0].y()
@@ -598,7 +662,8 @@ try:
             option: QStyleOptionGraphicsItem,
             widget: QWidget | None = None,
         ) -> None:
-            pts = self._all_points()
+            _ = (option, widget)
+            pts = self.all_points()
             line_col = str(self.data.get("Line", ""))
             fill_col = str(self.data.get("Fill", ""))
             stipple = str(self.data.get("Stipple", ""))
@@ -832,12 +897,12 @@ try:
             self.is_active_turn: bool = False
             self.is_selected: bool = False
             self.combat_mode: bool = False
-            self._sync_position()
+            self.sync_position()
 
         def update_data(self, new_data: dict[str, Any]) -> None:
             self.prepareGeometryChange()
             self.data.update(new_data)
-            self._sync_position()
+            self.sync_position()
             self.update()
 
         @property
@@ -848,9 +913,7 @@ try:
         def gy(self) -> float:
             return float(self.data.get("Gy", self.data.get("GY", 0.0)))
 
-        def _sync_position(self) -> None:
-            from gma_mapper.ui.canvas.context_menu import build_token_tooltip
-
+        def sync_position(self) -> None:
             gx = self.gx
             gy = self.gy
             self.setPos(gx * BASE_GRID_SCALE, gy * BASE_GRID_SCALE)
@@ -862,7 +925,9 @@ try:
                 self.setOpacity(1.0)
             self.setToolTip(build_token_tooltip(self.data))
 
-        def _area_info(self) -> tuple[float, int, int, list[list[int]], dict[str, Any]]:
+        _sync_position = sync_position
+
+        def area_info(self) -> tuple[float, int, int, list[list[int]], dict[str, Any]]:
             info = full_creature_area_info(self.data)
             if not info:
                 fallback = dict(self.data)
@@ -879,8 +944,20 @@ try:
                 info.custom_reach or {},
             )
 
+        _area_info = area_info
+
+        def center_scene_xy(self) -> tuple[float, float]:
+            """Return `(cx, cy)` scene coordinates at the center of the creature token."""
+            sz, _, _, _, _ = self.area_info()
+            return (
+                (self.gx + sz * 0.5) * BASE_GRID_SCALE,
+                (self.gy + sz * 0.5) * BASE_GRID_SCALE,
+            )
+
+        _center_scene_xy = center_scene_xy
+
         def boundingRect(self) -> QRectF:
-            mob_size, mob_area, mob_reach, _, _ = self._area_info()
+            mob_size, mob_area, mob_reach, _, _ = self.area_info()
             s = mob_size * BASE_GRID_SCALE
             aoe_r = 0.0
             for k in ("AoE", "_AoE"):
@@ -892,7 +969,7 @@ try:
 
         def shape(self) -> QPainterPath:
             """Restrict hit-testing and hover tooltips strictly to the creature's token footprint `[0, s) x [0, s)`."""
-            mob_size, _, _, _, _ = self._area_info()
+            mob_size, _, _, _, _ = self.area_info()
             s = max(0.5, mob_size) * BASE_GRID_SCALE
             path = QPainterPath()
             path.addRect(QRectF(0.0, 0.0, s, s))
@@ -904,7 +981,8 @@ try:
             option: QStyleOptionGraphicsItem,
             widget: QWidget | None = None,
         ) -> None:
-            mob_size, mob_area, mob_reach, mob_matrix, _ = self._area_info()
+            _ = (option, widget)
+            mob_size, mob_area, mob_reach, mob_matrix, _ = self.area_info()
             s = mob_size * BASE_GRID_SCALE
             ctype = int(self.data.get("CreatureType", 0) or 0)
             default_color = "#0000ff" if ctype == 2 else "#ff0000"

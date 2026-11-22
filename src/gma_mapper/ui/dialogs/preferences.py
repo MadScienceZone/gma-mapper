@@ -160,7 +160,7 @@ def _attempt_format(fmt: str, s: str) -> str:
         return s
     try:
         return fmt % s
-    except Exception:
+    except (TypeError, ValueError):
         return "**ERROR**"
 
 
@@ -191,6 +191,46 @@ if HAS_PYSIDE6:
             self.symbol_preview_labels: dict[str, QLabel] = {}
             self._updating_dieroll_ui: bool = False
             self._updating_marker_ui: bool = False
+
+            # Subtab widgets populated in _build_*_subtab helpers
+            self.fonts_list: Any = None
+            self.font_add_btn: Any = None
+            self.font_copy_btn: Any = None
+            self.font_del_btn: Any = None
+            self.font_choose_btn: Any = None
+            self.font_desc_label: Any = None
+            self.font_sample_label: Any = None
+            self.dialog_light_preview: Any = None
+            self.dialog_dark_preview: Any = None
+            self.dieroll_styles_list: Any = None
+            self.dr_desc_text: Any = None
+            self.dr_fg_check: Any = None
+            self.dr_fg_light_btn: Any = None
+            self.dr_fg_dark_btn: Any = None
+            self.dr_light_sample_label: Any = None
+            self.dr_bg_check: Any = None
+            self.dr_bg_light_btn: Any = None
+            self.dr_bg_dark_btn: Any = None
+            self.dr_dark_sample_label: Any = None
+            self.dr_font_combo: Any = None
+            self.dr_format_edit: Any = None
+            self.dr_overstrike_check: Any = None
+            self.dr_underline_check: Any = None
+            self.dr_offset_spin: Any = None
+            self.dr_reset_btn: Any = None
+            self.compact_recents_check: Any = None
+            self.markers_list: Any = None
+            self.marker_add_btn: Any = None
+            self.marker_copy_btn: Any = None
+            self.marker_del_btn: Any = None
+            self.marker_mods_edit: Any = None
+            self.marker_desc_edit: Any = None
+            self.marker_shape_combo: Any = None
+            self.marker_dash_combo: Any = None
+            self.marker_color_btn: Any = None
+            self.marker_tracer_check: Any = None
+            self.marker_endatdeath_check: Any = None
+            self.marker_limit_spin: Any = None
 
             self._build_appearance_tab()
             self._build_servers_tab()
@@ -421,9 +461,7 @@ if HAS_PYSIDE6:
             self.tabs.addTab(tab, "Servers")
             if self.prefs.get("profiles"):
                 cur_name = str(self.prefs.get("current_profile") or "offline")
-                initial_idx = find_server_index(self.prefs, cur_name)
-                if initial_idx < 0:
-                    initial_idx = 0
+                initial_idx = max(find_server_index(self.prefs, cur_name), 0)
                 self.server_combo.setCurrentIndex(initial_idx)
                 self._load_selected_server(initial_idx)
             self.server_combo.currentIndexChanged.connect(self._on_server_index_changed)
@@ -437,7 +475,7 @@ if HAS_PYSIDE6:
             btn.setText(rgb_name(color))
             try:
                 fg = contrasting_color(color)
-            except Exception:
+            except (TypeError, ValueError):
                 fg = "black"
             btn.setStyleSheet(f"background-color: {color}; color: {fg};")
 
@@ -1637,5 +1675,6 @@ else:
 
     class PreferencesDialog:  # type: ignore[no-redef]
         def __init__(self, prefs: dict[str, Any], parent: Any = None) -> None:
+            self.parent = parent
             self.prefs = fix_missing(copy.deepcopy(prefs))
 

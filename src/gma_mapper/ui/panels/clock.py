@@ -244,7 +244,7 @@ def compute_visible_initiative_slots(
             if sname == active_actor or strip_nameplate_prefix(sname) == clean_actor:
                 cur_pos = pos
                 break
-    if cur_pos < 0 and 0 <= current_slot < len(slots):
+    if cur_pos < 0 and current_slot in range(len(slots)):
         for pos, (_sk, orig_idx, _slot) in enumerate(indexed):
             if orig_idx == current_slot:
                 cur_pos = pos
@@ -388,7 +388,7 @@ class TimerRecord:
 
     @property
     def is_expired(self) -> bool:
-        return self.max_value > 0 and self.value <= 0
+        return self.value <= 0 < self.max_value
 
     @property
     def percentage(self) -> int:
@@ -679,6 +679,7 @@ if HAS_PYSIDE6:
             self.update()
 
         def paintEvent(self, event: Any) -> None:
+            _ = event
             painter = QPainter(self)
             painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
             w = self.width()
@@ -1466,12 +1467,14 @@ else:
             clock_styles: dict[str, Any] | None = None,
             dark_mode: bool = False,
         ) -> None:
+            self.parent = parent
             self.calendar = calendar
             self.clock_styles = clock_styles
             self.dark_mode = dark_mode
 
     class InitiativeClockPanel:  # type: ignore[no-redef]
         def __init__(self, calendar: GolarionCalendar | None = None, parent: Any = None) -> None:
+            self.parent = parent
             self.calendar = calendar or GolarionCalendar()
             self.timers: dict[str, TimerRecord] = {}
             self.timer_scope: str = "mine"
@@ -1507,6 +1510,7 @@ else:
             icon_catalog: Any = None,
             parent: Any = None,
         ) -> None:
+            self.parent = parent
             self.calendar = calendar
             self.prefs = dict(prefs or {})
             self.icon_catalog = icon_catalog

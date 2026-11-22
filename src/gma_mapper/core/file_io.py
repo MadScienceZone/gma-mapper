@@ -313,7 +313,7 @@ def save_arrays_to_file(
             rec["Locked"] = True
         objlist.append((ot, rec))
 
-    for mob_id, d in creatures.items():
+    for _mob_id, d in creatures.items():
         rec = dict(d)
         name = rec.get("Name", "")
         if name and name in imap:
@@ -438,7 +438,7 @@ def load_legacy_map_data(
         tokens = parse_tcl_list(v)
         ll = len(tokens)
         if ll == 4 and tokens[0] == "I":
-            _, image_id, image_zoom, image_filename = tokens
+            image_id, image_zoom, image_filename = tokens[1], tokens[2], tokens[3]
             imagedict.setdefault(image_id, {})[image_zoom] = image_filename
         elif ll == 2 and tokens[0] == "F":
             file_data.append(

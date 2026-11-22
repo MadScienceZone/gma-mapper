@@ -80,4 +80,4 @@ class AudioManager:
 
     def handle_play_sound(self, payload: dict[str, Any]) -> None:
         """Protocol stub for ``SOUND`` command."""
-        pass
+        _ = payload

@@ -55,6 +55,16 @@ generated-members = [
 [tool.pylint.messages_control]
 disable = [
     "C",  # Convention (formatting, naming, docstrings)
-    "R",  # Refactor (complexity, duplicate code, design)
+    # Structural size/count thresholds inherent to Qt widgets and protocol routers
+    "R0801",  # duplicate-code (shared Qt import headers / mirrored helpers)
+    "R0902",  # too-many-instance-attributes
+    "R0903",  # too-few-public-methods
+    "R0904",  # too-many-public-methods
+    "R0911",  # too-many-return-statements
+    "R0912",  # too-many-branches
+    "R0913",  # too-many-arguments
+    "R0914",  # too-many-locals
+    "R0915",  # too-many-statements
+    "R0917",  # too-many-positional-arguments
 ]
 

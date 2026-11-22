@@ -7,9 +7,9 @@ Ported from `bin/mapper_legacy.tcl` (`EditDieRollPresets`, `EditColorBoxTitle`,
 from __future__ import annotations
 
 import copy
-from typing import Any, Callable
+from typing import Any
 
-from gma_mapper.core.colors import color_to_hex, contrasting_color, darken_color
+from gma_mapper.core.colors import darken_color
 from gma_mapper.core.dice import (
     DICE_MODIFIER_HELP_TEXT,
     DICE_SYNTAX_HELP_SECTIONS,
@@ -22,32 +22,25 @@ from gma_mapper.core.dice import (
 )
 
 try:
-    from PySide6.QtCore import Qt, Signal
+    from PySide6.QtCore import Qt
     from PySide6.QtGui import QColor
     from PySide6.QtWidgets import (
-        QCheckBox,
         QColorDialog,
         QComboBox,
         QDialog,
         QDialogButtonBox,
         QFormLayout,
-        QGroupBox,
         QHBoxLayout,
         QHeaderView,
-        QInputDialog,
         QLabel,
         QLineEdit,
         QListWidget,
-        QListWidgetItem,
         QMessageBox,
         QPushButton,
-        QScrollArea,
-        QSplitter,
         QTableWidget,
         QTableWidgetItem,
         QTabWidget,
         QTextBrowser,
-        QToolButton,
         QVBoxLayout,
         QWidget,
     )
@@ -838,6 +831,7 @@ if QT_AVAILABLE:
             table.setCurrentCell(r, 0)
 
         def _duplicate_row(self, table: QTableWidget, tab_kind: str) -> None:
+            _ = tab_kind
             r = table.currentRow()
             if r < 0:
                 return

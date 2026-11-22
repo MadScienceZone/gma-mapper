@@ -986,7 +986,7 @@ def _parse_data_packet(raw_line: str) -> tuple[str, Any]:
                 json_payload = json.loads(payload)
                 if not isinstance(json_payload, dict):
                     return ("ERROR", ["JSON payload is not an object", line])
-            except Exception as err:
+            except Exception as err:  # pylint: disable=broad-exception-caught
                 return ("ERROR", [str(err), line])
         else:
             json_payload = {}
@@ -1001,7 +1001,7 @@ def _parse_data_packet(raw_line: str) -> tuple[str, Any]:
 
     try:
         return (command, _construct(json_payload, pfmt))
-    except Exception as err:
+    except Exception as err:  # pylint: disable=broad-exception-caught
         return ("ERROR", [str(err), line])
 
 
@@ -1138,20 +1138,17 @@ class BatchCollector:
         if batch_error:
             self._storage.pop(batch_group, None)
             return None
-        if (
-            not isinstance(part, int)
-            or not isinstance(total, int)
-            or part < 0
-            or total <= 0
-            or part >= total
-            or total > MAX_BATCH_PARTS
+        if not (
+            isinstance(part, int)
+            and isinstance(total, int)
+            and 0 <= part < total <= MAX_BATCH_PARTS
         ):
             self._storage.pop(batch_group, None)
             return None
 
         try:
             decoded_chunk = base64.b64decode(data) if isinstance(data, str) else bytes(data)
-        except Exception:
+        except Exception:  # pylint: disable=broad-exception-caught
             self._storage.pop(batch_group, None)
             return None
 

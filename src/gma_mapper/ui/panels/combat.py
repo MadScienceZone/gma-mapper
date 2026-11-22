@@ -596,6 +596,7 @@ else:
 
     class CombatPanel:  # type: ignore[no-redef]
         def __init__(self, parent: Any = None) -> None:
+            self.parent = parent
             self.combatants: dict[str, CombatantState] = {}
 
         def select_creature(self, obj_id_or_name: str) -> bool:

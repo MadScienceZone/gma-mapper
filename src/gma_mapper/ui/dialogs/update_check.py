@@ -49,4 +49,5 @@ else:
     class UpdateCheckDialog:  # type: ignore[no-redef]
         def __init__(self, current_version: str, parent: Any = None) -> None:
             self.current_version = current_version
+            self.parent = parent
 

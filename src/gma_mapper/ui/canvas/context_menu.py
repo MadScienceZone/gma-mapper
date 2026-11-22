@@ -13,18 +13,20 @@ import random
 import re
 from typing import Any, Callable
 
-from gma_mapper.core.util import letter_label
 from gma_mapper.core.zones import (
     creature_displayed_size,
     creature_size_params,
-    full_creature_area_info,
     reach_matrix,
     skin_comment,
     skin_is_default,
     skin_size_only,
 )
 from gma_mapper.net.protocol import from_enum, new_dict, new_id, to_enum
-from gma_mapper.ui.canvas.items import MARKER_COLOR, MARKER_DESCRIPTION, MARKER_SHAPE
+from gma_mapper.ui.canvas.items import (  # pylint: disable=unused-import  # re-export build_token_tooltip
+    MARKER_COLOR,
+    MARKER_DESCRIPTION,
+    build_token_tooltip,
+)
 
 SIZE_MENU_CHOICES: list[tuple[list[str], str]] = [
     (["F", "f"], "Fine"),
@@ -276,54 +278,13 @@ def build_spawned_creatures(
     return results
 
 
-def build_token_tooltip(mob_data: dict[str, Any]) -> str:
-    """Build a detailed hover tooltip for a creature token matching `bin/mapper_legacy.tcl`."""
-    name = str(mob_data.get("Name", "Unknown"))
-    disp_size = creature_displayed_size(mob_data)
-    lines = [f"{name} (Size: {disp_size})"]
-    if mob_data.get("Killed"):
-        lines.append("Status: KILLED / Dead")
-    statuses = list(mob_data.get("StatusList") or [])
-    if statuses:
-        lines.append(f"Conditions: {', '.join(statuses)}")
-    elev = int(mob_data.get("Elev", 0) or 0)
-    if elev != 0:
-        lines.append(f"Elevation: {elev:+d} ft")
-    mmode = from_enum("MoveMode", int(mob_data.get("MoveMode", 0) or 0))
-    if mmode:
-        lines.append(f"Movement: {mmode.capitalize()}")
-    note = str(mob_data.get("Note", "") or "")
-    if note:
-        lines.append(f"Tag: {note}")
-    health = mob_data.get("Health") or {}
-    if isinstance(health, dict) and int(health.get("MaxHP", 0) or 0) > 0:
-        max_hp = int(health.get("MaxHP", 0))
-        lethal = int(health.get("LethalDamage", 0) or 0)
-        nl = int(health.get("NonLethalDamage", 0) or 0)
-        tmp = int(health.get("TmpHP", 0) or 0)
-        cur = max_hp - lethal
-        hp_line = f"HP: {cur}/{max_hp}"
-        if tmp > 0:
-            hp_line += f" (+{tmp} tmp)"
-        if nl > 0:
-            hp_line += f" [{nl} NL]"
-        lines.append(hp_line)
-    targets = list(mob_data.get("Targets") or [])
-    if targets:
-        lines.append(f"Currently targeting: {', '.join(str(t) for t in targets)}")
-    return "\n".join(lines)
-
-
 try:
-    from PySide6.QtGui import QAction
     from PySide6.QtWidgets import (
         QCheckBox,
-        QComboBox,
         QDialog,
         QDialogButtonBox,
         QFormLayout,
         QInputDialog,
-        QLabel,
         QLineEdit,
         QMenu,
         QMessageBox,
@@ -845,7 +806,7 @@ try:
         if len(mob_ids) > 1 and source_tok is not None:
             act_rand = menu.addAction(f"Randomly Target One of {display_name}")
 
-            def _random_target(_c: bool = False, sid: str = source_id, ids: list[str] = list(mob_ids)) -> None:
+            def _random_target(_c: bool = False, sid: str = source_id, ids: tuple[str, ...] = tuple(mob_ids)) -> None:
                 chosen_id = random.choice(ids)
                 chosen_tok = scene.creatures.get(chosen_id)
                 if chosen_tok:
@@ -854,7 +815,7 @@ try:
 
             act_rand.triggered.connect(_random_target)
 
-        if is_single and (first_data.get("Targets") or []):
+        if is_single and first_data.get("Targets"):
             act_clr_t = menu.addAction(f"Clear Targets of {display_name}")
             act_clr_t.triggered.connect(
                 lambda _c=False, mid=mob_ids[0]: on_mutate_mob(mid, {"Targets": []})
@@ -863,7 +824,7 @@ try:
         menu.addSeparator()
 
         # 2. HP / Damage dialog (single or batch)
-        def _open_hp_dialog(_c: bool = False, ids: list[str] = list(mob_ids)) -> None:
+        def _open_hp_dialog(_c: bool = False, ids: tuple[str, ...] = tuple(mob_ids)) -> None:
             tok0 = scene.creatures.get(ids[0]) if ids else None
             if not tok0:
                 return
@@ -1140,7 +1101,7 @@ try:
             if not tok:
                 continue
             mname = str(tok.data.get("Name", mid))
-            msize, _, _, _, _ = tok._area_info()
+            msize, _, _, _, _ = tok.area_info()
             mcenter = type(scene_pt)(
                 (tok.gx + msize * 0.5) * BASE_GRID_SCALE,
                 (tok.gy + msize * 0.5) * BASE_GRID_SCALE,
