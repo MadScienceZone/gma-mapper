@@ -41,6 +41,8 @@ from gma_mapper.ui.canvas.drawing import (
 from gma_mapper.ui.canvas.items import creature_image_candidates
 from gma_mapper.ui.canvas.scene import CREATURE_GRID_SNAP_CHOICES, BattleMapScene
 from gma_mapper.ui.canvas.view import BattleMapView
+from gma_mapper.ui.dialogs.aka_dialog import SelectAKADialog
+from gma_mapper.ui.dialogs.ping_dialog import ServerPingDialog
 from gma_mapper.ui.dialogs.preferences import PreferencesDialog
 from gma_mapper.ui.dialogs.update_check import UpdateCheckDialog
 from gma_mapper.ui.dialogs.dice_dialogs import (
@@ -130,6 +132,11 @@ class MapperController:
         self.server_settings: dict[str, Any] = {}
         self.pc_templates: dict[str, dict[str, Any]] = {}
         self.my_names: list[str] = []
+        self.local_aka: list[str] = []
+        self.im_not_playing: bool = False
+        self.suppress_aka: bool = bool(self.prefs.get("suppress_aka", False))
+        self.peer_aka: dict[str, list[str]] = {}
+        self.peer_not_playing: dict[str, bool] = {}
         self.polo_cb: Callable[[], None] | None = None
         self.combatant_moved_cb: Callable[[str], None] | None = None
         self.combat_mode_changed_cb: Callable[[bool], None] | None = None
@@ -137,9 +144,68 @@ class MapperController:
         self.status_message_cb: Callable[[str], None] | None = None
         self.table_reply_cb: Callable[[dict[str, Any]], None] | None = None
         self.delegates_updated_cb: Callable[[], None] | None = None
+        self.echo_received_cb: Callable[[dict[str, Any]], None] | None = None
         self.debug_level: int = 0
         self.debug_proto: bool = False
+        self.diagnostic_log: list[tuple[str, str]] = []
+        self.max_diagnostic_lines: int = 5000
         self.apply_preferences(self.prefs)
+
+    def known_pc_names(self) -> list[str]:
+        """Return sorted unique player-character names from `AC` templates and map tokens."""
+        names: set[str] = set()
+        for data in self.pc_templates.values():
+            name = str(data.get("Name") or "").strip()
+            if name:
+                names.add(name)
+        for oid, tok in self.scene.tokens.items():
+            data = tok.data or {}
+            ctype = int(data.get("CreatureType", 0) or 0)
+            if ctype == 1 or str(oid).startswith("P"):
+                name = str(data.get("Name") or "").strip()
+                if name:
+                    names.add(name)
+        return sorted(names)
+
+    def apply_local_aka(self, names: list[str], not_playing: bool = False) -> None:
+        """Update local `AKA` / `NotPlaying` state and propagate to clock views."""
+        if not_playing:
+            self.im_not_playing = True
+            self.local_aka = []
+            self.my_names = []
+        else:
+            self.im_not_playing = False
+            clean: list[str] = []
+            seen: set[str] = set()
+            for raw in names:
+                s = str(raw or "").strip()
+                if s and s not in seen:
+                    seen.add(s)
+                    clean.append(s)
+            self.local_aka = clean
+            self.my_names = (
+                list(clean)
+                if clean
+                else ([self.chat_panel.local_user] if self.chat_panel.local_user else [])
+            )
+        self.clock_panel.my_names = list(self.my_names)
+        if self.player_clock_window is not None:
+            self.player_clock_window.my_names = list(self.my_names)
+        self.refresh_clocks()
+
+    def should_prompt_aka(self) -> bool:
+        """Return True when legacy `check_aka` rules call for prompting the user."""
+        local_user = self.chat_panel.local_user
+        if self.local_aka or self.suppress_aka or self.im_not_playing:
+            return False
+        if not local_user or local_user == "GM":
+            return False
+        if local_user in self.known_pc_names():
+            return False
+        for tok in self.scene.tokens.values():
+            if str((tok.data or {}).get("Name") or "").strip() == local_user:
+                return False
+        return True
 
     def _target_context_snapshot(
         self,
@@ -153,9 +219,12 @@ class MapperController:
             name = str(data.get("Name") or oid)
             if name:
                 mobs_by_name[name] = oid
-        names = list(self.my_names)
-        if not names and self.chat_panel.local_user:
-            names = [self.chat_panel.local_user]
+        if self.im_not_playing:
+            names: list[str] = []
+        else:
+            names = list(self.my_names)
+            if not names and self.chat_panel.local_user:
+                names = [self.chat_panel.local_user]
         return (names, mobs_by_id, mobs_by_name)
 
     def refresh_clocks(self) -> None:
@@ -178,10 +247,36 @@ class MapperController:
             self.player_clock_window.my_names = list(self.clock_panel.my_names)
             self.player_clock_window.sync_timers(self.clock_panel.timers)
 
+    def record_diagnostic(self, tag: str, msg: str) -> None:
+        """Append non-empty lines of `msg` with `tag` to the bounded diagnostic buffer."""
+        for line in str(msg).splitlines():
+            if line:
+                self.diagnostic_log.append((tag, line))
+        excess = len(self.diagnostic_log) - self.max_diagnostic_lines
+        if excess > 0:
+            del self.diagnostic_log[:excess]
+
+    def log_info(self, msg: str) -> None:
+        """Record an informational message in the diagnostic log."""
+        self.record_diagnostic("INFO", msg)
+
+    def log_protocol(self, msg: str) -> None:
+        """Record a protocol trace line and echo to stdout when `debug_proto` is enabled."""
+        self.record_diagnostic("PROTOCOL", msg)
+        if self.debug_proto:
+            print(f"[gma-mapper:proto] {msg}", flush=True)
+
     def log_debug(self, level: int, msg: str) -> None:
         """Emit diagnostic message if ``level <= self.debug_level``."""
+        if level == 0 or level <= self.debug_level:
+            tag = "ERROR" if level == 0 else f"DEBUG {level}"
+            self.record_diagnostic(tag, msg)
         if level <= self.debug_level:
             print(f"[gma-mapper:debug:{level}] {msg}", flush=True)
+
+    def format_diagnostic_text(self) -> str:
+        """Format buffered diagnostic messages matching legacy `SaveDebugText`."""
+        return "\n".join(f"{tag:<8}|{line}" for tag, line in self.diagnostic_log)
 
     def apply_preferences(self, prefs: dict[str, Any] | None = None) -> None:
         """Apply appearance, grid guide-line, player, and diagnostic preferences."""
@@ -220,6 +315,8 @@ class MapperController:
         self.cache.image_format = str(self.prefs.get("image_format", "png") or "png")
         self.cache.curl_insecure = bool(self.prefs.get("curl_insecure", False))
         self.audio.enabled = not bool(self.prefs.get("no_ondeck_audio", False))
+        if bool(self.prefs.get("suppress_aka", False)):
+            self.suppress_aka = True
         if hasattr(self.chat_panel, "set_preferences"):
             self.chat_panel.set_preferences(self.prefs)
         if hasattr(self.chat_panel, "presets_group"):
@@ -369,9 +466,12 @@ class MapperController:
 
     def _update_ondeck_and_audio(self) -> None:
         prev = self.calendar.ondeck_status
-        names = list(self.my_names)
-        if not names:
-            names = [str(d.get("Name", "")) for d in self.pc_templates.values() if d.get("Name")]
+        if self.im_not_playing:
+            names: list[str] = []
+        else:
+            names = list(self.my_names)
+            if not names:
+                names = [str(d.get("Name", "")) for d in self.pc_templates.values() if d.get("Name")]
         self.clock_panel.my_names = names
         new_status = self.calendar.compute_ondeck_status(names)
         if new_status in (0, 1, 2) and new_status != prev:
@@ -393,35 +493,48 @@ class MapperController:
                 if self.identity_changed_cb:
                     self.identity_changed_cb(user, self.chat_panel.is_gm)
         elif cmd == "AKA":
-            names = payload.get("Names") or []
-            if isinstance(names, list) and names:
-                self.my_names = [str(n) for n in names if n]
-                self.clock_panel.my_names = list(self.my_names)
-                if self.player_clock_window is not None:
-                    self.player_clock_window.my_names = list(self.my_names)
+            user = str(payload.get("User") or "")
+            raw_names = payload.get("Names") or []
+            clean_names = (
+                [str(n).strip() for n in raw_names if str(n).strip()]
+                if isinstance(raw_names, list)
+                else []
+            )
+            not_playing = bool(payload.get("NotPlaying", False))
+            if not user or user == self.chat_panel.local_user:
+                self.apply_local_aka(clean_names, not_playing=not_playing)
+            else:
+                self.peer_aka[user] = clean_names
+                self.peer_not_playing[user] = not_playing
         elif cmd == "CONN":
             peers = payload.get("PeerList") or []
             if isinstance(peers, list):
+                self.peer_aka.clear()
+                self.peer_not_playing.clear()
                 new_peer_names: list[str] = []
                 for peer in peers:
                     if isinstance(peer, dict):
                         user = str(peer.get("User") or "")
                         aka = peer.get("AKA") or []
+                        aka_list = (
+                            [str(n).strip() for n in aka if str(n).strip()]
+                            if isinstance(aka, list)
+                            else []
+                        )
+                        not_playing = bool(peer.get("NotPlaying", False))
                         if peer.get("IsMe"):
-                            self.my_names = [str(n) for n in aka if n] if aka else ([user] if user else [])
-                            self.clock_panel.my_names = list(self.my_names)
-                            if self.player_clock_window is not None:
-                                self.player_clock_window.my_names = list(self.my_names)
                             if user:
                                 self.chat_panel.set_identity(user)
                                 if self.identity_changed_cb:
                                     self.identity_changed_cb(user, self.chat_panel.is_gm)
+                            self.apply_local_aka(aka_list, not_playing=not_playing)
                         else:
                             if user:
                                 new_peer_names.append(user)
-                            for a in aka:
-                                if a:
-                                    new_peer_names.append(str(a))
+                                self.peer_aka[user] = aka_list
+                                self.peer_not_playing[user] = not_playing
+                            if not not_playing:
+                                new_peer_names.extend(aka_list)
                 clean_peers = sorted({p for p in new_peer_names if p})
                 if bool(self.prefs.get("notify_peers", False)) and self.peer_names:
                     joined = sorted(set(clean_peers) - set(self.peer_names))
@@ -753,6 +866,9 @@ class MapperController:
             self.audio.register_audio_asset(payload)
         elif cmd == "SOUND":
             self.audio.handle_play_sound(payload)
+        elif cmd == "ECHO":
+            if self.echo_received_cb:
+                self.echo_received_cb(payload)
 
 
 if HAS_PYSIDE6:
@@ -804,6 +920,8 @@ if HAS_PYSIDE6:
             self.controller.status_message_cb = lambda msg: self.statusBar().showMessage(msg)
             self.controller.table_reply_cb = self._on_table_roll_reply
             self.controller.delegates_updated_cb = self._rebuild_delegate_for_menu
+            self.controller.echo_received_cb = self._on_echo_received
+            self._ping_dialog: ServerPingDialog | None = None
             self._delegated_dialogs: dict[str, DelegatedDieRollerDialog] = {}
             self._apply_debug_protocol()
 
@@ -1312,6 +1430,11 @@ if HAS_PYSIDE6:
             play_menu.addAction(act_deselect_all)
 
             play_menu.addSeparator()
+            self.act_select_aka = QAction("Specify What &Character You're Playing...", self)
+            self.act_select_aka.triggered.connect(lambda: self._on_select_aka(auto_prompt=False))
+            play_menu.addAction(self.act_select_aka)
+
+            play_menu.addSeparator()
             self.act_edit_presets = QAction("Edit &Die Roll Presets...", self)
             self.act_edit_presets.triggered.connect(
                 lambda: self.controller.chat_panel.open_preset_editor(system_mode=False)
@@ -1343,7 +1466,82 @@ if HAS_PYSIDE6:
             self.delegate_for_menu = play_menu.addMenu("Access Die Rolls &For")
             self._rebuild_delegate_for_menu()
 
-            # 5. Help Menu
+            # 5. Tools Menu (ported from bin/mapper_legacy.tcl lines 1339-1360)
+            tools_menu = menubar.addMenu("&Tools")
+            self.act_check_updates = QAction("Check for &Updates...", self)
+            self.act_check_updates.triggered.connect(self._on_check_updates)
+            tools_menu.addAction(self.act_check_updates)
+
+            tools_menu.addSeparator()
+            self.act_clear_chat_history = QAction("Clear Chat &History", self)
+            self.act_clear_chat_history.triggered.connect(
+                lambda: self._on_reset_chat_history(-1)
+            )
+            tools_menu.addAction(self.act_clear_chat_history)
+
+            self.act_clear_pinned_chats = QAction("Clear &Pinned Chat Messages", self)
+            self.act_clear_pinned_chats.triggered.connect(self._on_clear_pinned_chats)
+            tools_menu.addAction(self.act_clear_pinned_chats)
+
+            self.reset_chat_menu = tools_menu.addMenu("Reset Chat History")
+            for qty, label in (
+                (50, "...and load 50 messages"),
+                (100, "...and load 100 messages"),
+                (500, "...and load 500 messages"),
+                (0, "...and load all"),
+            ):
+                act_rc = QAction(label, self.reset_chat_menu)
+                act_rc.triggered.connect(
+                    lambda _c=False, q=qty: self._on_reset_chat_history(q)
+                )
+                self.reset_chat_menu.addAction(act_rc)
+
+            tools_menu.addSeparator()
+            self.act_clear_image_cache = QAction("Clear Image &Cache", self)
+            self.act_clear_image_cache.triggered.connect(
+                lambda: self._on_cleanup_image_cache(0)
+            )
+            tools_menu.addAction(self.act_clear_image_cache)
+
+            self.act_clear_image_cache_60 = QAction(
+                "Clear Image Cache (over &60 days)", self
+            )
+            self.act_clear_image_cache_60.triggered.connect(
+                lambda: self._on_cleanup_image_cache(60)
+            )
+            tools_menu.addAction(self.act_clear_image_cache_60)
+
+            self.act_update_image_cache = QAction(
+                "&Update Cached Images from Server", self
+            )
+            self.act_update_image_cache.triggered.connect(
+                lambda: self._on_cleanup_image_cache("-update")
+            )
+            tools_menu.addAction(self.act_update_image_cache)
+
+            self.act_retry_failed_images = QAction(
+                "&Retry Failed Image Retrievals", self
+            )
+            self.act_retry_failed_images.triggered.connect(self._on_retry_failed_images)
+            tools_menu.addAction(self.act_retry_failed_images)
+
+            tools_menu.addSeparator()
+            self.act_server_ping_test = QAction(
+                "Test &Server Response Time...", self
+            )
+            self.act_server_ping_test.triggered.connect(self._on_server_ping_test)
+            tools_menu.addAction(self.act_server_ping_test)
+
+            tools_menu.addSeparator()
+            self.act_save_diagnostics = QAction(
+                "Save &Diagnostic Messages As...", self
+            )
+            self.act_save_diagnostics.triggered.connect(
+                self._on_save_diagnostic_messages
+            )
+            tools_menu.addAction(self.act_save_diagnostics)
+
+            # 6. Help Menu
             help_menu = menubar.addMenu("&Help")
             act_dice_syntax = QAction("&Die Roller Syntax Reference...", self)
             act_dice_syntax.triggered.connect(self._on_show_dice_syntax_help)
@@ -1353,12 +1551,7 @@ if HAS_PYSIDE6:
             act_dice_mod_help.triggered.connect(self._on_show_dice_modifier_help)
             help_menu.addAction(act_dice_mod_help)
 
-            help_menu.addSeparator()
-            act_update = QAction("Check for &Updates...", self)
-            act_update.triggered.connect(self._on_check_updates)
-            help_menu.addAction(act_update)
-
-            # 6. Tools Toolbar (ported from bin/mapper_legacy.tcl lines 2835-2880)
+            # 7. Tools Toolbar (ported from bin/mapper_legacy.tcl lines 2835-2880)
             toolbar = QToolBar("Tools", self)
             self.tools_toolbar = toolbar
             self.act_show_toolbar.triggered.connect(toolbar.setVisible)
@@ -1370,7 +1563,7 @@ if HAS_PYSIDE6:
             self.menu_tool_button.setToolTip("Main Application Menu")
             self.menu_tool_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
             compact_menu = QMenu(self.menu_tool_button)
-            for sub_m in (file_menu, edit_menu, view_menu, play_menu, help_menu):
+            for sub_m in (file_menu, edit_menu, view_menu, play_menu, tools_menu, help_menu):
                 compact_menu.addMenu(sub_m)
             self.menu_tool_button.setMenu(compact_menu)
             self.act_menu_button_widget = toolbar.addWidget(self.menu_tool_button)
@@ -2323,10 +2516,7 @@ if HAS_PYSIDE6:
             return ("", 0, "", "")
 
         def _apply_debug_protocol(self) -> None:
-            if self.controller.debug_proto:
-                self.net_client.session.debug_cb = lambda msg: print(f"[gma-mapper:proto] {msg}", flush=True)
-            else:
-                self.net_client.session.debug_cb = None
+            self.net_client.session.debug_cb = self.controller.log_protocol
 
         def _on_preferences(self) -> None:
             old_srv = self._configured_server_tuple(self.prefs)
@@ -2348,6 +2538,154 @@ if HAS_PYSIDE6:
         def _on_check_updates(self) -> None:
             dlg = UpdateCheckDialog(GMAMapperVersion, self)
             dlg.exec()
+
+        def _commit_aka_selection(self, names: list[str], not_playing: bool) -> None:
+            self.controller.apply_local_aka(names, not_playing=not_playing)
+            if self.net_client.session.is_ready():
+                self.net_client.session.aka(names, not_playing=not_playing)
+                if not_playing:
+                    msg = "Declared not playing any character."
+                elif names:
+                    msg = f"Playing as: {', '.join(names)}"
+                else:
+                    msg = "Cleared character selection (using login username)."
+                self.statusBar().showMessage(msg)
+            else:
+                warn = "Not connected to server — character selection updated locally only."
+                self.statusBar().showMessage(warn)
+                self.controller.chat_panel.append_notice(warn)
+
+        def _on_select_aka(self, auto_prompt: bool = False) -> bool:
+            dlg = SelectAKADialog(
+                known_pcs=self.controller.known_pc_names(),
+                current_aka=self.controller.local_aka,
+                local_user=self.controller.chat_panel.local_user,
+                im_not_playing=self.controller.im_not_playing,
+                show_suppress_option=auto_prompt,
+                parent=self,
+            )
+            if dlg.exec():
+                if auto_prompt and dlg.suppress_session_prompt():
+                    self.controller.suppress_aka = True
+                self._commit_aka_selection(dlg.selected_names(), dlg.not_playing())
+                return True
+            return False
+
+        def _on_reset_chat_history(self, load_qty: int) -> None:
+            self.controller.chat_panel.clear_chat_history(target=0, do_all=False)
+            if load_qty < 0:
+                msg = "Cleared local chat history."
+                self.controller.log_info(msg)
+                self.statusBar().showMessage(msg)
+                return
+            if not self.net_client.session.is_ready():
+                msg = "Cleared local chat history (not connected to server to reload messages)."
+                self.controller.log_info(msg)
+                self.statusBar().showMessage(msg)
+                return
+            target = -load_qty if load_qty > 0 else 0
+            desc = (
+                f"Loading up to {load_qty} chat messages"
+                if load_qty > 0
+                else "Loading full chat message history"
+            )
+            self.net_client.session.sync_chat(target)
+            self.net_client.session.watch_operation(desc)
+            self.controller.log_info(desc)
+            self.statusBar().showMessage(desc)
+
+        def _on_clear_pinned_chats(self) -> int:
+            count = self.controller.chat_panel.clear_pinned_messages()
+            msg = f"Cleared {count} pinned chat message(s)."
+            self.controller.log_info(msg)
+            self.statusBar().showMessage(msg)
+            return count
+
+        def _on_cleanup_image_cache(self, days_old: int | str) -> tuple[int, int, int]:
+            deleted, total, queries = self.cache.cleanup_image_cache(days_old)
+            requeried = 0
+            if days_old == "-update" and self.net_client.session.is_ready():
+                for img_name, img_zoom in queries:
+                    self.net_client.session.query_image(img_name, img_zoom)
+                requeried = len(queries)
+            msg = f"Removed {deleted} of {total} cached image file(s)"
+            if requeried:
+                msg += f" and requested {requeried} refresh(es)"
+            msg += "."
+            self.controller.log_info(msg)
+            self.statusBar().showMessage(msg)
+            return (deleted, total, requeried)
+
+        def _on_retry_failed_images(self) -> int:
+            cleared = len(
+                self.cache.forbidden_urls | self.net_client.session.forbidden_urls
+            )
+            self.cache.forbidden_urls.clear()
+            self.net_client.session.forbidden_urls.clear()
+            msg = f"Cleared {cleared} failed image/asset retrieval block(s)."
+            self.controller.log_info(msg)
+            self.statusBar().showMessage(msg)
+            return cleared
+
+        def _send_server_ping(self, slot_idx: int, origin_us: int) -> bool:
+            if not self.net_client.session.is_ready():
+                return False
+            self.net_client.session.echo(
+                s="__spt__", i=slot_idx, o={"origin": str(origin_us)}
+            )
+            return True
+
+        def _on_echo_received(self, payload: dict[str, Any]) -> None:
+            if self._ping_dialog is not None and payload.get("s") == "__spt__":
+                self._ping_dialog.handle_echo_reply(payload)
+
+        def _on_server_ping_test(self) -> ServerPingDialog:
+            if self._ping_dialog is not None:
+                self._ping_dialog.show()
+                self._ping_dialog.raise_()
+                return self._ping_dialog
+            dlg = ServerPingDialog(send_ping_cb=self._send_server_ping, parent=self)
+            self._ping_dialog = dlg
+            dlg.finished.connect(lambda _res: setattr(self, "_ping_dialog", None))
+            dlg.show()
+            return dlg
+
+        def save_diagnostics_to_file(self, path: str | Path) -> int:
+            """Write buffered diagnostic log entries to `path` and return line count."""
+            content = self.controller.format_diagnostic_text()
+            Path(path).write_text(
+                (content + "\n") if content else "",
+                encoding="utf-8",
+            )
+            return len(self.controller.diagnostic_log)
+
+        def _on_save_diagnostic_messages(self) -> None:
+            if not self.controller.diagnostic_log:
+                QMessageBox.information(
+                    self,
+                    "No Diagnostics to Save",
+                    "There are no diagnostic messages to save yet.",
+                )
+                return
+            path, _ = QFileDialog.getSaveFileName(
+                self,
+                "Save Diagnostic Messages As...",
+                "",
+                "Text Files (*.txt);;All Files (*)",
+            )
+            if not path:
+                return
+            try:
+                count = self.save_diagnostics_to_file(path)
+                self.statusBar().showMessage(
+                    f"Saved {count} diagnostic line(s) to {Path(path).name}."
+                )
+            except OSError as exc:
+                QMessageBox.critical(
+                    self,
+                    "Unable to Open File",
+                    f'Unable to write to "{path}": {exc}',
+                )
 
 else:
 

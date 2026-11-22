@@ -588,6 +588,368 @@ class TestPanelsAndCLI(unittest.TestCase):
                 win.controller.player_clock_window.close()
             win.close()
 
+    def test_select_aka_dialog_and_protocol_flow(self) -> None:
+        import json
+        import os
+
+        from gma_mapper.net.client import ProtocolSession
+        from gma_mapper.ui.dialogs.aka_dialog import SelectAKADialog, parse_custom_aka_names
+
+        # 1. Pure-Python custom name parser
+        self.assertEqual(
+            parse_custom_aka_names("Sir Robin, Valeros, , Sir Robin, Ezren "),
+            ["Sir Robin", "Valeros", "Ezren"],
+        )
+
+        # 2. ProtocolSession.aka() wire output
+        sent: list[str] = []
+        session = ProtocolSession(send_line_cb=sent.append)
+        session.reset_for_connection("localhost", 2323, "alice", "")
+        session.is_connected = True
+        session.pending_login = False
+        session.aka(["Valeros", "Sir Robin"], not_playing=False)
+        self.assertEqual(len(sent), 1)
+        self.assertTrue(sent[0].startswith("AKA "))
+        self.assertEqual(json.loads(sent[0][4:]), {"Names": ["Valeros", "Sir Robin"]})
+        sent.clear()
+        session.aka([], not_playing=True)
+        self.assertEqual(json.loads(sent[0][4:]), {"NotPlaying": True})
+
+        # 3. MapperController AKA / CONN isolation, known_pc_names, NotPlaying, and should_prompt_aka
+        ctrl = MapperController()
+        ctrl.dispatch_command("CONN", {"PeerList": [{"User": "alice", "IsMe": True}]})
+        self.assertTrue(ctrl.should_prompt_aka())
+
+        ctrl.dispatch_command(
+            "AC",
+            {"ID": "P1", "Name": "Valeros", "CreatureType": 1, "GX": 1, "GY": 1},
+        )
+        ctrl.dispatch_command(
+            "PS",
+            {"ID": "M1", "Name": "Goblin", "CreatureType": 2, "GX": 3, "GY": 3},
+        )
+        ctrl.dispatch_command(
+            "PS",
+            {"ID": "P2", "Name": "Seoni", "CreatureType": 1, "GX": 2, "GY": 2},
+        )
+        self.assertEqual(ctrl.known_pc_names(), ["Seoni", "Valeros"])
+
+        # Peer AKA must NOT overwrite local user's my_names
+        ctrl.dispatch_command(
+            "AKA",
+            {"User": "bob", "Names": ["Seoni"], "NotPlaying": False},
+        )
+        self.assertEqual(ctrl.peer_aka["bob"], ["Seoni"])
+        self.assertFalse(ctrl.peer_not_playing["bob"])
+        self.assertEqual(ctrl.my_names, ["alice"])
+        self.assertTrue(ctrl.should_prompt_aka())
+
+        # Local AKA updates my_names & suppresses prompt
+        ctrl.dispatch_command(
+            "AKA",
+            {"User": "alice", "Names": ["Valeros"], "NotPlaying": False},
+        )
+        self.assertEqual(ctrl.local_aka, ["Valeros"])
+        self.assertEqual(ctrl.my_names, ["Valeros"])
+        self.assertFalse(ctrl.should_prompt_aka())
+
+        # NotPlaying clears my_names without falling back to all PCs or username
+        ctrl.dispatch_command(
+            "AKA",
+            {"User": "alice", "Names": [], "NotPlaying": True},
+        )
+        self.assertTrue(ctrl.im_not_playing)
+        self.assertEqual(ctrl.my_names, [])
+        self.assertEqual(ctrl._target_context_snapshot()[0], [])
+        ctrl._update_ondeck_and_audio()
+        self.assertEqual(ctrl.clock_panel.my_names, [])
+        self.assertFalse(ctrl.should_prompt_aka())
+
+        # CONN populates local and peer AKA / NotPlaying accurately
+        ctrl.dispatch_command(
+            "CONN",
+            {
+                "PeerList": [
+                    {"User": "alice", "AKA": ["Valeros"], "NotPlaying": False, "IsMe": True},
+                    {"User": "bob", "AKA": ["Seoni"], "NotPlaying": False, "IsMe": False},
+                    {"User": "obs", "AKA": ["Ghost"], "NotPlaying": True, "IsMe": False},
+                ]
+            },
+        )
+        self.assertEqual(ctrl.local_aka, ["Valeros"])
+        self.assertFalse(ctrl.im_not_playing)
+        self.assertEqual(ctrl.peer_aka["bob"], ["Seoni"])
+        self.assertTrue(ctrl.peer_not_playing["obs"])
+        self.assertNotIn("Ghost", ctrl.peer_names)
+
+        # should_prompt_aka returns False for GM or matching PC name
+        gm_ctrl = MapperController()
+        gm_ctrl.dispatch_command("GRANTED", {"User": "GM"})
+        self.assertFalse(gm_ctrl.should_prompt_aka())
+
+        pc_ctrl = MapperController()
+        pc_ctrl.dispatch_command("GRANTED", {"User": "Valeros"})
+        pc_ctrl.dispatch_command("AC", {"ID": "P1", "Name": "Valeros", "CreatureType": 1})
+        self.assertFalse(pc_ctrl.should_prompt_aka())
+
+        # 4. Qt Dialog & GMAMapperMainWindow Play menu wiring
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        try:
+            from PySide6.QtWidgets import QApplication
+            from gma_mapper.ui.main_window import GMAMapperMainWindow
+        except ImportError:
+            self.skipTest("PySide6 not available")
+
+        _app = QApplication.instance() or QApplication([])
+        dlg = SelectAKADialog(
+            known_pcs=["Valeros", "Seoni"],
+            current_aka=["Valeros", "Sir Robin"],
+            local_user="alice",
+            im_not_playing=False,
+            show_suppress_option=True,
+        )
+        self.assertEqual(dlg.windowTitle(), "Who Are You?")
+        self.assertTrue(dlg.pc_checkboxes["Valeros"].isChecked())
+        self.assertFalse(dlg.pc_checkboxes["Seoni"].isChecked())
+        self.assertEqual(dlg.custom_edit.text(), "Sir Robin")
+        self.assertIsNotNone(dlg.suppress_chk)
+        self.assertEqual(dlg.selected_names(), ["Valeros", "Sir Robin"])
+
+        # Toggling NotPlaying disables PC checkboxes and custom input and clears selected_names
+        dlg.not_playing_chk.setChecked(True)
+        self.assertFalse(dlg.pc_checkboxes["Valeros"].isEnabled())
+        self.assertFalse(dlg.custom_edit.isEnabled())
+        self.assertTrue(dlg.not_playing())
+        self.assertEqual(dlg.selected_names(), [])
+        dlg.close()
+
+        win = GMAMapperMainWindow()
+        try:
+            self.assertEqual(
+                win.act_select_aka.text(),
+                "Specify What &Character You're Playing...",
+            )
+            # Disconnected commit updates locally with notice
+            win._commit_aka_selection(["Seoni"], not_playing=False)
+            self.assertEqual(win.controller.local_aka, ["Seoni"])
+            self.assertIn("updated locally", win.statusBar().currentMessage())
+
+            # Connected commit transmits AKA over ProtocolSession
+            win_sent: list[str] = []
+            win.net_client.session.send_line_cb = win_sent.append
+            win.net_client.session.reset_for_connection("localhost", 2323, "alice", "")
+            win.net_client.session.is_connected = True
+            win.net_client.session.pending_login = False
+            win._commit_aka_selection(["Valeros", "Seoni"], not_playing=False)
+            self.assertEqual(len(win_sent), 1)
+            self.assertEqual(
+                json.loads(win_sent[0][4:]),
+                {"Names": ["Valeros", "Seoni"]},
+            )
+        finally:
+            win.close()
+
+    def test_tools_menu_cache_chat_ping_and_diagnostics(self) -> None:
+        import json
+        import os
+        import tempfile
+        import time
+
+        from gma_mapper.core.dice import ChatHistoryManager
+        from gma_mapper.ui.dialogs.ping_dialog import (
+            compute_ping_metrics,
+            parse_rfc3339_seconds,
+        )
+
+        # 1. Pure-Python RFC 3339 parser & ping metric calculations
+        self.assertEqual(parse_rfc3339_seconds(""), 0.0)
+        self.assertEqual(parse_rfc3339_seconds("0001-01-01T00:00:00Z"), 0.0)
+        self.assertEqual(parse_rfc3339_seconds("not-a-timestamp"), 0.0)
+        t_recd = parse_rfc3339_seconds("2026-11-22T20:00:00.100000000Z")
+        t_sent = parse_rfc3339_seconds("2026-11-22T20:00:00.105000000Z")
+        self.assertAlmostEqual((t_sent - t_recd) * 1000.0, 5.0, places=3)
+        t_tz = parse_rfc3339_seconds("2026-11-22T12:00:00.250000-08:00")
+        self.assertGreater(t_tz, 0.0)
+
+        self.assertIsNone(compute_ping_metrics({"s": "other"}, 100_000))
+        metrics = compute_ping_metrics(
+            {
+                "s": "__spt__",
+                "i": 2,
+                "o": {"origin": "1000000"},
+                "ReceivedTime": "2026-11-22T20:00:00.100000Z",
+                "SentTime": "2026-11-22T20:00:00.102500Z",
+            },
+            now_us=1_015_000,
+        )
+        assert metrics is not None
+        slot_idx, in_transit_ms, in_server_ms, round_trip_ms = metrics
+        self.assertEqual(slot_idx, 2)
+        self.assertAlmostEqual(round_trip_ms, 15.0, places=3)
+        self.assertAlmostEqual(in_server_ms, 2.5, places=3)
+        self.assertAlmostEqual(in_transit_ms, 12.5, places=3)
+
+        # 2. ChatHistoryManager.clear_pinned_messages
+        hist = ChatHistoryManager()
+        hist.add_chat_message({"MessageID": 1, "Sender": "Alice", "Text": "Local pin"})
+        hist.add_chat_message({"MessageID": 2, "Sender": "GM", "Text": "Server pin", "Pin": True})
+        hist.pin_message(1)
+        self.assertEqual(len(hist.pinned_entries()), 2)
+        self.assertEqual(hist.clear_pinned_messages(), 2)
+        self.assertEqual(hist.pinned_entries(), [])
+        self.assertNotIn(1, hist.pin_list)
+        self.assertIn(2, hist.hide_list)
+
+        # 3. Qt ServerPingDialog & GMAMapperMainWindow Tools menu integration
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        try:
+            from PySide6.QtWidgets import QApplication
+            from gma_mapper.ui.dialogs.ping_dialog import ServerPingDialog
+            from gma_mapper.ui.main_window import GMAMapperMainWindow
+        except ImportError:
+            self.skipTest("PySide6 not available")
+
+        _app = QApplication.instance() or QApplication([])
+        sent_pings: list[tuple[int, int]] = []
+        ping_dlg = ServerPingDialog(
+            send_ping_cb=lambda idx, ts: sent_pings.append((idx, ts)) or True,
+            auto_start=False,
+        )
+        try:
+            slot = ping_dlg.send_ping()
+            self.assertEqual(slot, 0)
+            self.assertEqual(len(sent_pings), 1)
+            self.assertEqual(ping_dlg.table.item(0, 1).text(), "pending...")
+            origin_us = sent_pings[0][1]
+            ok = ping_dlg.handle_echo_reply(
+                {
+                    "s": "__spt__",
+                    "i": 0,
+                    "o": {"origin": str(origin_us)},
+                    "ReceivedTime": "2026-11-22T20:00:00.000Z",
+                    "SentTime": "2026-11-22T20:00:00.001Z",
+                },
+                now_us=origin_us + 8000,
+            )
+            self.assertTrue(ok)
+            self.assertEqual(ping_dlg.table.item(0, 1).text(), "7.000ms")
+            self.assertEqual(ping_dlg.table.item(0, 2).text(), "1.000ms")
+            self.assertEqual(ping_dlg.table.item(0, 3).text(), "8.000ms")
+
+            disc_dlg = ServerPingDialog(send_ping_cb=lambda _i, _t: False, auto_start=False)
+            disc_dlg.send_ping()
+            self.assertEqual(disc_dlg.table.item(0, 1).text(), "disconnected")
+            disc_dlg.close()
+        finally:
+            ping_dlg.close()
+
+        win = GMAMapperMainWindow()
+        try:
+            # Verify Tools menu & actions
+            menu_titles = [act.text() for act in win.menuBar().actions()]
+            self.assertIn("&Tools", menu_titles)
+            self.assertEqual(win.reset_chat_menu.actions().__len__(), 4)
+            self.assertEqual(win.act_check_updates.text(), "Check for &Updates...")
+            self.assertEqual(win.act_clear_chat_history.text(), "Clear Chat &History")
+            self.assertEqual(win.act_clear_pinned_chats.text(), "Clear &Pinned Chat Messages")
+            self.assertEqual(win.act_clear_image_cache.text(), "Clear Image &Cache")
+            self.assertEqual(win.act_clear_image_cache_60.text(), "Clear Image Cache (over &60 days)")
+            self.assertEqual(win.act_update_image_cache.text(), "&Update Cached Images from Server")
+            self.assertEqual(win.act_retry_failed_images.text(), "&Retry Failed Image Retrievals")
+            self.assertEqual(win.act_server_ping_test.text(), "Test &Server Response Time...")
+            self.assertEqual(win.act_save_diagnostics.text(), "Save &Diagnostic Messages As...")
+
+            # Wire session capture
+            win_sent: list[str] = []
+            win.net_client.session.send_line_cb = win_sent.append
+            win.net_client.session.reset_for_connection("localhost", 2323, "alice", "")
+            win.net_client.session.is_connected = True
+            win.net_client.session.pending_login = False
+
+            # Chat clear & Reset Chat History (50 / all)
+            win.controller.chat_panel.append_chat(
+                {"MessageID": 10, "Sender": "alice", "Text": "Hello", "Pin": True}
+            )
+            win._on_reset_chat_history(-1)
+            self.assertEqual(win_sent, [])
+            self.assertEqual(len(win.controller.chat_panel.history_manager.pinned_entries()), 1)
+
+            self.assertEqual(win._on_clear_pinned_chats(), 1)
+            self.assertEqual(win.controller.chat_panel.history_manager.pinned_entries(), [])
+
+            win._on_reset_chat_history(50)
+            self.assertTrue(any(l == 'SYNC-CHAT {"Target":-50}' for l in win_sent))
+            self.assertTrue(any(l.startswith("ECHO ") for l in win_sent))
+            win_sent.clear()
+            win._on_reset_chat_history(0)
+            self.assertTrue(any(l == "SYNC-CHAT {}" for l in win_sent))
+            win_sent.clear()
+
+            # Image cache cleanup (0 & -update) + retry failed retrievals
+            with tempfile.TemporaryDirectory() as tmpdir:
+                win.cache.cache_dir = Path(tmpdir)
+                cache_file = win.cache.cache_filename("orc", 1.0)
+                cache_file.parent.mkdir(parents=True, exist_ok=True)
+                cache_file.write_bytes(b"PNG")
+                os.utime(cache_file, (time.time() - 60, time.time() - 60))
+
+                deleted, total, requeried = win._on_cleanup_image_cache("-update")
+                self.assertEqual((deleted, total, requeried), (1, 1, 1))
+                self.assertFalse(cache_file.exists())
+                self.assertTrue(any(l.startswith("AI? ") and '"orc"' in l for l in win_sent))
+                win_sent.clear()
+
+                cache_file2 = win.cache.cache_filename("goblin", 1.0)
+                cache_file2.write_bytes(b"PNG")
+                self.assertEqual(win._on_cleanup_image_cache(0), (1, 1, 0))
+                self.assertFalse(cache_file2.exists())
+
+            win.cache.forbidden_urls.add("https://example.com/bad.png")
+            win.net_client.session.forbidden_urls.add("bad:1.00")
+            self.assertEqual(win._on_retry_failed_images(), 2)
+            self.assertEqual(win.cache.forbidden_urls, set())
+            self.assertEqual(win.net_client.session.forbidden_urls, set())
+
+            # Server Ping Test dialog + ECHO dispatch
+            win_sent.clear()
+            live_ping_dlg = win._on_server_ping_test()
+            self.assertIs(win._ping_dialog, live_ping_dlg)
+            echo_lines = [l for l in win_sent if l.startswith("ECHO ")]
+            self.assertEqual(len(echo_lines), 1)
+            echo_req = json.loads(echo_lines[0][5:])
+            self.assertEqual(echo_req["s"], "__spt__")
+            origin_val = int(echo_req["o"]["origin"])
+            win.controller.dispatch_command(
+                "ECHO",
+                {
+                    "s": "__spt__",
+                    "i": 0,
+                    "o": {"origin": str(origin_val)},
+                    "ReceivedTime": "2026-11-22T20:00:00.000Z",
+                    "SentTime": "2026-11-22T20:00:00.002Z",
+                },
+            )
+            self.assertTrue(live_ping_dlg.table.item(0, 3).text().endswith("ms"))
+            live_ping_dlg.close()
+            self.assertIsNone(win._ping_dialog)
+
+            # Diagnostic buffering & save to file
+            win.controller.debug_level = 1
+            win.controller.log_debug(0, "boom error")
+            win.controller.log_debug(2, "filtered out")
+            with tempfile.TemporaryDirectory() as tmpdir:
+                diag_path = Path(tmpdir) / "diag.txt"
+                count = win.save_diagnostics_to_file(diag_path)
+                self.assertGreater(count, 0)
+                text = diag_path.read_text(encoding="utf-8")
+                self.assertIn("ERROR   |boom error", text)
+                self.assertIn("PROTOCOL|-> AI?", text)
+                self.assertNotIn("filtered out", text)
+        finally:
+            if win._ping_dialog is not None:
+                win._ping_dialog.close()
+            win.close()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -324,11 +324,34 @@ class ProtocolSession:
             self.begin_progress_cb(op_id, description, "*")
         return op_id
 
+    def echo(
+        self,
+        s: str = "",
+        i: int = 0,
+        b: bool = False,
+        o: dict[str, Any] | None = None,
+    ) -> None:
+        """Send an `ECHO` round-trip packet (used by `ServerPingTest`)."""
+        payload: dict[str, Any] = {}
+        if s:
+            payload["s"] = s
+        if i:
+            payload["i"] = i
+        if b:
+            payload["b"] = True
+        if o:
+            payload["o"] = {str(k): str(v) for k, v in o.items()}
+        self.send_command("ECHO", payload)
+
     def adjust_view(self, x: float, y: float, grid_label: str = "") -> None:
         self.send_command("AV", {"Grid": grid_label, "XView": x, "YView": y})
 
     def character_name(self, names: list[str], not_playing: bool = False) -> None:
         self.send_command("AKA", {"Names": names, "NotPlaying": not_playing})
+
+    def aka(self, names: list[str], not_playing: bool = False) -> None:
+        """Alias for :meth:`character_name` sending an `AKA` protocol command."""
+        self.character_name(names, not_playing=not_playing)
 
     def chat_message(
         self,

@@ -1740,6 +1740,25 @@ class ChatHistoryManager:
         self.hide_list.add(int(msg_id))
         self.pin_list.discard(int(msg_id))
 
+    def clear_pinned_messages(self) -> int:
+        """Unpin locally pinned messages and hide server-pinned messages (`ClearPinnedChats`)."""
+        pinned = self.pinned_entries()
+        count = 0
+        for entry in pinned:
+            mid = entry.get("MessageID")
+            if mid is None:
+                continue
+            try:
+                mid_int = int(mid)
+            except (TypeError, ValueError):
+                continue
+            if mid_int in self.pin_list:
+                self.unpin_message(mid_int)
+            else:
+                self.hide_message(mid_int)
+            count += 1
+        return count
+
     def visible_entries(self) -> list[dict[str, Any]]:
         """Return all non-hidden history entries in chronological order."""
         out: list[dict[str, Any]] = []

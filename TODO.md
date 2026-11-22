@@ -1,7 +1,7 @@
 # GMA Mapper (`v5.0`) — Remaining Main Window To-Do List
 
 ## 1. Play Menu Additions
-- [ ] **"Specify What Character You're Playing..." (`AKA`)**: Dialog allowing players to select or enter which character(s) they control and send `ProtocolSession.aka()` to the server.
+- [x] **"Specify What Character You're Playing..." (`AKA`)**: Dialog allowing players to select or enter which character(s) they control and send `ProtocolSession.aka()` to the server.
 - [x] **Die-Roll Preset Editor**:
   - [x] *"Edit Die Roll Presets..."* and *"Edit System Die Roll Presets..."* (in-app CRUD editor synced via `DD`, `DD+`, `DR`/`DD=`).
 - [x] **Die-Roll Preset Delegation**:
@@ -10,17 +10,17 @@
 - [ ] **Quick Server Profile Switcher**: Submenu in the Play menu to switch between saved server profiles or reconnect without opening `PreferencesDialog`.
 
 ## 2. Tools Menu (Cache, Chat & Diagnostics)
-- [ ] **Top-level Tools Menu**: Add `&Tools` menu to `GMAMapperMainWindow` (including *"Check for Updates..."* currently under Help, if moving/mirroring to match legacy).
-- [ ] **Image Cache Management**:
-  - [ ] *"Clear Image Cache"* (`cleanup_image_cache(0)`), *"Clear Image Cache (over 60 days)"* (`cleanup_image_cache(60)`), and *"Update Cached Images from Server"* (`cleanup_image_cache("-update")` + `AI?` re-queries).
-  - [ ] *"Retry Failed Image Retrievals"* (clear `forbidden_urls` on `AssetCache` and `ProtocolSession`).
-- [ ] **Chat History Management**:
-  - [ ] *"Clear Chat History"* and *"Clear Pinned Chat Messages"*.
-  - [ ] *"Reset Chat History"* submenu (*"...and load 50 / 100 / 500 / all messages"*, clearing local chat and sending `SYNC-CHAT` via `ProtocolSession.sync_chat()`).
-- [ ] **Server Ping Test**:
-  - [ ] *"Test Server Response Time..."* dialog (`ServerPingTest`) using periodic `ECHO` round-trip timing (In Transit / In Server / Round-Trip).
-- [ ] **Diagnostic Logging**:
-  - [ ] *"Save Diagnostic Messages As..."* (`SaveDebugText` — capture diagnostic log buffer and export to `.txt`).
+- [x] **Top-level Tools Menu**: Add `&Tools` menu to `GMAMapperMainWindow` (including *"Check for Updates..."* currently under Help, if moving/mirroring to match legacy).
+- [x] **Image Cache Management**:
+  - [x] *"Clear Image Cache"* (`cleanup_image_cache(0)`), *"Clear Image Cache (over 60 days)"* (`cleanup_image_cache(60)`), and *"Update Cached Images from Server"* (`cleanup_image_cache("-update")` + `AI?` re-queries).
+  - [x] *"Retry Failed Image Retrievals"* (clear `forbidden_urls` on `AssetCache` and `ProtocolSession`).
+- [x] **Chat History Management**:
+  - [x] *"Clear Chat History"* and *"Clear Pinned Chat Messages"*.
+  - [x] *"Reset Chat History"* submenu (*"...and load 50 / 100 / 500 / all messages"*, clearing local chat and sending `SYNC-CHAT` via `ProtocolSession.sync_chat()`).
+- [x] **Server Ping Test**:
+  - [x] *"Test Server Response Time..."* dialog (`ServerPingTest`) using periodic `ECHO` round-trip timing (In Transit / In Server / Round-Trip).
+- [x] **Diagnostic Logging**:
+  - [x] *"Save Diagnostic Messages As..."* (`SaveDebugText` — capture diagnostic log buffer and export to `.txt`).
 
 ## 3. View Menu Dock Toggles
 - [ ] Add `clock_dock.toggleViewAction()` (`Alt+C`), `combat_dock.toggleViewAction()`, and `chat_dock.toggleViewAction()` (`Alt+D`) to the **View** menu so closed dock panels can be easily reopened.

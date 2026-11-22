@@ -1018,6 +1018,12 @@ if QT_AVAILABLE:
             )
             self._rerender_history_views()
 
+        def clear_pinned_messages(self) -> int:
+            """Unpin locally pinned messages and hide server-pinned messages, then refresh."""
+            count = self.history_manager.clear_pinned_messages()
+            self._rerender_history_views()
+            return count
+
         def prune_chat_history(self, min_id: int | None, max_id: int | None) -> None:
             """Apply `Y2` message pruning and re-render chat and pinned panes."""
             self.history_manager.prune_chat_history(min_id=min_id, max_id=max_id)
