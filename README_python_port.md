@@ -11,12 +11,20 @@ This guide walks through creating the virtual environment, installing dependenci
   python --version
   ```
 - **Git** (to clone or update the repository).
+- **Repository**: https://github.com/MadScienceZone/gma-mapper.git
 
 ---
 
-## 2. Navigate to the Repository
+## 2. Clone or Navigate to the Repository
 
-Open a terminal (PowerShell or Command Prompt) and change into the project root directory:
+If cloning for the first time, clone the repository and check out the `python-port` branch:
+
+```powershell
+git clone -b python-port https://github.com/MadScienceZone/gma-mapper.git
+cd gma-mapper
+```
+
+Or if you already have the repository cloned locally, change into the project root directory:
 
 ```powershell
 cd c:\Users\mbutry\Documents\GMA\gma-mapper

@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import base64
+import functools
 import gzip
 import hashlib
 import hmac
@@ -304,6 +305,10 @@ def my_platform() -> list[str]:
     ]
 
 
+# Cache executable PATH lookups (`curl`, `nc`, `scp`, `ssh`): `default_preferences()`,
+# `empty_server_profile()`, and `fix_missing()` query these binaries repeatedly, and
+# uncached `shutil.which()` scans every directory on the OS PATH on each call.
+@functools.lru_cache(maxsize=32)
 def search_in_path(cmd: str) -> str:
     """Search for an executable command in the user's PATH.
 
