@@ -18,9 +18,13 @@ from gma_mapper.core.file_io import (
 )
 from gma_mapper.core.profile import (
     default_preferences,
+    default_window_layout,
+    default_window_layout_path,
     find_server_index,
+    load_window_layout,
     preferred_color,
     save as save_preferences,
+    save_window_layout as save_window_layout_file,
 )
 from gma_mapper.net.client import GMANetworkClient
 from gma_mapper.ui.audio import AudioManager
@@ -63,7 +67,7 @@ from gma_mapper.ui.panels.combat import (
 )
 
 try:
-    from PySide6.QtCore import QEvent, QSize, Qt, QTimer, Signal
+    from PySide6.QtCore import QByteArray, QEvent, QSize, Qt, QTimer, Signal
     from PySide6.QtGui import QAction, QActionGroup, QCloseEvent, QColor, QKeySequence, QPixmap
     from PySide6.QtWidgets import (
         QApplication,
@@ -957,6 +961,14 @@ if HAS_PYSIDE6:
             super().__init__()
             self.prefs = prefs or default_preferences()
             self.prefs_path = Path(prefs_path) if prefs_path else None
+            self.window_layout_path: Path | None = (
+                default_window_layout_path(self.prefs_path) if self.prefs_path else None
+            )
+            self.window_layout: dict[str, Any] = (
+                load_window_layout(self.window_layout_path)
+                if self.window_layout_path
+                else default_window_layout()
+            )
             self.cache = AssetCache()
             self.audio = AudioManager()
             self._saf_mode = False
@@ -967,6 +979,7 @@ if HAS_PYSIDE6:
             )
             self._download_pool = ThreadPoolExecutor(max_workers=4)
             self._auth_prompt_pending = False
+            self._chat_history_synced_for_session = False
             self.act_reconnect_server: Any = None
             self.act_disconnect_server: Any = None
             self.net_client = GMANetworkClient(self)
@@ -1008,6 +1021,7 @@ if HAS_PYSIDE6:
             self._wire_signals()
             self.setStatusBar(QStatusBar(self))
             self.statusBar().showMessage("Ready")
+            self.restore_window_layout()
 
         def _submit_image_download(self, name: str, zoom: float, file_id: str, url_base: str) -> None:
             def _worker() -> None:
@@ -1046,16 +1060,20 @@ if HAS_PYSIDE6:
 
         def _create_docks(self) -> None:
             self.clock_dock = IndependentDockWidget("Initiative & Clock", self)
+            self.clock_dock.setObjectName("clock_dock")
             self.clock_dock.setWidget(self.controller.clock_panel)
             self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.clock_dock)
 
             self.combat_dock = IndependentDockWidget("Combat & Conditions", self)
+            self.combat_dock.setObjectName("combat_dock")
             self.combat_dock.setWidget(self.controller.combat_panel)
             self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.combat_dock)
 
             self.chat_dock = IndependentDockWidget("Chat & Dice Roller", self)
+            self.chat_dock.setObjectName("chat_dock")
             self.chat_dock.setWidget(self.controller.chat_panel)
             self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.chat_dock)
+            self.chat_dock.visibilityChanged.connect(self._on_chat_dock_visibility_changed)
 
             self._sync_role_ui()
 
@@ -1359,6 +1377,14 @@ if HAS_PYSIDE6:
             self.act_view_clock_dock = self.clock_dock.toggleViewAction()
             self.act_view_clock_dock.setShortcut(QKeySequence("Alt+Shift+C"))
             view_menu.addAction(self.act_view_clock_dock)
+
+            self.act_save_window_layout = QAction("&Save Window Layout", self)
+            self.act_save_window_layout.triggered.connect(self._on_save_window_layout)
+            view_menu.addAction(self.act_save_window_layout)
+
+            self.act_reset_window_layout = QAction("Reset &Window Layout", self)
+            self.act_reset_window_layout.triggered.connect(self._on_reset_window_layout)
+            view_menu.addAction(self.act_reset_window_layout)
             view_menu.addSeparator()
 
             self.act_show_grid = QAction("Show Map &Grid", self)
@@ -1648,6 +1674,7 @@ if HAS_PYSIDE6:
 
             # 7. Tools Toolbar (ported from bin/mapper_legacy.tcl lines 2835-2880)
             toolbar = QToolBar("Tools", self)
+            toolbar.setObjectName("tools_toolbar")
             self.tools_toolbar = toolbar
             self.act_show_toolbar.triggered.connect(toolbar.setVisible)
             self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
@@ -1759,7 +1786,7 @@ if HAS_PYSIDE6:
             self.net_client.command_received.connect(self.controller.dispatch_command)
             self.net_client.progress_message.connect(self._on_progress_message)
             self.net_client.server_notice.connect(lambda msg: self.statusBar().showMessage(f"Notice: {msg}"))
-            self.net_client.connection_lost.connect(lambda err: self.statusBar().showMessage(f"Disconnected: {err}"))
+            self.net_client.connection_lost.connect(self._on_connection_lost)
             self.net_client.login_successful.connect(self._on_login_successful)
 
             self.map_view.token_dragged.connect(
@@ -2032,7 +2059,68 @@ if HAS_PYSIDE6:
                         srv["password"] = pw
                         self.connect_to_configured_server()
 
+        def _on_connection_lost(self, err: str) -> None:
+            self._chat_history_synced_for_session = False
+            self.statusBar().showMessage(f"Disconnected: {err}")
+
+        def _active_server_profile(self) -> dict[str, Any]:
+            prof_name = str(
+                self.prefs.get("current_profile")
+                or self.prefs.get("current_server")
+                or "offline"
+            )
+            idx = find_server_index(self.prefs, prof_name)
+            profiles = self.prefs.get("profiles", [])
+            if 0 <= idx < len(profiles) and isinstance(profiles[idx], dict):
+                return profiles[idx]
+            return {}
+
+        def sync_chat_history_from_server(self) -> bool:
+            """Request chat/roll history from the server (`InitializeChatHistory` parity)."""
+            if not self.net_client.session.is_ready():
+                return False
+            prof = self._active_server_profile()
+            if bool(prof.get("suppress_chat", False)):
+                return False
+            raw_limit = prof.get("chat_limit", 500)
+            try:
+                chat_limit = int(500 if raw_limit is None else raw_limit)
+            except (TypeError, ValueError):
+                chat_limit = 500
+            if chat_limit < 0:
+                return False
+
+            last_id = self.controller.chat_panel.history_manager.last_message_id()
+            if last_id <= 0:
+                if chat_limit > 0:
+                    self.net_client.session.sync_chat(-chat_limit)
+                    self.net_client.session.watch_operation(
+                        f"Loading up to {chat_limit} chat messages"
+                    )
+                else:
+                    self.net_client.session.sync_chat(0)
+                    self.net_client.session.watch_operation(
+                        "Loading full chat message history"
+                    )
+            else:
+                self.net_client.session.sync_chat(last_id)
+                self.net_client.session.watch_operation("Loading new chat messages")
+            self._chat_history_synced_for_session = True
+            return True
+
+        def _on_chat_dock_visibility_changed(self, visible: bool) -> None:
+            if not visible or not hasattr(self, "net_client"):
+                return
+            if not self.net_client.session.is_ready():
+                return
+            if (
+                not self._chat_history_synced_for_session
+                or self.controller.chat_panel.history_manager.last_message_id() <= 0
+            ):
+                self.sync_chat_history_from_server()
+
         def _on_login_successful(self) -> None:
+            self._chat_history_synced_for_session = False
             user = str(getattr(self.net_client.session, "username", "") or "")
             if user:
                 self.controller.chat_panel.set_identity(user)
@@ -2046,6 +2134,7 @@ if HAS_PYSIDE6:
             self.net_client.session.subscribe()
             self.net_client.session.allow(["GMA-MARKUP", "DICE-COLOR-BOXES", "DICE-COLOR-LABELS"])
             self.net_client.session.sync()
+            self.sync_chat_history_from_server()
 
         def connect_to_configured_server(self) -> None:
             prof_name = self.prefs.get("current_profile") or self.prefs.get("current_server", "offline")
@@ -2299,7 +2388,17 @@ if HAS_PYSIDE6:
         def _sync_role_ui(self) -> None:
             is_gm = bool(self.controller.chat_panel.is_gm)
             if hasattr(self, "clock_dock"):
-                self.clock_dock.setVisible(is_gm)
+                if is_gm:
+                    layout = self.window_layout
+                    if isinstance(layout, dict) and bool(layout.get("saved", False)):
+                        clock_vis = bool(
+                            layout.get("docks", {}).get("clock", {}).get("visible", True)
+                        )
+                    else:
+                        clock_vis = True
+                    self.clock_dock.setVisible(clock_vis)
+                else:
+                    self.clock_dock.setVisible(False)
             if hasattr(self, "act_view_clock_dock"):
                 self.act_view_clock_dock.setVisible(is_gm)
                 self.act_view_clock_dock.setEnabled(is_gm)
@@ -2671,6 +2770,16 @@ if HAS_PYSIDE6:
 
         def switch_server_profile(self, profile_name: str) -> bool:
             """Switch active server profile in preferences, persist, and reconnect/hang up."""
+            old_profile = str(
+                self.prefs.get("current_profile")
+                or self.prefs.get("current_server")
+                or "offline"
+            )
+            self._chat_history_synced_for_session = False
+            if profile_name != old_profile and hasattr(
+                self.controller.chat_panel, "clear_chat_history"
+            ):
+                self.controller.chat_panel.clear_chat_history(target=0, do_all=True)
             self.prefs["current_profile"] = profile_name
             self.prefs["current_server"] = profile_name
             self.controller.apply_preferences(self.prefs)
@@ -2693,12 +2802,14 @@ if HAS_PYSIDE6:
                     "Current profile is offline — no server configured."
                 )
                 return False
+            self._chat_history_synced_for_session = False
             self.net_client.hangup()
             self.connect_to_configured_server()
             return True
 
         def disconnect_server(self) -> None:
             """Disconnect from the GMA server and enter offline state."""
+            self._chat_history_synced_for_session = False
             self.net_client.hangup()
             self.controller.log_info("Disconnected from server.")
             self.statusBar().showMessage("Disconnected (offline).")
@@ -2890,8 +3001,191 @@ if HAS_PYSIDE6:
                     f'Unable to write to "{path}": {exc}',
                 )
 
+        def _dock_area_to_name(self, area: Qt.DockWidgetArea, fallback: str) -> str:
+            area_map = {
+                Qt.DockWidgetArea.LeftDockWidgetArea: "left",
+                Qt.DockWidgetArea.RightDockWidgetArea: "right",
+                Qt.DockWidgetArea.TopDockWidgetArea: "top",
+                Qt.DockWidgetArea.BottomDockWidgetArea: "bottom",
+            }
+            return area_map.get(area, fallback)
+
+        def _name_to_dock_area(self, name: str, fallback: str = "right") -> Qt.DockWidgetArea:
+            name_map = {
+                "left": Qt.DockWidgetArea.LeftDockWidgetArea,
+                "right": Qt.DockWidgetArea.RightDockWidgetArea,
+                "top": Qt.DockWidgetArea.TopDockWidgetArea,
+                "bottom": Qt.DockWidgetArea.BottomDockWidgetArea,
+            }
+            return name_map.get(str(name).strip().lower(), name_map[fallback])
+
+        def _layout_dock_specs(self) -> tuple[tuple[str, IndependentDockWidget, str], ...]:
+            return (
+                ("clock", self.clock_dock, "right"),
+                ("combat", self.combat_dock, "right"),
+                ("chat", self.chat_dock, "bottom"),
+            )
+
+        def _apply_dock_layout(
+            self,
+            key: str,
+            dock: IndependentDockWidget,
+            cfg: dict[str, Any],
+            default_area: str,
+        ) -> None:
+            target_area = self._name_to_dock_area(
+                str(cfg.get("area") or default_area), default_area
+            )
+            if self.dockWidgetArea(dock) != target_area:
+                self.addDockWidget(target_area, dock)
+            is_floating = bool(cfg.get("floating", False))
+            dock.setFloating(is_floating)
+
+            geom = cfg.get("geometry")
+            if isinstance(geom, dict):
+                gx = int(geom.get("x", 0) or 0)
+                gy = int(geom.get("y", 0) or 0)
+                gw = int(geom.get("width", 0) or 0)
+                gh = int(geom.get("height", 0) or 0)
+                if gw > 0 and gh > 0:
+                    if is_floating:
+                        dock.setGeometry(gx, gy, gw, gh)
+                    else:
+                        horizontal = target_area in (
+                            Qt.DockWidgetArea.LeftDockWidgetArea,
+                            Qt.DockWidgetArea.RightDockWidgetArea,
+                        )
+                        orient = (
+                            Qt.Orientation.Horizontal
+                            if horizontal
+                            else Qt.Orientation.Vertical
+                        )
+                        self.resizeDocks([dock], [gw if horizontal else gh], orient)
+
+            if key == "clock" and not bool(self.controller.chat_panel.is_gm):
+                dock.setVisible(False)
+            else:
+                dock.setVisible(bool(cfg.get("visible", True)))
+
+        def save_window_layout(self, persist: bool = True) -> dict[str, Any]:
+            """Capture main window and dock states/geometries into `window_layout.json`."""
+            prev = self.window_layout
+            if not isinstance(prev, dict):
+                prev = default_window_layout()
+            prev_docks = prev.get("docks") if isinstance(prev.get("docks"), dict) else {}
+
+            rect = (
+                self.normalGeometry()
+                if self.isMaximized() and self.normalGeometry().isValid()
+                else self.geometry()
+            )
+            docks_out: dict[str, dict[str, Any]] = {}
+            is_gm = bool(self.controller.chat_panel.is_gm)
+            for key, dock, default_area in self._layout_dock_specs():
+                prev_dock = prev_docks.get(key) if isinstance(prev_docks.get(key), dict) else {}
+                prev_area = str(prev_dock.get("area") or default_area)
+                area_name = self._dock_area_to_name(self.dockWidgetArea(dock), prev_area)
+                vis = (
+                    bool(prev_dock.get("visible", True))
+                    if (key == "clock" and not is_gm)
+                    else (not dock.isHidden())
+                )
+                g = dock.geometry()
+                docks_out[key] = {
+                    "floating": bool(dock.isFloating()),
+                    "area": area_name,
+                    "visible": vis,
+                    "geometry": {
+                        "x": int(g.x()),
+                        "y": int(g.y()),
+                        "width": int(g.width()),
+                        "height": int(g.height()),
+                    },
+                }
+
+            layout: dict[str, Any] = {
+                "saved": True,
+                "main_geometry": bytes(self.saveGeometry().toBase64()).decode("ascii"),
+                "main_state": bytes(self.saveState().toBase64()).decode("ascii"),
+                "main_window": {
+                    "x": int(rect.x()),
+                    "y": int(rect.y()),
+                    "width": int(rect.width()),
+                    "height": int(rect.height()),
+                    "maximized": bool(self.isMaximized()),
+                },
+                "docks": docks_out,
+            }
+            self.window_layout = layout
+            if persist and self.window_layout_path:
+                save_window_layout_file(self.window_layout_path, layout)
+            return layout
+
+        def restore_window_layout(self, layout: dict[str, Any] | None = None) -> bool:
+            """Restore previously saved main window and dock layout from `window_layout.json`."""
+            cfg = layout if isinstance(layout, dict) else self.window_layout
+            if not isinstance(cfg, dict) or not bool(cfg.get("saved", False)):
+                return False
+
+            main_geom = str(cfg.get("main_geometry") or "")
+            if main_geom:
+                self.restoreGeometry(QByteArray.fromBase64(main_geom.encode("ascii")))
+
+            mw = cfg.get("main_window")
+            if isinstance(mw, dict):
+                mw_w = int(mw.get("width", 0) or 0)
+                mw_h = int(mw.get("height", 0) or 0)
+                mw_x = int(mw.get("x", 0) or 0)
+                mw_y = int(mw.get("y", 0) or 0)
+                mw_max = bool(mw.get("maximized", False))
+                if mw_max:
+                    self.setWindowState(self.windowState() | Qt.WindowState.WindowMaximized)
+                elif mw_w > 0 and mw_h > 0:
+                    self.resize(mw_w, mw_h)
+                    if mw_x != 0 or mw_y != 0:
+                        self.move(mw_x, mw_y)
+
+            main_state = str(cfg.get("main_state") or "")
+            if main_state:
+                self.restoreState(QByteArray.fromBase64(main_state.encode("ascii")))
+
+            docks_cfg = cfg.get("docks")
+            docks_dict = docks_cfg if isinstance(docks_cfg, dict) else {}
+            for key, dock, default_area in self._layout_dock_specs():
+                d_cfg = docks_dict.get(key)
+                self._apply_dock_layout(
+                    key,
+                    dock,
+                    d_cfg if isinstance(d_cfg, dict) else {},
+                    default_area,
+                )
+            return True
+
+        def reset_window_layout(self, persist: bool = True) -> None:
+            """Reset main window and all dock panels back to their default docked positions."""
+            self.window_layout = default_window_layout()
+            for key, dock, default_area in self._layout_dock_specs():
+                dock.setFloating(False)
+                self.addDockWidget(self._name_to_dock_area(default_area, default_area), dock)
+                if key == "clock":
+                    dock.setVisible(bool(self.controller.chat_panel.is_gm))
+                else:
+                    dock.setVisible(True)
+            self.resize(1280, 840)
+            if persist and self.window_layout_path:
+                save_window_layout_file(self.window_layout_path, self.window_layout)
+            self.statusBar().showMessage("Window layout reset to default.")
+
+        def _on_save_window_layout(self) -> None:
+            self.save_window_layout(persist=True)
+            self.statusBar().showMessage("Window layout saved.")
+
+        def _on_reset_window_layout(self) -> None:
+            self.reset_window_layout(persist=True)
+
         def closeEvent(self, event: QCloseEvent) -> None:
-            """Close floating docks and unowned modeless child windows when the main window closes."""
+            """Persist layout then close floating docks and unowned modeless child windows."""
+            self.save_window_layout(persist=True)
             for dock in (self.clock_dock, self.combat_dock, self.chat_dock):
                 dock.close()
             if self.controller.player_clock_window is not None:
@@ -2912,4 +3206,12 @@ else:
         ) -> None:
             self.prefs = prefs or default_preferences()
             self.prefs_path = Path(prefs_path) if prefs_path else None
+            self.window_layout_path: Path | None = (
+                default_window_layout_path(self.prefs_path) if self.prefs_path else None
+            )
+            self.window_layout: dict[str, Any] = (
+                load_window_layout(self.window_layout_path)
+                if self.window_layout_path
+                else default_window_layout()
+            )
             self.controller = MapperController(self.prefs)

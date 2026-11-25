@@ -389,6 +389,106 @@ class TestColorBlocksStatsAndHistory(unittest.TestCase):
             self.assertTrue(log_file.is_file())
             self.assertIn("Message 1", log_file.read_text(encoding="utf-8"))
 
+    def test_chat_history_deduplication_and_last_message_id(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log_file = Path(tmpdir) / "dedup.log"
+            mgr = ChatHistoryManager(transcript_path=log_file)
+            self.assertEqual(mgr.last_message_id(), 0)
+
+            e1 = mgr.add_chat_message({"MessageID": 12, "Origin": "GM", "Text": "First"})
+            e2 = mgr.add_roll_message(
+                {"MessageID": 25, "Origin": "Ezren", "RollData": {"Title": "Init", "Result": 15}}
+            )
+            self.assertFalse(e1["_duplicate"])
+            self.assertFalse(e2["_duplicate"])
+            self.assertEqual(mgr.last_message_id(), 25)
+
+            dup1 = mgr.add_chat_message({"MessageID": 12, "Origin": "GM", "Text": "First"})
+            dup2 = mgr.add_roll_message(
+                {"MessageID": 25, "Origin": "Ezren", "RollData": {"Title": "Init", "Result": 15}}
+            )
+            self.assertTrue(dup1["_duplicate"])
+            self.assertTrue(dup2["_duplicate"])
+            self.assertEqual(len(mgr.entries), 2)
+
+            unnumbered = mgr.add_chat_message({"Origin": "System", "Text": "Notice"})
+            self.assertFalse(unnumbered["_duplicate"])
+            self.assertEqual(len(mgr.entries), 3)
+
+            lines = log_file.read_text(encoding="utf-8").splitlines()
+            self.assertEqual(len(lines), 3)
+
+    def test_chat_and_roll_colors_and_rfc3339_timestamps(self) -> None:
+        from gma_mapper.core.dice import get_component_style_dict
+        from gma_mapper.core.profile import default_preferences
+
+        prefs = default_preferences()
+        light_norm = get_component_style_dict("normal", prefs=prefs)
+        self.assertEqual(light_norm["fg"], "#1a1a1a")
+        dark_norm = get_component_style_dict("normal", prefs=prefs, dark=True)
+        self.assertEqual(dark_norm["fg"], "#e6edf3")
+
+        # Legacy low-contrast saved title colors are normalized automatically
+        legacy_prefs = default_preferences()
+        legacy_prefs["styles"]["dierolls"]["components"]["title"]["fg"] = {
+            "light": "#ffffff",
+            "dark": "#aaaaaa",
+        }
+        legacy_prefs["styles"]["dierolls"]["components"]["title"]["bg"] = {
+            "light": "#c7c0ae",
+            "dark": "#000044",
+        }
+        norm_light_title = get_component_style_dict("title", prefs=legacy_prefs, dark=False)
+        self.assertEqual(norm_light_title["fg"], "#1e293b")
+        self.assertEqual(norm_light_title["bg"], "#dbe4f0")
+        norm_dark_title = get_component_style_dict("title", prefs=legacy_prefs, dark=True)
+        self.assertEqual(norm_dark_title["fg"], "#f0f6fc")
+        self.assertEqual(norm_dark_title["bg"], "#1e3a5f")
+
+        roll_html = render_roll_payload_html(
+            {
+                "Origin": "Valeros",
+                "Sent": "2026-11-24T12:34:56.500Z",
+                "RollData": {"Title": "Attack", "Result": 18},
+            },
+            prefs=prefs,
+            dark=False,
+        )
+        self.assertIn("background-color:#dbe4f0", roll_html)
+        self.assertIn("color:#52606d", roll_html)
+
+        chat_light = render_chat_payload_html(
+            {
+                "MessageID": 5,
+                "Origin": "GM",
+                "Sent": "2026-11-24T12:34:56Z",
+                "Text": "Welcome back",
+            },
+            prefs=prefs,
+            dark=False,
+            is_gm=True,
+        )
+        self.assertIn("color:#0052cc", chat_light)
+        self.assertIn("color:#c92a2a", chat_light)
+        self.assertIn("color:#52606d", chat_light)
+
+        prefs_no_ts = default_preferences()
+        prefs_no_ts["chat_timestamp"] = False
+        chat_dark_no_ts = render_chat_payload_html(
+            {
+                "MessageID": 5,
+                "Origin": "GM",
+                "Sent": "2026-11-24T12:34:56Z",
+                "Text": "Welcome back",
+            },
+            prefs=prefs_no_ts,
+            dark=True,
+            is_gm=True,
+        )
+        self.assertIn("color:#58a6ff", chat_dark_no_ts)
+        self.assertIn("color:#ff6b6b", chat_dark_no_ts)
+        self.assertNotIn("color:#94a3b8", chat_dark_no_ts)
+
     def test_html_renderers_and_table_sort(self) -> None:
         roll_html = render_roll_payload_html(
             {
@@ -838,6 +938,35 @@ class TestDicePanelAndControllerIntegration(unittest.TestCase):
         session.define_dice_presets(big_presets, append_mode=False, for_user="Valeros")
         self.assertGreater(len(sent), 1)
         self.assertTrue(all(line.startswith("BATCH ") for line in sent))
+
+    def test_panel_defaults_to_light_theme_dedup_and_rerender(self) -> None:
+        from gma_mapper.ui.panels.chat_dice import ChatDicePanel
+
+        panel = ChatDicePanel()
+        self.assertFalse(panel.dark)
+        self.assertIn("#f8f9fa", panel.chat_log.styleSheet())
+        self.assertIn("#1a1a1a", panel.chat_log.styleSheet())
+        self.assertIn("#0052cc", panel.chat_log.document().defaultStyleSheet())
+
+        panel.append_chat({"MessageID": 7, "Origin": "GM", "Text": "Hello adventurers"})
+        panel.append_chat({"MessageID": 7, "Origin": "GM", "Text": "Hello adventurers"})
+        panel.append_roll(
+            {"MessageID": 8, "Origin": "Ezren", "RollData": {"Title": "Arcana", "Result": 19}}
+        )
+        panel.append_roll(
+            {"MessageID": 8, "Origin": "Ezren", "RollData": {"Title": "Arcana", "Result": 19}}
+        )
+        self.assertEqual(len(panel.history_manager.entries), 2)
+        plain = panel.chat_log.toPlainText()
+        self.assertEqual(plain.count("Hello adventurers"), 1)
+        self.assertEqual(plain.count("Arcana"), 1)
+
+        panel.set_theme(True)
+        self.assertTrue(panel.dark)
+        self.assertIn("#1b1f24", panel.chat_log.styleSheet())
+        self.assertIn("#e6edf3", panel.chat_log.styleSheet())
+        self.assertIn("#58a6ff", panel.chat_log.document().defaultStyleSheet())
+        self.assertEqual(panel.chat_log.toPlainText().count("Hello adventurers"), 1)
 
 
 if __name__ == "__main__":

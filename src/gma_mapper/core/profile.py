@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import copy
 import json
+import os
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -457,55 +459,55 @@ def default_styles() -> dict[str, Any]:
 
     components: dict[str, dict[str, Any]] = {
         "begingroup": _comp(),
-        "best": _comp("#aaaaaa", "#888888", font="Special", fmt=" best of %s"),
+        "best": _comp("#9fb3c8", "#52606d", font="Special", fmt=" best of %s"),
         "bold": _comp(font="Bold"),
         "bolditalic": _comp(font="BoldItalic"),
-        "bonus": _comp("#fffb00", "#f05b00", font="Normal"),
+        "bonus": _comp("#ffd43b", "#b84700", font="Normal"),
         "constant": _comp(),
-        "critlabel": _comp("#fffb00", "#f05b00", font="Special", fmt="Confirm: "),
-        "critspec": _comp("#fffb00", "#f05b00", font="Special"),
-        "cumulative": _comp("#aaaaaa", "#888888", font="Special", fmt=" (now %s)"),
-        "dc": _comp("#aaaaaa", "#888888", font="Special", fmt="DC %s: "),
-        "diebonus": _comp("red", "red", font="Special", fmt="(%s per die)"),
+        "critlabel": _comp("#ffd43b", "#b84700", font="Special", fmt="Confirm: "),
+        "critspec": _comp("#ffd43b", "#b84700", font="Special"),
+        "cumulative": _comp("#9fb3c8", "#52606d", font="Special", fmt=" (now %s)"),
+        "dc": _comp("#9fb3c8", "#52606d", font="Special", fmt="DC %s: "),
+        "diebonus": _comp("#ff6b6b", "#c92a2a", font="Special", fmt="(%s per die)"),
         "diespec": _comp(),
-        "discarded": _comp("#aaaaaa", "#888888", font="Normal", fmt="{%s}", overstrike=True),
+        "discarded": _comp("#9fb3c8", "#52606d", font="Normal", fmt="{%s}", overstrike=True),
         "endgroup": _comp(),
-        "error": _comp("red", "red", font="Normal", fmt="ERROR: %s"),
-        "exceeded": _comp("#00fa92", "green", font="Special", fmt=" exceeded DC by %s"),
-        "fail": _comp("red", "red", font="Important", fmt="(%s) "),
-        "from": _comp("cyan", "blue", font="Normal"),
-        "fullmax": _comp("red", "red", font="Important", fmt="maximized"),
-        "fullresult": _comp("blue", "#ffffff", "white", "blue", font="FullResult"),
+        "error": _comp("#ffffff", "#ffffff", "#b42318", "#b42318", font="Normal", fmt="ERROR: %s"),
+        "exceeded": _comp("#2ee69a", "#087f38", font="Special", fmt=" exceeded DC by %s"),
+        "fail": _comp("#ff6b6b", "#c92a2a", font="Important", fmt="(%s) "),
+        "from": _comp("#4dd0e1", "#0052cc", font="Normal"),
+        "fullmax": _comp("#ff6b6b", "#c92a2a", font="Important", fmt="maximized"),
+        "fullresult": _comp("#0f172a", "#ffffff", "#93c5fd", "#1d4ed8", font="FullResult"),
         "italic": _comp(font="Italic"),
-        "iteration": _comp("#aaaaaa", "#888888", font="Special", fmt=" (roll #%s)"),
-        "label": _comp("cyan", "blue", font="Special", fmt=" %s"),
-        "max": _comp("#aaaaaa", "#888888", font="Special", fmt="max %s"),
-        "maximized": _comp("red", "red", font="Important", fmt=">"),
-        "maxroll": _comp("red", "red", font="Important", fmt="{%s}"),
-        "met": _comp("#00fa92", "green", font="Special", fmt="successful"),
-        "min": _comp("#aaaaaa", "#888888", font="Special", fmt="min %s"),
-        "moddelim": _comp("#fffb00", "#f05b00", font="Normal", fmt=" | "),
+        "iteration": _comp("#9fb3c8", "#52606d", font="Special", fmt=" (roll #%s)"),
+        "label": _comp("#4dd0e1", "#0052cc", font="Special", fmt=" %s"),
+        "max": _comp("#9fb3c8", "#52606d", font="Special", fmt="max %s"),
+        "maximized": _comp("#ff6b6b", "#c92a2a", font="Important", fmt=">"),
+        "maxroll": _comp("#ff6b6b", "#c92a2a", font="Important", fmt="{%s}"),
+        "met": _comp("#2ee69a", "#087f38", font="Special", fmt="successful"),
+        "min": _comp("#9fb3c8", "#52606d", font="Special", fmt="min %s"),
+        "moddelim": _comp("#ffd43b", "#b84700", font="Normal", fmt=" | "),
         "normal": _comp(),
-        "notice": _comp("yellow", "red", font="Special", fmt="[%s] "),
+        "notice": _comp("#ffd166", "#b42318", font="Special", fmt="[%s] "),
         "operator": _comp(),
-        "repeat": _comp("#aaaaaa", "#888888", font="Special", fmt="repeat %s"),
+        "repeat": _comp("#9fb3c8", "#52606d", font="Special", fmt="repeat %s"),
         "result": _comp(font="Result"),
-        "roll": _comp("#00fa92", "green", font="Normal", fmt="{%s}"),
+        "roll": _comp("#2ee69a", "#087f38", font="Normal", fmt="{%s}"),
         "section": _comp(font="Title"),
         "separator": _comp(font="Normal", fmt="="),
-        "sf": _comp("#aaaaaa", "#888888", font="Special"),
-        "short": _comp("red", "red", font="Special", fmt=" missed DC by %s"),
-        "stats": _comp("#aaaaaa", "#888888", font="Tiny"),
+        "sf": _comp("#9fb3c8", "#52606d", font="Special"),
+        "short": _comp("#ff6b6b", "#c92a2a", font="Special", fmt=" missed DC by %s"),
+        "stats": _comp("#9fb3c8", "#52606d", font="Tiny"),
         "subsection": _comp(font="Subtitle"),
-        "subtotal": _comp("#00fa92", "green", font="Normal", fmt="(%s)"),
-        "success": _comp("#00fa92", "green", font="Important", fmt="(%s) "),
-        "system": _comp("cyan", "blue", font="System"),
-        "timestamp": _comp("#888888", "#888888", font="Tiny"),
-        "title": _comp("#aaaaaa", "#ffffff", "#000044", "#c7c0ae", font="Normal"),
-        "to": _comp("red", "red", font="Special"),
-        "total": _comp("#aaaaaa", "#888888", font="Special", fmt="total %s"),
-        "until": _comp("#aaaaaa", "#888888", font="Special", fmt="until %s"),
-        "worst": _comp("#aaaaaa", "#888888", font="Special", fmt=" worst of %s"),
+        "subtotal": _comp("#2ee69a", "#087f38", font="Normal", fmt="(%s)"),
+        "success": _comp("#2ee69a", "#087f38", font="Important", fmt="(%s) "),
+        "system": _comp("#4dd0e1", "#0052cc", font="System"),
+        "timestamp": _comp("#94a3b8", "#52606d", font="Tiny"),
+        "title": _comp("#f0f6fc", "#1e293b", "#1e3a5f", "#dbe4f0", font="Normal"),
+        "to": _comp("#ff6b6b", "#c92a2a", font="Special"),
+        "total": _comp("#9fb3c8", "#52606d", font="Special", fmt="total %s"),
+        "until": _comp("#9fb3c8", "#52606d", font="Special", fmt="until %s"),
+        "worst": _comp("#9fb3c8", "#52606d", font="Special", fmt=" worst of %s"),
     }
 
     return {
@@ -548,6 +550,42 @@ def empty_server_profile(name: str) -> dict[str, Any]:
         "scp_server": "",
         "scp_proxy": "",
         "ssh_path": search_in_path("ssh"),
+    }
+
+
+def default_window_layout() -> dict[str, Any]:
+    """Return the default main window and dock panel layout dictionary."""
+    return {
+        "saved": False,
+        "main_geometry": "",
+        "main_state": "",
+        "main_window": {
+            "x": 0,
+            "y": 0,
+            "width": 1280,
+            "height": 840,
+            "maximized": False,
+        },
+        "docks": {
+            "clock": {
+                "floating": False,
+                "area": "right",
+                "visible": True,
+                "geometry": {"x": 0, "y": 0, "width": 0, "height": 0},
+            },
+            "combat": {
+                "floating": False,
+                "area": "right",
+                "visible": True,
+                "geometry": {"x": 0, "y": 0, "width": 0, "height": 0},
+            },
+            "chat": {
+                "floating": False,
+                "area": "bottom",
+                "visible": True,
+                "geometry": {"x": 0, "y": 0, "width": 0, "height": 0},
+            },
+        },
     }
 
 
@@ -727,4 +765,69 @@ def list_server_names(prefs: dict[str, Any]) -> list[str]:
 def default_preferences_path() -> Path:
     """Return the standard `~/.gma/mapper/preferences.json` path."""
     return Path.home() / ".gma" / "mapper" / "preferences.json"
+
+
+def default_window_layout_path(prefs_path: str | Path | None = None) -> Path:
+    """Return the sibling `window_layout.json` path next to `preferences.json`.
+
+    Keeping Qt window layout out of `preferences.json` preserves strict v15
+    schema compatibility with the legacy Tcl/Tk mapper (`bin/mapper.tcl`).
+    """
+    base_dir = Path(prefs_path).parent if prefs_path else default_preferences_path().parent
+    return base_dir / "window_layout.json"
+
+
+def _normalize_window_layout(raw: Any) -> dict[str, Any]:
+    defaults = default_window_layout()
+    if not isinstance(raw, dict):
+        return defaults
+    layout = copy.deepcopy(raw)
+    _deep_fill_defaults(layout, defaults, replace_empty_dicts=True)
+    _deep_fill_defaults(layout["docks"], defaults["docks"], replace_empty_dicts=True)
+    for dock_cfg in layout["docks"].values():
+        if isinstance(dock_cfg, dict):
+            _deep_fill_defaults(
+                dock_cfg,
+                {
+                    "floating": False,
+                    "area": "right",
+                    "visible": True,
+                    "geometry": {"x": 0, "y": 0, "width": 0, "height": 0},
+                },
+                replace_empty_dicts=True,
+            )
+    return layout
+
+
+def load_window_layout(filename: str | Path) -> dict[str, Any]:
+    """Load and normalize Qt window layout from `window_layout.json`."""
+    path = Path(filename)
+    if not path.is_file():
+        return default_window_layout()
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return default_window_layout()
+    return _normalize_window_layout(raw)
+
+
+def save_window_layout(filename: str | Path, layout: dict[str, Any]) -> None:
+    """Atomically write Qt window layout to `window_layout.json`."""
+    normalized = _normalize_window_layout(layout)
+    path = Path(filename)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = json.dumps(normalized, indent=4) + "\n"
+    # Write to a temp file in the target directory and atomically replace so a
+    # crash or abrupt exit never leaves a truncated/corrupted layout file.
+    fd, tmp_name = tempfile.mkstemp(prefix=".window_layout_", suffix=".tmp", dir=str(path.parent))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(payload)
+        os.replace(tmp_name, path)
+    except Exception:
+        try:
+            os.unlink(tmp_name)
+        except OSError:
+            pass
+        raise
 

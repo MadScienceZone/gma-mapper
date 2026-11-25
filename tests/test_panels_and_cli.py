@@ -1230,6 +1230,164 @@ class TestPanelsAndCLI(unittest.TestCase):
                 pclock.close()
             win.close()
 
+    def test_auto_sync_chat_on_login_and_opening_chat_dock(self) -> None:
+        import os
+
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        try:
+            from PySide6.QtWidgets import QApplication
+            from gma_mapper.core.profile import default_preferences, empty_server_profile
+            from gma_mapper.ui.main_window import GMAMapperMainWindow
+        except ImportError:
+            self.skipTest("PySide6 not available")
+
+        app = QApplication.instance() or QApplication([])
+        prefs = default_preferences()
+        home = empty_server_profile("Home")
+        home.update({"host": "home.example.org", "port": 2323, "chat_limit": 250, "suppress_chat": False})
+        unlimited = empty_server_profile("Unlimited")
+        unlimited.update({"host": "all.example.org", "port": 2323, "chat_limit": 0, "suppress_chat": False})
+        quiet = empty_server_profile("Quiet")
+        quiet.update({"host": "quiet.example.org", "port": 2323, "chat_limit": 500, "suppress_chat": True})
+        prefs["profiles"] = [empty_server_profile("offline"), home, unlimited, quiet]
+        prefs["current_profile"] = "Home"
+
+        win = GMAMapperMainWindow(prefs=prefs)
+        try:
+            sync_calls: list[int] = []
+            win.net_client.session.is_ready = lambda: True  # type: ignore[method-assign]
+            win.net_client.session.subscribe = lambda: None  # type: ignore[method-assign]
+            win.net_client.session.allow = lambda *_args, **_kw: None  # type: ignore[method-assign]
+            win.net_client.session.sync = lambda: None  # type: ignore[method-assign]
+            win.net_client.session.watch_operation = lambda *_args, **_kw: None  # type: ignore[method-assign]
+            win.net_client.session.sync_chat = lambda target: sync_calls.append(target)  # type: ignore[method-assign]
+
+            # 1. Login triggers SYNC-CHAT with -chat_limit when no messages are loaded
+            win._on_login_successful()
+            self.assertEqual(sync_calls, [-250])
+
+            # 2. Catch up from last_message_id when unsynced session opens chat_dock
+            sync_calls.clear()
+            win.controller.chat_panel.append_chat(
+                {"MessageID": 42, "Origin": "GM", "Text": "Session recap"}
+            )
+            win.show()
+            win.chat_dock.hide()
+            app.processEvents()
+            win._chat_history_synced_for_session = False
+            win.chat_dock.show()
+            app.processEvents()
+            self.assertEqual(sync_calls, [42])
+
+            # 3. Reopening an empty chat dock while connected requests full profile limit again
+            sync_calls.clear()
+            win.controller.chat_panel.clear_chat_history(target=0, do_all=True)
+            win.chat_dock.hide()
+            app.processEvents()
+            win.chat_dock.show()
+            app.processEvents()
+            self.assertEqual(sync_calls, [-250])
+
+            # 4. chat_limit == 0 requests full history (SYNC-CHAT 0)
+            sync_calls.clear()
+            win.net_client.dial = lambda **_kw: None  # type: ignore[method-assign]
+            win.net_client.hangup = lambda: None  # type: ignore[method-assign]
+            win.switch_server_profile("Unlimited")
+            self.assertEqual(len(win.controller.chat_panel.history_manager.entries), 0)
+            self.assertTrue(win.sync_chat_history_from_server())
+            self.assertEqual(sync_calls, [0])
+
+            # 5. suppress_chat == True skips SYNC-CHAT
+            sync_calls.clear()
+            win.switch_server_profile("Quiet")
+            self.assertFalse(win.sync_chat_history_from_server())
+            self.assertEqual(sync_calls, [])
+        finally:
+            win.close()
+
+    def test_window_layout_save_restore_reset_and_close_persistence(self) -> None:
+        import os
+        import tempfile
+        from pathlib import Path
+
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        try:
+            from PySide6.QtCore import Qt
+            from PySide6.QtWidgets import QApplication
+            from gma_mapper.core.profile import (
+                default_preferences,
+                default_window_layout_path,
+                load_window_layout,
+            )
+            from gma_mapper.ui.main_window import GMAMapperMainWindow
+        except ImportError:
+            self.skipTest("PySide6 not available")
+
+        app = QApplication.instance() or QApplication([])
+        with tempfile.TemporaryDirectory() as tmpdir:
+            prefs_path = Path(tmpdir) / "preferences.json"
+            layout_path = default_window_layout_path(prefs_path)
+            prefs = default_preferences()
+            self.assertNotIn("window_layout", prefs)
+            win = GMAMapperMainWindow(prefs=prefs, prefs_path=prefs_path)
+            win2 = None
+            try:
+                win.show()
+                app.processEvents()
+
+                win.resize(1440, 900)
+                win.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, win.combat_dock)
+                win.combat_dock.hide()
+                win.chat_dock.setFloating(True)
+                win.chat_dock.setGeometry(120, 140, 520, 360)
+                app.processEvents()
+
+                win.close()
+                app.processEvents()
+
+                # Legacy preferences.json must remain untouched; layout lives in window_layout.json
+                self.assertFalse(prefs_path.exists())
+                self.assertTrue(layout_path.is_file())
+
+                wl = load_window_layout(layout_path)
+                self.assertTrue(wl["saved"])
+                self.assertEqual(wl["docks"]["combat"]["area"], "left")
+                self.assertFalse(wl["docks"]["combat"]["visible"])
+                self.assertTrue(wl["docks"]["chat"]["floating"])
+                self.assertEqual(
+                    wl["docks"]["chat"]["geometry"],
+                    {"x": 120, "y": 140, "width": 520, "height": 360},
+                )
+
+                win2 = GMAMapperMainWindow(prefs=default_preferences(), prefs_path=prefs_path)
+                self.assertEqual(
+                    win2.dockWidgetArea(win2.combat_dock),
+                    Qt.DockWidgetArea.LeftDockWidgetArea,
+                )
+                self.assertTrue(win2.combat_dock.isHidden())
+                self.assertTrue(win2.chat_dock.isFloating())
+                self.assertEqual(win2.chat_dock.geometry().width(), 520)
+                self.assertEqual(win2.chat_dock.geometry().height(), 360)
+
+                win2.act_reset_window_layout.trigger()
+                app.processEvents()
+                self.assertEqual(
+                    win2.dockWidgetArea(win2.combat_dock),
+                    Qt.DockWidgetArea.RightDockWidgetArea,
+                )
+                self.assertFalse(win2.combat_dock.isHidden())
+                self.assertFalse(win2.chat_dock.isFloating())
+                self.assertEqual(
+                    win2.dockWidgetArea(win2.chat_dock),
+                    Qt.DockWidgetArea.BottomDockWidgetArea,
+                )
+                self.assertFalse(win2.window_layout["saved"])
+                self.assertFalse(load_window_layout(layout_path)["saved"])
+            finally:
+                if win2 is not None:
+                    win2.close()
+                win.close()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -32,6 +32,16 @@
 - [x] *"Text Markup Syntax..."* (`Alt+?`)
 
 ## 5. Chat & Die Roller Window Improvements
-- [ ] **Load Chat History When Opening Chat / Die Roller Window**: Automatically request/load chat history from the server (e.g., via `SYNC-CHAT` respecting profile `chat_limit` / `suppress_chat`) when connecting or opening the Chat & Dice Roller window.
-- [ ] **Better Default Colors in Chat History Window**: Improve default light/dark theme colors and contrast in the chat history window for messages, sender labels, timestamps, and die-roll results.
+- [x] **Load Chat History When Opening Chat / Die Roller Window**: Automatically request/load chat history from the server (e.g., via `SYNC-CHAT` respecting profile `chat_limit` / `suppress_chat`) when connecting or opening the Chat & Dice Roller window.
+- [x] **Better Default Colors in Chat History Window**: Improve default light/dark theme colors and contrast in the chat history window for messages, sender labels, timestamps, and die-roll results.
+- [ ] **Load Server Dice Presets When Starting Chat / Die Roller**: If the PC or GM has die-roll presets stored on the server, automatically request/load them (e.g., via `DR`) when connecting or opening the Chat & Dice Roller window.
+
+## 6. Window Layout Persistence
+- [x] **Save Window Layout Feature**: Persist and restore main window and dock panel layout across sessions (docked vs. undocked/floating state, docked area/position, floating window geometry, and dock sizes).
+
+## 7. Standalone Die Roller Port (`src/py_dieroller`)
+- [ ] **Port Standalone Die Roller from `gma/extras/dieroller` to `src/py_dieroller`**: Copy the standalone die roller code from `gma/extras/dieroller` into `src/py_dieroller` and port its GUI to PySide6 while keeping it operable as a standalone die roller application.
+
+## 8. Debug / Diagnostic Message Window
+- [ ] **Spawn Debug Window for Errors and Diagnostic Messages**: Match legacy mapper behavior by spawning/displaying a dedicated debug/diagnostic window to show errors, protocol traces, and diagnostic messages as they occur (with support for saving/clearing diagnostic messages).
 

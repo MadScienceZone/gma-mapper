@@ -204,7 +204,7 @@ if QT_AVAILABLE:
             self.is_gm: bool = (local_user == "GM")
             self.roll_only: bool = bool(roll_only)
             self.prefs: dict[str, Any] = prefs or default_preferences()
-            self.dark: bool = bool(self.prefs.get("dark", True))
+            self.dark: bool = bool(self.prefs.get("dark", False))
 
             self.bank = DicePresetBank(tkey=tkey)
             if shared_gvar_state is not None:
@@ -468,16 +468,46 @@ if QT_AVAILABLE:
         # ------------------------------------------------------------------
         def set_theme(self, dark: bool) -> None:
             self.dark = bool(dark)
-            bg = "#000000" if self.dark else "#ffffff"
-            fg = "#ffffff" if self.dark else "#000000"
-            style = f"QTextBrowser {{ background-color: {bg}; color: {fg}; }}"
+            theme_key = "dark" if self.dark else "light"
+            dialogs = self.prefs.get("styles", {}).get("dialogs", {}) if isinstance(self.prefs, dict) else {}
+            nbg = (
+                str(dialogs.get("normal_bg", {}).get(theme_key) or "")
+                if isinstance(dialogs, dict) and isinstance(dialogs.get("normal_bg"), dict)
+                else ""
+            )
+            nfg = (
+                str(dialogs.get("normal_fg", {}).get(theme_key) or "")
+                if isinstance(dialogs, dict) and isinstance(dialogs.get("normal_fg"), dict)
+                else ""
+            )
+            if self.dark:
+                bg = nbg if nbg and nbg.lower() != "#232323" else "#1b1f24"
+                fg = nfg if nfg and nfg.lower() != "#aaaaaa" else "#e6edf3"
+                border = "#30363d"
+                link = "#58a6ff"
+            else:
+                bg = nbg if nbg and nbg.lower() != "#cccccc" else "#f8f9fa"
+                fg = nfg if nfg and nfg.lower() != "#000000" else "#1a1a1a"
+                border = "#d0d5dd"
+                link = "#0052cc"
+            style = (
+                f"QTextBrowser {{ background-color: {bg}; color: {fg}; "
+                f"border: 1px solid {border}; border-radius: 3px; padding: 4px; }}"
+            )
+            doc_css = f"a {{ color: {link}; text-decoration: none; }}"
             self.chat_log.setStyleSheet(style)
             self.pinned_log.setStyleSheet(style)
+            self.chat_log.document().setDefaultStyleSheet(doc_css)
+            self.pinned_log.document().setDefaultStyleSheet(doc_css)
+            if hasattr(self, "history_manager") and self.history_manager.entries:
+                self._rerender_history_views()
 
         def set_preferences(self, prefs: dict[str, Any]) -> None:
+            had_entries = bool(self.history_manager.entries)
             self.prefs = prefs
-            self.set_theme(bool(prefs.get("dark", True)))
-            self._rerender_history_views()
+            self.set_theme(bool(prefs.get("dark", False)))
+            if not had_entries:
+                self._rerender_history_views()
 
         def set_identity(self, local_user: str, is_gm: bool | None = None) -> None:
             self.local_user = local_user
@@ -966,6 +996,9 @@ if QT_AVAILABLE:
         def append_chat(self, payload: dict[str, Any]) -> None:
             """Record and display an incoming `TO` chat payload."""
             entry = self.history_manager.add_chat_message(payload)
+            if bool(entry.get("_duplicate", False)):
+                self._rerender_history_views()
+                return
             msg_id = entry.get("MessageID")
             is_local_pin = False
             if msg_id is not None:
@@ -988,8 +1021,15 @@ if QT_AVAILABLE:
 
         def append_roll(self, payload: dict[str, Any], _styles: Any = None) -> None:
             """Record, collect stats for, and display an incoming `ROLL` payload."""
-            stats_line = self.stat_collector.collect(payload)
+            stats_line = (
+                None
+                if self.history_manager.has_message_id(payload.get("MessageID"))
+                else self.stat_collector.collect(payload)
+            )
             entry = self.history_manager.add_roll_message(payload, stats_line=stats_line)
+            if bool(entry.get("_duplicate", False)):
+                self._rerender_history_views()
+                return
             html_line = render_roll_payload_html(
                 entry,
                 prefs=self.prefs,
@@ -1006,7 +1046,7 @@ if QT_AVAILABLE:
         def append_notice(self, text: str) -> None:
             """Display a local status/warning notice in the chat log."""
             self.history_manager.add_notice(text)
-            color = "#ffcc00" if self.dark else "#995500"
+            color = "#ffd166" if self.dark else "#9a3412"
             self.chat_log.append(
                 f'<div><span style="color:{color};font-style:italic;">* {text}</span></div>'
             )
@@ -1050,7 +1090,7 @@ if QT_AVAILABLE:
                         )
                     )
                 elif kind == "notice":
-                    color = "#ffcc00" if self.dark else "#995500"
+                    color = "#ffd166" if self.dark else "#9a3412"
                     self.chat_log.append(
                         f'<div><span style="color:{color};font-style:italic;">* {entry.get("Text", "")}</span></div>'
                     )

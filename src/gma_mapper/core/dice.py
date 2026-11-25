@@ -21,6 +21,7 @@ from typing import Any
 
 from .colors import color_to_hex, contrasting_color, darken_color
 from .profile import SYMBOLS, default_fonts, default_styles
+from .util import parse_rfc3339_seconds
 
 # Delimiter candidates for table presets (matching EncodePresetDetails in mapper_legacy.tcl)
 TABLE_DELIMITER_CANDIDATES = ";|,:/~><=!@_^`\x01\x02\x03\x04\x05\x06\x07"
@@ -1264,7 +1265,7 @@ def get_component_style_dict(
 ) -> dict[str, Any]:
     """Return the resolved style dictionary for one of the 39 die-roll/chat components."""
     if dark is None:
-        dark = bool((prefs or {}).get("dark", True))
+        dark = bool((prefs or {}).get("dark", False))
     theme_key = "dark" if dark else "light"
 
     styles_root = (prefs or {}).get("styles") or default_styles()
@@ -1297,6 +1298,35 @@ def get_component_style_dict(
         bg_val = str(comp[theme_key].get("bg") or "")
     else:
         bg_val = str(bg_entry or "")
+
+    # Normalize legacy low-contrast `title` colors from older preferences files
+    if canonical_key == "title":
+        if not dark and fg_val.lower() == "#ffffff" and bg_val.lower() == "#c7c0ae":
+            fg_val = "#1e293b"
+            bg_val = "#dbe4f0"
+        elif dark and fg_val.lower() == "#aaaaaa" and bg_val.lower() == "#000044":
+            fg_val = "#f0f6fc"
+            bg_val = "#1e3a5f"
+
+    if not fg_val:
+        dialogs = styles_root.get("dialogs", {}) if isinstance(styles_root, dict) else {}
+        normal_fg_entry = (
+            str(dialogs.get("normal_fg", {}).get(theme_key) or "")
+            if isinstance(dialogs, dict) and isinstance(dialogs.get("normal_fg"), dict)
+            else ""
+        )
+        if dark:
+            fg_val = (
+                normal_fg_entry
+                if normal_fg_entry and normal_fg_entry.lower() != "#aaaaaa"
+                else "#e6edf3"
+            )
+        else:
+            fg_val = (
+                normal_fg_entry
+                if normal_fg_entry and normal_fg_entry.lower() != "#000000"
+                else "#1a1a1a"
+            )
 
     fonts_root = (prefs or {}).get("fonts") or default_fonts()
     font_key = str(comp.get("font") or "Normal")
@@ -1463,6 +1493,37 @@ def render_roll_components_html(
     return "".join(parts)
 
 
+def _format_payload_timestamp(
+    payload: dict[str, Any],
+    prefs: dict[str, Any] | None = None,
+    dark: bool | None = None,
+) -> str:
+    """Format a payload's `Sent` or `Time` field (numeric epoch or RFC 3339 string) to HTML."""
+    if isinstance(prefs, dict) and not bool(prefs.get("chat_timestamp", True)):
+        return ""
+    sent_time = payload.get("Sent")
+    if sent_time is None or sent_time == "":
+        sent_time = payload.get("Time")
+    if sent_time is None or sent_time == "":
+        return ""
+
+    epoch = 0.0
+    if isinstance(sent_time, (int, float)):
+        epoch = float(sent_time)
+    elif isinstance(sent_time, str):
+        raw_ts = sent_time.strip()
+        if raw_ts:
+            try:
+                epoch = float(raw_ts)
+            except ValueError:
+                epoch = parse_rfc3339_seconds(raw_ts)
+
+    if epoch <= 0.0:
+        return ""
+    dt = datetime.datetime.fromtimestamp(epoch)
+    return format_component_html(dt.strftime("%H:%M:%S "), "timestamp", prefs=prefs, dark=dark)
+
+
 def render_roll_payload_html(
     payload: dict[str, Any],
     prefs: dict[str, Any] | None = None,
@@ -1476,6 +1537,11 @@ def render_roll_payload_html(
     Supports both GMA wire payloads (`Sender`, `Result: {Result, Details, InvalidRequest, ResultSuppressed}`)
     and synthetic test payloads (`RollData`).
     """
+    is_dark = (
+        bool(dark)
+        if dark is not None
+        else (bool(prefs.get("dark", False)) if isinstance(prefs, dict) else False)
+    )
     result_obj = (
         payload.get("Result")
         if isinstance(payload.get("Result"), dict)
@@ -1540,36 +1606,34 @@ def render_roll_payload_html(
     icon_html = _icon_img_tag(die_icon, icon_data_uris)
 
     # Timestamp if present
-    ts_html = ""
-    sent_time = payload.get("Sent") or payload.get("Time")
-    if isinstance(sent_time, (int, float)) and sent_time > 0:
-        dt = datetime.datetime.fromtimestamp(sent_time)
-        ts_html = format_component_html(dt.strftime("%H:%M:%S "), "timestamp", prefs=prefs, dark=dark)
+    ts_html = _format_payload_timestamp(payload, prefs=prefs, dark=is_dark)
 
     # Leading [fullresult] badge (matching DisplayDieRoll line 12415)
     fullresult_html = ""
     if not is_blind and not is_invalid and result_val is not None and str(result_val) != "":
-        fullresult_html = format_component_html(str(result_val), "fullresult", prefs=prefs, dark=dark) + " "
+        fullresult_html = format_component_html(str(result_val), "fullresult", prefs=prefs, dark=is_dark) + " "
 
     # Sender and recipient attribution
-    sender_html = format_component_html(sender, "origin", prefs=prefs, dark=dark)
+    sender_html = format_component_html(sender, "origin", prefs=prefs, dark=is_dark)
     recip_html = ""
     if to_gm and not to_all:
-        recip_html = " \u2192 " + format_component_html("GM", "GM", prefs=prefs, dark=dark)
+        recip_html = " \u2192 " + format_component_html("GM", "GM", prefs=prefs, dark=is_dark)
     elif not to_all and recipients:
         recip_html = " \u2192 " + format_component_html(
-            ", ".join(str(t) for t in recipients), "target", prefs=prefs, dark=dark
+            ", ".join(str(t) for t in recipients), "target", prefs=prefs, dark=is_dark
         )
 
     # Title with color-box support (matching DisplayDieRoll lines 12419-12450)
     title_html = ""
     if title:
-        title_style = get_component_style_dict("title", prefs=prefs, dark=dark)
-        default_title_fg = title_style["fg"] or ("#ffffff" if dark else "#000000")
-        try:
-            default_title_bg = darken_color(default_title_fg, 40)
-        except ValueError:
-            default_title_bg = ""
+        title_style = get_component_style_dict("title", prefs=prefs, dark=is_dark)
+        default_title_fg = title_style["fg"] or ("#f0f6fc" if is_dark else "#1e293b")
+        default_title_bg = str(title_style.get("bg") or "")
+        if not default_title_bg:
+            try:
+                default_title_bg = darken_color(default_title_fg, 40)
+            except ValueError:
+                default_title_bg = ""
         blocks = parse_color_blocks(title, default_fg=default_title_fg, default_bg=default_title_bg)
         rendered_blocks: list[str] = []
         for blk_label, blk_fg, blk_bg in blocks:
@@ -1578,7 +1642,7 @@ def render_roll_payload_html(
                     blk_label,
                     "title",
                     prefs=prefs,
-                    dark=dark,
+                    dark=is_dark,
                     override_fg=blk_fg,
                     override_bg=blk_bg,
                 )
@@ -1588,14 +1652,14 @@ def render_roll_payload_html(
     # Detailed breakdown (server Details already includes Type='result', Type='separator' ('='), etc.)
     if isinstance(details, list) and details:
         details_html = (" " if not title_html else "") + render_roll_components_html(
-            details, prefs=prefs, dark=dark
+            details, prefs=prefs, dark=is_dark
         )
     elif isinstance(details, str) and details:
-        details_html = " : " + format_component_html(details, "default", prefs=prefs, dark=dark)
+        details_html = " : " + format_component_html(details, "default", prefs=prefs, dark=is_dark)
     else:
         spec_str = str(result_obj.get("RollSpec") or payload.get("RollSpec") or "")
         details_html = (
-            " : " + format_component_html(spec_str, "default", prefs=prefs, dark=dark)
+            " : " + format_component_html(spec_str, "default", prefs=prefs, dark=is_dark)
             if spec_str
             else ""
         )
@@ -1605,7 +1669,7 @@ def render_roll_payload_html(
         f"{sender_html}{recip_html}{title_html}{details_html}</div>"
     )
     if stats_line:
-        stats_html = format_component_html(stats_line, "stats", prefs=prefs, dark=dark)
+        stats_html = format_component_html(stats_line, "stats", prefs=prefs, dark=is_dark)
         line_html += f'<div style="margin-left:20px;">{stats_html}</div>'
     return line_html
 
@@ -1622,6 +1686,11 @@ def render_chat_payload_html(
 
     Matches `_render_chat_message` in `bin/mapper_legacy.tcl`.
     """
+    is_dark = (
+        bool(dark)
+        if dark is not None
+        else (bool(prefs.get("dark", False)) if isinstance(prefs, dict) else False)
+    )
     msg_id = payload.get("MessageID")
     sender = str(
         payload.get("Sender")
@@ -1635,46 +1704,46 @@ def render_chat_payload_html(
     markup = bool(payload.get("Markup", False))
     global_pin = bool(payload.get("Pin", False))
 
-    ts_html = ""
-    sent_time = payload.get("Sent") or payload.get("Time")
-    if isinstance(sent_time, (int, float)) and sent_time > 0:
-        dt = datetime.datetime.fromtimestamp(sent_time)
-        ts_html = format_component_html(dt.strftime("%H:%M:%S "), "timestamp", prefs=prefs, dark=dark)
+    ts_html = _format_payload_timestamp(payload, prefs=prefs, dark=is_dark)
 
-    origin_html = format_component_html(sender, "origin", prefs=prefs, dark=dark)
+    origin_html = format_component_html(sender, "origin", prefs=prefs, dark=is_dark)
     recip_html = ""
     if to_gm and not to_all:
-        recip_html = " \u2192 " + format_component_html("GM", "GM", prefs=prefs, dark=dark)
+        recip_html = " \u2192 " + format_component_html("GM", "GM", prefs=prefs, dark=is_dark)
     elif not to_all and recipients:
         recip_html = " \u2192 " + format_component_html(
-            ", ".join(str(r) for r in recipients), "target", prefs=prefs, dark=dark
+            ", ".join(str(r) for r in recipients), "target", prefs=prefs, dark=is_dark
         )
 
     body_html = (
-        render_markup_text_html(text, "chat", prefs=prefs, dark=dark)
+        render_markup_text_html(text, "chat", prefs=prefs, dark=is_dark)
         if markup
-        else format_component_html(text, "chat", prefs=prefs, dark=dark)
+        else format_component_html(text, "chat", prefs=prefs, dark=is_dark)
     )
 
     actions_html = ""
     if msg_id is not None:
+        link_color = "#58a6ff" if is_dark else "#0052cc"
+        del_color = "#ff6b6b" if is_dark else "#c92a2a"
+        link_css = f"color:{link_color};text-decoration:none;"
+        del_css = f"color:{del_color};text-decoration:none;"
         links: list[str] = []
         if is_pinned_view:
             if is_locally_pinned:
-                links.append(f'<a href="unpin:{msg_id}" title="Unpin locally" style="text-decoration:none;">[\u2606]</a>')
+                links.append(f'<a href="unpin:{msg_id}" title="Unpin locally" style="{link_css}">[\u2606]</a>')
             elif global_pin:
-                links.append(f'<a href="hide:{msg_id}" title="Dismiss pinned message" style="text-decoration:none;">[\u00d7]</a>')
+                links.append(f'<a href="hide:{msg_id}" title="Dismiss pinned message" style="{link_css}">[\u00d7]</a>')
         else:
             if is_locally_pinned:
-                links.append(f'<a href="unpin:{msg_id}" title="Unpin locally" style="text-decoration:none;">[\u2605]</a>')
+                links.append(f'<a href="unpin:{msg_id}" title="Unpin locally" style="{link_css}">[\u2605]</a>')
             else:
-                links.append(f'<a href="pin:{msg_id}" title="Pin locally" style="text-decoration:none;">[\u2606]</a>')
+                links.append(f'<a href="pin:{msg_id}" title="Pin locally" style="{link_css}">[\u2606]</a>')
         if is_gm:
-            links.append(f'<a href="del:{msg_id}" title="Delete message for all" style="text-decoration:none;">[\U0001f5d1]</a>')
+            links.append(f'<a href="del:{msg_id}" title="Delete message for all" style="{del_css}">[\U0001f5d1]</a>')
         else:
-            links.append(f'<a href="hide:{msg_id}" title="Hide message locally" style="text-decoration:none;">[\u00d7]</a>')
+            links.append(f'<a href="hide:{msg_id}" title="Hide message locally" style="{link_css}">[\u00d7]</a>')
         if links:
-            actions_html = " <span style=\"font-size:85%;opacity:0.75;\">" + " ".join(links) + "</span>"
+            actions_html = ' <span style="font-size:85%;">' + " ".join(links) + "</span>"
 
     pin_badge = "\U0001f4cc " if (global_pin or is_locally_pinned) and is_pinned_view else ""
     return f"<div>{pin_badge}{ts_html}{origin_html}{recip_html}: {body_html}{actions_html}</div>"
@@ -1694,10 +1763,54 @@ class ChatHistoryManager:
         self.last_displayed_date: str = ""
         self.transcript_path: Path | None = Path(transcript_path) if transcript_path else None
 
+    def last_message_id(self) -> int:
+        """Return the highest positive `MessageID` stored in history, or 0 if none."""
+        best = 0
+        for entry in self.entries:
+            mid = entry.get("MessageID")
+            if mid is None:
+                continue
+            try:
+                mid_int = int(mid)
+            except (TypeError, ValueError):
+                continue
+            best = max(best, mid_int)
+        return best
+
+    def has_message_id(self, msg_id: Any) -> bool:
+        """Return True if a positive integer `msg_id` is already present in history."""
+        return self._find_entry_by_message_id(msg_id) is not None
+
+    def _find_entry_by_message_id(self, msg_id: Any) -> dict[str, Any] | None:
+        if msg_id is None:
+            return None
+        try:
+            target_id = int(msg_id)
+        except (TypeError, ValueError):
+            return None
+        if target_id <= 0:
+            return None
+        for entry in self.entries:
+            raw_mid = entry.get("MessageID")
+            if raw_mid is None:
+                continue
+            try:
+                if int(raw_mid) == target_id:
+                    return entry
+            except (TypeError, ValueError):
+                continue
+        return None
+
     def add_chat_message(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Record an incoming `TO` chat message and optionally write to the transcript file."""
         entry = copy.deepcopy(payload)
         entry.setdefault("kind", "chat")
+        existing = self._find_entry_by_message_id(entry.get("MessageID"))
+        if existing is not None:
+            existing.update(entry)
+            existing["_duplicate"] = True
+            return existing
+        entry["_duplicate"] = False
         self.entries.append(entry)
         self.transcribe_chat(entry)
         return entry
@@ -1708,6 +1821,12 @@ class ChatHistoryManager:
         entry["kind"] = "roll"
         if stats_line:
             entry["stats_line"] = stats_line
+        existing = self._find_entry_by_message_id(entry.get("MessageID"))
+        if existing is not None:
+            existing.update(entry)
+            existing["_duplicate"] = True
+            return existing
+        entry["_duplicate"] = False
         self.entries.append(entry)
         self.transcribe_die_roll(entry, stats_line=stats_line)
         return entry

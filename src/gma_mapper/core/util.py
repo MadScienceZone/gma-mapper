@@ -27,6 +27,7 @@ import shutil
 import subprocess
 import time
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any, BinaryIO, Callable
 
@@ -662,4 +663,28 @@ def ustar_format_contents(contents: list[UstarEntry]) -> str:
         mtime_str = time.ctime(int(item.mtime))
         lines.append(f"{mode_str} {uname} {gname} {item.size} {mtime_str} {name}")
     return "\n".join(lines) + ("\n" if lines else "")
+
+
+_RFC3339_RE = re.compile(
+    r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d+))?(Z|[+-]\d{2}:\d{2})$"
+)
+
+
+def parse_rfc3339_seconds(ts: str) -> float:
+    """Parse an RFC 3339 timestamp with optional arbitrary-precision fractional seconds."""
+    raw = str(ts or "").strip()
+    if not raw or raw == "0001-01-01T00:00:00Z":
+        return 0.0
+    m = _RFC3339_RE.match(raw)
+    if not m:
+        return 0.0
+    base, frac, tz = m.groups()
+    if tz == "Z":
+        tz = "+00:00"
+    try:
+        dt = datetime.fromisoformat(f"{base}{tz}")
+    except ValueError:
+        return 0.0
+    frac_sec = int(frac) / (10 ** len(frac)) if frac else 0.0
+    return dt.timestamp() + frac_sec
 

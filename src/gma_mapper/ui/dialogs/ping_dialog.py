@@ -6,10 +6,10 @@ Ported from `ServerPingTest`, `_ping_server`, `scan_fractional_seconds`, and
 
 from __future__ import annotations
 
-from datetime import datetime
-import re
 import time
 from typing import Any, Callable
+
+from gma_mapper.core.util import parse_rfc3339_seconds
 
 try:
     from PySide6.QtCore import Qt, QTimer
@@ -28,29 +28,6 @@ try:
     QT_AVAILABLE = True
 except ImportError:  # pragma: no cover
     QT_AVAILABLE = False
-
-_RFC3339_RE = re.compile(
-    r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d+))?(Z|[+-]\d{2}:\d{2})$"
-)
-
-
-def parse_rfc3339_seconds(ts: str) -> float:
-    """Parse an RFC 3339 timestamp with optional arbitrary-precision fractional seconds."""
-    raw = str(ts or "").strip()
-    if not raw or raw == "0001-01-01T00:00:00Z":
-        return 0.0
-    m = _RFC3339_RE.match(raw)
-    if not m:
-        return 0.0
-    base, frac, tz = m.groups()
-    if tz == "Z":
-        tz = "+00:00"
-    try:
-        dt = datetime.fromisoformat(f"{base}{tz}")
-    except ValueError:
-        return 0.0
-    frac_sec = int(frac) / (10 ** len(frac)) if frac else 0.0
-    return dt.timestamp() + frac_sec
 
 
 def compute_ping_metrics(
