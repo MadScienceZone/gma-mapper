@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+import sys
 from typing import Any, Callable
 
 from gma_mapper import GMAMapperVersion
@@ -62,8 +63,8 @@ from gma_mapper.ui.panels.combat import (
 )
 
 try:
-    from PySide6.QtCore import QSize, Qt, QTimer, Signal
-    from PySide6.QtGui import QAction, QActionGroup, QColor, QKeySequence, QPixmap
+    from PySide6.QtCore import QEvent, QSize, Qt, QTimer, Signal
+    from PySide6.QtGui import QAction, QActionGroup, QCloseEvent, QColor, QKeySequence, QPixmap
     from PySide6.QtWidgets import (
         QApplication,
         QColorDialog,
@@ -77,6 +78,7 @@ try:
         QToolBar,
         QToolButton,
         QStatusBar,
+        QWidget,
     )
     from gma_mapper.ui.panels.clock import TimerRequestDialog
     from gma_mapper.ui.panels.combat import HPRequestDialog
@@ -891,6 +893,56 @@ if HAS_PYSIDE6:
         "QToolButton:disabled { background-color: #d9d9d9; color: #777777; border-color: #c4c4c4; }"
     )
 
+    def detach_window_owner(widget: QWidget) -> None:
+        """Clear Qt transient parent and Win32 owner so a floating window can layer behind the main window.
+
+        Win32 always keeps an owned HWND above its owner in Z-order, and Qt's Windows QPA
+        plugin only updates GWLP_HWNDPARENT when transientParent() is non-null.
+        """
+        if not widget.isWindow() or not widget.isVisible():
+            return
+        wh = widget.windowHandle()
+        if wh is not None:
+            wh.setTransientParent(None)
+        if sys.platform == "win32":
+            try:
+                import ctypes
+
+                user32 = ctypes.windll.user32
+                set_win_long = getattr(user32, "SetWindowLongPtrW", user32.SetWindowLongW)
+                set_win_long.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p]
+                set_win_long.restype = ctypes.c_void_p
+                set_win_long(int(widget.winId()), -8, 0)  # GWLP_HWNDPARENT = -8
+            except Exception:  # pylint: disable=broad-exception-caught
+                pass
+
+    class IndependentDockWidget(QDockWidget):
+        """Dock widget whose floating window is unowned so it can move behind the main window."""
+
+        def __init__(self, title: str, parent: QWidget | None = None) -> None:
+            super().__init__(title, parent)
+            self.topLevelChanged.connect(self._on_top_level_changed)
+
+        def _detach_if_floating(self) -> None:
+            if self.isFloating():
+                detach_window_owner(self)
+
+        def _on_top_level_changed(self, floating: bool) -> None:
+            if floating:
+                self._detach_if_floating()
+                QTimer.singleShot(0, self._detach_if_floating)
+
+        def event(self, event: QEvent) -> bool:
+            res = super().event(event)
+            if self.isFloating() and event.type() in (
+                QEvent.Type.Show,
+                QEvent.Type.WinIdChange,
+                QEvent.Type.WindowActivate,
+            ):
+                self._detach_if_floating()
+                QTimer.singleShot(0, self._detach_if_floating)
+            return res
+
     class GMAMapperMainWindow(QMainWindow):
         """Primary Qt6 Main Window for GMA Mapper (`QMainWindow` + `QDockWidget` panels)."""
 
@@ -993,15 +1045,15 @@ if HAS_PYSIDE6:
                 self.statusBar().showMessage(f"Error loading map: {exc}")
 
         def _create_docks(self) -> None:
-            self.clock_dock = QDockWidget("Initiative & Clock", self)
+            self.clock_dock = IndependentDockWidget("Initiative & Clock", self)
             self.clock_dock.setWidget(self.controller.clock_panel)
             self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.clock_dock)
 
-            self.combat_dock = QDockWidget("Combat & Conditions", self)
+            self.combat_dock = IndependentDockWidget("Combat & Conditions", self)
             self.combat_dock.setWidget(self.controller.combat_panel)
             self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.combat_dock)
 
-            self.chat_dock = QDockWidget("Chat & Dice Roller", self)
+            self.chat_dock = IndependentDockWidget("Chat & Dice Roller", self)
             self.chat_dock.setWidget(self.controller.chat_panel)
             self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.chat_dock)
 
@@ -2279,6 +2331,7 @@ if HAS_PYSIDE6:
             win.apply_styles(self.prefs, bool(self.prefs.get("dark", False)))
             win.refresh()
             win.show()
+            detach_window_owner(win)
             win.raise_()
             win.activateWindow()
             return win
@@ -2519,6 +2572,7 @@ if HAS_PYSIDE6:
             if for_user in self._delegated_dialogs:
                 dlg = self._delegated_dialogs[for_user]
                 dlg.show()
+                detach_window_owner(dlg)
                 dlg.raise_()
                 return
             dlg = DelegatedDieRollerDialog(
@@ -2538,6 +2592,7 @@ if HAS_PYSIDE6:
             self._delegated_dialogs[for_user] = dlg
             self.net_client.session.query_dice_presets(for_user=for_user)
             dlg.show()
+            detach_window_owner(dlg)
 
         def _on_show_about_mapper(self) -> AboutMapperDialog:
             dlg = AboutMapperDialog(self.net_client.session, self)
@@ -2834,6 +2889,18 @@ if HAS_PYSIDE6:
                     "Unable to Open File",
                     f'Unable to write to "{path}": {exc}',
                 )
+
+        def closeEvent(self, event: QCloseEvent) -> None:
+            """Close floating docks and unowned modeless child windows when the main window closes."""
+            for dock in (self.clock_dock, self.combat_dock, self.chat_dock):
+                dock.close()
+            if self.controller.player_clock_window is not None:
+                self.controller.player_clock_window.close()
+            if self._ping_dialog is not None:
+                self._ping_dialog.close()
+            for dlg in list(self._delegated_dialogs.values()):
+                dlg.close()
+            super().closeEvent(event)
 
 else:
 

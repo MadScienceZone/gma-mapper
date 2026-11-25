@@ -31,3 +31,7 @@
 - [x] *"Die Modifiers and Conditions..."*
 - [x] *"Text Markup Syntax..."* (`Alt+?`)
 
+## 5. Chat & Die Roller Window Improvements
+- [ ] **Load Chat History When Opening Chat / Die Roller Window**: Automatically request/load chat history from the server (e.g., via `SYNC-CHAT` respecting profile `chat_limit` / `suppress_chat`) when connecting or opening the Chat & Dice Roller window.
+- [ ] **Better Default Colors in Chat History Window**: Improve default light/dark theme colors and contrast in the chat history window for messages, sender labels, timestamps, and die-roll results.
+

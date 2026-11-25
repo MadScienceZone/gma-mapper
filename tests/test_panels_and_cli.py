@@ -1175,6 +1175,61 @@ class TestPanelsAndCLI(unittest.TestCase):
                 open_markup.close()
             win.close()
 
+    def test_floating_docks_detach_owner_and_close_with_main_window(self) -> None:
+        import os
+        import sys
+
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        try:
+            from PySide6.QtWidgets import QApplication
+            from gma_mapper.ui.main_window import GMAMapperMainWindow, IndependentDockWidget
+        except ImportError:
+            self.skipTest("PySide6 not available")
+
+        app = QApplication.instance() or QApplication([])
+        win = GMAMapperMainWindow()
+        pclock = None
+        try:
+            self.assertIsInstance(win.chat_dock, IndependentDockWidget)
+            self.assertIsInstance(win.combat_dock, IndependentDockWidget)
+            self.assertIsInstance(win.clock_dock, IndependentDockWidget)
+
+            win.show()
+            app.processEvents()
+
+            win.chat_dock.setFloating(True)
+            app.processEvents()
+            self.assertTrue(win.chat_dock.isFloating())
+            wh = win.chat_dock.windowHandle()
+            if wh is not None:
+                self.assertIsNone(wh.transientParent())
+            if sys.platform == "win32" and app.platformName() != "offscreen":
+                import ctypes
+
+                get_window = ctypes.windll.user32.GetWindow
+                get_window.argtypes = [ctypes.c_void_p, ctypes.c_uint]
+                get_window.restype = ctypes.c_void_p
+                self.assertEqual(get_window(int(win.chat_dock.winId()), 4) or 0, 0)
+
+            win.chat_dock.setFloating(False)
+            app.processEvents()
+            self.assertFalse(win.chat_dock.isFloating())
+
+            win.chat_dock.setFloating(True)
+            pclock = win.show_player_clock_window()
+            app.processEvents()
+            self.assertTrue(win.chat_dock.isVisible())
+            self.assertTrue(pclock.isVisible())
+
+            win.close()
+            app.processEvents()
+            self.assertFalse(win.chat_dock.isVisible())
+            self.assertFalse(pclock.isVisible())
+        finally:
+            if pclock is not None:
+                pclock.close()
+            win.close()
+
 
 if __name__ == "__main__":
     unittest.main()
