@@ -40,7 +40,7 @@
 - [x] **Save Window Layout Feature**: Persist and restore main window and dock panel layout across sessions (docked vs. undocked/floating state, docked area/position, floating window geometry, and dock sizes).
 
 ## 7. Standalone Die Roller Port (`src/py_dieroller`)
-- [ ] **Port Standalone Die Roller from `gma/extras/dieroller` to `src/py_dieroller`**: Copy the standalone die roller code from `gma/extras/dieroller` into `src/py_dieroller` and port its GUI to PySide6 while keeping it operable as a standalone die roller application.
+- [x] **Port Standalone Die Roller from `gma/extras/dieroller` to `src/py_dieroller`**: Copy the standalone die roller code from `gma/extras/dieroller` into `src/py_dieroller` and port its GUI to PySide6 while keeping it operable as a standalone die roller application.
 
 ## 8. Debug / Diagnostic Message Window
 - [ ] **Spawn Debug Window for Errors and Diagnostic Messages**: Match legacy mapper behavior by spawning/displaying a dedicated debug/diagnostic window to show errors, protocol traces, and diagnostic messages as they occur (with support for saving/clearing diagnostic messages).

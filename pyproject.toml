@@ -27,6 +27,8 @@ dev = [
 
 [project.scripts]
 gma-mapper = "gma_mapper.__main__:main"
+py-dieroller = "py_dieroller.__main__:main"
+py-roll = "py_dieroller.roll:main"
 
 [project.gui-scripts]
 gma-mapper-gui = "gma_mapper.__main__:main"
