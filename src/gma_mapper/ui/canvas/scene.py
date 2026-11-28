@@ -6,7 +6,7 @@ Manages grid lines, coordinate labels, map elements, creature tokens, targeting 
 from __future__ import annotations
 
 import math
-from typing import Any
+from typing import Any, Sequence
 
 from gma_mapper.core.colors import color_to_hex
 from gma_mapper.core.util import letter_label
@@ -215,6 +215,7 @@ try:
             self.major_offset: tuple[int, int] = (0, 0)
 
             self._target_lines: list[Any] = []
+            self._distance_tracer_items: list[Any] = []
             self.highlighted_element_id: str = ""
             self.marks: list[tuple[float, float]] = []
             self._active_pings: dict[tuple[float, float], list[QGraphicsEllipseItem]] = {}
@@ -602,39 +603,22 @@ try:
             if self.combat_mode and self.creatures:
                 creatures_data = {cid: tok.data for cid, tok in self.creatures.items()}
                 threat_color = QColor("#ff0000")
-                threat_pen = QPen(threat_color, 5.0)
-                head_size = 15.0
-                wing = 8.0
                 for _src_id, _dst_id, aox, aoy, adx, ady in compute_combat_threat_arrows(
                     creatures_data, BASE_GRID_SCALE
                 ):
-                    shaft = self.addLine(aox, aoy, adx, ady, threat_pen)
-                    shaft.setZValue(2_000_000_007)
-                    self._target_lines.append(shaft)
-
-                    dx = adx - aox
-                    dy = ady - aoy
-                    length = math.hypot(dx, dy)
-                    if length > 1e-3:
-                        ux = dx / length
-                        uy = dy / length
-                        px = -uy
-                        py = ux
-                        bx = adx - ux * head_size
-                        by = ady - uy * head_size
-                        poly = QPolygonF(
-                            [
-                                QPointF(adx, ady),
-                                QPointF(bx + px * wing, by + py * wing),
-                                QPointF(bx - px * wing, by - py * wing),
-                            ]
+                    self._target_lines.extend(
+                        self._draw_arrow_with_head(
+                            aox,
+                            aoy,
+                            adx,
+                            ady,
+                            color=threat_color,
+                            width=5.0,
+                            z_value=2_000_000_007,
+                            head_size=15.0,
+                            wing=8.0,
                         )
-                        head = QGraphicsPolygonItem(poly)
-                        head.setPen(QPen(threat_color, 1))
-                        head.setBrush(QBrush(threat_color))
-                        head.setZValue(2_000_000_007)
-                        self.addItem(head)
-                        self._target_lines.append(head)
+                    )
 
             # 1. Draw green dotted SRCTARG box around active_target_source (or active_actor_id)
             src_id = self.active_target_source or self.active_actor_id
@@ -724,6 +708,94 @@ try:
                 QTimer.singleShot(100, lambda: _step_ping(seq + 1))
 
             _step_ping(0)
+
+        def _draw_arrow_with_head(
+            self,
+            x0: float,
+            y0: float,
+            x1: float,
+            y1: float,
+            color: QColor,
+            width: float,
+            z_value: float,
+            head_size: float = 15.0,
+            wing: float = 8.0,
+        ) -> list[Any]:
+            items: list[Any] = []
+            shaft = self.addLine(x0, y0, x1, y1, QPen(color, width))
+            shaft.setZValue(z_value)
+            items.append(shaft)
+
+            dx = x1 - x0
+            dy = y1 - y0
+            length = math.hypot(dx, dy)
+            if length > 1e-3:
+                ux = dx / length
+                uy = dy / length
+                px = -uy
+                py = ux
+                bx = x1 - ux * head_size
+                by = y1 - uy * head_size
+                poly = QPolygonF(
+                    [
+                        QPointF(x1, y1),
+                        QPointF(bx + px * wing, by + py * wing),
+                        QPointF(bx - px * wing, by - py * wing),
+                    ]
+                )
+                head = QGraphicsPolygonItem(poly)
+                head.setPen(QPen(color, 1))
+                head.setBrush(QBrush(color))
+                head.setZValue(z_value)
+                self.addItem(head)
+                items.append(head)
+            return items
+
+        def clear_distance_tracers(self) -> None:
+            """Remove temporary yellow distance arrows and highlighted grid cells."""
+            for item in self._distance_tracer_items:
+                if item.scene() is self:
+                    self.removeItem(item)
+            self._distance_tracer_items.clear()
+
+        def set_distance_tracers(self, rows: Sequence[Any]) -> int:
+            """Render temporary yellow distance arrows and nearest-cell boxes (`distanceTracer`)."""
+            self.clear_distance_tracers()
+            tracer_color = QColor("#ffff00")
+            box_pen = QPen(tracer_color, 5.0)
+            seen_cells: set[tuple[int, int]] = set()
+            for row in rows:
+                arrow = getattr(row, "arrow", None)
+                if arrow is not None and len(arrow) == 4:
+                    x0, y0, x1, y1 = arrow
+                    self._distance_tracer_items.extend(
+                        self._draw_arrow_with_head(
+                            float(x0),
+                            float(y0),
+                            float(x1),
+                            float(y1),
+                            color=tracer_color,
+                            width=5.0,
+                            z_value=2_050_000_000,
+                            head_size=15.0,
+                            wing=8.0,
+                        )
+                    )
+                for cell in getattr(row, "highlight_cells", ()):
+                    cx, cy = int(cell[0]), int(cell[1])
+                    if (cx, cy) in seen_cells:
+                        continue
+                    seen_cells.add((cx, cy))
+                    rect = self.addRect(
+                        cx * BASE_GRID_SCALE,
+                        cy * BASE_GRID_SCALE,
+                        BASE_GRID_SCALE,
+                        BASE_GRID_SCALE,
+                        box_pen,
+                    )
+                    rect.setZValue(2_050_000_001)
+                    self._distance_tracer_items.append(rect)
+            return len(self._distance_tracer_items)
 
         @property
         def tokens(self) -> dict[str, CreatureTokenItem]:

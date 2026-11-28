@@ -9,6 +9,7 @@ Provides:
 
 from __future__ import annotations
 
+import math
 import random
 import re
 from typing import Any, Callable
@@ -959,14 +960,15 @@ try:
         on_spawn_mob: Callable[[dict[str, Any]], None],
         on_hp_request: Callable[[dict[str, Any]], None] | None = None,
         pc_templates: dict[str, dict[str, Any]] | None = None,
+        on_distance_from_grid: Callable[[int, int], None] | None = None,
+        on_distance_from_mob: Callable[[str], None] | None = None,
     ) -> None:
         """Populate `menu` with the full token & battle-map right-click context menu (`DoContext`)."""
-        from gma_mapper.ui.canvas.items import BASE_GRID_SCALE
         from gma_mapper.ui.canvas.scene import grid_coord_label, scene_to_grid_xy
 
         gx, gy = scene_to_grid_xy(scene_pt.x(), scene_pt.y())
-        snap_gx = float(int(gx)) if gx >= 0 else float(int(gx) - 1)
-        snap_gy = float(int(gy)) if gy >= 0 else float(int(gy) - 1)
+        snap_gx = int(math.floor(gx))
+        snap_gy = int(math.floor(gy))
         grid_lbl = grid_coord_label(gx, gy)
 
         mobs = (
@@ -1085,33 +1087,47 @@ try:
         act_add_monster = menu.addAction("Add Monster...")
         act_add_monster.triggered.connect(lambda _c=False: _prompt_add_creature("monster"))
 
-        # Distance from <GridLabel> / <Name>
-        grid_center = type(scene_pt)(
-            (snap_gx + 0.5) * BASE_GRID_SCALE, (snap_gy + 0.5) * BASE_GRID_SCALE
-        )
-        act_dist_grid = menu.addAction(f"Distance from {grid_lbl}")
-        act_dist_grid.triggered.connect(
-            lambda _c=False, pt=grid_center: (
-                view.start_ruler_from(pt) if hasattr(view, "start_ruler_from") else None
-            )
-        )
+        # Distance from <GridLabel> and Distance from <Icon>... (legacy DistanceFromGrid / DistanceFromMob)
+        def _trigger_distance_from_grid(cell_x: int = snap_gx, cell_y: int = snap_gy) -> None:
+            if on_distance_from_grid is not None:
+                on_distance_from_grid(cell_x, cell_y)
+            elif hasattr(view, "request_distance_from_grid"):
+                view.request_distance_from_grid(cell_x, cell_y)
 
-        for mid in mobs:
+        def _trigger_distance_from_mob(mob_id: str) -> None:
+            if on_distance_from_mob is not None:
+                on_distance_from_mob(mob_id)
+            elif hasattr(view, "request_distance_from_mob"):
+                view.request_distance_from_mob(mob_id)
+
+        act_dist_grid = menu.addAction(f"Distance from {grid_lbl}")
+        act_dist_grid.triggered.connect(lambda _c=False: _trigger_distance_from_grid())
+
+        if not mobs:
+            act_dist_none = menu.addAction("Distance from...")
+            act_dist_none.setEnabled(False)
+        elif len(mobs) == 1:
+            mid = mobs[0]
             tok = scene.creatures.get(mid)
-            if not tok:
-                continue
-            mname = str(tok.data.get("Name", mid))
-            msize, _, _, _, _ = tok.area_info()
-            mcenter = type(scene_pt)(
-                (tok.gx + msize * 0.5) * BASE_GRID_SCALE,
-                (tok.gy + msize * 0.5) * BASE_GRID_SCALE,
-            )
-            act_dist_mob = menu.addAction(f"Distance from {mname}...")
-            act_dist_mob.triggered.connect(
-                lambda _c=False, pt=mcenter: (
-                    view.start_ruler_from(pt) if hasattr(view, "start_ruler_from") else None
+            if tok:
+                raw_name = str(tok.data.get("Name", mid))
+                disp_name = re.sub(r"^\w*_", "", raw_name) or raw_name
+                act_dist_mob = menu.addAction(f"Distance from {disp_name}...")
+                act_dist_mob.triggered.connect(
+                    lambda _c=False, m=mid: _trigger_distance_from_mob(m)
                 )
-            )
+        else:
+            dist_sub = menu.addMenu("Distance From...")
+            for mid in mobs:
+                tok = scene.creatures.get(mid)
+                if not tok:
+                    continue
+                raw_name = str(tok.data.get("Name", mid))
+                disp_name = re.sub(r"^\w*_", "", raw_name) or raw_name
+                act_dist_mob = dist_sub.addAction(disp_name)
+                act_dist_mob.triggered.connect(
+                    lambda _c=False, m=mid: _trigger_distance_from_mob(m)
+                )
 
         # Selection actions
         selected_set: set[str] = getattr(scene, "selected_mobs", set())

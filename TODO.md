@@ -34,7 +34,7 @@
 ## 5. Chat & Die Roller Window Improvements
 - [x] **Load Chat History When Opening Chat / Die Roller Window**: Automatically request/load chat history from the server (e.g., via `SYNC-CHAT` respecting profile `chat_limit` / `suppress_chat`) when connecting or opening the Chat & Dice Roller window.
 - [x] **Better Default Colors in Chat History Window**: Improve default light/dark theme colors and contrast in the chat history window for messages, sender labels, timestamps, and die-roll results.
-- [ ] **Load Server Dice Presets When Starting Chat / Die Roller**: If the PC or GM has die-roll presets stored on the server, automatically request/load them (e.g., via `DR`) when connecting or opening the Chat & Dice Roller window.
+- [x] **Load Server Dice Presets When Starting Chat / Die Roller**: If the PC or GM has die-roll presets stored on the server, automatically request/load them (e.g., via `DR`) when connecting or opening the Chat & Dice Roller window.
 
 ## 6. Window Layout Persistence
 - [x] **Save Window Layout Feature**: Persist and restore main window and dock panel layout across sessions (docked vs. undocked/floating state, docked area/position, floating window geometry, and dock sizes).
@@ -46,6 +46,6 @@
 - [x] **Spawn Debug Window for Errors and Diagnostic Messages**: Match legacy mapper behavior by spawning/displaying a dedicated debug/diagnostic window to show errors, protocol traces, and diagnostic messages as they occur (with support for saving/clearing diagnostic messages).
 
 ## 9. Distance Measurement Features
-- [ ] **Distance from Icon**: Measure/display distance from a selected icon/creature matching legacy `bin/mapper.tcl` behavior.
-- [ ] **Distance from Cell**: Measure/display distance from a chosen grid cell matching legacy `bin/mapper.tcl` behavior.
+- [x] **Distance from Icon**: Measure/display distance from a selected icon/creature matching legacy `bin/mapper.tcl` behavior.
+- [x] **Distance from Cell**: Measure/display distance from a chosen grid cell matching legacy `bin/mapper.tcl` behavior.
 

@@ -1492,6 +1492,184 @@ class TestPanelsAndCLI(unittest.TestCase):
         finally:
             win.close()
 
+    def test_distance_from_cell_and_icon_dialog_and_tracers(self) -> None:
+        import os
+
+        from gma_mapper.ui.dialogs.distance_dialog import (
+            compute_distances_from_grid,
+            compute_distances_from_mob,
+            format_distance_table_html,
+            format_distance_table_text,
+        )
+
+        # 1. Pure-Python 2D/3D distances, Large creature nearest cell, Hidden filtering
+        creatures = {
+            "p1": {"ID": "p1", "Name": "01_Valeros", "Gx": 0.0, "Gy": 0.0, "Size": "M", "Elev": 0},
+            "m1": {"ID": "m1", "Name": "02_Ogre", "Gx": 4.0, "Gy": 0.0, "Size": "L", "Elev": 0},
+            "m2": {"ID": "m2", "Name": "03_Wyvern", "Gx": 0.0, "Gy": 4.0, "Size": "M", "Elev": 20},
+            "h1": {"ID": "h1", "Name": "Stalker", "Gx": 1.0, "Gy": 0.0, "Size": "M", "Hidden": True},
+        }
+        player_rows = compute_distances_from_grid(0, 0, 0.0, creatures, is_gm=False)
+        self.assertEqual([r.display_name for r in player_rows], ["Valeros", "Ogre", "Wyvern"])
+        ogre_row = next(r for r in player_rows if r.target_id == "m1")
+        self.assertEqual((ogre_row.center_sq, ogre_row.center_ft, ogre_row.dimension), (5, 25, "2D"))
+        self.assertEqual((ogre_row.nearest_sq, ogre_row.nearest_ft, ogre_row.nearest_label), (4, 20, "E1"))
+        wyvern_row = next(r for r in player_rows if r.target_id == "m2")
+        self.assertEqual(wyvern_row.dimension, "3D")
+        self.assertEqual(wyvern_row.center_sq, 6)  # hypot(4, 20/5=4) = 5.656 -> 6
+
+        # GM sees hidden targets in parentheses
+        gm_rows = compute_distances_from_grid(0, 0, 0.0, creatures, is_gm=True)
+        self.assertIn("(Stalker)", [r.display_name for r in gm_rows])
+
+        # Distance from icon excludes self & hidden for players
+        self.assertIsNone(compute_distances_from_mob("h1", creatures, is_gm=False))
+        mob_rows = compute_distances_from_mob("p1", creatures, is_gm=False)
+        assert mob_rows is not None
+        self.assertEqual([r.display_name for r in mob_rows], ["Ogre", "Wyvern"])
+
+        tbl_txt = format_distance_table_text(player_rows)
+        self.assertIn("CENTER-TO-CENTER", tbl_txt)
+        self.assertIn("E1", tbl_txt)
+        tbl_html = format_distance_table_html(player_rows)
+        self.assertIn("NEAREST-GRID", tbl_html)
+
+        # 2. Qt DistanceDialog & BattleMapScene distanceTracer lifecycle
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        try:
+            from PySide6.QtWidgets import QApplication
+            from gma_mapper.ui.main_window import GMAMapperMainWindow
+        except ImportError:
+            self.skipTest("PySide6 not available")
+
+        _app = QApplication.instance() or QApplication([])
+        win = GMAMapperMainWindow()
+        try:
+            for cid, cdata in creatures.items():
+                win.controller.scene.add_or_update_token(cid, cdata)
+
+            dlg = win.show_distance_from_grid(0, 0, z_ft=0.0)
+            self.assertEqual(dlg.windowTitle(), "Distance from grid point A1")
+            self.assertTrue(dlg.isVisible())
+            self.assertGreater(len(win.controller.scene._distance_tracer_items), 0)
+            self.assertIn("Ogre", dlg.text_view.toPlainText())
+
+            # Adjusting elevation recalculates rows dynamically in 3D
+            dlg.elev_spin.setValue(20)
+            wyv = next(r for r in dlg.rows if r.target_id == "m2")
+            self.assertEqual(wyv.dimension, "2D")
+            self.assertEqual(wyv.center_sq, 4)
+
+            # Closing dialog removes all yellow tracer overlays
+            dlg.close()
+            self.assertEqual(win.controller.scene._distance_tracer_items, [])
+            self.assertIsNone(win._distance_dialog)
+
+            # Distance from icon spawns tracers & replaces cleanly on win.close()
+            mob_dlg = win.show_distance_from_mob("p1")
+            assert mob_dlg is not None
+            self.assertEqual(mob_dlg.windowTitle(), "Distance from 01_Valeros")
+            self.assertGreater(len(win.controller.scene._distance_tracer_items), 0)
+            self.assertFalse(mob_dlg.elev_bar.isVisibleTo(mob_dlg))
+        finally:
+            win.close()
+        self.assertEqual(win.controller.scene._distance_tracer_items, [])
+        self.assertIsNone(win._distance_dialog)
+
+    def test_auto_load_server_dice_presets_on_login_and_chat_open(self) -> None:
+        import os
+
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        try:
+            from PySide6.QtWidgets import QApplication
+            from gma_mapper.core.profile import default_preferences, empty_server_profile
+            from gma_mapper.ui.main_window import GMAMapperMainWindow
+        except ImportError:
+            self.skipTest("PySide6 not available")
+
+        app = QApplication.instance() or QApplication([])
+        prefs = default_preferences()
+        srv_a = empty_server_profile("Alpha")
+        srv_a.update({"host": "alpha.example.org", "port": 2323, "username": "Valeros"})
+        srv_b = empty_server_profile("Beta")
+        srv_b.update({"host": "beta.example.org", "port": 2323, "username": "GM"})
+        prefs["profiles"] = [empty_server_profile("offline"), srv_a, srv_b]
+        prefs["current_profile"] = "Alpha"
+
+        win = GMAMapperMainWindow(prefs=prefs)
+        try:
+            # Disconnected state returns False and issues no DR command
+            dr_calls: list[tuple[str, bool]] = []
+            win.net_client.session.query_dice_presets = (  # type: ignore[method-assign]
+                lambda for_user="", globals_only=False: dr_calls.append((for_user, globals_only))
+            )
+            self.assertFalse(win.sync_dice_presets_from_server())
+            self.assertEqual(dr_calls, [])
+
+            # Connected stubs
+            win.net_client.session.is_ready = lambda: True  # type: ignore[method-assign]
+            win.net_client.session.subscribe = lambda: None  # type: ignore[method-assign]
+            win.net_client.session.allow = lambda *_a, **_kw: None  # type: ignore[method-assign]
+            win.net_client.session.sync = lambda: None  # type: ignore[method-assign]
+            win.net_client.session.sync_chat = lambda *_a, **_kw: None  # type: ignore[method-assign]
+            win.net_client.session.watch_operation = lambda *_a, **_kw: None  # type: ignore[method-assign]
+            win.net_client.dial = lambda **_kw: None  # type: ignore[method-assign]
+            win.net_client.hangup = lambda: None  # type: ignore[method-assign]
+
+            # 1. PC login automatically queries DR for "Valeros" and DD= populates panel presets
+            win.net_client.session.username = "Valeros"
+            win._on_login_successful()
+            self.assertEqual(dr_calls, [("Valeros", False)])
+            self.assertTrue(win._dice_presets_synced_for_session)
+
+            win.controller.dispatch_command(
+                "DD=",
+                {
+                    "For": "Valeros",
+                    "Global": False,
+                    "Presets": [{"Name": "Longsword", "DieRollSpec": "1d20+8", "Targets": []}],
+                },
+            )
+            win.controller.dispatch_command(
+                "DD=",
+                {
+                    "For": "",
+                    "Global": True,
+                    "Presets": [{"Name": "Initiative", "DieRollSpec": "1d20", "Targets": []}],
+                },
+            )
+            self.assertEqual(len(win.controller.chat_panel.bank.user_presets), 1)
+            self.assertEqual(len(win.controller.chat_panel.bank.system_presets), 1)
+
+            # 2. Showing chat_dock while already synced does not send duplicate DR; unsynced does
+            dr_calls.clear()
+            win.show()
+            win.chat_dock.hide()
+            app.processEvents()
+            win.chat_dock.show()
+            app.processEvents()
+            self.assertEqual(dr_calls, [])
+
+            win.chat_dock.hide()
+            app.processEvents()
+            win._dice_presets_synced_for_session = False
+            win.chat_dock.show()
+            app.processEvents()
+            self.assertEqual(dr_calls, [("Valeros", False)])
+
+            # 3. Switching profile clears stale presets and GM login queries DR for "GM"
+            win.switch_server_profile("Beta")
+            self.assertEqual(win.controller.chat_panel.bank.user_presets, [])
+            self.assertEqual(win.controller.chat_panel.bank.system_presets, [])
+            self.assertFalse(win._dice_presets_synced_for_session)
+
+            dr_calls.clear()
+            win.net_client.session.username = "GM"
+            win._on_login_successful()
+            self.assertEqual(dr_calls, [("GM", False)])
+        finally:
+            win.close()
+
 
 if __name__ == "__main__":
     unittest.main()

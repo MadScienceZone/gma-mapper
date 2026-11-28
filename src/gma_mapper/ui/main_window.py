@@ -42,12 +42,21 @@ from gma_mapper.ui.canvas.drawing import (
     cycle_in_list,
 )
 from gma_mapper.ui.canvas.items import creature_image_candidates
-from gma_mapper.ui.canvas.scene import CREATURE_GRID_SNAP_CHOICES, BattleMapScene
+from gma_mapper.ui.canvas.scene import (
+    CREATURE_GRID_SNAP_CHOICES,
+    BattleMapScene,
+    grid_coord_label,
+)
 from gma_mapper.ui.canvas.view import BattleMapView
 from gma_mapper.ui.dialogs.aka_dialog import SelectAKADialog
 from gma_mapper.ui.dialogs.debug_window import (
     DiagnosticWindow,
     format_diagnostic_entries_text,
+)
+from gma_mapper.ui.dialogs.distance_dialog import (
+    DistanceDialog,
+    compute_distances_from_grid,
+    compute_distances_from_mob,
 )
 from gma_mapper.ui.dialogs.help_dialogs import AboutMapperDialog, MarkupSyntaxHelpDialog
 from gma_mapper.ui.dialogs.ping_dialog import ServerPingDialog
@@ -1006,6 +1015,7 @@ if HAS_PYSIDE6:
             self._download_pool = ThreadPoolExecutor(max_workers=4)
             self._auth_prompt_pending = False
             self._chat_history_synced_for_session = False
+            self._dice_presets_synced_for_session = False
             self.act_reconnect_server: Any = None
             self.act_disconnect_server: Any = None
             self.net_client = GMANetworkClient(self)
@@ -1024,6 +1034,7 @@ if HAS_PYSIDE6:
             self.controller.echo_received_cb = self._on_echo_received
             self._ping_dialog: ServerPingDialog | None = None
             self._debug_window: DiagnosticWindow | None = None
+            self._distance_dialog: DistanceDialog | None = None
             self._delegated_dialogs: dict[str, DelegatedDieRollerDialog] = {}
             self.controller.diagnostic_recorded_cb = self._on_diagnostic_recorded
             self.controller.diagnostic_cleared_cb = self._on_diagnostics_cleared
@@ -1877,6 +1888,12 @@ if HAS_PYSIDE6:
             self.map_view.sync_view_requested.connect(
                 self.net_client.session.adjust_view
             )
+            self.map_view.distance_from_grid_requested.connect(
+                self.show_distance_from_grid
+            )
+            self.map_view.distance_from_mob_requested.connect(
+                self.show_distance_from_mob
+            )
             self._wire_chat_panel_signals(self.controller.chat_panel)
             # Initiative & Clock Dock signals
             self.controller.clock_panel.timeAdvanceRequested.connect(self._on_clock_time_advance)
@@ -2115,6 +2132,7 @@ if HAS_PYSIDE6:
 
         def _on_connection_lost(self, err: str) -> None:
             self._chat_history_synced_for_session = False
+            self._dice_presets_synced_for_session = False
             self.statusBar().showMessage(f"Disconnected: {err}")
             if err:
                 self.controller.log_error(f"Connection lost: {err}")
@@ -2164,6 +2182,20 @@ if HAS_PYSIDE6:
             self._chat_history_synced_for_session = True
             return True
 
+        def sync_dice_presets_from_server(self, for_user: str = "") -> bool:
+            """Request saved die-roll presets from the server (`DR`) on connect or chat open."""
+            if not self.net_client.session.is_ready():
+                return False
+            target_user = (
+                for_user
+                or self.controller.chat_panel.local_user
+                or str(getattr(self.net_client.session, "username", "") or "")
+            )
+            self.net_client.session.query_dice_presets(for_user=target_user)
+            if not for_user:
+                self._dice_presets_synced_for_session = True
+            return True
+
         def _on_chat_dock_visibility_changed(self, visible: bool) -> None:
             if not visible or not hasattr(self, "net_client"):
                 return
@@ -2174,9 +2206,12 @@ if HAS_PYSIDE6:
                 or self.controller.chat_panel.history_manager.last_message_id() <= 0
             ):
                 self.sync_chat_history_from_server()
+            if not self._dice_presets_synced_for_session:
+                self.sync_dice_presets_from_server()
 
         def _on_login_successful(self) -> None:
             self._chat_history_synced_for_session = False
+            self._dice_presets_synced_for_session = False
             user = str(getattr(self.net_client.session, "username", "") or "")
             if user:
                 self.controller.chat_panel.set_identity(user)
@@ -2191,6 +2226,7 @@ if HAS_PYSIDE6:
             self.net_client.session.allow(["GMA-MARKUP", "DICE-COLOR-BOXES", "DICE-COLOR-LABELS"])
             self.net_client.session.sync()
             self.sync_chat_history_from_server()
+            self.sync_dice_presets_from_server()
 
         def connect_to_configured_server(self) -> None:
             prof_name = self.prefs.get("current_profile") or self.prefs.get("current_server", "offline")
@@ -2834,10 +2870,14 @@ if HAS_PYSIDE6:
                 or "offline"
             )
             self._chat_history_synced_for_session = False
-            if profile_name != old_profile and hasattr(
-                self.controller.chat_panel, "clear_chat_history"
-            ):
-                self.controller.chat_panel.clear_chat_history(target=0, do_all=True)
+            self._dice_presets_synced_for_session = False
+            if profile_name != old_profile:
+                if hasattr(self.controller.chat_panel, "clear_chat_history"):
+                    self.controller.chat_panel.clear_chat_history(target=0, do_all=True)
+                if hasattr(self.controller.chat_panel, "set_presets"):
+                    self.controller.chat_panel.set_presets([])
+                if hasattr(self.controller.chat_panel, "set_system_presets"):
+                    self.controller.chat_panel.set_system_presets([])
             self.prefs["current_profile"] = profile_name
             self.prefs["current_server"] = profile_name
             self.controller.apply_preferences(self.prefs)
@@ -2861,6 +2901,7 @@ if HAS_PYSIDE6:
                 )
                 return False
             self._chat_history_synced_for_session = False
+            self._dice_presets_synced_for_session = False
             self.net_client.hangup()
             self.connect_to_configured_server()
             return True
@@ -2868,6 +2909,7 @@ if HAS_PYSIDE6:
         def disconnect_server(self) -> None:
             """Disconnect from the GMA server and enter offline state."""
             self._chat_history_synced_for_session = False
+            self._dice_presets_synced_for_session = False
             self.net_client.hangup()
             self.controller.log_info("Disconnected from server.")
             self.statusBar().showMessage("Disconnected (offline).")
@@ -2900,6 +2942,10 @@ if HAS_PYSIDE6:
                 if self._debug_window is not None:
                     self._debug_window.apply_theme(bool(self.prefs.get("dark", False)))
                     self._debug_window.set_show_protocol(self.controller.debug_proto)
+                if self._distance_dialog is not None:
+                    self._distance_dialog.apply_theme(
+                        self.prefs, bool(self.prefs.get("dark", False))
+                    )
                 self._rebuild_server_profile_menu()
                 if self.prefs_path:
                     save_preferences(self.prefs_path, self.prefs)
@@ -3024,6 +3070,104 @@ if HAS_PYSIDE6:
             dlg.finished.connect(lambda _res: setattr(self, "_ping_dialog", None))
             dlg.show()
             return dlg
+
+        def _close_distance_dialog(self) -> None:
+            if self._distance_dialog is not None:
+                prev = self._distance_dialog
+                self._distance_dialog = None
+                prev.close()
+
+        def _on_distance_dialog_closed(self, dlg: DistanceDialog) -> None:
+            if self._distance_dialog is dlg:
+                self._distance_dialog = None
+
+        def _open_distance_dialog(
+            self,
+            title: str,
+            rows_provider: Any,
+            allow_elevation: bool,
+            initial_z_ft: float = 0.0,
+        ) -> DistanceDialog:
+            self._close_distance_dialog()
+            scene = self.controller.scene
+            dlg = DistanceDialog(
+                title=title,
+                rows_provider=rows_provider,
+                apply_tracers_cb=(
+                    scene.set_distance_tracers
+                    if hasattr(scene, "set_distance_tracers")
+                    else None
+                ),
+                clear_tracers_cb=(
+                    scene.clear_distance_tracers
+                    if hasattr(scene, "clear_distance_tracers")
+                    else None
+                ),
+                allow_elevation=allow_elevation,
+                initial_z_ft=initial_z_ft,
+                prefs=self.prefs,
+                dark_mode=bool(self.prefs.get("dark", False)),
+                window_icon=self.icon_catalog.app_window_icon(),
+            )
+            dlg.closed.connect(lambda d=dlg: self._on_distance_dialog_closed(d))
+            self._distance_dialog = dlg
+            dlg.show()
+            detach_window_owner(dlg)
+            dlg.raise_()
+            return dlg
+
+        def show_distance_from_grid(
+            self, gx: int, gy: int, z_ft: float = 0.0
+        ) -> DistanceDialog:
+            """Display the Distance from Cell dialog and yellow tracers (`DistanceFromGrid`)."""
+            label = grid_coord_label(gx, gy)
+            scene = self.controller.scene
+
+            def _rows(elev_ft: float) -> list[Any]:
+                creatures = {cid: tok.data for cid, tok in scene.creatures.items()}
+                return compute_distances_from_grid(
+                    gx,
+                    gy,
+                    elev_ft,
+                    creatures,
+                    is_gm=bool(self.controller.chat_panel.is_gm),
+                )
+
+            return self._open_distance_dialog(
+                title=f"Distance from grid point {label}",
+                rows_provider=_rows,
+                allow_elevation=True,
+                initial_z_ft=z_ft,
+            )
+
+        def show_distance_from_mob(self, mob_id: str) -> DistanceDialog | None:
+            """Display the Distance from Icon dialog and yellow tracers (`DistanceFromMob`)."""
+            scene = self.controller.scene
+            tok = scene.creatures.get(mob_id)
+            if tok is None:
+                return None
+            is_gm = bool(self.controller.chat_panel.is_gm)
+            if tok.data.get("Hidden") and not is_gm:
+                return None
+
+            raw_name = str(tok.data.get("Name") or mob_id)
+
+            def _rows(_elev_ft: float) -> list[Any]:
+                creatures = {cid: t.data for cid, t in scene.creatures.items()}
+                return (
+                    compute_distances_from_mob(
+                        mob_id,
+                        creatures,
+                        is_gm=bool(self.controller.chat_panel.is_gm),
+                    )
+                    or []
+                )
+
+            return self._open_distance_dialog(
+                title=f"Distance from {raw_name}",
+                rows_provider=_rows,
+                allow_elevation=False,
+            )
 
         def ensure_diagnostic_window(self) -> DiagnosticWindow:
             """Create (if needed) the modeless ``DiagnosticWindow`` and return it."""
@@ -3304,6 +3448,10 @@ if HAS_PYSIDE6:
                 self.controller.player_clock_window.close()
             if self._ping_dialog is not None:
                 self._ping_dialog.close()
+            if self._distance_dialog is not None:
+                self._close_distance_dialog()
+            elif hasattr(self.controller.scene, "clear_distance_tracers"):
+                self.controller.scene.clear_distance_tracers()
             if self._debug_window is not None:
                 self._debug_window.close()
             for dlg in list(self._delegated_dialogs.values()):

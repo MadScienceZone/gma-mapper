@@ -87,6 +87,8 @@ try:
         tool_options_changed = Signal()  # active tool sub-options (join, spline, arrow, dash, etc.)
         status_message = Signal(str)  # status bar notification
         sync_view_requested = Signal(float, float, str)  # (xview, yview, grid_label)
+        distance_from_grid_requested = Signal(int, int)  # (gx, gy)
+        distance_from_mob_requested = Signal(str)  # mob_id
 
         def __init__(
             self, scene: BattleMapScene, parent: QWidget | None = None
@@ -526,6 +528,14 @@ try:
             self.element_removed.emit(obj_id)
             self.status_message.emit(f"Removed object {obj_id}")
 
+        def request_distance_from_grid(self, gx: int, gy: int) -> None:
+            """Emit ``distance_from_grid_requested`` for cell `(gx, gy)`."""
+            self.distance_from_grid_requested.emit(int(gx), int(gy))
+
+        def request_distance_from_mob(self, mob_id: str) -> None:
+            """Emit ``distance_from_mob_requested`` for creature `mob_id`."""
+            self.distance_from_mob_requested.emit(str(mob_id))
+
         def _open_context_menu(self, global_pos: Any, scene_pt: QPointF) -> None:
             if populate_canvas_context_menu is None:
                 return
@@ -541,6 +551,8 @@ try:
                 on_spawn_mob=self._spawn_mob,
                 on_hp_request=self.hp_request_sent.emit,
                 pc_templates=pc_tpls,
+                on_distance_from_grid=self.request_distance_from_grid,
+                on_distance_from_mob=self.request_distance_from_mob,
             )
             menu.exec(global_pos)
 

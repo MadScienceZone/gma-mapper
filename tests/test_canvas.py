@@ -219,6 +219,51 @@ class TestCanvasHelpers(unittest.TestCase):
         self.assertTrue(any("Polymorph Valeros" in t for t in action_texts))
         self.assertTrue(any("Add Monster..." in t for t in action_texts))
         self.assertTrue(any("Distance from C4" in t for t in action_texts))
+        self.assertTrue(any("Distance from Valeros..." in t for t in action_texts))
+
+        # 0 creatures at empty grid cell A1 -> disabled "Distance from..."
+        empty_menu = QMenu()
+        populate_canvas_context_menu(
+            menu=empty_menu,
+            scene=scene,
+            view=view,
+            scene_pt=QPointF(25.0, 25.0),
+            on_mutate_mob=lambda _mid, _attrs: None,
+            on_remove_mob=lambda _mid: None,
+            on_spawn_mob=lambda _d: None,
+        )
+        dist_none = next(a for a in empty_menu.actions() if a.text() == "Distance from...")
+        self.assertFalse(dist_none.isEnabled())
+
+        # Overlapping creatures -> "Distance From..." submenu listing each creature
+        scene.place_someone({
+            "ID": "m2",
+            "Name": "01_Goblin",
+            "Gx": 2.0,
+            "Gy": 3.0,
+            "Size": "M",
+            "DispSize": "M",
+            "CreatureType": 2,
+        })
+        multi_menu = QMenu()
+        emitted_mob_ids: list[str] = []
+        populate_canvas_context_menu(
+            menu=multi_menu,
+            scene=scene,
+            view=view,
+            scene_pt=pt,
+            on_mutate_mob=lambda _mid, _attrs: None,
+            on_remove_mob=lambda _mid: None,
+            on_spawn_mob=lambda _d: None,
+            on_distance_from_mob=emitted_mob_ids.append,
+        )
+        dist_sub_act = next(a for a in multi_menu.actions() if a.text() == "Distance From...")
+        dist_sub = dist_sub_act.menu()
+        self.assertIsNotNone(dist_sub)
+        sub_labels = [a.text() for a in dist_sub.actions()]
+        self.assertEqual(sub_labels, ["Valeros", "Goblin"])
+        dist_sub.actions()[1].trigger()
+        self.assertEqual(emitted_mob_ids, ["m2"])
 
     def test_drawing_snap_style_cyclers_and_nudge(self) -> None:
         # snap_coord with grid_scale=50.0
