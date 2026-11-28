@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Sequence
@@ -45,6 +46,8 @@ class MapperCLIOptions:
     geometry: str | None = None
     display: str | None = None
     chat_Transcript: str | None = None
+    debug_level: int = 0
+    debug_proto: bool = False
     list_profiles: bool = False
     extra_args: list[str] = field(default_factory=list)
 
@@ -62,6 +65,8 @@ def normalize_legacy_argv(argv: Sequence[str]) -> list[str]:
         "-select": "--select",
         "-list-profiles": "--list-profiles",
         "-dark": "--dark",
+        "-debug": "--debug",
+        "-debug-proto": "--debug-proto",
         "-preload": "--preload",
         "-button-size": "--button-size",
         "-curl-url-base": "--curl-url-base",
@@ -113,6 +118,20 @@ def parse_cli_args(argv: Sequence[str] | None = None) -> MapperCLIOptions:
     )
     parser.add_argument("-f", "--config", dest="config_path", help="Path to preferences.json")
     parser.add_argument("--dark", action="store_true", help="Enable dark UI mode")
+    parser.add_argument(
+        "-D",
+        "--debug",
+        action="count",
+        default=0,
+        dest="debug_level",
+        help="Increase diagnostic debugging level (repeatable, max 6)",
+    )
+    parser.add_argument(
+        "--debug-proto",
+        action="store_true",
+        dest="debug_proto",
+        help="Show and log client/server protocol trace messages",
+    )
     parser.add_argument("--preload", action="store_true", help="Preload map/image assets")
     parser.add_argument("--no-animate", action="store_true", help="Disable animated tiles")
     parser.add_argument(
@@ -145,6 +164,8 @@ def parse_cli_args(argv: Sequence[str] | None = None) -> MapperCLIOptions:
         geometry=ns.geometry,
         display=ns.display,
         chat_Transcript=ns.chat_transcript,
+        debug_level=min(6, int(ns.debug_level or 0)),
+        debug_proto=bool(ns.debug_proto),
         list_profiles=bool(ns.list_profiles),
         extra_args=extra,
     )
@@ -154,6 +175,11 @@ def apply_cli_overrides(prefs: dict, opts: MapperCLIOptions) -> dict:
     """Apply CLI flag overrides to loaded preferences dictionary without mutating disk until saved."""
     if opts.dark:
         prefs["dark"] = True
+    if opts.debug_level > 0:
+        cur_dbg = int(prefs.get("debug_level", 0) or 0)
+        prefs["debug_level"] = max(cur_dbg, min(6, int(opts.debug_level)))
+    if opts.debug_proto:
+        prefs["debug_proto"] = True
     if opts.no_animate:
         prefs["animate"] = False
     if opts.button_size is not None:
@@ -253,7 +279,22 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"[gma-mapper] Window show warning: {exc}", flush=True)
     from PySide6.QtCore import QTimer
     QTimer.singleShot(100, win.connect_to_configured_server)
-    return app.exec()
+
+    orig_excepthook = sys.excepthook
+
+    def _gui_excepthook(exc_type: type[BaseException], exc_value: BaseException, exc_tb: object) -> None:
+        tb_text = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+        try:
+            win.controller.log_error(tb_text.strip() or f"{exc_type.__name__}: {exc_value}")
+        except Exception:  # pylint: disable=broad-exception-caught
+            pass
+        orig_excepthook(exc_type, exc_value, exc_tb)  # type: ignore[arg-type]
+
+    sys.excepthook = _gui_excepthook
+    try:
+        return app.exec()
+    finally:
+        sys.excepthook = orig_excepthook
 
 
 if __name__ == "__main__":

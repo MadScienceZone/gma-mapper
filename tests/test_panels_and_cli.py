@@ -1339,7 +1339,9 @@ class TestPanelsAndCLI(unittest.TestCase):
                 win.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, win.combat_dock)
                 win.combat_dock.hide()
                 win.chat_dock.setFloating(True)
-                win.chat_dock.setGeometry(120, 140, 520, 360)
+                target_w = max(680, win.chat_dock.minimumSizeHint().width() + 40)
+                target_h = max(440, win.chat_dock.minimumSizeHint().height() + 40)
+                win.chat_dock.setGeometry(120, 140, target_w, target_h)
                 app.processEvents()
 
                 win.close()
@@ -1356,7 +1358,7 @@ class TestPanelsAndCLI(unittest.TestCase):
                 self.assertTrue(wl["docks"]["chat"]["floating"])
                 self.assertEqual(
                     wl["docks"]["chat"]["geometry"],
-                    {"x": 120, "y": 140, "width": 520, "height": 360},
+                    {"x": 120, "y": 140, "width": target_w, "height": target_h},
                 )
 
                 win2 = GMAMapperMainWindow(prefs=default_preferences(), prefs_path=prefs_path)
@@ -1366,8 +1368,8 @@ class TestPanelsAndCLI(unittest.TestCase):
                 )
                 self.assertTrue(win2.combat_dock.isHidden())
                 self.assertTrue(win2.chat_dock.isFloating())
-                self.assertEqual(win2.chat_dock.geometry().width(), 520)
-                self.assertEqual(win2.chat_dock.geometry().height(), 360)
+                self.assertEqual(win2.chat_dock.geometry().width(), target_w)
+                self.assertEqual(win2.chat_dock.geometry().height(), target_h)
 
                 win2.act_reset_window_layout.trigger()
                 app.processEvents()
@@ -1387,6 +1389,108 @@ class TestPanelsAndCLI(unittest.TestCase):
                 if win2 is not None:
                     win2.close()
                 win.close()
+
+    def test_diagnostic_window_auto_spawn_colors_save_clear_and_cli(self) -> None:
+        import os
+        import tempfile
+
+        from gma_mapper.__main__ import apply_cli_overrides, parse_cli_args
+        from gma_mapper.core.profile import default_preferences
+        from gma_mapper.ui.dialogs.debug_window import (
+            diagnostic_tag_colors,
+            format_diagnostic_entries_text,
+            format_diagnostic_line_html,
+            should_display_diagnostic,
+        )
+
+        # 1. Pure-Python colors, escaping, filtering, and text formatting
+        self.assertEqual(diagnostic_tag_colors("ERROR", dark_mode=False), ("#ff0000", "#ffff00"))
+        self.assertEqual(diagnostic_tag_colors("DEBUG 1", dark_mode=True), ("#ffff00", "#232323"))
+        self.assertEqual(diagnostic_tag_colors("DEBUG 1", dark_mode=False), ("#ff0000", "#cccccc"))
+        self.assertEqual(diagnostic_tag_colors("DEBUG 2", dark_mode=False), ("#000000", "#ffff00"))
+        self.assertEqual(diagnostic_tag_colors("DEBUG 3", dark_mode=True), ("#ffffff", "#232323"))
+        self.assertEqual(diagnostic_tag_colors("DEBUG 3", dark_mode=False), ("#0000ff", "#cccccc"))
+        self.assertEqual(diagnostic_tag_colors("INFO", dark_mode=False), ("#ffffff", "#0000ff"))
+        self.assertEqual(diagnostic_tag_colors("PROTOCOL", dark_mode=False), ("#ffffff", "#666666"))
+        self.assertFalse(should_display_diagnostic("PROTOCOL", show_protocol=False))
+        self.assertTrue(should_display_diagnostic("PROTOCOL", show_protocol=True))
+        self.assertTrue(should_display_diagnostic("ERROR", show_protocol=False))
+
+        html_line = format_diagnostic_line_html("INFO", "Connected <ok>", dark_mode=False)
+        self.assertIn("[info] Connected &lt;ok&gt;", html_line)
+        self.assertIn("#0000ff", html_line)
+        self.assertEqual(
+            format_diagnostic_entries_text([("ERROR", "bad"), ("PROTOCOL", "-> OK")]),
+            "ERROR   |bad\nPROTOCOL|-> OK",
+        )
+
+        # 2. CLI -D / --debug / --debug-proto options
+        opts = parse_cli_args(["-D", "-D", "--debug-proto"])
+        self.assertEqual(opts.debug_level, 2)
+        self.assertTrue(opts.debug_proto)
+        prefs_cli = apply_cli_overrides(default_preferences(), opts)
+        self.assertEqual(prefs_cli["debug_level"], 2)
+        self.assertTrue(prefs_cli["debug_proto"])
+
+        # 3. Headless Qt DiagnosticWindow lifecycle & auto-spawn
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        try:
+            from PySide6.QtWidgets import QApplication
+            from gma_mapper.ui.main_window import GMAMapperMainWindow
+        except ImportError:
+            self.skipTest("PySide6 not available")
+
+        _app = QApplication.instance() or QApplication([])
+        win = GMAMapperMainWindow()
+        try:
+            self.assertIsNone(win._debug_window)
+            self.assertEqual(win.act_show_diagnostics.text(), "Show &Diagnostic Messages...")
+
+            # Passive PROTOCOL does not auto-spawn when debug_proto=False
+            win.controller.log_protocol("<- PING")
+            self.assertIsNone(win._debug_window)
+
+            # Error auto-spawns the modeless DiagnosticWindow
+            win.controller.log_error("boom error")
+            self.assertIsNotNone(win._debug_window)
+            dbg = win._debug_window
+            assert dbg is not None
+            self.assertTrue(dbg.isVisible())
+            self.assertIn("boom error", dbg.text_view.toPlainText())
+            self.assertNotIn("<- PING", dbg.text_view.toPlainText())
+
+            # Show protocol traces checkbox reveals previously buffered PROTOCOL entries
+            dbg.chk_show_protocol.setChecked(True)
+            self.assertIn("<- PING", dbg.text_view.toPlainText())
+            dbg.chk_show_protocol.setChecked(False)
+
+            # Light/dark theme application
+            dbg.apply_theme(True)
+            self.assertIn("#232323", dbg.text_view.styleSheet())
+            dbg.apply_theme(False)
+            self.assertIn("#cccccc", dbg.text_view.styleSheet())
+
+            # Clear button empties both controller log and window view
+            dbg.btn_clear.click()
+            self.assertEqual(win.controller.diagnostic_log, [])
+            self.assertEqual(dbg.text_view.toPlainText(), "")
+
+            # Save As callback & save_diagnostics_to_file parity
+            win.controller.debug_proto = True
+            win.controller.log_protocol("-> SYNC")
+            self.assertIn("-> SYNC", dbg.text_view.toPlainText())
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = Path(tmpdir) / "diag_window.txt"
+                self.assertEqual(win.save_diagnostics_to_file(out_path), 1)
+                self.assertEqual(out_path.read_text(encoding="utf-8").strip(), "PROTOCOL|-> SYNC")
+
+            # Closing debug window and reopening via Tools -> Show Diagnostic Messages
+            dbg.close()
+            self.assertFalse(dbg.isVisible())
+            win.act_show_diagnostics.trigger()
+            self.assertTrue(dbg.isVisible())
+        finally:
+            win.close()
 
 
 if __name__ == "__main__":

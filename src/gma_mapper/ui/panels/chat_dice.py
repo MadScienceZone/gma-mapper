@@ -32,6 +32,7 @@ try:
         QDialog,
         QFileDialog,
         QFrame,
+        QGridLayout,
         QGroupBox,
         QHBoxLayout,
         QLabel,
@@ -394,10 +395,10 @@ if QT_AVAILABLE:
             self.presets_scroll.setWidget(self.presets_host)
             presets_outer.addWidget(self.presets_scroll, stretch=1)
 
-            # Bottom Preset Management Toolbar
-            toolbar_row = QHBoxLayout()
-            toolbar_row.setContentsMargins(0, 0, 0, 0)
-            toolbar_row.setSpacing(4)
+            # Bottom Preset Management Toolbar (2 rows so dock can narrow cleanly)
+            toolbar_grid = QGridLayout()
+            toolbar_grid.setContentsMargins(0, 0, 0, 0)
+            toolbar_grid.setSpacing(4)
 
             self.btn_edit_presets = QPushButton("Edit...", self.presets_group)
             self.btn_edit_presets.setToolTip(
@@ -428,14 +429,14 @@ if QT_AVAILABLE:
                 lambda: self.refresh_presets_requested.emit(self.for_user)
             )
 
-            toolbar_row.addWidget(self.btn_edit_presets)
-            toolbar_row.addWidget(self.btn_edit_sys_presets)
-            toolbar_row.addWidget(self.btn_save_to_server)
-            toolbar_row.addWidget(self.btn_import_presets)
-            toolbar_row.addWidget(self.btn_export_presets)
-            toolbar_row.addWidget(self.btn_refresh_presets)
-            toolbar_row.addStretch(1)
-            presets_outer.addLayout(toolbar_row)
+            toolbar_grid.addWidget(self.btn_edit_presets, 0, 0)
+            toolbar_grid.addWidget(self.btn_edit_sys_presets, 0, 1)
+            toolbar_grid.addWidget(self.btn_save_to_server, 0, 2)
+            toolbar_grid.addWidget(self.btn_import_presets, 1, 0)
+            toolbar_grid.addWidget(self.btn_export_presets, 1, 1)
+            toolbar_grid.addWidget(self.btn_refresh_presets, 1, 2)
+            toolbar_grid.setColumnStretch(3, 1)
+            presets_outer.addLayout(toolbar_grid)
 
             self.main_splitter.addWidget(self.presets_group)
             self.main_splitter.setStretchFactor(1, 3)

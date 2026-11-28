@@ -45,6 +45,10 @@ from gma_mapper.ui.canvas.items import creature_image_candidates
 from gma_mapper.ui.canvas.scene import CREATURE_GRID_SNAP_CHOICES, BattleMapScene
 from gma_mapper.ui.canvas.view import BattleMapView
 from gma_mapper.ui.dialogs.aka_dialog import SelectAKADialog
+from gma_mapper.ui.dialogs.debug_window import (
+    DiagnosticWindow,
+    format_diagnostic_entries_text,
+)
 from gma_mapper.ui.dialogs.help_dialogs import AboutMapperDialog, MarkupSyntaxHelpDialog
 from gma_mapper.ui.dialogs.ping_dialog import ServerPingDialog
 from gma_mapper.ui.dialogs.preferences import PreferencesDialog
@@ -152,6 +156,8 @@ class MapperController:
         self.debug_proto: bool = False
         self.diagnostic_log: list[tuple[str, str]] = []
         self.max_diagnostic_lines: int = 5000
+        self.diagnostic_recorded_cb: Callable[[str, str, bool], None] | None = None
+        self.diagnostic_cleared_cb: Callable[[], None] | None = None
         self.apply_preferences(self.prefs)
 
     def known_pc_names(self) -> list[str]:
@@ -252,22 +258,37 @@ class MapperController:
             self.player_clock_window.my_names = list(self.clock_panel.my_names)
             self.player_clock_window.sync_timers(self.clock_panel.timers)
 
-    def record_diagnostic(self, tag: str, msg: str) -> None:
+    def record_diagnostic(
+        self, tag: str, msg: str, auto_spawn: bool = False
+    ) -> None:
         """Append non-empty lines of `msg` with `tag` to the bounded diagnostic buffer."""
+        appended: list[str] = []
         for line in str(msg).splitlines():
             if line:
                 self.diagnostic_log.append((tag, line))
+                appended.append(line)
         excess = len(self.diagnostic_log) - self.max_diagnostic_lines
         if excess > 0:
             del self.diagnostic_log[:excess]
+        if appended and self.diagnostic_recorded_cb is not None:
+            for line in appended:
+                self.diagnostic_recorded_cb(tag, line, auto_spawn)
+
+    def clear_diagnostics(self) -> int:
+        """Clear all buffered diagnostic entries and notify listeners."""
+        count = len(self.diagnostic_log)
+        self.diagnostic_log.clear()
+        if self.diagnostic_cleared_cb is not None:
+            self.diagnostic_cleared_cb()
+        return count
 
     def log_info(self, msg: str) -> None:
         """Record an informational message in the diagnostic log."""
-        self.record_diagnostic("INFO", msg)
+        self.record_diagnostic("INFO", msg, auto_spawn=True)
 
     def log_protocol(self, msg: str) -> None:
         """Record a protocol trace line and echo to stdout when `debug_proto` is enabled."""
-        self.record_diagnostic("PROTOCOL", msg)
+        self.record_diagnostic("PROTOCOL", msg, auto_spawn=self.debug_proto)
         if self.debug_proto:
             print(f"[gma-mapper:proto] {msg}", flush=True)
 
@@ -275,13 +296,17 @@ class MapperController:
         """Emit diagnostic message if ``level <= self.debug_level``."""
         if level == 0 or level <= self.debug_level:
             tag = "ERROR" if level == 0 else f"DEBUG {level}"
-            self.record_diagnostic(tag, msg)
+            self.record_diagnostic(tag, msg, auto_spawn=True)
         if level <= self.debug_level:
             print(f"[gma-mapper:debug:{level}] {msg}", flush=True)
 
+    def log_error(self, msg: str) -> None:
+        """Record a level-0 error diagnostic message (matching legacy ``DEBUG 0``)."""
+        self.log_debug(0, msg)
+
     def format_diagnostic_text(self) -> str:
         """Format buffered diagnostic messages matching legacy `SaveDebugText`."""
-        return "\n".join(f"{tag:<8}|{line}" for tag, line in self.diagnostic_log)
+        return format_diagnostic_entries_text(self.diagnostic_log)
 
     def apply_preferences(self, prefs: dict[str, Any] | None = None) -> None:
         """Apply appearance, grid guide-line, player, and diagnostic preferences."""
@@ -952,6 +977,7 @@ if HAS_PYSIDE6:
 
         _image_downloaded = Signal(str, str)       # (name, local_file_path)
         _map_downloaded = Signal(str, bool)        # (local_file_path, merge)
+        _diagnostic_event = Signal(str, str, bool) # (tag, message, auto_spawn)
 
         def __init__(
             self,
@@ -997,7 +1023,10 @@ if HAS_PYSIDE6:
             self.controller.delegates_updated_cb = self._rebuild_delegate_for_menu
             self.controller.echo_received_cb = self._on_echo_received
             self._ping_dialog: ServerPingDialog | None = None
+            self._debug_window: DiagnosticWindow | None = None
             self._delegated_dialogs: dict[str, DelegatedDieRollerDialog] = {}
+            self.controller.diagnostic_recorded_cb = self._on_diagnostic_recorded
+            self.controller.diagnostic_cleared_cb = self._on_diagnostics_cleared
             self._apply_debug_protocol()
 
             self.setWindowTitle(f"GMA Mapper {GMAMapperVersion}")
@@ -1030,8 +1059,10 @@ if HAS_PYSIDE6:
                     local_img = self.cache.fetch_image(name, zoom, file_id)
                     if local_img and Path(local_img).is_file():
                         self._image_downloaded.emit(name, str(local_img))
-                except Exception:  # pylint: disable=broad-exception-caught
-                    pass
+                except Exception as exc:  # pylint: disable=broad-exception-caught
+                    self._diagnostic_event.emit(
+                        "ERROR", f"Image download failed ({name}): {exc}", True
+                    )
 
             self._download_pool.submit(_worker)
 
@@ -1042,8 +1073,10 @@ if HAS_PYSIDE6:
                     local_map = self.cache.fetch_map_file(file_id)
                     if not cache_only and local_map and Path(local_map).is_file():
                         self._map_downloaded.emit(str(local_map), merge)
-                except Exception:  # pylint: disable=broad-exception-caught
-                    pass
+                except Exception as exc:  # pylint: disable=broad-exception-caught
+                    self._diagnostic_event.emit(
+                        "ERROR", f"Map download failed ({file_id}): {exc}", True
+                    )
 
             self._download_pool.submit(_worker)
 
@@ -1056,7 +1089,9 @@ if HAS_PYSIDE6:
             try:
                 self.controller.apply_loaded_map_file(local_path, merge)
             except Exception as exc:  # pylint: disable=broad-exception-caught
-                self.statusBar().showMessage(f"Error loading map: {exc}")
+                msg = f"Error loading map: {exc}"
+                self.statusBar().showMessage(msg)
+                self.controller.log_error(msg)
 
         def _create_docks(self) -> None:
             self.clock_dock = IndependentDockWidget("Initiative & Clock", self)
@@ -1642,6 +1677,14 @@ if HAS_PYSIDE6:
             tools_menu.addAction(self.act_server_ping_test)
 
             tools_menu.addSeparator()
+            self.act_show_diagnostics = QAction(
+                "Show &Diagnostic Messages...", self
+            )
+            self.act_show_diagnostics.triggered.connect(
+                lambda _c=False: self.show_diagnostic_window(raise_window=True)
+            )
+            tools_menu.addAction(self.act_show_diagnostics)
+
             self.act_save_diagnostics = QAction(
                 "Save &Diagnostic Messages As...", self
             )
@@ -1782,6 +1825,7 @@ if HAS_PYSIDE6:
         def _wire_signals(self) -> None:
             self._image_downloaded.connect(self._on_image_downloaded)
             self._map_downloaded.connect(self._on_map_downloaded)
+            self._diagnostic_event.connect(self._on_async_diagnostic_event)
 
             self.net_client.command_received.connect(self.controller.dispatch_command)
             self.net_client.progress_message.connect(self._on_progress_message)
@@ -2027,6 +2071,16 @@ if HAS_PYSIDE6:
         def _on_progress_message(self, msg: str) -> None:
             print(f"[gma-mapper] {msg}", flush=True)
             self.statusBar().showMessage(msg)
+            lower_msg = msg.lower()
+            if (
+                msg.startswith("Disconnected:")
+                or "error" in lower_msg
+                or "failed" in lower_msg
+                or "authentication required" in lower_msg
+            ):
+                self.controller.log_error(msg)
+            else:
+                self.controller.record_diagnostic("INFO", msg, auto_spawn=False)
             if "Authentication required" in msg and not self._auth_prompt_pending:
                 self._auth_prompt_pending = True
                 QTimer.singleShot(0, self._prompt_for_credentials)
@@ -2062,6 +2116,8 @@ if HAS_PYSIDE6:
         def _on_connection_lost(self, err: str) -> None:
             self._chat_history_synced_for_session = False
             self.statusBar().showMessage(f"Disconnected: {err}")
+            if err:
+                self.controller.log_error(f"Connection lost: {err}")
 
         def _active_server_profile(self) -> dict[str, Any]:
             prof_name = str(
@@ -2550,7 +2606,9 @@ if HAS_PYSIDE6:
                         f"Saved {count} map object(s) to {Path(path).name}"
                     )
                 except (OSError, ValueError) as exc:
-                    self.statusBar().showMessage(f"Error saving map: {exc}")
+                    msg = f"Error saving map: {exc}"
+                    self.statusBar().showMessage(msg)
+                    self.controller.log_error(msg)
 
         def _on_open_dice(self) -> None:
             self.controller.chat_panel.prompt_import_presets_from_file()
@@ -2839,6 +2897,9 @@ if HAS_PYSIDE6:
                 self.controller.apply_preferences(self.prefs)
                 self._refresh_toolbar_appearance()
                 self._apply_debug_protocol()
+                if self._debug_window is not None:
+                    self._debug_window.apply_theme(bool(self.prefs.get("dark", False)))
+                    self._debug_window.set_show_protocol(self.controller.debug_proto)
                 self._rebuild_server_profile_menu()
                 if self.prefs_path:
                     save_preferences(self.prefs_path, self.prefs)
@@ -2963,6 +3024,57 @@ if HAS_PYSIDE6:
             dlg.finished.connect(lambda _res: setattr(self, "_ping_dialog", None))
             dlg.show()
             return dlg
+
+        def ensure_diagnostic_window(self) -> DiagnosticWindow:
+            """Create (if needed) the modeless ``DiagnosticWindow`` and return it."""
+            if self._debug_window is None:
+                dlg = DiagnosticWindow(
+                    entries_provider=lambda: self.controller.diagnostic_log,
+                    save_cb=self._on_save_diagnostic_messages,
+                    clear_cb=self.clear_diagnostic_messages,
+                    dark_mode=bool(self.prefs.get("dark", False)),
+                    show_protocol=self.controller.debug_proto,
+                    max_lines=self.controller.max_diagnostic_lines,
+                    window_icon=self.icon_catalog.app_window_icon(),
+                )
+                self._debug_window = dlg
+            return self._debug_window
+
+        def show_diagnostic_window(self, raise_window: bool = True) -> DiagnosticWindow:
+            """Show (and optionally raise) the modeless ``DiagnosticWindow``."""
+            dlg = self.ensure_diagnostic_window()
+            if not dlg.isVisible():
+                dlg.show()
+                detach_window_owner(dlg)
+            if raise_window:
+                dlg.raise_()
+            return dlg
+
+        def clear_diagnostic_messages(self) -> int:
+            """Clear all buffered and displayed diagnostic messages."""
+            return self.controller.clear_diagnostics()
+
+        def _on_diagnostic_recorded(self, tag: str, line: str, auto_spawn: bool) -> None:
+            if self._debug_window is None:
+                if auto_spawn:
+                    # ensure_diagnostic_window() hydrates from diagnostic_log (which already has `line`).
+                    self.show_diagnostic_window(raise_window=False)
+                return
+            if auto_spawn and tag == "PROTOCOL" and not self._debug_window.show_protocol:
+                # set_show_protocol() re-renders from diagnostic_log (which already has `line`).
+                self._debug_window.set_show_protocol(True)
+                appended = True
+            else:
+                appended = self._debug_window.append_entry(tag, line)
+            if auto_spawn and appended and not self._debug_window.isVisible():
+                self.show_diagnostic_window(raise_window=False)
+
+        def _on_diagnostics_cleared(self) -> None:
+            if self._debug_window is not None:
+                self._debug_window.clear_entries()
+
+        def _on_async_diagnostic_event(self, tag: str, msg: str, auto_spawn: bool) -> None:
+            self.controller.record_diagnostic(tag, msg, auto_spawn=auto_spawn)
 
         def save_diagnostics_to_file(self, path: str | Path) -> int:
             """Write buffered diagnostic log entries to `path` and return line count."""
@@ -3192,6 +3304,8 @@ if HAS_PYSIDE6:
                 self.controller.player_clock_window.close()
             if self._ping_dialog is not None:
                 self._ping_dialog.close()
+            if self._debug_window is not None:
+                self._debug_window.close()
             for dlg in list(self._delegated_dialogs.values()):
                 dlg.close()
             super().closeEvent(event)
