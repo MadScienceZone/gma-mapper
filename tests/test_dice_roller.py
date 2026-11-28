@@ -318,6 +318,56 @@ class TestRollPipelineAndTables(unittest.TestCase):
         self.assertEqual(reply["text"], "rolled 7 on Pocket Loot: Silver ring")
         self.assertFalse(reply["markup"])
 
+        # Non-origin bystander peers must not emit duplicate table chat replies
+        bystander_payload = dict(roll_payload, Origin=False)
+        self.assertIsNone(
+            resolve_table_roll_reply(bystander_payload, banks_by_tkey={"Valeros": self.bank})
+        )
+
+        # Blind roll on ##global table received by GM resolves with sender attribution
+        gm_global_blind = {
+            "RequestID": "##weather;Valeros;mb;r43",
+            "Sender": "Valeros",
+            "Origin": False,
+            "ToAll": False,
+            "ToGM": True,
+            "RollData": {"Result": 5, "ResultSuppressed": False},
+        }
+        gm_reply = resolve_table_roll_reply(
+            gm_global_blind,
+            banks_by_tkey={"Valeros": self.bank},
+            is_gm=True,
+        )
+        self.assertIsNotNone(gm_reply)
+        assert gm_reply is not None
+        self.assertEqual(
+            gm_reply["text"], "Valeros rolled 5 on Weather Table: **Thunderstorm**"
+        )
+        self.assertTrue(gm_reply["markup"])
+        self.assertTrue(gm_reply["to_gm"])
+        self.assertFalse(gm_reply["to_all"])
+
+        # Blind roll on player's private #table received by GM emits legacy notification
+        gm_priv_blind = {
+            "RequestID": "#loot;Valeros;b;r44",
+            "Sender": "Valeros",
+            "Origin": False,
+            "ToAll": False,
+            "ToGM": True,
+            "RollData": {"Result": 8, "ResultSuppressed": False},
+        }
+        gm_priv_reply = resolve_table_roll_reply(
+            gm_priv_blind,
+            default_bank=DicePresetBank(tkey="GM"),
+            is_gm=True,
+        )
+        self.assertIsNotNone(gm_priv_reply)
+        assert gm_priv_reply is not None
+        self.assertEqual(
+            gm_priv_reply["text"], "(Valeros blind-rolled 8 on their lookup table #loot)"
+        )
+        self.assertTrue(gm_priv_reply["to_gm"])
+
         # Replay rolls must not re-trigger table chat replies
         roll_payload["Replay"] = True
         self.assertIsNone(

@@ -12,6 +12,7 @@ import tempfile
 from typing import Any, Callable
 
 from gma_mapper.core.colors import color_to_hex
+from gma_mapper.core.minimarkup import render_html as render_minimarkup_html
 from py_dieroller.debug import dprint
 
 DEF_PORT: int = 2323
@@ -536,6 +537,12 @@ def render_message_segment_html(msg: dict[str, Any], store: SettingsStore) -> st
             box_css = _span_css(style_dict, override_fg=fg, override_bg=bg)
             spans.append(f'<span style="{box_css}"> {html.escape(seg_text)} </span>')
         return "".join(spans)
+
+    if msg.get("markup"):
+        markup_body = render_minimarkup_html(raw_text)
+        if base_css:
+            return f'<span style="{base_css}">{markup_body}</span>'
+        return markup_body
 
     escaped = html.escape(raw_text)
     if base_css:

@@ -923,6 +923,8 @@ def prepare_die_roll(
 
         tbl_details = table_map[table_name]
         tbl_flags = "".join(tbl_details.get("flags") or [])
+        if to_gm and "b" not in tbl_flags:
+            tbl_flags += "b"
         tkey = bank.tkey if bank else ""
         effective_req_id = f"#{glob_mark}{table_name};{tkey};{tbl_flags};{effective_req_id}"
         spec = f"{title_part} {tbl_details['dieroll']} {rest_part}".strip()
@@ -979,6 +981,30 @@ def prepare_die_roll(
     }
 
 
+def lookup_table_outcome(result_int: int, pairs_or_flat: list[Any]) -> str | None:
+    """Resolve the matching table text for ``result_int`` from pairs or flat alternating entries."""
+    if not pairs_or_flat:
+        return None
+    if isinstance(pairs_or_flat[0], (tuple, list)):
+        pairs: list[tuple[Any, Any]] = [(row[0], row[1]) for row in pairs_or_flat if len(row) >= 2]
+    else:
+        pairs = [
+            (pairs_or_flat[i], pairs_or_flat[i + 1])
+            for i in range(0, len(pairs_or_flat) - 1, 2)
+        ]
+
+    for bound_raw, row_text in pairs:
+        bound_str = str(bound_raw).strip()
+        if bound_str == "*":
+            return str(row_text)
+        try:
+            if result_int <= int(bound_str):
+                return str(row_text)
+        except ValueError:
+            continue
+    return None
+
+
 def resolve_table_roll_reply(
     payload: dict[str, Any],
     banks_by_tkey: dict[str, DicePresetBank] | None = None,
@@ -987,7 +1013,7 @@ def resolve_table_roll_reply(
 ) -> dict[str, Any] | None:
     """Inspect an incoming `ROLL` payload for a `#table` `RequestID` and resolve the table row.
 
-    Matches the table-lookup callback in `DisplayDieRoll` (`bin/mapper_legacy.tcl`).
+    Matches the table-lookup callback in `DisplayDieRoll` (`bin/mapper.tcl`).
     Returns `None` if `payload` is a `Replay` or not a table roll, or a dictionary with:
     `text`, `markup`, `to_all`, `to_gm`, `recipients`, `table_name`, `result_value`.
     """
@@ -1012,15 +1038,6 @@ def resolve_table_roll_reply(
         is_global_tbl = False
         table_name = raw_tbl_token[1:]
 
-    bank = (banks_by_tkey or {}).get(tkey) or default_bank
-    if bank is None:
-        return None
-
-    table_map = bank.global_tables_by_name if is_global_tbl else bank.tables_by_name
-    tbl = table_map.get(table_name)
-    if tbl is None:
-        return None
-
     result_obj = (
         payload.get("Result")
         if isinstance(payload.get("Result"), dict)
@@ -1028,6 +1045,20 @@ def resolve_table_roll_reply(
     )
     if result_obj.get("InvalidRequest"):
         return None
+
+    is_origin = bool(payload.get("Origin", False))
+    to_all = bool(payload.get("ToAll", False))
+    to_gm = bool(payload.get("ToGM", False))
+    recipients = list(payload.get("Recipients") or payload.get("Targets") or [])
+    is_blind = (
+        bool(result_obj.get("ResultSuppressed", False))
+        or ("b" in flags_str)
+        or (to_gm and not to_all and not recipients and not is_origin)
+    )
+
+    if is_origin and is_blind and not is_gm:
+        return None
+
     raw_result = result_obj.get(
         "Result",
         payload.get("Result") if not isinstance(payload.get("Result"), dict) else None,
@@ -1037,47 +1068,70 @@ def resolve_table_roll_reply(
     except (TypeError, ValueError):
         return None
 
-    pairs = tbl.get("pairs") or []
-    if not pairs:
-        raw_flat = tbl.get("table") or []
-        pairs = [(raw_flat[i], raw_flat[i + 1]) for i in range(0, len(raw_flat) - 1, 2)]
-
-    matched_text: str | None = None
-    for bound_str, row_text in pairs:
-        if bound_str == "*":
-            matched_text = row_text
-            break
-        try:
-            if result_int <= int(bound_str):
-                matched_text = row_text
-                break
-        except ValueError:
-            continue
-
-    if matched_text is None:
-        return None
-
-    display_name = tbl.get("Description") or tbl.get("description") or table_name
-    to_all = bool(payload.get("ToAll", False))
-    to_gm = bool(payload.get("ToGM", False))
-    recipients = list(payload.get("Recipients") or payload.get("Targets") or [])
-
+    bank = (banks_by_tkey or {}).get(tkey) or default_bank
     sender = str(
         payload.get("Sender")
         or (payload.get("Origin") if isinstance(payload.get("Origin"), str) else "")
+        or ""
     )
-    if is_gm and to_gm and not to_all and not recipients and sender:
-        recipients = [sender]
 
-    return {
-        "text": f"rolled {result_int} on {display_name}: {matched_text}",
-        "markup": "m" in flags_str,
-        "to_all": to_all,
-        "to_gm": to_gm,
-        "recipients": recipients,
-        "table_name": table_name,
-        "result_value": result_int,
-    }
+    if is_origin and not is_blind:
+        if bank is None:
+            return None
+        table_map = bank.global_tables_by_name if is_global_tbl else bank.tables_by_name
+        tbl = table_map.get(table_name)
+        if tbl is None:
+            return None
+        matched_text = lookup_table_outcome(result_int, tbl.get("pairs") or tbl.get("table") or [])
+        if matched_text is None:
+            return None
+        display_name = tbl.get("Description") or tbl.get("description") or table_name
+        return {
+            "text": f"rolled {result_int} on {display_name}: {matched_text}",
+            "markup": ("m" in flags_str) or bool(tbl.get("markup", False)),
+            "to_all": to_all,
+            "to_gm": to_gm,
+            "recipients": recipients,
+            "table_name": table_name,
+            "result_value": result_int,
+        }
+
+    if is_gm and is_blind:
+        if not is_global_tbl and not is_origin:
+            return {
+                "text": (
+                    f"({sender or 'Player'} blind-rolled {result_int} "
+                    f"on their lookup table #{table_name})"
+                ),
+                "markup": False,
+                "to_all": False,
+                "to_gm": True,
+                "recipients": [],
+                "table_name": table_name,
+                "result_value": result_int,
+            }
+        if bank is None:
+            return None
+        table_map = bank.global_tables_by_name if is_global_tbl else bank.tables_by_name
+        tbl = table_map.get(table_name)
+        if tbl is None:
+            return None
+        matched_text = lookup_table_outcome(result_int, tbl.get("pairs") or tbl.get("table") or [])
+        if matched_text is None:
+            return None
+        display_name = tbl.get("Description") or tbl.get("description") or table_name
+        attrib = f"{sender} " if (not is_origin and sender) else ""
+        return {
+            "text": f"{attrib}rolled {result_int} on {display_name}: {matched_text}",
+            "markup": ("m" in flags_str) or bool(tbl.get("markup", False)),
+            "to_all": False,
+            "to_gm": True,
+            "recipients": [],
+            "table_name": table_name,
+            "result_value": result_int,
+        }
+
+    return None
 
 
 def parse_color_blocks(

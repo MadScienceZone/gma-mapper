@@ -14,6 +14,7 @@ from typing import Any
 _DIE_TERM_RE = re.compile(
     r"^\s*(?:(\d*)[dD](\d+|%))(?:\s+(best|worst)\s+(\d+))?\s*$"
 )
+_REPEAT_OPT_RE = re.compile(r"\brepeat\s+(\d+)\b", flags=re.IGNORECASE)
 _TOKEN_RE = re.compile(
     r"(\d*[dD](?:\d+|%)(?:\s+(?:best|worst)\s+\d+)?|\d+|[+\-*/]|//|\(|\)|\{[^{}]+\})"
 )
@@ -48,49 +49,57 @@ class LocalDieRoller:
             body = body.strip()
             pipe_opts = pipe_opts.strip()
 
-        details: list[tuple[str, str]] = []
-        eval_parts: list[str] = []
+        repeat_count = 1
+        if pipe_opts:
+            rep_match = _REPEAT_OPT_RE.search(pipe_opts)
+            if rep_match:
+                repeat_count = max(1, min(int(rep_match.group(1)), 50))
 
         tokens = _TOKEN_RE.findall(body)
         if not tokens:
             return (label, [(0, [("error", f"Cannot parse expression: {body}")])])
 
-        for tok in tokens:
-            if tok.startswith("{") and tok.endswith("}"):
-                details.append(("label", tok[1:-1].strip()))
-                continue
+        results: list[tuple[int, list[tuple[str, str]]]] = []
+        for _ in range(repeat_count):
+            details: list[tuple[str, str]] = []
+            eval_parts: list[str] = []
+            for tok in tokens:
+                if tok.startswith("{") and tok.endswith("}"):
+                    details.append(("label", tok[1:-1].strip()))
+                    continue
 
-            if tok in ("+", "-", "*", "/", "//", "(", ")"):
-                details.append(("operator", tok))
-                eval_parts.append(tok)
-                continue
+                if tok in ("+", "-", "*", "/", "//", "(", ")"):
+                    details.append(("operator", tok))
+                    eval_parts.append(tok)
+                    continue
 
-            if tok.isdigit():
-                details.append(("constant", tok))
-                eval_parts.append(tok)
-                continue
+                if tok.isdigit():
+                    details.append(("constant", tok))
+                    eval_parts.append(tok)
+                    continue
 
-            m = _DIE_TERM_RE.match(tok)
-            if m:
-                spec_str, rolls_str, term_sum = self._eval_die_match(m)
-                details.append(("diespec", spec_str))
-                details.append(("roll", rolls_str))
-                eval_parts.append(str(term_sum))
-                continue
+                m = _DIE_TERM_RE.match(tok)
+                if m:
+                    spec_str, rolls_str, term_sum = self._eval_die_match(m)
+                    details.append(("diespec", spec_str))
+                    details.append(("roll", rolls_str))
+                    eval_parts.append(str(term_sum))
+                    continue
 
-            details.append(("label", tok))
+                details.append(("label", tok))
 
-        total = _safe_eval_arithmetic(" ".join(eval_parts))
-        full_details: list[tuple[str, str]] = [
-            ("result", str(total)),
-            ("separator", "="),
-            *details,
-        ]
-        if pipe_opts:
-            full_details.append(("moddelim", "|"))
-            full_details.append(("critspec", pipe_opts))
+            total = _safe_eval_arithmetic(" ".join(eval_parts))
+            full_details: list[tuple[str, str]] = [
+                ("result", str(total)),
+                ("separator", "="),
+                *details,
+            ]
+            if pipe_opts:
+                full_details.append(("moddelim", "|"))
+                full_details.append(("critspec", pipe_opts))
+            results.append((total, full_details))
 
-        return (label, [(total, full_details)])
+        return (label, results)
 
     def _eval_die_match(self, match: re.Match[str]) -> tuple[str, str, int]:
         count = int(match.group(1)) if match.group(1) else 1

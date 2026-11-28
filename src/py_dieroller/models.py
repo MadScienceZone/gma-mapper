@@ -9,6 +9,12 @@ from __future__ import annotations
 import re
 from typing import Any, Callable
 
+from gma_mapper.core.dice import (
+    add_to_die_roll_title,
+    encode_preset_details,
+    get_preset_details,
+)
+
 PRESET_TYPES: tuple[str, ...] = ("attack", "damage", "save", "skill", "other")
 MODIFIER_TYPES: tuple[str, ...] = (*PRESET_TYPES, "atk/dmg")
 
@@ -23,6 +29,10 @@ PRESET_TAB_BY_TYPE: dict[str, str] = {
 _VAR_RE = re.compile(r"\$\{([^{}]+)\}")
 _GMA_CRIT_RE = re.compile(r"\|\s*c([0-9]*)$", flags=re.IGNORECASE)
 _GMA_PTYPE_RE = re.compile(r"(attack|damage|save|skill)", flags=re.IGNORECASE)
+_TABLE_NAME_RE = re.compile(r"^[a-zA-Z_]\w*$")
+_TABLE_CALL_RE = re.compile(
+    r"^\s*(.*=)?\s*#(#?)\{?([a-zA-Z_]\w*)\}?((?:[^a-zA-Z0-9_].*)?)$"
+)
 
 COLOR_INVALID_REGEX = "#eba0b8"
 COLOR_HAS_MOD = "#fde5c1"
@@ -164,6 +174,91 @@ def parse_gma_preset(raw_preset: dict[str, Any]) -> dict[str, str]:
         "expr": expr,
         "crit": "",
     }
+
+
+def parse_table_invocation(expr: str) -> dict[str, Any] | None:
+    """Parse ``[Label =] #[#]tablename [extra modifiers] [| opts]`` or return ``None``."""
+    match = _TABLE_CALL_RE.match(str(expr or "").strip())
+    if not match:
+        return None
+    return {
+        "title": (match.group(1) or "").strip(),
+        "is_global": match.group(2) == "#",
+        "name": match.group(3),
+        "rest": (match.group(4) or "").strip(),
+    }
+
+
+def compose_table_roll_expression(title_part: str, dieroll: str, rest_part: str = "") -> str:
+    """Combine a table's ``dieroll`` with optional caller title prefix and trailing mods/options."""
+    spec = str(dieroll or "").strip()
+    clean_title = str(title_part or "").strip().rstrip("=").strip()
+    if clean_title:
+        spec = (
+            add_to_die_roll_title(clean_title, spec)
+            if "=" in spec
+            else f"{clean_title} = {spec}"
+        )
+
+    clean_rest = str(rest_part or "").strip()
+    if not clean_rest:
+        return spec
+
+    if "|" in spec and not clean_rest.startswith("|"):
+        if "|" in clean_rest:
+            rest_mods, rest_pipe = clean_rest.split("|", 1)
+            base_body, base_pipe = spec.split("|", 1)
+            combined_mods = f"{base_body.strip()} {rest_mods.strip()}".strip()
+            combined_pipe = f"{base_pipe.strip()} {rest_pipe.strip()}".strip()
+            return f"{combined_mods} | {combined_pipe}" if combined_pipe else combined_mods
+        base_body, base_pipe = spec.split("|", 1)
+        return f"{base_body.strip()} {clean_rest} | {base_pipe.strip()}"
+
+    return f"{spec} {clean_rest}".strip()
+
+
+def normalize_table_dict(raw: dict[str, Any]) -> dict[str, Any]:
+    """Normalize a serialized lookup table dict from ``presets.json`` or GMA ``.dice`` details."""
+    raw_pairs = raw.get("pairs")
+    pairs: list[tuple[str, str]] = []
+    if isinstance(raw_pairs, list):
+        for entry in raw_pairs:
+            if isinstance(entry, (tuple, list)) and len(entry) >= 2:
+                pairs.append((str(entry[0]).strip(), str(entry[1])))
+    if not pairs and isinstance(raw.get("table"), list):
+        flat = raw["table"]
+        for i in range(0, len(flat) - 1, 2):
+            pairs.append((str(flat[i]).strip(), str(flat[i + 1])))
+    if not pairs:
+        pairs = [("1", "Low"), ("*", "Default")]
+
+    return {
+        "name": str(raw.get("name") or "").strip(),
+        "description": str(raw.get("description", raw.get("Description", "")) or "").strip(),
+        "dieroll": str(raw.get("dieroll") or "1d20").strip() or "1d20",
+        "markup": bool(raw.get("markup", False)),
+        "pairs": pairs,
+    }
+
+
+def parse_gma_table_preset(raw_preset: dict[str, Any]) -> dict[str, Any] | None:
+    """Parse a raw GMA preset dict into a normalized lookup table dict if ``type == 'table'``."""
+    try:
+        details = get_preset_details(raw_preset)
+    except ValueError:
+        return None
+    if details.get("type") != "table":
+        return None
+    return normalize_table_dict(details)
+
+
+def format_table_pairs_summary(pairs: list[tuple[str, str]]) -> str:
+    """Return a concise one-line summary of table bounds for the Tables tab."""
+    if not pairs:
+        return "0 rows"
+    bounds = [f"<={b}" if b != "*" else "*" for b, _text in pairs[:4]]
+    suffix = ", ..." if len(pairs) > 4 else ""
+    return f"{len(pairs)} rows ({', '.join(bounds)}{suffix})"
 
 
 try:
@@ -428,3 +523,147 @@ if QT_AVAILABLE:
                 "expr": self.value("expr"),
                 "crit": self.crit_edit.text().strip() if self.crit_edit is not None else "",
             }
+
+    class TableRow:
+        """One editable lookup-table row in the Tables tab."""
+
+        def __init__(
+            self,
+            parent: QWidget,
+            on_changed: Callable[[], None],
+            name: str = "",
+            description: str = "",
+            dieroll: str = "1d20",
+            markup: bool = False,
+            pairs: list[tuple[str, str]] | None = None,
+        ) -> None:
+            self._on_changed = on_changed
+            self.pairs: list[tuple[str, str]] = [
+                (str(b).strip(), str(t)) for b, t in (pairs or [("1", "Low"), ("*", "Default")])
+            ]
+
+            self.name_edit = QLineEdit(str(name), parent)
+            self.name_edit.setPlaceholderText("table_name")
+            self.name_edit.textChanged.connect(self._on_name_changed)
+
+            self.desc_edit = QLineEdit(str(description), parent)
+            self.desc_edit.setPlaceholderText("Table description")
+            self.desc_edit.textChanged.connect(lambda _t: self._on_changed())
+
+            self.dieroll_edit = QLineEdit(str(dieroll or "1d20"), parent)
+            self.dieroll_edit.setPlaceholderText("1d20")
+            self.dieroll_edit.textChanged.connect(lambda _t: self._on_changed())
+
+            self.markup_chk = QCheckBox(parent)
+            self.markup_chk.setChecked(bool(markup))
+            self.markup_chk.setToolTip("Render matched outcome with GMA inline markup")
+            self.markup_chk.stateChanged.connect(lambda _s: self._on_changed())
+
+            self.summary_edit = QLineEdit("", parent)
+            self.summary_edit.setReadOnly(True)
+            self._refresh_summary()
+            self._validate_name()
+
+        def _on_name_changed(self, _text: str) -> None:
+            self._validate_name()
+            self._on_changed()
+
+        def _validate_name(self) -> None:
+            raw = self.name_edit.text().strip()
+            if raw and not _TABLE_NAME_RE.match(raw):
+                self.name_edit.setStyleSheet(f"background-color: {COLOR_INVALID_REGEX};")
+                self.name_edit.setToolTip("Table name must start with a letter/_ and use [A-Za-z0-9_]")
+            else:
+                self.name_edit.setStyleSheet("")
+                self.name_edit.setToolTip("")
+
+        def _refresh_summary(self) -> None:
+            self.summary_edit.setText(format_table_pairs_summary(self.pairs))
+            preview = "\n".join(
+                f"{'<=' + b if b != '*' else '*'}: {t}" for b, t in self.pairs[:12]
+            )
+            if len(self.pairs) > 12:
+                preview += f"\n... ({len(self.pairs) - 12} more)"
+            self.summary_edit.setToolTip(preview)
+
+        def value(self, which: str) -> str:
+            """Return trimmed field value for ``name``, ``description``, or ``dieroll``."""
+            if which == "name":
+                return self.name_edit.text().strip()
+            if which == "description":
+                return self.desc_edit.text().strip()
+            if which == "dieroll":
+                return self.dieroll_edit.text().strip()
+            raise ValueError(f"Unknown table field {which}")
+
+        def is_markup(self) -> bool:
+            """Return True when GMA inline markup rendering is enabled for this table."""
+            return self.markup_chk.isChecked()
+
+        def set_pairs(self, pairs: list[tuple[str, str]]) -> None:
+            """Replace this row's ``(bound, text)`` entries and refresh the summary box."""
+            self.pairs = [(str(b).strip(), str(t)) for b, t in pairs]
+            self._refresh_summary()
+            self._on_changed()
+
+        def set_dieroll(self, dieroll: str) -> None:
+            """Update the table's die-roll expression."""
+            self.dieroll_edit.setText(str(dieroll or "1d20").strip())
+
+        def flat_table(self) -> list[str]:
+            """Return alternating ``[bound1, text1, ...]`` strings for ``EditLookupTableDialog``."""
+            flat: list[str] = []
+            for bound, text in self.pairs:
+                flat.extend([str(bound), str(text)])
+            return flat
+
+        def roll_expression(self) -> str:
+            """Build a ``#tablename`` roll command string for this table."""
+            name = self.value("name")
+            if not name or not _TABLE_NAME_RE.match(name):
+                return ""
+            desc = self.value("description")
+            dieroll = self.value("dieroll")
+            if desc and "=" not in dieroll:
+                return f"{desc} = #{name}"
+            return f"#{name}"
+
+        def to_dict(self) -> dict[str, Any]:
+            """Serialize this row for ``presets.json``."""
+            return {
+                "name": self.value("name"),
+                "description": self.value("description"),
+                "dieroll": self.value("dieroll") or "1d20",
+                "markup": self.is_markup(),
+                "pairs": [[str(b), str(t)] for b, t in self.pairs],
+            }
+
+        def to_gma_preset(self, seq: int = 0) -> dict[str, Any] | None:
+            """Encode this row as a GMA protocol/# preset dict, or ``None`` if incomplete."""
+            name = self.value("name")
+            dieroll = self.value("dieroll")
+            if not name or not _TABLE_NAME_RE.match(name) or not dieroll or not self.pairs:
+                return None
+            if str(self.pairs[-1][0]).strip() != "*":
+                return None
+            return encode_preset_details(
+                {
+                    "type": "table",
+                    "name": name,
+                    "description": self.value("description") or name,
+                    "dieroll": dieroll,
+                    "markup": self.is_markup(),
+                    "seq": f"{seq:03d}" if seq > 0 else "",
+                    "table": self.pairs,
+                }
+            )
+
+        def widgets(self) -> tuple[QWidget, ...]:
+            """Return column widgets in left-to-right grid order."""
+            return (
+                self.name_edit,
+                self.desc_edit,
+                self.dieroll_edit,
+                self.markup_chk,
+                self.summary_edit,
+            )

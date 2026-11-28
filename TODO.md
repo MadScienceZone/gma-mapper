@@ -49,3 +49,9 @@
 - [x] **Distance from Icon**: Measure/display distance from a selected icon/creature matching legacy `bin/mapper.tcl` behavior.
 - [x] **Distance from Cell**: Measure/display distance from a chosen grid cell matching legacy `bin/mapper.tcl` behavior.
 
+## 10. Standalone Die Roller Enhancements (`src/py_dieroller`)
+- [x] **Pinned Chat Messages**: Port pinned chat message support from the legacy die roller / mapper into `src/py_dieroller`.
+
+## 11. Die Roller Tables
+- [x] **Port Legacy Die Roller Tables**: Port legacy die roller table support (`#table` / random lookup tables) to the Python port (`src/gma_mapper` and `src/py_dieroller`).
+

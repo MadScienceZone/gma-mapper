@@ -11,7 +11,9 @@ from pathlib import Path
 import tempfile
 from typing import Any
 
+from gma_mapper.core.dice import DicePresetBank, merge_preset_lists
 from gma_mapper.core.file_io import load_dice_presets_from_file
+from gma_mapper.ui.dialogs.dice_dialogs import EditLookupTableDialog
 from py_dieroller import APP_NAME, APP_VERSION
 from py_dieroller.chat import ChatPanel
 from py_dieroller.images import DICE_LARGE_PNG, DICE_LT_PNG, load_qicon, load_qpixmap
@@ -21,8 +23,11 @@ from py_dieroller.models import (
     PRESET_TAB_BY_TYPE,
     ModifierRow,
     PresetRow,
+    TableRow,
     VariableRow,
+    normalize_table_dict,
     parse_gma_preset,
+    parse_gma_table_preset,
 )
 from py_dieroller.settings import SettingsDialog, SettingsStore
 
@@ -74,8 +79,10 @@ if QT_AVAILABLE:
 
             self.presets_filename: Path | None = None
             self.modifiers: list[ModifierRow] = []
+            self.tables: list[TableRow] = []
             self.variables: list[VariableRow] = []
             self.variable_defs: dict[str, str] = {}
+            self.server_bank = DicePresetBank(tkey="local")
             self.presets: dict[str, list[PresetRow]] = {
                 "pnCombat": [],
                 "pnSave": [],
@@ -90,6 +97,7 @@ if QT_AVAILABLE:
                 "pnSkill": [],
                 "pnOther": [],
                 "pnModifiers": [],
+                "pnTables": [],
                 "pnConst": [],
                 "pnHistory": [],
             }
@@ -124,7 +132,12 @@ if QT_AVAILABLE:
             self.chatwindow.service = self.service
             self.service.connection_changed.connect(self._on_connect_state_changed)
             self.service.messages_received.connect(self.chatwindow.add_messages)
+            self.service.chat_received.connect(self.chatwindow.append_chat_payload)
+            self.service.chat_cleared.connect(self.chatwindow.handle_clear_chat_payload)
+            self.service.chat_pruned.connect(self.chatwindow.handle_prune_chat_payload)
             self.service.userlist_updated.connect(self.chatwindow.update_userlist)
+            self.service.presets_received.connect(self._on_server_presets_received)
+            self.service.roll_payload_received.connect(self.chatwindow.handle_roll_payload)
 
             self._rebuild_server_menu()
             self.load_presets()
@@ -170,6 +183,19 @@ if QT_AVAILABLE:
             self.act_preferences.triggered.connect(self.open_preferences)
             edit_menu.addAction(self.act_preferences)
 
+            edit_menu.addSeparator()
+            self.act_clear_chat = QAction("Clear &Chat Messages", self)
+            self.act_clear_chat.triggered.connect(
+                lambda _c=False: self.chatwindow.clear_chat_messages(include_pinned=False)
+            )
+            edit_menu.addAction(self.act_clear_chat)
+
+            self.act_clear_pinned = QAction("Clear &Pinned Chat Messages", self)
+            self.act_clear_pinned.triggered.connect(
+                lambda _c=False: self.chatwindow.clear_pinned_messages()
+            )
+            edit_menu.addAction(self.act_clear_pinned)
+
             # Server menu
             self.server_menu = menubar.addMenu("&Server")
             self.act_server_connect = QAction("&Connect", self)
@@ -189,6 +215,11 @@ if QT_AVAILABLE:
             self.act_view_chat.setChecked(True)
             self.act_view_chat.toggled.connect(self.on_menu_view_chat)
             view_menu.addAction(self.act_view_chat)
+
+            self.act_view_pinned = QAction("&Pinned messages", self)
+            self.act_view_pinned.setCheckable(True)
+            self.act_view_pinned.setChecked(True)
+            view_menu.addAction(self.act_view_pinned)
 
             layout_menu = view_menu.addMenu("&Layout")
             self.act_layout_h = QAction("&Horizontal", self)
@@ -215,7 +246,9 @@ if QT_AVAILABLE:
                 on_alert=self.alert,
                 get_variables=self._get_variable_defs,
                 on_history_add=self.history_add,
+                get_table_bank=self.get_table_bank,
             )
+            self.act_view_pinned.toggled.connect(self.chatwindow.set_pinned_panel_enabled)
 
             self.tab_panel = QWidget(self.split_win)
             tab_vbox = QVBoxLayout(self.tab_panel)
@@ -230,12 +263,14 @@ if QT_AVAILABLE:
             self.preset_tabs["pnSave"] = self._create_scrollable_tab("Save", "pnSave")
             self.preset_tabs["pnSkill"] = self._create_scrollable_tab("Skill", "pnSkill")
             self.preset_tabs["pnOther"] = self._create_scrollable_tab("Other", "pnOther")
+            self.table_host = self._create_scrollable_tab("Tables", "pnTables")
             self.variable_host = self._create_scrollable_tab("Variables", "pnConst")
             self.history_host = self._create_scrollable_tab("History", "pnHistory")
 
             self._relayout_modifier_tab()
             for tname in ("pnCombat", "pnSave", "pnSkill", "pnOther"):
                 self._relayout_preset_tab(tname)
+            self._relayout_table_tab()
             self._relayout_variable_tab()
             self._relayout_history_tab()
 
@@ -483,6 +518,92 @@ if QT_AVAILABLE:
             )
             grid.addWidget(add_btn, len(rows) + 1, roll_col + 2)
 
+        def _relayout_table_tab(self) -> None:
+            tab_name = "pnTables"
+            host = self.table_host
+            grid = self.preset_grids[tab_name]
+            self._clear_grid_buttons(tab_name, grid)
+            self._clear_grid_layout(grid)
+
+            headers = (
+                (1, "Name"),
+                (2, "Description"),
+                (3, "Die Roll"),
+                (4, "Mk"),
+                (5, "Entries"),
+                (6, "Actions"),
+            )
+            for col, text in headers:
+                lbl = QLabel(text, host)
+                self._tab_row_buttons[tab_name].append(lbl)
+                if text == "Actions":
+                    grid.addWidget(lbl, 0, 6, 1, 3)
+                else:
+                    grid.addWidget(lbl, 0, col)
+            grid.setColumnStretch(1, 2)
+            grid.setColumnStretch(2, 3)
+            grid.setColumnStretch(3, 2)
+            grid.setColumnStretch(5, 3)
+
+            for idx, trow in enumerate(self.tables):
+                row_num = idx + 1
+                del_btn = self._make_icon_btn(
+                    host,
+                    tab_name,
+                    "-",
+                    "Delete table",
+                    lambda _c=False, i=idx: self.table_delete(i),
+                )
+                edit_btn = self._make_icon_btn(
+                    host,
+                    tab_name,
+                    "...",
+                    "Edit lookup table rows",
+                    lambda _c=False, i=idx: self.edit_table_entries(i),
+                )
+                roll_btn = self._make_icon_btn(
+                    host,
+                    tab_name,
+                    "R",
+                    "Roll lookup table",
+                    lambda _c=False, i=idx: self._on_table_roll(i),
+                    b64_icon=DICE_LT_PNG,
+                )
+                stage_btn = self._make_icon_btn(
+                    host,
+                    tab_name,
+                    ">",
+                    "Stage #table expression in message entry",
+                    lambda _c=False, i=idx: self._on_table_stage(i),
+                    std_icon=QStyle.StandardPixmap.SP_ArrowForward,
+                )
+                ins_btn = self._make_icon_btn(
+                    host,
+                    tab_name,
+                    "+",
+                    "Insert table before this row",
+                    lambda _c=False, i=idx: self.table_insert(i),
+                )
+                grid.addWidget(del_btn, row_num, 0)
+                grid.addWidget(trow.name_edit, row_num, 1)
+                grid.addWidget(trow.desc_edit, row_num, 2)
+                grid.addWidget(trow.dieroll_edit, row_num, 3)
+                grid.addWidget(trow.markup_chk, row_num, 4, Qt.AlignmentFlag.AlignCenter)
+                grid.addWidget(trow.summary_edit, row_num, 5)
+                grid.addWidget(edit_btn, row_num, 6)
+                grid.addWidget(roll_btn, row_num, 7)
+                grid.addWidget(stage_btn, row_num, 8)
+                grid.addWidget(ins_btn, row_num, 9)
+
+            add_btn = self._make_icon_btn(
+                host,
+                tab_name,
+                "+",
+                "Append lookup table",
+                lambda _c=False: self.table_append(),
+            )
+            grid.addWidget(add_btn, len(self.tables) + 1, 9)
+
         def _relayout_history_tab(self) -> None:
             tab_name = "pnHistory"
             host = self.history_host
@@ -674,6 +795,103 @@ if QT_AVAILABLE:
             if expr:
                 self.chatwindow.stage_dice(expr)
 
+        def table_append(self, **data: Any) -> TableRow:
+            """Append a lookup table row to the Tables tab."""
+            return self.table_insert(len(self.tables), **data)
+
+        def table_insert(self, idx: int, **data: Any) -> TableRow:
+            """Insert a lookup table row into the Tables tab at ``idx``."""
+            row = TableRow(self.table_host, self.set_user_content_changed, **data)
+            self.tables.insert(idx, row)
+            self._relayout_table_tab()
+            self.set_user_content_changed()
+            return row
+
+        def table_delete(self, idx: int) -> None:
+            """Delete lookup table row at ``idx``."""
+            if 0 <= idx < len(self.tables):
+                row = self.tables.pop(idx)
+                for w in row.widgets():
+                    w.deleteLater()
+                self._relayout_table_tab()
+                self.set_user_content_changed()
+
+        def table_delete_all(self) -> None:
+            """Remove all lookup table rows."""
+            for row in self.tables:
+                for w in row.widgets():
+                    w.deleteLater()
+            self.tables = []
+            self._relayout_table_tab()
+
+        def edit_table_entries(self, idx: int) -> EditLookupTableDialog | None:
+            """Open the shared ``EditLookupTableDialog`` for table row ``idx``."""
+            if not (0 <= idx < len(self.tables)):
+                return None
+            row = self.tables[idx]
+            dlg = EditLookupTableDialog(
+                dieroll=row.value("dieroll") or "1d20",
+                flat_table=row.flat_table(),
+                parent=self,
+            )
+            if dlg.exec() == QDialog.DialogCode.Accepted:
+                flat = dlg.flat_table()
+                pairs = [(flat[i], flat[i + 1]) for i in range(0, len(flat) - 1, 2)]
+                row.set_dieroll(dlg.dieroll())
+                row.set_pairs(pairs)
+            return dlg
+
+        def _on_table_roll(self, idx: int) -> None:
+            if 0 <= idx < len(self.tables):
+                expr = self.tables[idx].roll_expression()
+                if expr:
+                    self.chatwindow.roll_dice(expr=expr)
+
+        def _on_table_stage(self, idx: int) -> None:
+            if 0 <= idx < len(self.tables):
+                expr = self.tables[idx].roll_expression()
+                if expr:
+                    self.chatwindow.stage_dice(expr)
+
+        def get_table_bank(self) -> DicePresetBank:
+            """Build a merged ``DicePresetBank`` combining server presets and local Tables rows."""
+            tkey = str(getattr(self.service, "username", "") or "local")
+            bank = DicePresetBank(tkey=tkey)
+            if self.server_bank.system_presets:
+                bank.set_system_presets(self.server_bank.system_presets)
+
+            local_user_tables: list[dict[str, Any]] = []
+            for idx, trow in enumerate(self.tables, start=1):
+                encoded = trow.to_gma_preset(seq=idx)
+                if encoded is not None:
+                    local_user_tables.append(encoded)
+            merged_user = merge_preset_lists(self.server_bank.user_presets, local_user_tables)
+            if merged_user:
+                bank.set_user_presets(merged_user)
+            return bank
+
+        def _on_server_presets_received(self, cmd: str, payload: dict[str, Any]) -> None:
+            presets = payload.get("Presets", payload.get("List", []))
+            if not isinstance(presets, list):
+                return
+            is_global = bool(payload.get("Global", False))
+            for_user = str(payload.get("For", "") or "")
+            append_mode = cmd == "DD+"
+            if is_global:
+                sys_list = (
+                    merge_preset_lists(self.server_bank.system_presets, presets)
+                    if append_mode
+                    else presets
+                )
+                self.server_bank.set_system_presets(sys_list)
+            elif not for_user or for_user == self.service.username:
+                user_list = (
+                    merge_preset_lists(self.server_bank.user_presets, presets)
+                    if append_mode
+                    else presets
+                )
+                self.server_bank.set_user_presets(user_list)
+
         def history_add(self, expr: str) -> None:
             """Record ``expr`` at the top of History tab (max 20 unique most recent)."""
             if not expr or (self.history and self.history[0] == expr):
@@ -852,7 +1070,7 @@ if QT_AVAILABLE:
             else:
                 target = self.presets_filename
 
-            data: dict[str, Any] = {"presets": [], "mods": [], "variables": []}
+            data: dict[str, Any] = {"presets": [], "mods": [], "variables": [], "tables": []}
             for tab_rows in self.presets.values():
                 for prow in tab_rows:
                     data["presets"].append(prow.to_dict())
@@ -860,6 +1078,8 @@ if QT_AVAILABLE:
                 data["mods"].append(mrow.to_dict())
             for vrow in self.variables:
                 data["variables"].append(vrow.to_dict())
+            for trow in self.tables:
+                data["tables"].append(trow.to_dict())
 
             try:
                 target.parent.mkdir(parents=True, exist_ok=True)
@@ -919,6 +1139,7 @@ if QT_AVAILABLE:
                 self.preset_delete_all()
                 self.modifier_delete_all()
                 self.variable_delete_all()
+                self.table_delete_all()
 
             self.loading_presets = True
             try:
@@ -935,6 +1156,9 @@ if QT_AVAILABLE:
                     self.modifier_append(**mod)
                 for var in data.get("variables", []):
                     self.variable_append(**var)
+                for tbl in data.get("tables", []):
+                    if isinstance(tbl, dict):
+                        self.table_append(**normalize_table_dict(tbl))
             finally:
                 self.loading_presets = False
 
@@ -963,6 +1187,11 @@ if QT_AVAILABLE:
 
             imported = 0
             for raw in raw_presets:
+                parsed_tbl = parse_gma_table_preset(raw)
+                if parsed_tbl is not None:
+                    self.table_append(**parsed_tbl)
+                    imported += 1
+                    continue
                 parsed = parse_gma_preset(raw)
                 tab = PRESET_TAB_BY_TYPE.get(parsed["ptype"], "pnOther")
                 self.preset_append(tab, **parsed)

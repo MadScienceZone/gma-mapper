@@ -128,6 +128,11 @@ if QT_AVAILABLE:
         connection_changed = Signal(bool, dict)
         messages_received = Signal(list)
         userlist_updated = Signal(list)
+        chat_received = Signal(dict)
+        chat_cleared = Signal(dict)
+        chat_pruned = Signal(dict)
+        presets_received = Signal(str, dict)
+        roll_payload_received = Signal(dict)
 
         def __init__(
             self,
@@ -216,15 +221,17 @@ if QT_AVAILABLE:
             session_user = str(getattr(self.client.session, "username", "") or "")
             if session_user:
                 self.username = session_user
-            self.client.session.subscribe(["TO", "MARCO", "ROLL", "CONN", "OA", "PS"])
+            self.client.session.subscribe(
+                ["TO", "MARCO", "ROLL", "CONN", "OA", "PS", "CC", "Y2", "DD", "DD=", "DD+"]
+            )
 
-            features: list[str] = []
+            features: list[str] = ["GMA-MARKUP"]
             if self.settings.allow_colorized_titles():
                 features.append("DICE-COLOR-BOXES")
             if self.settings.allow_colorized_labels():
                 features.append("DICE-COLOR-LABELS")
-            if features:
-                self.client.session.allow(features)
+            self.client.session.allow(features)
+            self.client.session.query_dice_presets(for_user=self.username)
 
             self.connection_changed.emit(True, self.server or {})
             self.messages_received.emit(
@@ -259,6 +266,7 @@ if QT_AVAILABLE:
             blind: bool = False,
             recipients: list[str] | None = None,
             roll_for: str = "",
+            request_id: str = "",
         ) -> None:
             """Send a die-roll command ``D`` when connected."""
             if not self.connected() or not expr:
@@ -269,6 +277,7 @@ if QT_AVAILABLE:
                     to_all=False,
                     blind_to_gm=True,
                     targets=self.targetlist or [],
+                    rid=request_id,
                     for_user=roll_for,
                 )
             elif recipients is not None:
@@ -277,6 +286,7 @@ if QT_AVAILABLE:
                     recipients=recipients,
                     to_all=False,
                     targets=self.targetlist or [],
+                    rid=request_id,
                     for_user=roll_for,
                 )
             else:
@@ -284,19 +294,48 @@ if QT_AVAILABLE:
                     expr,
                     to_all=True,
                     targets=self.targetlist or [],
+                    rid=request_id,
                     for_user=roll_for,
                 )
 
-        def send_chat(self, message: str, recipients: list[str] | None = None) -> None:
+        def send_chat(
+            self,
+            message: str,
+            recipients: list[str] | None = None,
+            pinned: bool = False,
+            markup: bool = False,
+            to_gm: bool = False,
+        ) -> None:
             """Send a chat message ``TO`` when connected."""
             if not self.connected() or not message:
                 return
-            if recipients is None:
-                self.client.session.chat_message(message, to_all=True)
+            if to_gm:
+                self.client.session.chat_message(
+                    message,
+                    recipients=recipients or [],
+                    to_all=False,
+                    to_gm=True,
+                    markup=markup,
+                    pinned=pinned,
+                )
+            elif recipients is None:
+                self.client.session.chat_message(
+                    message, to_all=True, markup=markup, pinned=pinned
+                )
             else:
                 self.client.session.chat_message(
-                    message, recipients=recipients, to_all=False
+                    message,
+                    recipients=recipients,
+                    to_all=False,
+                    markup=markup,
+                    pinned=pinned,
                 )
+
+        def delete_chat_message(self, msg_id: int) -> None:
+            """Request server-wide deletion of chat message ``msg_id`` via ``CC`` (GM only)."""
+            if not self.connected():
+                return
+            self.client.session.clear_chat_list(silent=True, targets=[int(msg_id)])
 
         def _update_last_msgid(self, msgid: Any) -> None:
             if msgid is None:
@@ -331,11 +370,18 @@ if QT_AVAILABLE:
                         self.targeted_mod_list = attrs["TargetedModifiers"]
             elif cmd == "TO":
                 self._update_last_msgid(payload.get("MessageID"))
-                self.messages_received.emit(format_chat_event_messages(payload))
+                self.chat_received.emit(payload)
+            elif cmd == "CC":
+                self.chat_cleared.emit(payload)
+            elif cmd == "Y2":
+                self.chat_pruned.emit(payload)
+            elif cmd in ("DD", "DD=", "DD+"):
+                self.presets_received.emit(cmd, payload)
             elif cmd == "ROLL":
                 self._update_last_msgid(payload.get("MessageID"))
                 dprint(f"ROLL received: {payload}")
                 self.messages_received.emit(format_roll_event_messages(payload))
+                self.roll_payload_received.emit(payload)
 
         def _handle_conn(self, payload: dict[str, Any]) -> None:
             peers = payload.get("PeerList") or []

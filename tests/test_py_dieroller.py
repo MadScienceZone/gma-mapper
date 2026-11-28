@@ -13,14 +13,20 @@ import tempfile
 import unittest
 from unittest import mock
 
+from gma_mapper.core.dice import lookup_table_outcome
+from py_dieroller.chat import render_chat_entry_html
 from py_dieroller.local_roller import LocalDieRoller
 from py_dieroller.map_service import format_chat_event_messages, format_roll_event_messages
 from py_dieroller.models import (
     build_preset_roll_expression,
+    compose_table_roll_expression,
     expand_variables,
     format_applied_modifiers,
     match_modifier_to_preset,
+    normalize_table_dict,
     parse_gma_preset,
+    parse_gma_table_preset,
+    parse_table_invocation,
 )
 from py_dieroller.roll import format_cli_roll_output, load_dieroller_settings, parse_roll_args
 from py_dieroller.settings import SettingsStore, render_messages_html, render_sample_preview_html
@@ -98,6 +104,41 @@ class TestPyDieRollerCore(unittest.TestCase):
         )
         self.assertEqual(gma_save["ptype"], "save")
 
+        tbl_parsed = parse_gma_table_preset(
+            {
+                "Name": "#001;m|weather",
+                "Description": "Weather Table",
+                "DieRollSpec": ";1d6;3;Clear;*;**Storm**;",
+            }
+        )
+        self.assertIsNotNone(tbl_parsed)
+        assert tbl_parsed is not None
+        self.assertEqual(tbl_parsed["name"], "weather")
+        self.assertEqual(tbl_parsed["description"], "Weather Table")
+        self.assertEqual(tbl_parsed["dieroll"], "1d6")
+        self.assertTrue(tbl_parsed["markup"])
+        self.assertEqual(tbl_parsed["pairs"], [("3", "Clear"), ("*", "**Storm**")])
+        self.assertIsNone(parse_gma_table_preset(gma_save))
+
+        inv = parse_table_invocation("Random Weather = ##weather +1 | repeat 2")
+        self.assertEqual(
+            inv,
+            {
+                "title": "Random Weather =",
+                "is_global": True,
+                "name": "weather",
+                "rest": "+1 | repeat 2",
+            },
+        )
+        self.assertEqual(
+            compose_table_roll_expression("Loot =", "1d20 | c20", "+2"),
+            "Loot = 1d20 +2 | c20",
+        )
+        self.assertEqual(lookup_table_outcome(2, tbl_parsed["pairs"]), "Clear")
+        self.assertEqual(lookup_table_outcome(6, tbl_parsed["pairs"]), "**Storm**")
+        norm = normalize_table_dict({"name": "crit", "table": ["1", "Slip", "*", "Hit"]})
+        self.assertEqual(norm["pairs"], [("1", "Slip"), ("*", "Hit")])
+
     def test_settings_store_roundtrip_and_chat_formatting(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             cfg = Path(tmpdir) / "settings.json"
@@ -149,6 +190,24 @@ class TestPyDieRollerCore(unittest.TestCase):
                 }
             )
             self.assertTrue(any("\u231b" in s["text"] for s in roll_segs))
+
+            pinned_html = render_chat_entry_html(
+                {
+                    "MessageID": 77,
+                    "Sender": "GM",
+                    "ToAll": True,
+                    "Text": "**Important** rule",
+                    "Pin": True,
+                    "Markup": True,
+                },
+                reloaded,
+                is_pinned_view=True,
+                is_locally_pinned=False,
+                is_gm=True,
+            )
+            self.assertIn("<b>Important</b>", pinned_html)
+            self.assertIn('href="hide:77"', pinned_html)
+            self.assertIn('href="del:77"', pinned_html)
 
     def test_roll_cli_parsing_and_settings_loading(self) -> None:
         args = parse_roll_args(["-b", "-H", "host.example", "-p", "2325", "-u", "Valeros", "1d20+5"])
@@ -231,10 +290,19 @@ class TestPyDieRollerUI(unittest.TestCase):
             win = DieRollerWindow(config_file=cfg)
             win2 = None
             try:
-                self.assertEqual(win.notebook.count(), 7)
+                self.assertEqual(win.notebook.count(), 8)
                 self.assertEqual(
                     [win.notebook.tabText(i) for i in range(win.notebook.count())],
-                    ["Modifiers", "Atk/Dmg", "Save", "Skill", "Other", "Variables", "History"],
+                    [
+                        "Modifiers",
+                        "Atk/Dmg",
+                        "Save",
+                        "Skill",
+                        "Other",
+                        "Tables",
+                        "Variables",
+                        "History",
+                    ],
                 )
 
                 # Add variable, active atk/dmg modifier, and combat preset
@@ -365,6 +433,232 @@ class TestPyDieRollerUI(unittest.TestCase):
                 self.assertEqual(win.settings.last_msgid(servername="Local"), 55)
                 self.assertIn("Welcome!", win.chatwindow.messages.toPlainText())
             finally:
+                win.clear_user_content_changed()
+                win.close()
+
+    def test_pinned_chat_messages_pin_unpin_hide_clear_send_and_cc(self) -> None:
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        _app = QApplication.instance() or QApplication([])
+
+        from PySide6.QtCore import QUrl
+        from py_dieroller.app import DieRollerWindow
+
+        with tempfile.TemporaryDirectory() as tmpdir, mock.patch.object(
+            Path, "home", return_value=Path(tmpdir)
+        ):
+            cfg = Path(tmpdir) / "settings.json"
+            win = DieRollerWindow(config_file=cfg)
+            try:
+                chat = win.chatwindow
+                self.assertTrue(chat.pinned_group.isHidden())
+
+                sent_cmds: list[tuple[str, dict]] = []
+                win.service.username = "Ezren"
+                win.service.server = {"name": "Local"}
+                win.service.client.session.is_connected = True
+                win.service.client.session.pending_login = False
+                win.service.client.session.send_command = (  # type: ignore[method-assign]
+                    lambda cmd, payload=None: sent_cmds.append((cmd, payload or {}))
+                )
+
+                # 1. Server-pinned chat auto-shows Pinned Messages and deduplicates on replay
+                win.service.dispatch_command(
+                    "TO",
+                    {
+                        "MessageID": 10,
+                        "Sender": "GM",
+                        "ToAll": True,
+                        "Text": "Stay on the bridge",
+                        "Pin": True,
+                    },
+                )
+                self.assertFalse(chat.pinned_group.isHidden())
+                self.assertIn("Stay on the bridge", chat.pinned_messages.toPlainText())
+                win.service.dispatch_command(
+                    "TO",
+                    {
+                        "MessageID": 10,
+                        "Sender": "GM",
+                        "ToAll": True,
+                        "Text": "Stay on the bridge",
+                        "Pin": True,
+                    },
+                )
+                self.assertEqual(chat.pinned_messages.toPlainText().count("Stay on the bridge"), 1)
+
+                # 2. Local pin/unpin & View menu toggle
+                win.service.dispatch_command(
+                    "TO",
+                    {"MessageID": 11, "Sender": "Ezren", "ToAll": True, "Text": "Torch active"},
+                )
+                chat._on_anchor_clicked(QUrl("pin:11"))
+                self.assertIn("Torch active", chat.pinned_messages.toPlainText())
+                self.assertIn("Stay on the bridge", chat.messages.toPlainText())
+
+                win.act_view_pinned.setChecked(False)
+                self.assertTrue(chat.pinned_group.isHidden())
+                win.act_view_pinned.setChecked(True)
+                self.assertFalse(chat.pinned_group.isHidden())
+
+                # 3. Sending pinned + markup chat resets Pin toggle and transmits Pin=True, Markup=True
+                chat.chattext.setPlainText("**Watch** out")
+                chat.markup_btn.setChecked(True)
+                chat.pin_btn.setChecked(True)
+                chat.do_chat(pm=False)
+                self.assertFalse(chat.pin_btn.isChecked())
+                self.assertEqual(sent_cmds[-1][0], "TO")
+                self.assertTrue(sent_cmds[-1][1]["Pin"])
+                self.assertTrue(sent_cmds[-1][1]["Markup"])
+
+                # 4. Clear Chat preserves pinned messages; Clear Pinned removes them
+                win.act_clear_chat.trigger()
+                self.assertIn("Stay on the bridge", chat.pinned_messages.toPlainText())
+                self.assertIn("Torch active", chat.pinned_messages.toPlainText())
+
+                # Unpin local 11, then test CC TargetMessages removal and Clear Pinned
+                chat._on_anchor_clicked(QUrl("unpin:11"))
+                self.assertNotIn("Torch active", chat.pinned_messages.toPlainText())
+
+                win.service.dispatch_command("CC", {"DoSilently": True, "TargetMessages": [10]})
+                self.assertTrue(chat.pinned_group.isHidden())
+
+                # 5. GM delete anchor sends CC TargetMessages for that message ID
+                win.service.username = "GM"
+                win.service.dispatch_command(
+                    "TO",
+                    {"MessageID": 12, "Sender": "GM", "ToAll": True, "Text": "Temp pin", "Pin": True},
+                )
+                sent_cmds.clear()
+                chat._on_anchor_clicked(QUrl("del:12"))
+                self.assertEqual(sent_cmds, [("CC", {"DoSilently": True, "TargetMessages": [12]})])
+
+                win.act_clear_pinned.trigger()
+                self.assertTrue(chat.pinned_group.isHidden())
+            finally:
+                win.clear_user_content_changed()
+                win.close()
+
+    def test_lookup_tables_crud_import_persistence_offline_and_online(self) -> None:
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        _app = QApplication.instance() or QApplication([])
+
+        from py_dieroller.app import DieRollerWindow
+
+        with tempfile.TemporaryDirectory() as tmpdir, mock.patch.object(
+            Path, "home", return_value=Path(tmpdir)
+        ):
+            cfg = Path(tmpdir) / "settings.json"
+            presets_path = Path(tmpdir) / "presets.json"
+            win = DieRollerWindow(config_file=cfg)
+            win2 = None
+            try:
+                # 1. Local table CRUD + deterministic offline lookup roll with inline markup
+                trow = win.table_append(
+                    name="loot",
+                    description="Pocket Loot",
+                    dieroll="1d1+4",
+                    markup=True,
+                    pairs=[("3", "Copper"), ("6", "**Silver**"), ("*", "Gold")],
+                )
+                self.assertEqual(trow.roll_expression(), "Pocket Loot = #loot")
+                win._on_table_roll(0)
+                log_html = win.chatwindow.messages.toHtml()
+                log_text = win.chatwindow.messages.toPlainText()
+                self.assertIn("Offline table lookup:", log_text)
+                self.assertIn("rolled 5 on Pocket Loot: Silver", log_text)
+                self.assertIn("font-weight:700", log_html)
+                self.assertNotIn("**Silver**", log_text)
+
+                # Insert & delete table rows
+                extra_row = win.table_insert(0, name="tmp", dieroll="1d4")
+                self.assertEqual(win.tables[0], extra_row)
+                win.table_delete(0)
+                self.assertEqual(len(win.tables), 1)
+
+                # 2. Persist tables in presets.json and reload in a fresh window
+                self.assertTrue(win.save_presets(filepath=presets_path))
+                win2 = DieRollerWindow(config_file=cfg)
+                self.assertTrue(win2.load_presets(filepath=presets_path))
+                self.assertEqual(len(win2.tables), 1)
+                self.assertEqual(win2.tables[0].value("name"), "loot")
+                self.assertEqual(win2.tables[0].pairs, [("3", "Copper"), ("6", "**Silver**"), ("*", "Gold")])
+
+                # 3. Import .dice (v2) file containing a #table preset
+                dice_file = Path(tmpdir) / "tables.dice"
+                dice_file.write_text(
+                    "\n".join(
+                        [
+                            "__DICE__:2",
+                            '\u00ab__META__\u00bb {"Comment": "tables", "Timestamp": 0}',
+                            (
+                                '\u00abPRESET\u00bb {"Name": "#002;m|crit", '
+                                '"Description": "Crit Effects", '
+                                '"DieRollSpec": ";1d20;10;Staggered;*;**Stunned**;"}'
+                            ),
+                            "\u00ab__EOF__\u00bb",
+                            "",
+                        ]
+                    ),
+                    encoding="utf-8",
+                )
+                imported = win2.import_gma(filepath=dice_file)
+                self.assertEqual(imported, 1)
+                self.assertEqual(len(win2.tables), 2)
+                self.assertEqual(win2.tables[1].value("name"), "crit")
+                self.assertTrue(win2.tables[1].is_markup())
+
+                # 4. Online server ##global table sync (DD=), D request with RequestID, and ROLL->TO
+                sent_cmds: list[tuple[str, dict]] = []
+                win2.service.username = "Ezren"
+                win2.service.server = {"name": "Local"}
+                win2.service.client.session.is_connected = True
+                win2.service.client.session.pending_login = False
+                win2.service.client.session.send_command = (  # type: ignore[method-assign]
+                    lambda cmd, payload=None: sent_cmds.append((cmd, payload or {}))
+                )
+                win2.service.dispatch_command(
+                    "DD=",
+                    {
+                        "Global": True,
+                        "Presets": [
+                            {
+                                "Name": "#001;m|weather",
+                                "Description": "Weather Table",
+                                "DieRollSpec": ";1d6;3;Clear skies;*;**Thunderstorm**;",
+                                "Global": True,
+                            }
+                        ],
+                    },
+                )
+                win2.chatwindow.roll_dice("##weather +1")
+                self.assertEqual(sent_cmds[-1][0], "D")
+                d_payload = sent_cmds[-1][1]
+                self.assertEqual(d_payload["RollSpec"], "1d6 +1")
+                self.assertEqual(d_payload["RequestID"], "##weather;Ezren;m;r1")
+
+                sent_cmds.clear()
+                win2.service.dispatch_command(
+                    "ROLL",
+                    {
+                        "RequestID": "##weather;Ezren;m;r1",
+                        "Sender": "Ezren",
+                        "Origin": True,
+                        "ToAll": True,
+                        "Result": {"Result": 5, "Details": [{"Type": "result", "Value": "5"}]},
+                    },
+                )
+                self.assertEqual(len(sent_cmds), 1)
+                self.assertEqual(sent_cmds[0][0], "TO")
+                self.assertEqual(
+                    sent_cmds[0][1]["Text"],
+                    "rolled 5 on Weather Table: **Thunderstorm**",
+                )
+                self.assertTrue(sent_cmds[0][1]["Markup"])
+                self.assertTrue(sent_cmds[0][1]["ToAll"])
+            finally:
+                if win2 is not None:
+                    win2.clear_user_content_changed()
+                    win2.close()
                 win.clear_user_content_changed()
                 win.close()
 
